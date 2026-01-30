@@ -1,0 +1,486 @@
+import { useEffect, useState } from "react";
+import { MainLayout } from "@/components/layout/MainLayout";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
+import { calculateBoxes } from "@/lib/xml-parser";
+import { Plus, Truck, Loader2, FileText, Eye } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Link } from "react-router-dom";
+
+interface Carga {
+  id: string;
+  data: string;
+  placa: string;
+  motorista: string;
+  observacao: string | null;
+  status: "aberta" | "fechada";
+  created_at: string;
+  _count?: {
+    nfs: number;
+    itens: number;
+  };
+}
+
+export default function Cargas() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [cargas, setCargas] = useState<Carga[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    data: format(new Date(), "yyyy-MM-dd"),
+    placa: "",
+    motorista: "",
+    observacao: "",
+  });
+  const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
+
+  useEffect(() => {
+    loadCargas();
+  }, []);
+
+  async function loadCargas() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("cargas")
+        .select(`
+          *,
+          notas_fiscais(
+            id,
+            itens_nf(id)
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const cargasWithCounts = (data || []).map((carga) => ({
+        ...carga,
+        _count: {
+          nfs: carga.notas_fiscais?.length || 0,
+          itens: carga.notas_fiscais?.reduce(
+            (acc: number, nf: any) => acc + (nf.itens_nf?.length || 0),
+            0
+          ) || 0,
+        },
+      }));
+
+      setCargas(cargasWithCounts);
+    } catch (error) {
+      console.error("Error loading cargas:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar cargas",
+        description: "Tente novamente mais tarde.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleFilesProcessed(newFiles: ParsedFile[]) {
+    setParsedFiles((prev) => [...prev, ...newFiles]);
+  }
+
+  function handleRemoveFile(index: number) {
+    setParsedFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    const successFiles = parsedFiles.filter((f) => f.status === "success");
+    if (successFiles.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Nenhum XML válido",
+        description: "Adicione pelo menos um arquivo XML válido.",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. Create carga
+      const { data: cargaData, error: cargaError } = await supabase
+        .from("cargas")
+        .insert({
+          data: formData.data,
+          placa: formData.placa.toUpperCase(),
+          motorista: formData.motorista,
+          observacao: formData.observacao || null,
+          created_by: user?.id,
+        })
+        .select()
+        .single();
+
+      if (cargaError) throw cargaError;
+
+      const cargaId = cargaData.id;
+
+      // 2. Insert NFs and Items
+      for (const file of successFiles) {
+        const nf = file.data;
+
+        const { data: nfData, error: nfError } = await supabase
+          .from("notas_fiscais")
+          .insert({
+            carga_id: cargaId,
+            numero_nf: nf.numeroNf,
+            chave_acesso: nf.chaveAcesso,
+            razao_social_emitente: nf.razaoSocialEmitente,
+            cnpj_emitente: nf.cnpjEmitente,
+            data_emissao: nf.dataEmissao,
+          })
+          .select()
+          .single();
+
+        if (nfError) throw nfError;
+
+        const nfId = nfData.id;
+
+        // Insert items
+        const itensToInsert = nf.itens.map((item) => ({
+          nf_id: nfId,
+          c_prod: item.cProd,
+          x_prod: item.xProd,
+          q_com: item.qCom,
+          u_com: item.uCom,
+        }));
+
+        const { error: itensError } = await supabase
+          .from("itens_nf")
+          .insert(itensToInsert);
+
+        if (itensError) throw itensError;
+
+        // 3. Generate etiquetas
+        const etiquetasToInsert: any[] = [];
+
+        for (const item of nf.itens) {
+          const totalCaixas = calculateBoxes(item.qCom);
+
+          for (let seq = 1; seq <= totalCaixas; seq++) {
+            const qrPayload = `${cargaId};${nf.numeroNf};${item.cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
+
+            etiquetasToInsert.push({
+              carga_id: cargaId,
+              nf_id: nfId,
+              c_prod: item.cProd,
+              x_prod: item.xProd,
+              numero_nf: nf.numeroNf,
+              chave_acesso: nf.chaveAcesso,
+              seq,
+              total: totalCaixas,
+              qr_payload: qrPayload,
+            });
+          }
+        }
+
+        if (etiquetasToInsert.length > 0) {
+          const { error: etiquetasError } = await supabase
+            .from("etiquetas")
+            .insert(etiquetasToInsert);
+
+          if (etiquetasError) throw etiquetasError;
+        }
+      }
+
+      toast({
+        title: "Carga criada com sucesso!",
+        description: `${successFiles.length} NF(s) importada(s).`,
+      });
+
+      // Reset form
+      setFormData({
+        data: format(new Date(), "yyyy-MM-dd"),
+        placa: "",
+        motorista: "",
+        observacao: "",
+      });
+      setParsedFiles([]);
+      setDialogOpen(false);
+      loadCargas();
+    } catch (error: any) {
+      console.error("Error creating carga:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao criar carga",
+        description: error.message || "Tente novamente.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada") {
+    try {
+      const { error } = await supabase
+        .from("cargas")
+        .update({ status: newStatus })
+        .eq("id", cargaId);
+
+      if (error) throw error;
+
+      setCargas((prev) =>
+        prev.map((c) => (c.id === cargaId ? { ...c, status: newStatus } : c))
+      );
+
+      toast({
+        title: "Status atualizado",
+        description: `Carga ${newStatus === "fechada" ? "fechada" : "reaberta"} com sucesso.`,
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao atualizar status",
+      });
+    }
+  }
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Cargas</h1>
+            <p className="text-muted-foreground">
+              Gerencie as cargas e importe XMLs de NF-e
+            </p>
+          </div>
+
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Carga
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Nova Carga</DialogTitle>
+              </DialogHeader>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Carga info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="data">Data</Label>
+                    <Input
+                      id="data"
+                      type="date"
+                      value={formData.data}
+                      onChange={(e) =>
+                        setFormData({ ...formData, data: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="placa">Placa</Label>
+                    <Input
+                      id="placa"
+                      placeholder="ABC-1234"
+                      value={formData.placa}
+                      onChange={(e) =>
+                        setFormData({ ...formData, placa: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="motorista">Motorista</Label>
+                  <Input
+                    id="motorista"
+                    placeholder="Nome do motorista"
+                    value={formData.motorista}
+                    onChange={(e) =>
+                      setFormData({ ...formData, motorista: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="observacao">Observação (opcional)</Label>
+                  <Textarea
+                    id="observacao"
+                    placeholder="Observações sobre a carga..."
+                    value={formData.observacao}
+                    onChange={(e) =>
+                      setFormData({ ...formData, observacao: e.target.value })
+                    }
+                    rows={2}
+                  />
+                </div>
+
+                {/* XML Upload */}
+                <div className="space-y-2">
+                  <Label>Arquivos XML (NF-e)</Label>
+                  <XMLDropzone
+                    onFilesProcessed={handleFilesProcessed}
+                    processedFiles={parsedFiles}
+                    onRemoveFile={handleRemoveFile}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      saving ||
+                      parsedFiles.filter((f) => f.status === "success").length ===
+                        0
+                    }
+                  >
+                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Criar Carga
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Table */}
+        <div className="wms-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Placa</TableHead>
+                <TableHead>Motorista</TableHead>
+                <TableHead className="text-center">NFs</TableHead>
+                <TableHead className="text-center">Itens</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
+              ) : cargas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <Truck className="w-10 h-10 text-muted-foreground/50" />
+                      <p className="text-muted-foreground">
+                        Nenhuma carga cadastrada
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                cargas.map((carga) => (
+                  <TableRow key={carga.id} className="wms-table-row">
+                    <TableCell className="font-medium">
+                      {format(new Date(carga.data), "dd/MM/yyyy", {
+                        locale: ptBR,
+                      })}
+                    </TableCell>
+                    <TableCell className="font-mono">{carga.placa}</TableCell>
+                    <TableCell>{carga.motorista}</TableCell>
+                    <TableCell className="text-center">
+                      {carga._count?.nfs || 0}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {carga._count?.itens || 0}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={carga.status}
+                        onValueChange={(value: "aberta" | "fechada") =>
+                          handleStatusChange(carga.id, value)
+                        }
+                      >
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="aberta">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-primary" />
+                              Aberta
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="fechada">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+                              Fechada
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link to={`/romaneio?carga=${carga.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <FileText className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Link to={`/etiquetas?carga=${carga.id}`}>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </MainLayout>
+  );
+}
