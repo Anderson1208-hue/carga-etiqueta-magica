@@ -35,8 +35,9 @@ const MARGIN = 15;
 
 // Helper function for real numeric sorting
 function numericSort(a: string, b: string): number {
-  const numA = parseFloat(a.replace(/[^\d.-]/g, '')) || 0;
-  const numB = parseFloat(b.replace(/[^\d.-]/g, '')) || 0;
+  // Extract only digits for numeric comparison
+  const numA = parseFloat(a.replace(/\D/g, '')) || 0;
+  const numB = parseFloat(b.replace(/\D/g, '')) || 0;
   if (numA !== numB) return numA - numB;
   return a.localeCompare(b); // fallback to string comparison if equal
 }
