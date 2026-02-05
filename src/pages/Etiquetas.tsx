@@ -39,6 +39,7 @@ interface Etiqueta {
   total: number;
   qrPayload: string;
   status: "pendente" | "conferido";
+  cnpjDestinatario: string;
 }
 
 export default function Etiquetas() {
@@ -95,14 +96,17 @@ export default function Etiquetas() {
 
       const { data: etiquetasData } = await supabase
         .from("etiquetas")
-        .select("*")
+        .select(`
+          *,
+          notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario)
+        `)
         .eq("carga_id", cargaId)
         .order("c_prod", { ascending: true })
         .order("seq", { ascending: true });
 
       if (etiquetasData) {
         setEtiquetas(
-          etiquetasData.map((e) => ({
+          etiquetasData.map((e: any) => ({
             id: e.id,
             numeroNf: e.numero_nf,
             cProd: e.c_prod,
@@ -111,6 +115,7 @@ export default function Etiquetas() {
             total: e.total,
             qrPayload: e.qr_payload,
             status: e.status as "pendente" | "conferido",
+            cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
           }))
         );
       }
@@ -137,6 +142,7 @@ export default function Etiquetas() {
         seq: e.seq,
         total: e.total,
         qrPayload: e.qrPayload,
+        cnpjDestinatario: e.cnpjDestinatario,
       }));
 
       const blob = await generateEtiquetasPDF(etiquetasData);
