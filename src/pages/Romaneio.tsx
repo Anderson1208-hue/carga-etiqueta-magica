@@ -46,6 +46,7 @@ interface NotaFiscalData {
   numeroNf: string;
   razaoSocialEmitente: string;
   cnpjEmitente: string;
+  cnpjDestinatario: string;
   dataEmissao: string | null;
   itens: {
     cProd: string;
@@ -116,6 +117,7 @@ export default function Romaneio() {
           numero_nf,
           razao_social_emitente,
           cnpj_emitente,
+          cnpj_destinatario,
           data_emissao,
           itens_nf(
             c_prod,
@@ -160,6 +162,7 @@ export default function Romaneio() {
         numeroNf: nf.numero_nf,
         razaoSocialEmitente: nf.razao_social_emitente,
         cnpjEmitente: nf.cnpj_emitente,
+        cnpjDestinatario: nf.cnpj_destinatario || "",
         dataEmissao: nf.data_emissao,
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
@@ -220,6 +223,7 @@ export default function Romaneio() {
         numeroNf: nf.numeroNf,
         razaoSocialEmitente: nf.razaoSocialEmitente,
         cnpjEmitente: nf.cnpjEmitente,
+        cnpjDestinatario: nf.cnpjDestinatario,
         dataEmissao: nf.dataEmissao,
         itens: nf.itens.map((item) => ({
           cProd: item.cProd,

@@ -163,6 +163,7 @@ export default function Cargas() {
             chave_acesso: nf.chaveAcesso,
             razao_social_emitente: nf.razaoSocialEmitente,
             cnpj_emitente: nf.cnpjEmitente,
+            cnpj_destinatario: nf.cnpjDestinatario,
             data_emissao: nf.dataEmissao,
           })
           .select()

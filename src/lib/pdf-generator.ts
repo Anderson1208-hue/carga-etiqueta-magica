@@ -11,6 +11,7 @@ interface NotaFiscalPDF {
   numeroNf: string;
   razaoSocialEmitente: string;
   cnpjEmitente: string;
+  cnpjDestinatario: string;
   dataEmissao: string | null;
   itens: {
     cProd: string;
@@ -26,6 +27,7 @@ interface EtiquetaData {
   seq: number;
   total: number;
   qrPayload: string;
+  cnpjDestinatario: string;
 }
 
 // A4 dimensions in mm (landscape)
@@ -135,7 +137,7 @@ export async function generateRomaneioPDF(
     doc.line(MARGIN, y - 2, A4_LANDSCAPE_WIDTH - MARGIN, y - 2);
   });
 
-  // Total
+  // Total row
   y += 4;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -145,6 +147,17 @@ export async function generateRomaneioPDF(
   doc.text(totalCaixas.toString(), MARGIN + pageWidth - 8, y, {
     align: "right",
   });
+
+  // TOTAL GERAL DE CAIXAS DA CARGA (at the end, prominent)
+  y += 15;
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    `TOTAL GERAL DE CAIXAS: ${totalCaixas}`,
+    A4_LANDSCAPE_WIDTH - MARGIN,
+    y,
+    { align: "right" }
+  );
 
   return doc.output("blob");
 }
@@ -165,8 +178,14 @@ export async function generateNotaDeCargaPDF(
 
   const pageWidth = A4_WIDTH - MARGIN * 2;
 
-  // Sort NFs by numero_nf numerically
-  const sortedNFs = [...notasFiscais].sort((a, b) => numericSort(a.numeroNf, b.numeroNf));
+  // CRITICAL: Sort NFs by CNPJ destinatário (numeric), then by numero_nf (numeric)
+  const sortedNFs = [...notasFiscais].sort((a, b) => {
+    // First sort by CNPJ destinatário (numeric)
+    const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
+    if (cnpjCompare !== 0) return cnpjCompare;
+    // Then by numero_nf (numeric)
+    return numericSort(a.numeroNf, b.numeroNf);
+  });
 
   sortedNFs.forEach((nf, nfIndex) => {
     if (nfIndex > 0) {
@@ -185,9 +204,12 @@ export async function generateNotaDeCargaPDF(
     doc.setFont("helvetica", "normal");
     doc.text(`Emitente: ${nf.razaoSocialEmitente}`, MARGIN, y);
     y += 7;
-    doc.text(`CNPJ: ${nf.cnpjEmitente}`, MARGIN, y);
+    doc.text(`CNPJ Emitente: ${nf.cnpjEmitente}`, MARGIN, y);
+    y += 7;
+    // Include CNPJ destinatário
+    doc.text(`CNPJ Destinatário: ${nf.cnpjDestinatario || "N/A"}`, MARGIN, y);
     if (nf.dataEmissao) {
-      doc.text(`Data Emissão: ${formatDate(nf.dataEmissao)}`, MARGIN + 80, y);
+      doc.text(`Data Emissão: ${formatDate(nf.dataEmissao)}`, MARGIN + 100, y);
     }
     y += 9;
 
@@ -219,8 +241,10 @@ export async function generateNotaDeCargaPDF(
     doc.setFontSize(11);
     const rowHeight = 7;
 
+    let totalCaixasNF = 0;
+
     sortedItens.forEach((item, index) => {
-      if (y > A4_HEIGHT - 20) {
+      if (y > A4_HEIGHT - 35) {
         doc.addPage();
         y = MARGIN;
       }
@@ -239,11 +263,24 @@ export async function generateNotaDeCargaPDF(
       doc.text(item.qtdCaixas.toString(), x + colWidths[2] - 5, y, {
         align: "right",
       });
+      
+      totalCaixasNF += item.qtdCaixas;
       y += rowHeight;
 
       doc.setDrawColor(200, 200, 200);
       doc.line(MARGIN, y - 2, A4_WIDTH - MARGIN, y - 2);
     });
+
+    // Total de caixas da NF (at the end of each NF)
+    y += 5;
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `TOTAL DE CAIXAS DA NF: ${totalCaixasNF}`,
+      A4_WIDTH - MARGIN,
+      y,
+      { align: "right" }
+    );
   });
 
   return doc.output("blob");
@@ -263,18 +300,23 @@ export async function generateEtiquetasPDF(
     format: [LABEL_WIDTH, LABEL_HEIGHT],
   });
 
-  // CRITICAL: Sort by numero_nf numerically FIRST, then by cProd numerically, then by seq
-  // This ensures all labels of one NF are generated before starting the next NF
+  // CRITICAL: Sort by CNPJ destinatário FIRST, then by numero_nf, then by cProd, then by seq
+  // This ensures all labels of one CNPJ are generated before starting the next CNPJ
+  // And all labels of one NF are generated before starting the next NF
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
-    // 1. First sort by NF number (numeric)
+    // 1. First sort by CNPJ destinatário (numeric)
+    const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
+    if (cnpjCompare !== 0) return cnpjCompare;
+    
+    // 2. Within same CNPJ, sort by NF number (numeric)
     const nfCompare = numericSort(a.numeroNf, b.numeroNf);
     if (nfCompare !== 0) return nfCompare;
     
-    // 2. Within same NF, sort by cProd (numeric)
+    // 3. Within same NF, sort by cProd (numeric)
     const prodCompare = numericSort(a.cProd, b.cProd);
     if (prodCompare !== 0) return prodCompare;
     
-    // 3. Within same product, sort by seq (1/Y, 2/Y, ..., Y/Y)
+    // 4. Within same product, sort by seq (1/Y, 2/Y, ..., Y/Y)
     return a.seq - b.seq;
   });
 

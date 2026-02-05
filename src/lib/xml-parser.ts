@@ -5,6 +5,7 @@ export interface NFeParsed {
   chaveAcesso: string;
   razaoSocialEmitente: string;
   cnpjEmitente: string;
+  cnpjDestinatario: string;
   dataEmissao: string | null;
   itens: ItemNFParsed[];
 }
@@ -71,8 +72,14 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   const razaoSocialEmitente = xNome?.textContent || "Emitente não identificado";
   const cnpjEmitente = CNPJ?.textContent || "";
 
-  // Format CNPJ
-  const cnpjFormatted = formatCNPJ(cnpjEmitente);
+  // Format CNPJ emitente
+  const cnpjEmitenteFormatted = formatCNPJ(cnpjEmitente);
+
+  // Extract recipient data (destinatário)
+  const dest = xmlDoc.querySelector("dest");
+  const destCNPJ = dest?.querySelector("CNPJ");
+  const cnpjDestinatario = destCNPJ?.textContent || "";
+  const cnpjDestinatarioFormatted = formatCNPJ(cnpjDestinatario);
 
   // Extract emission date
   const dhEmi = xmlDoc.querySelector("ide dhEmi, dhEmi");
@@ -118,7 +125,8 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     numeroNf,
     chaveAcesso,
     razaoSocialEmitente,
-    cnpjEmitente: cnpjFormatted,
+    cnpjEmitente: cnpjEmitenteFormatted,
+    cnpjDestinatario: cnpjDestinatarioFormatted,
     dataEmissao,
     itens,
   };

@@ -158,6 +158,7 @@ export type Database = {
         Row: {
           carga_id: string
           chave_acesso: string
+          cnpj_destinatario: string | null
           cnpj_emitente: string
           created_at: string
           data_emissao: string | null
@@ -168,6 +169,7 @@ export type Database = {
         Insert: {
           carga_id: string
           chave_acesso: string
+          cnpj_destinatario?: string | null
           cnpj_emitente: string
           created_at?: string
           data_emissao?: string | null
@@ -178,6 +180,7 @@ export type Database = {
         Update: {
           carga_id?: string
           chave_acesso?: string
+          cnpj_destinatario?: string | null
           cnpj_emitente?: string
           created_at?: string
           data_emissao?: string | null
