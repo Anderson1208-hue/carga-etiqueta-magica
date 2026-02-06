@@ -97,23 +97,26 @@ export default function ConferenciaMobile() {
         setSelectedCarga(cargaData);
       }
 
-      const { data: etiquetasData } = await supabase
+      // Use count queries to get accurate totals without row limits
+      const { count: totalCount } = await supabase
         .from("etiquetas")
-        .select("status")
+        .select("*", { count: "exact", head: true })
         .eq("carga_id", cargaId);
 
-      if (etiquetasData) {
-        const total = etiquetasData.length;
-        const conferidas = etiquetasData.filter(
-          (e) => e.status === "conferido"
-        ).length;
+      const { count: conferidoCount } = await supabase
+        .from("etiquetas")
+        .select("*", { count: "exact", head: true })
+        .eq("carga_id", cargaId)
+        .eq("status", "conferido");
 
-        setStats({
-          total,
-          conferidas,
-          pendentes: total - conferidas,
-        });
-      }
+      const total = totalCount || 0;
+      const conferidas = conferidoCount || 0;
+
+      setStats({
+        total,
+        conferidas,
+        pendentes: total - conferidas,
+      });
     } catch (error) {
       console.error("Error loading conferencia data:", error);
     } finally {

@@ -110,14 +110,31 @@ export default function Conferencia() {
         setSelectedCarga(cargaData);
       }
 
-      const { data: etiquetasData } = await supabase
-        .from("etiquetas")
-        .select("c_prod, x_prod, status")
-        .eq("carga_id", cargaId);
+      // Fetch ALL etiquetas using pagination to bypass 1000 row limit
+      let allEtiquetas: { c_prod: string; x_prod: string; status: string }[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (etiquetasData) {
-        const total = etiquetasData.length;
-        const conferidas = etiquetasData.filter(
+      while (hasMore) {
+        const { data: batch } = await supabase
+          .from("etiquetas")
+          .select("c_prod, x_prod, status")
+          .eq("carga_id", cargaId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (batch && batch.length > 0) {
+          allEtiquetas = [...allEtiquetas, ...batch];
+          hasMore = batch.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allEtiquetas.length > 0) {
+        const total = allEtiquetas.length;
+        const conferidas = allEtiquetas.filter(
           (e) => e.status === "conferido"
         ).length;
 
@@ -133,7 +150,7 @@ export default function Conferencia() {
           { cProd: string; xProd: string; total: number; conferidas: number }
         >();
 
-        etiquetasData.forEach((e) => {
+        allEtiquetas.forEach((e) => {
           const key = e.c_prod;
           if (!skuMap.has(key)) {
             skuMap.set(key, {
@@ -150,9 +167,12 @@ export default function Conferencia() {
           }
         });
 
-        const skuList = Array.from(skuMap.values()).sort((a, b) =>
-          a.cProd.localeCompare(b.cProd)
-        );
+        // Sort by numeric extraction for proper ordering
+        const skuList = Array.from(skuMap.values()).sort((a, b) => {
+          const numA = parseInt(a.cProd.replace(/\D/g, "") || "0", 10);
+          const numB = parseInt(b.cProd.replace(/\D/g, "") || "0", 10);
+          return numA - numB;
+        });
         setSkuProgress(skuList);
       }
     } catch (error) {
