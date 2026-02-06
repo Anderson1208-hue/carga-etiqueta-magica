@@ -133,13 +133,12 @@ export default function Roteirizacao() {
         `)
         .eq("carga_id", cargaId);
 
-      // Group by CEP + CNPJ (mesmo CEP mas CNPJs diferentes = entregas separadas)
+      // Group by CNPJ — cada CNPJ é uma parada única
       const entregasMap = new Map<string, Entrega>();
 
       (nfsData || []).forEach((nf) => {
-        const cep = nf.dest_cep || "SEM_CEP";
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
-        const chave = `${cep}|${cnpj}`;
+        const chave = cnpj;
         
         if (!entregasMap.has(chave)) {
           const endereco = [
@@ -154,7 +153,7 @@ export default function Roteirizacao() {
             .join(", ");
 
           entregasMap.set(chave, {
-            cep,
+            cep: nf.dest_cep || "SEM_CEP",
             cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
@@ -180,10 +179,11 @@ export default function Roteirizacao() {
         });
       });
 
+      // Ordenação inicial por CNPJ numérico
       const entregasList = Array.from(entregasMap.values()).sort((a, b) => {
-        const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
-        const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
-        return cepA - cepB;
+        const cnpjA = parseInt((a.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+        const cnpjB = parseInt((b.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+        return cnpjA - cnpjB;
       });
       setEntregas(entregasList);
     } catch (error) {
@@ -239,7 +239,7 @@ export default function Roteirizacao() {
     // After geocoding, sort by nearest-neighbor from CD to group nearby deliveries
     const cdLatNum = parseFloat(cdLat);
     const cdLngNum = parseFloat(cdLng);
-    const sortedEntregas = nearestNeighborSort(updatedEntregas, cdLatNum, cdLngNum);
+    const sortedEntregas = clusterAndSort(updatedEntregas, cdLatNum, cdLngNum);
 
     setEntregas(sortedEntregas);
     setGeocoding(false);
@@ -273,16 +273,43 @@ export default function Roteirizacao() {
   }
 
   /**
-   * Cluster-based sort: groups nearby deliveries into geographic clusters,
-   * then orders clusters by proximity to CD, and within each cluster
-   * orders stops by nearest-neighbor. This keeps nearby neighborhoods
-   * together, minimizing back-and-forth.
-   *
-   * Uses a simple greedy clustering: pick the nearest unvisited point to
-   * the cluster centroid, and keep adding points within CLUSTER_RADIUS_KM.
-   * When no more points fit, start a new cluster from the nearest remaining.
+   * Detects whether the delivery set is urban or rural based on
+   * average inter-point distance. Returns adaptive cluster radius in km.
+   * Urban (avg < 10km): 6 km radius
+   * Interior (avg >= 10km): 17 km radius
    */
-  function nearestNeighborSort(
+  function detectClusterRadius(points: Entrega[]): number {
+    if (points.length < 2) return 6;
+
+    let totalDist = 0;
+    let count = 0;
+    // Sample distances (limit to avoid O(n²) for large sets)
+    const sampleSize = Math.min(points.length, 30);
+    for (let i = 0; i < sampleSize; i++) {
+      for (let j = i + 1; j < sampleSize; j++) {
+        totalDist += haversineDistance(
+          points[i].latitude!, points[i].longitude!,
+          points[j].latitude!, points[j].longitude!
+        );
+        count++;
+      }
+    }
+
+    const avgDist = totalDist / count;
+    // Urban: avg distance between points < 10km → radius 6km
+    // Interior: avg distance >= 10km → radius 17km
+    if (avgDist < 10) return 6;
+    return 17;
+  }
+
+  /**
+   * Cluster-based sort with adaptive radius:
+   * 1. Detects urban (5-8km) vs interior (15-20km) based on point density
+   * 2. Groups nearby deliveries into geographic clusters
+   * 3. Orders clusters by proximity to CD (nearest-neighbor)
+   * 4. Within each cluster, orders stops by nearest-neighbor
+   */
+  function clusterAndSort(
     list: Entrega[],
     startLat: number,
     startLng: number
@@ -292,13 +319,15 @@ export default function Roteirizacao() {
 
     if (geocoded.length === 0) return list;
 
-    // --- Step 1: Build geographic clusters ---
-    const CLUSTER_RADIUS_KM = 3; // points within 3 km form a cluster
+    // --- Step 1: Detect adaptive radius ---
+    const clusterRadius = detectClusterRadius(geocoded);
+
+    // --- Step 2: Build geographic clusters ---
     const clusters: Entrega[][] = [];
     const unassigned = [...geocoded];
 
     while (unassigned.length > 0) {
-      // Seed: pick the point closest to CD (or to the last cluster's centroid)
+      // Seed: pick the point closest to CD (first cluster) or last cluster centroid
       const refLat = clusters.length === 0
         ? startLat
         : clusters[clusters.length - 1].reduce((s, e) => s + e.latitude!, 0) /
@@ -308,7 +337,6 @@ export default function Roteirizacao() {
         : clusters[clusters.length - 1].reduce((s, e) => s + e.longitude!, 0) /
           clusters[clusters.length - 1].length;
 
-      // Find nearest unassigned to reference
       let seedIdx = 0;
       let seedDist = Infinity;
       for (let i = 0; i < unassigned.length; i++) {
@@ -321,15 +349,14 @@ export default function Roteirizacao() {
       let centroidLat = seed.latitude!;
       let centroidLng = seed.longitude!;
 
-      // Greedily add nearby points
+      // Greedily absorb nearby points within adaptive radius
       let changed = true;
       while (changed) {
         changed = false;
         for (let i = unassigned.length - 1; i >= 0; i--) {
           const d = haversineDistance(centroidLat, centroidLng, unassigned[i].latitude!, unassigned[i].longitude!);
-          if (d <= CLUSTER_RADIUS_KM) {
+          if (d <= clusterRadius) {
             cluster.push(unassigned.splice(i, 1)[0]);
-            // Recalculate centroid
             centroidLat = cluster.reduce((s, e) => s + e.latitude!, 0) / cluster.length;
             centroidLng = cluster.reduce((s, e) => s + e.longitude!, 0) / cluster.length;
             changed = true;
@@ -340,7 +367,7 @@ export default function Roteirizacao() {
       clusters.push(cluster);
     }
 
-    // --- Step 2: Order clusters by nearest-neighbor from CD ---
+    // --- Step 3: Order clusters by nearest-neighbor from CD ---
     const orderedClusters: Entrega[][] = [];
     const remainingClusters = [...clusters];
     let curLat = startLat;
@@ -365,7 +392,7 @@ export default function Roteirizacao() {
       curLng = cLng;
     }
 
-    // --- Step 3: Within each cluster, order by nearest-neighbor ---
+    // --- Step 4: Within each cluster, order by nearest-neighbor ---
     const result: Entrega[] = [];
     let nnLat = startLat;
     let nnLng = startLng;
@@ -386,11 +413,11 @@ export default function Roteirizacao() {
       }
     }
 
-    // Append non-geocoded sorted by CEP
+    // Append non-geocoded sorted by CNPJ
     const sortedNotGeocoded = notGeocoded.sort((a, b) => {
-      const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
-      const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
-      return cepA - cepB;
+      const cnpjA = parseInt((a.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+      const cnpjB = parseInt((b.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+      return cnpjA - cnpjB;
     });
 
     return [...result, ...sortedNotGeocoded];
