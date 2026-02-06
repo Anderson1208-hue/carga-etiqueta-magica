@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { Link } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +21,7 @@ import {
   AlertCircle,
   Package,
   Loader2,
+  Smartphone,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -269,11 +271,19 @@ export default function Conferencia() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold">Conferência</h1>
-          <p className="text-muted-foreground">
-            Leia os QR Codes das etiquetas para conferir
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Conferência</h1>
+            <p className="text-muted-foreground">
+              Leia os QR Codes das etiquetas para conferir
+            </p>
+          </div>
+          <Link to="/conferencia-mobile">
+            <Button variant="outline" className="gap-2">
+              <Smartphone className="w-4 h-4" />
+              Modo Mobile
+            </Button>
+          </Link>
         </div>
 
         {/* Carga Selector */}

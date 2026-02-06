@@ -162,6 +162,13 @@ export type Database = {
           cnpj_emitente: string
           created_at: string
           data_emissao: string | null
+          dest_bairro: string | null
+          dest_cep: string | null
+          dest_cidade: string | null
+          dest_logradouro: string | null
+          dest_numero: string | null
+          dest_razao_social: string | null
+          dest_uf: string | null
           id: string
           numero_nf: string
           razao_social_emitente: string
@@ -173,6 +180,13 @@ export type Database = {
           cnpj_emitente: string
           created_at?: string
           data_emissao?: string | null
+          dest_bairro?: string | null
+          dest_cep?: string | null
+          dest_cidade?: string | null
+          dest_logradouro?: string | null
+          dest_numero?: string | null
+          dest_razao_social?: string | null
+          dest_uf?: string | null
           id?: string
           numero_nf: string
           razao_social_emitente: string
@@ -184,6 +198,13 @@ export type Database = {
           cnpj_emitente?: string
           created_at?: string
           data_emissao?: string | null
+          dest_bairro?: string | null
+          dest_cep?: string | null
+          dest_cidade?: string | null
+          dest_logradouro?: string | null
+          dest_numero?: string | null
+          dest_razao_social?: string | null
+          dest_uf?: string | null
           id?: string
           numero_nf?: string
           razao_social_emitente?: string
@@ -224,6 +245,106 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      roteirizacao_paradas: {
+        Row: {
+          cnpj_destinatario: string
+          distancia_anterior_km: number | null
+          endereco_completo: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          ordem: number
+          razao_social: string | null
+          roteirizacao_id: string
+          tempo_anterior_min: number | null
+          total_caixas: number | null
+          total_nfs: number | null
+        }
+        Insert: {
+          cnpj_destinatario: string
+          distancia_anterior_km?: number | null
+          endereco_completo?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          ordem: number
+          razao_social?: string | null
+          roteirizacao_id: string
+          tempo_anterior_min?: number | null
+          total_caixas?: number | null
+          total_nfs?: number | null
+        }
+        Update: {
+          cnpj_destinatario?: string
+          distancia_anterior_km?: number | null
+          endereco_completo?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          ordem?: number
+          razao_social?: string | null
+          roteirizacao_id?: string
+          tempo_anterior_min?: number | null
+          total_caixas?: number | null
+          total_nfs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roteirizacao_paradas_roteirizacao_id_fkey"
+            columns: ["roteirizacao_id"]
+            isOneToOne: false
+            referencedRelation: "roteirizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roteirizacoes: {
+        Row: {
+          carga_id: string
+          created_at: string
+          created_by: string | null
+          distancia_total_km: number | null
+          id: string
+          ponto_inicial_lat: number | null
+          ponto_inicial_lng: number | null
+          ponto_inicial_nome: string | null
+          status: string | null
+          tempo_estimado_min: number | null
+        }
+        Insert: {
+          carga_id: string
+          created_at?: string
+          created_by?: string | null
+          distancia_total_km?: number | null
+          id?: string
+          ponto_inicial_lat?: number | null
+          ponto_inicial_lng?: number | null
+          ponto_inicial_nome?: string | null
+          status?: string | null
+          tempo_estimado_min?: number | null
+        }
+        Update: {
+          carga_id?: string
+          created_at?: string
+          created_by?: string | null
+          distancia_total_km?: number | null
+          id?: string
+          ponto_inicial_lat?: number | null
+          ponto_inicial_lng?: number | null
+          ponto_inicial_nome?: string | null
+          status?: string | null
+          tempo_estimado_min?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roteirizacoes_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

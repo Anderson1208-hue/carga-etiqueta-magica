@@ -10,6 +10,8 @@ import {
   LogOut,
   User,
   LayoutDashboard,
+  Smartphone,
+  Route,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +22,8 @@ const navigation = [
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
   { name: "Conferência", href: "/conferencia", icon: CheckSquare },
+  { name: "Conf. Mobile", href: "/conferencia-mobile", icon: Smartphone },
+  { name: "Roteirização", href: "/roteirizacao", icon: Route },
 ];
 
 export function Sidebar() {

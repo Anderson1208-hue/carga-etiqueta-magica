@@ -178,6 +178,14 @@ export default function Cargas() {
             cnpj_emitente: nf.cnpjEmitente,
             cnpj_destinatario: nf.cnpjDestinatario,
             data_emissao: nf.dataEmissao,
+            // Address fields from destinatário
+            dest_razao_social: nf.destinatario?.razaoSocial || null,
+            dest_logradouro: nf.destinatario?.logradouro || null,
+            dest_numero: nf.destinatario?.numero || null,
+            dest_bairro: nf.destinatario?.bairro || null,
+            dest_cidade: nf.destinatario?.cidade || null,
+            dest_uf: nf.destinatario?.uf || null,
+            dest_cep: nf.destinatario?.cep || null,
           })
           .select()
           .single();
