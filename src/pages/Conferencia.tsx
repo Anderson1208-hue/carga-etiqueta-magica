@@ -22,6 +22,7 @@ import {
   Package,
   Loader2,
   Smartphone,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -41,6 +42,12 @@ interface ConferenciaStats {
 interface SkuProgress {
   cProd: string;
   xProd: string;
+  total: number;
+  conferidas: number;
+}
+
+interface NfProgress {
+  numeroNf: string;
   total: number;
   conferidas: number;
 }
@@ -65,6 +72,7 @@ export default function Conferencia() {
     pendentes: 0,
   });
   const [skuProgress, setSkuProgress] = useState<SkuProgress[]>([]);
+  const [nfProgress, setNfProgress] = useState<NfProgress[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
@@ -111,7 +119,7 @@ export default function Conferencia() {
       }
 
       // Fetch ALL etiquetas using pagination to bypass 1000 row limit
-      let allEtiquetas: { c_prod: string; x_prod: string; status: string }[] = [];
+      let allEtiquetas: { c_prod: string; x_prod: string; status: string; numero_nf: string }[] = [];
       let page = 0;
       const pageSize = 1000;
       let hasMore = true;
@@ -119,7 +127,7 @@ export default function Conferencia() {
       while (hasMore) {
         const { data: batch } = await supabase
           .from("etiquetas")
-          .select("c_prod, x_prod, status")
+          .select("c_prod, x_prod, status, numero_nf")
           .eq("carga_id", cargaId)
           .range(page * pageSize, (page + 1) * pageSize - 1);
 
@@ -174,6 +182,36 @@ export default function Conferencia() {
           return numA - numB;
         });
         setSkuProgress(skuList);
+
+        // Calculate NF progress
+        const nfMap = new Map<
+          string,
+          { numeroNf: string; total: number; conferidas: number }
+        >();
+
+        allEtiquetas.forEach((e) => {
+          const key = e.numero_nf;
+          if (!nfMap.has(key)) {
+            nfMap.set(key, {
+              numeroNf: e.numero_nf,
+              total: 0,
+              conferidas: 0,
+            });
+          }
+          const nf = nfMap.get(key)!;
+          nf.total++;
+          if (e.status === "conferido") {
+            nf.conferidas++;
+          }
+        });
+
+        // Sort by numeric extraction for proper ordering
+        const nfList = Array.from(nfMap.values()).sort((a, b) => {
+          const numA = parseInt(a.numeroNf.replace(/\D/g, "") || "0", 10);
+          const numB = parseInt(b.numeroNf.replace(/\D/g, "") || "0", 10);
+          return numA - numB;
+        });
+        setNfProgress(nfList);
       }
     } catch (error) {
       console.error("Error loading conferencia data:", error);
@@ -426,6 +464,55 @@ export default function Conferencia() {
                   </div>
                   <Progress value={progressPercent} className="h-3" />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* NF Progress */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Progresso por Nota Fiscal
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {nfProgress.map((nf) => {
+                      const nfPercent =
+                        nf.total > 0
+                          ? Math.round((nf.conferidas / nf.total) * 100)
+                          : 0;
+                      const isComplete = nf.conferidas === nf.total;
+
+                      return (
+                        <div key={nf.numeroNf} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              {isComplete && (
+                                <CheckCircle2 className="w-4 h-4 text-success" />
+                              )}
+                              <span className="font-medium">
+                                NF {nf.numeroNf}
+                              </span>
+                            </div>
+                            <span className="font-medium">
+                              {nf.conferidas}/{nf.total}
+                            </span>
+                          </div>
+                          <Progress
+                            value={nfPercent}
+                            className={`h-2 ${isComplete ? "[&>div]:bg-success" : ""}`}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
