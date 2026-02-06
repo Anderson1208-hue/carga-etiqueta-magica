@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface Entrega {
+  cep: string;
   cnpjDestinatario: string;
   razaoSocial: string;
   enderecoCompleto: string;
