@@ -406,42 +406,84 @@ export default function Conferencia() {
         {selectedCarga && (
           <>
             {/* Progress Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Total Carga</p>
+                <p className="text-sm text-muted-foreground">Total Caixas</p>
                 <p className="text-3xl font-bold">{stats.total}</p>
               </div>
               <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Pendentes</p>
+                <p className="text-sm text-muted-foreground">Total NFs</p>
+                <p className="text-3xl font-bold">{nfProgress.length}</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground">Caixas Pendentes</p>
                 <p className="text-3xl font-bold text-pending">
                   {stats.pendentes}
                 </p>
               </div>
               <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Conferidas</p>
+                <p className="text-sm text-muted-foreground">Caixas Conferidas</p>
                 <p className="text-3xl font-bold text-success">
                   {stats.conferidas}
                 </p>
               </div>
             </div>
 
-            {/* Overall Progress */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Progresso Geral da Carga</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {stats.conferidas} de {stats.total}
-                    </span>
-                    <span className="font-medium">{progressPercent}%</span>
+            {/* Progress Bars */}
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Progress by Caixas */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Package className="w-4 h-4" />
+                    Progresso por Caixas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {stats.conferidas} de {stats.total} caixas
+                      </span>
+                      <span className="font-medium">{progressPercent}%</span>
+                    </div>
+                    <Progress value={progressPercent} className="h-3" />
                   </div>
-                  <Progress value={progressPercent} className="h-3" />
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Progress by NF */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="w-4 h-4" />
+                    Progresso por NF
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const nfsCompletas = nfProgress.filter(
+                      (nf) => nf.conferidas === nf.total
+                    ).length;
+                    const totalNfs = nfProgress.length;
+                    const nfPercent =
+                      totalNfs > 0 ? Math.round((nfsCompletas / totalNfs) * 100) : 0;
+
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {nfsCompletas} de {totalNfs} NFs completas
+                          </span>
+                          <span className="font-medium">{nfPercent}%</span>
+                        </div>
+                        <Progress value={nfPercent} className="h-3" />
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
               {/* NF List */}
