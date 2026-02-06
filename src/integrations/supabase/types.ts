@@ -23,6 +23,7 @@ export type Database = {
           import_batch_id: string | null
           motorista: string
           observacao: string | null
+          operador_responsavel: string | null
           placa: string
           status: Database["public"]["Enums"]["load_status"]
           updated_at: string
@@ -35,6 +36,7 @@ export type Database = {
           import_batch_id?: string | null
           motorista: string
           observacao?: string | null
+          operador_responsavel?: string | null
           placa: string
           status?: Database["public"]["Enums"]["load_status"]
           updated_at?: string
@@ -47,6 +49,7 @@ export type Database = {
           import_batch_id?: string | null
           motorista?: string
           observacao?: string | null
+          operador_responsavel?: string | null
           placa?: string
           status?: Database["public"]["Enums"]["load_status"]
           updated_at?: string
