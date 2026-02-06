@@ -252,9 +252,35 @@ export default function Roteirizacao() {
   }
 
   /**
-   * Nearest-neighbor heuristic: starting from CD, always pick the closest
-   * unvisited delivery. Non-geocoded deliveries are appended at the end
-   * sorted by CEP.
+   * Haversine distance in km between two points.
+   */
+  function haversineDistance(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number
+  ) {
+    const toRad = (v: number) => (v * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  /**
+   * Cluster-based sort: groups nearby deliveries into geographic clusters,
+   * then orders clusters by proximity to CD, and within each cluster
+   * orders stops by nearest-neighbor. This keeps nearby neighborhoods
+   * together, minimizing back-and-forth.
+   *
+   * Uses a simple greedy clustering: pick the nearest unvisited point to
+   * the cluster centroid, and keep adding points within CLUSTER_RADIUS_KM.
+   * When no more points fit, start a new cluster from the nearest remaining.
    */
   function nearestNeighborSort(
     list: Entrega[],
@@ -266,50 +292,98 @@ export default function Roteirizacao() {
 
     if (geocoded.length === 0) return list;
 
-    const haversineDistance = (
-      lat1: number,
-      lng1: number,
-      lat2: number,
-      lng2: number
-    ) => {
-      const toRad = (v: number) => (v * Math.PI) / 180;
-      const R = 6371;
-      const dLat = toRad(lat2 - lat1);
-      const dLng = toRad(lng2 - lng1);
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) *
-          Math.cos(toRad(lat2)) *
-          Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
+    // --- Step 1: Build geographic clusters ---
+    const CLUSTER_RADIUS_KM = 3; // points within 3 km form a cluster
+    const clusters: Entrega[][] = [];
+    const unassigned = [...geocoded];
 
-    const ordered: Entrega[] = [];
-    const remaining = [...geocoded];
-    let currentLat = startLat;
-    let currentLng = startLng;
+    while (unassigned.length > 0) {
+      // Seed: pick the point closest to CD (or to the last cluster's centroid)
+      const refLat = clusters.length === 0
+        ? startLat
+        : clusters[clusters.length - 1].reduce((s, e) => s + e.latitude!, 0) /
+          clusters[clusters.length - 1].length;
+      const refLng = clusters.length === 0
+        ? startLng
+        : clusters[clusters.length - 1].reduce((s, e) => s + e.longitude!, 0) /
+          clusters[clusters.length - 1].length;
 
-    while (remaining.length > 0) {
-      let nearestIdx = 0;
-      let nearestDist = Infinity;
+      // Find nearest unassigned to reference
+      let seedIdx = 0;
+      let seedDist = Infinity;
+      for (let i = 0; i < unassigned.length; i++) {
+        const d = haversineDistance(refLat, refLng, unassigned[i].latitude!, unassigned[i].longitude!);
+        if (d < seedDist) { seedDist = d; seedIdx = i; }
+      }
 
-      for (let i = 0; i < remaining.length; i++) {
-        const dist = haversineDistance(
-          currentLat,
-          currentLng,
-          remaining[i].latitude!,
-          remaining[i].longitude!
-        );
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestIdx = i;
+      const seed = unassigned.splice(seedIdx, 1)[0];
+      const cluster: Entrega[] = [seed];
+      let centroidLat = seed.latitude!;
+      let centroidLng = seed.longitude!;
+
+      // Greedily add nearby points
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = unassigned.length - 1; i >= 0; i--) {
+          const d = haversineDistance(centroidLat, centroidLng, unassigned[i].latitude!, unassigned[i].longitude!);
+          if (d <= CLUSTER_RADIUS_KM) {
+            cluster.push(unassigned.splice(i, 1)[0]);
+            // Recalculate centroid
+            centroidLat = cluster.reduce((s, e) => s + e.latitude!, 0) / cluster.length;
+            centroidLng = cluster.reduce((s, e) => s + e.longitude!, 0) / cluster.length;
+            changed = true;
+          }
         }
       }
 
-      const nearest = remaining.splice(nearestIdx, 1)[0];
-      ordered.push(nearest);
-      currentLat = nearest.latitude!;
-      currentLng = nearest.longitude!;
+      clusters.push(cluster);
+    }
+
+    // --- Step 2: Order clusters by nearest-neighbor from CD ---
+    const orderedClusters: Entrega[][] = [];
+    const remainingClusters = [...clusters];
+    let curLat = startLat;
+    let curLng = startLng;
+
+    while (remainingClusters.length > 0) {
+      let nearestClusterIdx = 0;
+      let nearestClusterDist = Infinity;
+
+      for (let i = 0; i < remainingClusters.length; i++) {
+        const cLat = remainingClusters[i].reduce((s, e) => s + e.latitude!, 0) / remainingClusters[i].length;
+        const cLng = remainingClusters[i].reduce((s, e) => s + e.longitude!, 0) / remainingClusters[i].length;
+        const d = haversineDistance(curLat, curLng, cLat, cLng);
+        if (d < nearestClusterDist) { nearestClusterDist = d; nearestClusterIdx = i; }
+      }
+
+      const chosen = remainingClusters.splice(nearestClusterIdx, 1)[0];
+      orderedClusters.push(chosen);
+      const cLat = chosen.reduce((s, e) => s + e.latitude!, 0) / chosen.length;
+      const cLng = chosen.reduce((s, e) => s + e.longitude!, 0) / chosen.length;
+      curLat = cLat;
+      curLng = cLng;
+    }
+
+    // --- Step 3: Within each cluster, order by nearest-neighbor ---
+    const result: Entrega[] = [];
+    let nnLat = startLat;
+    let nnLng = startLng;
+
+    for (const cluster of orderedClusters) {
+      const remaining = [...cluster];
+      while (remaining.length > 0) {
+        let nearestIdx = 0;
+        let nearestDist = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+          const d = haversineDistance(nnLat, nnLng, remaining[i].latitude!, remaining[i].longitude!);
+          if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+        }
+        const nearest = remaining.splice(nearestIdx, 1)[0];
+        result.push(nearest);
+        nnLat = nearest.latitude!;
+        nnLng = nearest.longitude!;
+      }
     }
 
     // Append non-geocoded sorted by CEP
@@ -319,7 +393,7 @@ export default function Roteirizacao() {
       return cepA - cepB;
     });
 
-    return [...ordered, ...sortedNotGeocoded];
+    return [...result, ...sortedNotGeocoded];
   }
 
   async function calculateRoute() {
