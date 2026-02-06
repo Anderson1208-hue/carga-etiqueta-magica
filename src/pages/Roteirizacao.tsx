@@ -112,7 +112,7 @@ export default function Roteirizacao() {
         setSelectedCarga(cargaData);
       }
 
-      // Fetch NFs with address data AND items with weight in a single query
+      // Fetch NFs with address data, weight, and items
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select(`
@@ -126,7 +126,9 @@ export default function Roteirizacao() {
           dest_cidade,
           dest_uf,
           dest_cep,
-          itens_nf(q_com, peso_bruto, peso_liquido)
+          peso_bruto,
+          peso_liquido,
+          itens_nf(q_com)
         `)
         .eq("carga_id", cargaId);
 
@@ -163,12 +165,14 @@ export default function Roteirizacao() {
 
         const entrega = entregasMap.get(cnpj)!;
         entrega.totalNfs++;
+        
+        // Add NF weight (from transp/vol in XML)
+        entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
 
-        // Count boxes and weight from items embedded in the NF query
-        const nfItems = (nf.itens_nf || []) as { q_com: number; peso_bruto: number; peso_liquido: number }[];
+        // Count boxes from items
+        const nfItems = (nf.itens_nf || []) as { q_com: number }[];
         nfItems.forEach((item) => {
           entrega.totalCaixas += calculateBoxes(Number(item.q_com));
-          entrega.pesoTotalKg += Number(item.peso_bruto) || 0;
         });
       });
 
