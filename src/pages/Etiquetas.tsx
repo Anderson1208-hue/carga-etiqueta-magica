@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -20,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { generateEtiquetasPDF, downloadBlob } from "@/lib/pdf-generator";
-import { Tags, Download, Loader2, Package } from "lucide-react";
+import { Tags, Download, Loader2, Package, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 interface Carga {
@@ -54,6 +55,7 @@ export default function Etiquetas() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [selectedNfs, setSelectedNfs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadCargas();
@@ -105,19 +107,20 @@ export default function Etiquetas() {
         .order("seq", { ascending: true });
 
       if (etiquetasData) {
-        setEtiquetas(
-          etiquetasData.map((e: any) => ({
-            id: e.id,
-            numeroNf: e.numero_nf,
-            cProd: e.c_prod,
-            xProd: e.x_prod,
-            seq: e.seq,
-            total: e.total,
-            qrPayload: e.qr_payload,
-            status: e.status as "pendente" | "conferido",
-            cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
-          }))
-        );
+        const mapped = etiquetasData.map((e: any) => ({
+          id: e.id,
+          numeroNf: e.numero_nf,
+          cProd: e.c_prod,
+          xProd: e.x_prod,
+          seq: e.seq,
+          total: e.total,
+          qrPayload: e.qr_payload,
+          status: e.status as "pendente" | "conferido",
+          cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
+        }));
+        setEtiquetas(mapped);
+        // Reset selection when loading new carga
+        setSelectedNfs(new Set());
       }
     } catch (error) {
       console.error("Error loading etiquetas:", error);
@@ -130,12 +133,61 @@ export default function Etiquetas() {
     }
   }
 
-  async function handleGenerateEtiquetas() {
+// Get unique NFs for the checkbox list
+  const uniqueNfs = useMemo(() => {
+    const nfMap = new Map<string, { numeroNf: string; count: number }>();
+    etiquetas.forEach((e) => {
+      if (!nfMap.has(e.numeroNf)) {
+        nfMap.set(e.numeroNf, { numeroNf: e.numeroNf, count: 0 });
+      }
+      nfMap.get(e.numeroNf)!.count++;
+    });
+    return Array.from(nfMap.values()).sort((a, b) => {
+      const numA = parseInt(a.numeroNf.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.numeroNf.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+  }, [etiquetas]);
+
+  function handleToggleNf(numeroNf: string) {
+    setSelectedNfs((prev) => {
+      const next = new Set(prev);
+      if (next.has(numeroNf)) {
+        next.delete(numeroNf);
+      } else {
+        next.add(numeroNf);
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAllNfs() {
+    if (selectedNfs.size === uniqueNfs.length) {
+      setSelectedNfs(new Set());
+    } else {
+      setSelectedNfs(new Set(uniqueNfs.map((nf) => nf.numeroNf)));
+    }
+  }
+
+  async function handleGenerateEtiquetas(onlySelected: boolean = false) {
     if (!selectedCarga || etiquetas.length === 0) return;
+
+    const etiquetasToGenerate = onlySelected
+      ? etiquetas.filter((e) => selectedNfs.has(e.numeroNf))
+      : etiquetas;
+
+    if (etiquetasToGenerate.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Nenhuma NF selecionada",
+        description: "Selecione pelo menos uma NF para gerar as etiquetas.",
+      });
+      return;
+    }
 
     setGenerating(true);
     try {
-      const etiquetasData = etiquetas.map((e) => ({
+      const etiquetasData = etiquetasToGenerate.map((e) => ({
         numeroNf: e.numeroNf,
         cProd: e.cProd,
         xProd: e.xProd,
@@ -147,14 +199,15 @@ export default function Etiquetas() {
 
       const blob = await generateEtiquetasPDF(etiquetasData);
 
+      const suffix = onlySelected ? "_selecionadas" : "";
       downloadBlob(
         blob,
-        `etiquetas_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}.pdf`
+        `etiquetas_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}${suffix}.pdf`
       );
 
       toast({
         title: "PDF gerado com sucesso!",
-        description: `${etiquetas.length} etiquetas prontas para impressão.`,
+        description: `${etiquetasToGenerate.length} etiquetas prontas para impressão.`,
       });
     } catch (error) {
       console.error("Error generating etiquetas PDF:", error);
@@ -219,20 +272,71 @@ export default function Etiquetas() {
             </div>
 
             {selectedCarga && (
-              <Button
-                onClick={handleGenerateEtiquetas}
-                disabled={generating || etiquetas.length === 0}
-              >
-                {generating ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="w-4 h-4 mr-2" />
-                )}
-                Gerar PDF de Etiquetas
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => handleGenerateEtiquetas(false)}
+                  disabled={generating || etiquetas.length === 0}
+                >
+                  {generating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Gerar Todas
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleGenerateEtiquetas(true)}
+                  disabled={generating || selectedNfs.size === 0}
+                >
+                  {generating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4 mr-2" />
+                  )}
+                  Gerar Selecionadas ({selectedNfs.size})
+                </Button>
+              </div>
             )}
           </div>
         </div>
+
+        {/* NF Selection */}
+        {selectedCarga && uniqueNfs.length > 0 && (
+          <div className="wms-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm">Selecionar NFs para impressão</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAllNfs}
+              >
+                {selectedNfs.size === uniqueNfs.length ? "Desmarcar Todas" : "Selecionar Todas"}
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {uniqueNfs.map((nf) => (
+                <label
+                  key={nf.numeroNf}
+                  className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                    selectedNfs.has(nf.numeroNf)
+                      ? "bg-primary/10 border-primary"
+                      : "bg-background border-border hover:bg-muted"
+                  }`}
+                >
+                  <Checkbox
+                    checked={selectedNfs.has(nf.numeroNf)}
+                    onCheckedChange={() => handleToggleNf(nf.numeroNf)}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">NF {nf.numeroNf}</span>
+                    <span className="text-xs text-muted-foreground">{nf.count} etiq.</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         {selectedCarga && etiquetas.length > 0 && (
