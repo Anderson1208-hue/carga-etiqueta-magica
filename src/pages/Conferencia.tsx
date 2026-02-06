@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ScanLine,
   CheckCircle2,
@@ -23,6 +25,7 @@ import {
   Loader2,
   Smartphone,
   FileText,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -39,17 +42,20 @@ interface ConferenciaStats {
   pendentes: number;
 }
 
-interface SkuProgress {
-  cProd: string;
-  xProd: string;
-  total: number;
-  conferidas: number;
-}
-
 interface NfProgress {
   numeroNf: string;
   total: number;
   conferidas: number;
+}
+
+interface Etiqueta {
+  id: string;
+  c_prod: string;
+  x_prod: string;
+  seq: number;
+  total: number;
+  status: string;
+  numero_nf: string;
 }
 
 interface ScanResult {
@@ -66,14 +72,16 @@ export default function Conferencia() {
   const [cargas, setCargas] = useState<Carga[]>([]);
   const [selectedCargaId, setSelectedCargaId] = useState<string>("");
   const [selectedCarga, setSelectedCarga] = useState<Carga | null>(null);
+  const [selectedNf, setSelectedNf] = useState<string | null>(null);
   const [stats, setStats] = useState<ConferenciaStats>({
     total: 0,
     conferidas: 0,
     pendentes: 0,
   });
-  const [skuProgress, setSkuProgress] = useState<SkuProgress[]>([]);
   const [nfProgress, setNfProgress] = useState<NfProgress[]>([]);
+  const [nfEtiquetas, setNfEtiquetas] = useState<Etiqueta[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingNfDetails, setLoadingNfDetails] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
@@ -84,16 +92,24 @@ export default function Conferencia() {
 
   useEffect(() => {
     if (selectedCargaId) {
+      setSelectedNf(null);
+      setNfEtiquetas([]);
       loadConferenciaData(selectedCargaId);
     }
   }, [selectedCargaId]);
 
   useEffect(() => {
-    // Focus input for scanning
-    if (selectedCargaId && inputRef.current) {
+    if (selectedNf && selectedCargaId) {
+      loadNfEtiquetas(selectedCargaId, selectedNf);
+    }
+  }, [selectedNf, selectedCargaId]);
+
+  useEffect(() => {
+    // Focus input for scanning when NF is selected
+    if (selectedNf && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [selectedCargaId]);
+  }, [selectedNf]);
 
   async function loadCargas() {
     const { data } = await supabase
@@ -152,37 +168,6 @@ export default function Conferencia() {
           pendentes: total - conferidas,
         });
 
-        // Calculate SKU progress
-        const skuMap = new Map<
-          string,
-          { cProd: string; xProd: string; total: number; conferidas: number }
-        >();
-
-        allEtiquetas.forEach((e) => {
-          const key = e.c_prod;
-          if (!skuMap.has(key)) {
-            skuMap.set(key, {
-              cProd: e.c_prod,
-              xProd: e.x_prod,
-              total: 0,
-              conferidas: 0,
-            });
-          }
-          const sku = skuMap.get(key)!;
-          sku.total++;
-          if (e.status === "conferido") {
-            sku.conferidas++;
-          }
-        });
-
-        // Sort by numeric extraction for proper ordering
-        const skuList = Array.from(skuMap.values()).sort((a, b) => {
-          const numA = parseInt(a.cProd.replace(/\D/g, "") || "0", 10);
-          const numB = parseInt(b.cProd.replace(/\D/g, "") || "0", 10);
-          return numA - numB;
-        });
-        setSkuProgress(skuList);
-
         // Calculate NF progress
         const nfMap = new Map<
           string,
@@ -212,11 +197,33 @@ export default function Conferencia() {
           return numA - numB;
         });
         setNfProgress(nfList);
+      } else {
+        setStats({ total: 0, conferidas: 0, pendentes: 0 });
+        setNfProgress([]);
       }
     } catch (error) {
       console.error("Error loading conferencia data:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadNfEtiquetas(cargaId: string, numeroNf: string) {
+    setLoadingNfDetails(true);
+    try {
+      const { data } = await supabase
+        .from("etiquetas")
+        .select("id, c_prod, x_prod, seq, total, status, numero_nf")
+        .eq("carga_id", cargaId)
+        .eq("numero_nf", numeroNf)
+        .order("c_prod")
+        .order("seq");
+
+      setNfEtiquetas(data || []);
+    } catch (error) {
+      console.error("Error loading NF etiquetas:", error);
+    } finally {
+      setLoadingNfDetails(false);
     }
   }
 
@@ -249,6 +256,18 @@ export default function Conferencia() {
           type: "warning",
           message: "Etiqueta de outra carga",
           details: `Esta etiqueta pertence a outra carga`,
+        });
+        setQrInput("");
+        inputRef.current?.focus();
+        return;
+      }
+
+      // Validate NF if one is selected
+      if (selectedNf && numeroNf !== selectedNf) {
+        setLastResult({
+          type: "warning",
+          message: "Etiqueta de outra NF",
+          details: `Esta etiqueta é da NF ${numeroNf}, mas você está conferindo a NF ${selectedNf}`,
         });
         setQrInput("");
         inputRef.current?.focus();
@@ -308,6 +327,9 @@ export default function Conferencia() {
 
       // Reload data
       loadConferenciaData(selectedCargaId);
+      if (selectedNf) {
+        loadNfEtiquetas(selectedCargaId, selectedNf);
+      }
     } catch (error) {
       console.error("Error scanning:", error);
       setLastResult({
@@ -325,15 +347,21 @@ export default function Conferencia() {
   const progressPercent =
     stats.total > 0 ? Math.round((stats.conferidas / stats.total) * 100) : 0;
 
+  const selectedNfData = nfProgress.find((nf) => nf.numeroNf === selectedNf);
+  const selectedNfPercent =
+    selectedNfData && selectedNfData.total > 0
+      ? Math.round((selectedNfData.conferidas / selectedNfData.total) * 100)
+      : 0;
+
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Conferência</h1>
+            <h1 className="text-2xl font-bold">Conferência por NF</h1>
             <p className="text-muted-foreground">
-              Leia os QR Codes das etiquetas para conferir
+              Selecione uma Nota Fiscal para conferir as etiquetas
             </p>
           </div>
           <Link to="/conferencia-mobile">
@@ -370,69 +398,10 @@ export default function Conferencia() {
 
         {selectedCarga && (
           <>
-            {/* Scanner Input */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ScanLine className="w-5 h-5" />
-                  Leitura de QR Code
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-4">
-                  <Input
-                    ref={inputRef}
-                    placeholder="Escaneie ou digite o QR Code..."
-                    value={qrInput}
-                    onChange={(e) => setQrInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleScan();
-                      }
-                    }}
-                    className="flex-1 font-mono"
-                    disabled={scanning}
-                  />
-                  <Button onClick={handleScan} disabled={scanning || !qrInput}>
-                    {scanning ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Conferir"
-                    )}
-                  </Button>
-                </div>
-
-                {/* Scan Result */}
-                {lastResult && (
-                  <div
-                    className={`p-4 rounded-lg flex items-start gap-3 animate-fade-in ${
-                      lastResult.type === "success"
-                        ? "bg-success/10 text-success"
-                        : lastResult.type === "warning"
-                        ? "bg-warning/10 text-warning"
-                        : "bg-destructive/10 text-destructive"
-                    }`}
-                  >
-                    {lastResult.type === "success" ? (
-                      <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                    )}
-                    <div>
-                      <p className="font-medium">{lastResult.message}</p>
-                      {lastResult.details && (
-                        <p className="text-sm opacity-80">{lastResult.details}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Progress Stats */}
             <div className="grid gap-4 md:grid-cols-3">
               <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-sm text-muted-foreground">Total Carga</p>
                 <p className="text-3xl font-bold">{stats.total}</p>
               </div>
               <div className="wms-stat-card">
@@ -452,7 +421,7 @@ export default function Conferencia() {
             {/* Overall Progress */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Progresso Geral</CardTitle>
+                <CardTitle className="text-base">Progresso Geral da Carga</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -467,106 +436,239 @@ export default function Conferencia() {
               </CardContent>
             </Card>
 
-            {/* NF Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Progresso por Nota Fiscal
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {nfProgress.map((nf) => {
-                      const nfPercent =
-                        nf.total > 0
-                          ? Math.round((nf.conferidas / nf.total) * 100)
-                          : 0;
-                      const isComplete = nf.conferidas === nf.total;
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* NF List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Notas Fiscais ({nfProgress.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {loading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="divide-y">
+                        {nfProgress.map((nf) => {
+                          const nfPercent =
+                            nf.total > 0
+                              ? Math.round((nf.conferidas / nf.total) * 100)
+                              : 0;
+                          const isComplete = nf.conferidas === nf.total;
+                          const isSelected = selectedNf === nf.numeroNf;
 
-                      return (
-                        <div key={nf.numeroNf} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              {isComplete && (
-                                <CheckCircle2 className="w-4 h-4 text-success" />
-                              )}
-                              <span className="font-medium">
-                                NF {nf.numeroNf}
-                              </span>
-                            </div>
-                            <span className="font-medium">
-                              {nf.conferidas}/{nf.total}
+                          return (
+                            <button
+                              key={nf.numeroNf}
+                              onClick={() => setSelectedNf(nf.numeroNf)}
+                              className={`w-full p-4 text-left transition-colors hover:bg-accent ${
+                                isSelected ? "bg-accent" : ""
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  {isComplete ? (
+                                    <CheckCircle2 className="w-4 h-4 text-success" />
+                                  ) : (
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                  <span className="font-medium">
+                                    NF {nf.numeroNf}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={isComplete ? "default" : "secondary"}
+                                    className={isComplete ? "bg-success" : ""}
+                                  >
+                                    {nf.conferidas}/{nf.total}
+                                  </Badge>
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </div>
+                              </div>
+                              <Progress
+                                value={nfPercent}
+                                className={`h-1.5 ${isComplete ? "[&>div]:bg-success" : ""}`}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* NF Details & Scanner */}
+              <div className="space-y-4">
+                {selectedNf ? (
+                  <>
+                    {/* NF Progress */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <FileText className="w-5 h-5" />
+                            NF {selectedNf}
+                          </span>
+                          {selectedNfData && selectedNfData.conferidas === selectedNfData.total && (
+                            <Badge className="bg-success">Completa</Badge>
+                          )}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {selectedNfData?.conferidas || 0} de {selectedNfData?.total || 0}
                             </span>
+                            <span className="font-medium">{selectedNfPercent}%</span>
                           </div>
-                          <Progress
-                            value={nfPercent}
-                            className={`h-2 ${isComplete ? "[&>div]:bg-success" : ""}`}
-                          />
+                          <Progress value={selectedNfPercent} className="h-3" />
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      </CardContent>
+                    </Card>
 
-            {/* SKU Progress */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Progresso por Produto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {skuProgress.map((sku) => {
-                      const skuPercent =
-                        sku.total > 0
-                          ? Math.round((sku.conferidas / sku.total) * 100)
-                          : 0;
-                      const isComplete = sku.conferidas === sku.total;
+                    {/* Scanner Input */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <ScanLine className="w-5 h-5" />
+                          Leitura de QR Code
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex gap-4">
+                          <Input
+                            ref={inputRef}
+                            placeholder="Escaneie ou digite o QR Code..."
+                            value={qrInput}
+                            onChange={(e) => setQrInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleScan();
+                              }
+                            }}
+                            className="flex-1 font-mono"
+                            disabled={scanning}
+                          />
+                          <Button onClick={handleScan} disabled={scanning || !qrInput}>
+                            {scanning ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Conferir"
+                            )}
+                          </Button>
+                        </div>
 
-                      return (
-                        <div key={sku.cProd} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              {isComplete && (
-                                <CheckCircle2 className="w-4 h-4 text-success" />
+                        {/* Scan Result */}
+                        {lastResult && (
+                          <div
+                            className={`p-4 rounded-lg flex items-start gap-3 animate-fade-in ${
+                              lastResult.type === "success"
+                                ? "bg-success/10 text-success"
+                                : lastResult.type === "warning"
+                                ? "bg-warning/10 text-warning"
+                                : "bg-destructive/10 text-destructive"
+                            }`}
+                          >
+                            {lastResult.type === "success" ? (
+                              <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                            ) : (
+                              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                            )}
+                            <div>
+                              <p className="font-medium">{lastResult.message}</p>
+                              {lastResult.details && (
+                                <p className="text-sm opacity-80">{lastResult.details}</p>
                               )}
-                              <span className="font-mono text-muted-foreground">
-                                {sku.cProd}
-                              </span>
-                              <span className="truncate max-w-[200px]">
-                                {sku.xProd}
-                              </span>
                             </div>
-                            <span className="font-medium">
-                              {sku.conferidas}/{sku.total}
-                            </span>
                           </div>
-                          <Progress
-                            value={skuPercent}
-                            className={`h-2 ${isComplete ? "[&>div]:bg-success" : ""}`}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Etiquetas List */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Package className="w-5 h-5" />
+                          Etiquetas da NF
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {loadingNfDetails ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <ScrollArea className="h-[250px]">
+                            <div className="divide-y">
+                              {nfEtiquetas.map((etiqueta) => (
+                                <div
+                                  key={etiqueta.id}
+                                  className={`p-3 flex items-center justify-between ${
+                                    etiqueta.status === "conferido"
+                                      ? "bg-success/5"
+                                      : ""
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {etiqueta.status === "conferido" ? (
+                                      <CheckCircle2 className="w-4 h-4 text-success" />
+                                    ) : (
+                                      <div className="w-4 h-4 rounded-full border-2 border-pending" />
+                                    )}
+                                    <div>
+                                      <p className="text-sm font-medium">
+                                        {etiqueta.x_prod}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Cód: {etiqueta.c_prod}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Badge
+                                    variant={
+                                      etiqueta.status === "conferido"
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    className={
+                                      etiqueta.status === "conferido"
+                                        ? "bg-success"
+                                        : ""
+                                    }
+                                  >
+                                    {etiqueta.seq}/{etiqueta.total}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : (
+                  <Card className="h-full min-h-[400px] flex items-center justify-center">
+                    <div className="text-center text-muted-foreground p-8">
+                      <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg font-medium">
+                        Selecione uma Nota Fiscal
+                      </p>
+                      <p className="text-sm">
+                        Clique em uma NF na lista ao lado para iniciar a conferência
+                      </p>
+                    </div>
+                  </Card>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </>
         )}
       </div>
