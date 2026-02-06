@@ -180,7 +180,11 @@ export default function Roteirizacao() {
         });
       });
 
-      const entregasList = Array.from(entregasMap.values());
+      const entregasList = Array.from(entregasMap.values()).sort((a, b) => {
+        const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
+        const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
+        return cepA - cepB;
+      });
       setEntregas(entregasList);
     } catch (error) {
       console.error("Error loading entregas:", error);
