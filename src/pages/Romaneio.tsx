@@ -23,9 +23,10 @@ import {
   generateRomaneioPDF,
   generateNotaDeCargaPDF,
   downloadBlob,
+  printBlob,
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { FileText, Download, Loader2 } from "lucide-react";
+import { FileText, Download, Loader2, Printer } from "lucide-react";
 import { format } from "date-fns";
 
 interface Carga {
@@ -67,7 +68,7 @@ export default function Romaneio() {
   const [romaneioItems, setRomaneioItems] = useState<RomaneioItem[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState<"romaneio" | "nota" | null>(null);
+  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | null>(null);
 
   useEffect(() => {
     loadCargas();
@@ -258,6 +259,62 @@ export default function Romaneio() {
     }
   }
 
+  async function handlePrintRomaneio() {
+    if (!selectedCarga) return;
+    setGenerating("print-romaneio");
+    try {
+      const blob = await generateRomaneioPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        romaneioItems
+      );
+      printBlob(blob);
+      toast({ title: "Enviado para impressão!" });
+    } catch (error) {
+      console.error("Error printing PDF:", error);
+      toast({ variant: "destructive", title: "Erro ao imprimir" });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  async function handlePrintNotaDeCarga() {
+    if (!selectedCarga || notasFiscais.length === 0) return;
+    setGenerating("print-nota");
+    try {
+      const nfsPDF = notasFiscais.map((nf) => ({
+        numeroNf: nf.numeroNf,
+        razaoSocialEmitente: nf.razaoSocialEmitente,
+        cnpjEmitente: nf.cnpjEmitente,
+        cnpjDestinatario: nf.cnpjDestinatario,
+        dataEmissao: nf.dataEmissao,
+        itens: nf.itens.map((item) => ({
+          cProd: item.cProd,
+          xProd: item.xProd,
+          qtdCaixas: calculateBoxes(item.qCom),
+        })),
+      }));
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        nfsPDF
+      );
+      printBlob(blob);
+      toast({ title: "Enviado para impressão!" });
+    } catch (error) {
+      console.error("Error printing PDF:", error);
+      toast({ variant: "destructive", title: "Erro ao imprimir" });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
   const totalCaixas = romaneioItems.reduce(
     (acc, item) => acc + item.quantidadeTotal,
     0
@@ -299,7 +356,7 @@ export default function Romaneio() {
             </div>
 
             {selectedCarga && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   onClick={handleGenerateRomaneio}
                   disabled={generating !== null || romaneioItems.length === 0}
@@ -309,7 +366,19 @@ export default function Romaneio() {
                   ) : (
                     <Download className="w-4 h-4 mr-2" />
                   )}
-                  Romaneio Totalizado
+                  Romaneio PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handlePrintRomaneio}
+                  disabled={generating !== null || romaneioItems.length === 0}
+                >
+                  {generating === "print-romaneio" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4 mr-2" />
+                  )}
+                  Imprimir Romaneio
                 </Button>
                 <Button
                   variant="secondary"
@@ -319,9 +388,21 @@ export default function Romaneio() {
                   {generating === "nota" ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <FileText className="w-4 h-4 mr-2" />
+                    <Download className="w-4 h-4 mr-2" />
                   )}
-                  Nota de Carga
+                  Nota de Carga PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handlePrintNotaDeCarga}
+                  disabled={generating !== null || notasFiscais.length === 0}
+                >
+                  {generating === "print-nota" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4 mr-2" />
+                  )}
+                  Imprimir Nota de Carga
                 </Button>
               </div>
             )}
