@@ -10,6 +10,8 @@ import Cargas from "./pages/Cargas";
 import Romaneio from "./pages/Romaneio";
 import Etiquetas from "./pages/Etiquetas";
 import Conferencia from "./pages/Conferencia";
+import ConferenciaMobile from "./pages/ConferenciaMobile";
+import Roteirizacao from "./pages/Roteirizacao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -106,6 +108,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Conferencia />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/conferencia-mobile"
+        element={
+          <ProtectedRoute>
+            <ConferenciaMobile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/roteirizacao"
+        element={
+          <ProtectedRoute>
+            <Roteirizacao />
           </ProtectedRoute>
         }
       />

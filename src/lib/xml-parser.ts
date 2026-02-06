@@ -1,5 +1,15 @@
 // Parser for Brazilian NF-e XML files
 
+export interface DestinatarioEndereco {
+  razaoSocial: string;
+  logradouro: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+}
+
 export interface NFeParsed {
   numeroNf: string;
   chaveAcesso: string;
@@ -8,6 +18,7 @@ export interface NFeParsed {
   cnpjDestinatario: string;
   dataEmissao: string | null;
   itens: ItemNFParsed[];
+  destinatario?: DestinatarioEndereco;
 }
 
 export interface ItemNFParsed {
@@ -81,6 +92,25 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   const cnpjDestinatario = destCNPJ?.textContent || "";
   const cnpjDestinatarioFormatted = formatCNPJ(cnpjDestinatario);
 
+  // Extract recipient address (endereço do destinatário)
+  let destinatario: DestinatarioEndereco | undefined;
+  if (dest) {
+    const destNome = dest.querySelector("xNome");
+    const enderDest = dest.querySelector("enderDest");
+    
+    if (enderDest) {
+      destinatario = {
+        razaoSocial: destNome?.textContent || "",
+        logradouro: enderDest.querySelector("xLgr")?.textContent || "",
+        numero: enderDest.querySelector("nro")?.textContent || "",
+        bairro: enderDest.querySelector("xBairro")?.textContent || "",
+        cidade: enderDest.querySelector("xMun")?.textContent || "",
+        uf: enderDest.querySelector("UF")?.textContent || "",
+        cep: enderDest.querySelector("CEP")?.textContent || "",
+      };
+    }
+  }
+
   // Extract emission date
   const dhEmi = xmlDoc.querySelector("ide dhEmi, dhEmi");
   const dEmi = xmlDoc.querySelector("ide dEmi, dEmi");
@@ -129,6 +159,7 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     cnpjDestinatario: cnpjDestinatarioFormatted,
     dataEmissao,
     itens,
+    destinatario,
   };
 }
 
