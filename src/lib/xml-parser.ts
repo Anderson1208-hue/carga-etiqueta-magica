@@ -26,6 +26,8 @@ export interface ItemNFParsed {
   xProd: string;
   qCom: number;
   uCom: string;
+  pesoBruto: number;
+  pesoLiquido: number;
 }
 
 export function parseNFeXML(xmlString: string): NFeParsed {
@@ -133,8 +135,12 @@ export function parseNFeXML(xmlString: string): NFeParsed {
       const xProd = prod.querySelector("xProd")?.textContent || "";
       const qComStr = prod.querySelector("qCom")?.textContent || "0";
       const uCom = prod.querySelector("uCom")?.textContent || "UN";
+      const pesoBrutoStr = prod.querySelector("pesoB")?.textContent || "0";
+      const pesoLiquidoStr = prod.querySelector("pesoL")?.textContent || "0";
 
       const qCom = parseFloat(qComStr);
+      const pesoBruto = parseFloat(pesoBrutoStr) || 0;
+      const pesoLiquido = parseFloat(pesoLiquidoStr) || 0;
 
       if (cProd && xProd && qCom > 0) {
         itens.push({
@@ -142,6 +148,8 @@ export function parseNFeXML(xmlString: string): NFeParsed {
           xProd,
           qCom,
           uCom,
+          pesoBruto,
+          pesoLiquido,
         });
       }
     }
