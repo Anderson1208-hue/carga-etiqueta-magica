@@ -132,6 +132,28 @@ export default function Cargas() {
     setParsedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Input validation helpers
+  function validatePlaca(placa: string): boolean {
+    const cleanPlaca = placa.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    // Brazilian plates: ABC1234 (old) or ABC1D23 (Mercosul)
+    return /^[A-Z]{3}[0-9]{4}$/.test(cleanPlaca) || /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlaca);
+  }
+
+  function validateChaveAcesso(chave: string): boolean {
+    const cleanChave = chave.replace(/\D/g, "");
+    return cleanChave.length === 44;
+  }
+
+  function validateCNPJ(cnpj: string): boolean {
+    if (!cnpj) return true; // Optional field
+    const cleanCnpj = cnpj.replace(/\D/g, "");
+    return cleanCnpj.length === 14;
+  }
+
+  function sanitizeText(text: string, maxLength: number): string {
+    return text.trim().slice(0, maxLength);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -144,6 +166,50 @@ export default function Cargas() {
         variant: "destructive",
         title: "Nenhum XML válido",
         description: "Adicione pelo menos um arquivo XML válido.",
+      });
+      return;
+    }
+
+    // Validate placa format
+    if (!validatePlaca(formData.placa)) {
+      toast({
+        variant: "destructive",
+        title: "Placa inválida",
+        description: "Formato de placa inválido. Use ABC1234 ou ABC1D23.",
+      });
+      return;
+    }
+
+    // Validate motorista (required, max 100 chars)
+    if (!formData.motorista.trim() || formData.motorista.length > 100) {
+      toast({
+        variant: "destructive",
+        title: "Nome do motorista inválido",
+        description: "O nome do motorista é obrigatório e deve ter no máximo 100 caracteres.",
+      });
+      return;
+    }
+
+    // Validate all XMLs have proper chave_acesso
+    const invalidXmls = successFiles.filter((f) => !validateChaveAcesso(f.data.chaveAcesso));
+    if (invalidXmls.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Chave de acesso inválida",
+        description: `${invalidXmls.length} XML(s) com chave de acesso inválida (deve ter 44 dígitos).`,
+      });
+      return;
+    }
+
+    // Validate CNPJs in XMLs
+    const invalidCnpjs = successFiles.filter(
+      (f) => !validateCNPJ(f.data.cnpjEmitente) || !validateCNPJ(f.data.cnpjDestinatario || "")
+    );
+    if (invalidCnpjs.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "CNPJ inválido",
+        description: `${invalidCnpjs.length} XML(s) com CNPJ inválido (deve ter 14 dígitos).`,
       });
       return;
     }
@@ -214,9 +280,9 @@ export default function Cargas() {
 
       const payload = {
         carga: {
-          motorista: formData.motorista,
-          placa: formData.placa.toUpperCase(),
-          observacao: formData.observacao || null,
+          motorista: sanitizeText(formData.motorista, 100),
+          placa: formData.placa.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+          observacao: formData.observacao ? sanitizeText(formData.observacao, 500) : null,
           data: formData.data,
           import_batch_id: importBatchId,
         },
