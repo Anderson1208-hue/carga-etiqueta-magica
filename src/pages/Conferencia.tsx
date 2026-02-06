@@ -406,28 +406,49 @@ export default function Conferencia() {
         {selectedCarga && (
           <>
             {/* Progress Stats */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Total Caixas</p>
-                <p className="text-3xl font-bold">{stats.total}</p>
-              </div>
-              <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Total NFs</p>
-                <p className="text-3xl font-bold">{nfProgress.length}</p>
-              </div>
-              <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Caixas Pendentes</p>
-                <p className="text-3xl font-bold text-pending">
-                  {stats.pendentes}
-                </p>
-              </div>
-              <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Caixas Conferidas</p>
-                <p className="text-3xl font-bold text-success">
-                  {stats.conferidas}
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const nfsCompletas = nfProgress.filter(
+                (nf) => nf.conferidas === nf.total
+              ).length;
+              const nfsPendentes = nfProgress.length - nfsCompletas;
+
+              return (
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">Total Caixas</p>
+                    <p className="text-3xl font-bold">{stats.total}</p>
+                  </div>
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">Caixas Pendentes</p>
+                    <p className="text-3xl font-bold text-pending">
+                      {stats.pendentes}
+                    </p>
+                  </div>
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">Caixas Conferidas</p>
+                    <p className="text-3xl font-bold text-success">
+                      {stats.conferidas}
+                    </p>
+                  </div>
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">Total NFs</p>
+                    <p className="text-3xl font-bold">{nfProgress.length}</p>
+                  </div>
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">NFs Pendentes</p>
+                    <p className="text-3xl font-bold text-pending">
+                      {nfsPendentes}
+                    </p>
+                  </div>
+                  <div className="wms-stat-card">
+                    <p className="text-sm text-muted-foreground">NFs Conferidas</p>
+                    <p className="text-3xl font-bold text-success">
+                      {nfsCompletas}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Progress Bars */}
             <div className="grid gap-4 md:grid-cols-2">
