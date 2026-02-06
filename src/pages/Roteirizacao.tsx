@@ -24,6 +24,7 @@ import {
   Package,
   FileText,
 } from "lucide-react";
+import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
@@ -160,10 +161,10 @@ export default function Roteirizacao() {
         const entrega = entregasMap.get(cnpj)!;
         entrega.totalNfs++;
 
-        // Count boxes from items
+        // Count boxes from items - using same calculateBoxes function as Romaneio
         const nfItems = (itensData || []).filter((item) => item.nf_id === nf.id);
         const caixas = nfItems.reduce(
-          (sum, item) => sum + Math.ceil(Number(item.q_com)),
+          (sum, item) => sum + calculateBoxes(Number(item.q_com)),
           0
         );
         entrega.totalCaixas += caixas;
