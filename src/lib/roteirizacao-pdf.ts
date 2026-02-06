@@ -17,6 +17,8 @@ interface Parada {
   longitude: number | null;
   totalNfs: number;
   totalCaixas: number;
+  pesoTotalKg: number;
+  volumeTotalM3: number;
   ordem?: number;
 }
 
@@ -27,6 +29,8 @@ interface RoteirizacaoData {
   cdLng: number;
   distanciaTotalKm: number;
   tempoEstimadoMin: number;
+  pesoTotalKg: number;
+  volumeTotalM3: number;
   paradas: Parada[];
 }
 
@@ -36,6 +40,8 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
     cdNome,
     distanciaTotalKm,
     tempoEstimadoMin,
+    pesoTotalKg,
+    volumeTotalM3,
     paradas,
   } = data;
 
@@ -80,29 +86,40 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
 
   y = 45;
 
-  // Summary Card
+  // Summary Card - Row 1
   doc.setTextColor(0, 0, 0);
   doc.setFillColor(240, 249, 255); // Light blue
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 25, 3, 3, "F");
+  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 35, 3, 3, "F");
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text("PONTO DE PARTIDA", MARGIN + 5, y + 8);
-  doc.text("PARADAS", MARGIN + 60, y + 8);
-  doc.text("DISTÂNCIA", MARGIN + 100, y + 8);
-  doc.text("TEMPO ESTIMADO", MARGIN + 140, y + 8);
+  doc.text("PONTO DE PARTIDA", MARGIN + 5, y + 7);
+  doc.text("PARADAS", MARGIN + 50, y + 7);
+  doc.text("DISTÂNCIA", MARGIN + 80, y + 7);
+  doc.text("TEMPO", MARGIN + 110, y + 7);
+  doc.text("PESO TOTAL", MARGIN + 140, y + 7);
+  doc.text("VOLUME", MARGIN + 170, y + 7);
 
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(cdNome.substring(0, 20), MARGIN + 5, y + 18);
-  doc.text(String(paradas.length), MARGIN + 60, y + 18);
-  doc.text(`${distanciaTotalKm.toFixed(1)} km`, MARGIN + 100, y + 18);
+  doc.text(cdNome.substring(0, 18), MARGIN + 5, y + 16);
+  doc.text(String(paradas.length), MARGIN + 50, y + 16);
+  doc.text(`${distanciaTotalKm.toFixed(1)} km`, MARGIN + 80, y + 16);
   
   const hours = Math.floor(tempoEstimadoMin / 60);
   const mins = tempoEstimadoMin % 60;
-  doc.text(`${hours}h ${mins}min`, MARGIN + 140, y + 18);
+  doc.text(`${hours}h ${mins}min`, MARGIN + 110, y + 16);
+  doc.text(`${pesoTotalKg.toFixed(1)} kg`, MARGIN + 140, y + 16);
+  doc.text(`${volumeTotalM3.toFixed(2)} m³`, MARGIN + 170, y + 16);
 
-  y += 35;
+  // Summary totals row
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  const totalNfs = paradas.reduce((sum, p) => sum + p.totalNfs, 0);
+  const totalCaixas = paradas.reduce((sum, p) => sum + p.totalCaixas, 0);
+  doc.text(`Total: ${totalNfs} NFs | ${totalCaixas} caixas`, MARGIN + 5, y + 28);
+
+  y += 42;
 
   // Stops Table Header
   doc.setFillColor(51, 65, 85); // Slate-700
@@ -112,18 +129,22 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   
-  const colWidths = [12, 50, 60, 28, 30];
+  const colWidths = [10, 42, 48, 24, 24, 22, 10];
   let x = MARGIN;
 
-  doc.text("#", x + 4, y + 7);
+  doc.text("#", x + 3, y + 7);
   x += colWidths[0];
-  doc.text("CLIENTE / CNPJ", x + 3, y + 7);
+  doc.text("CLIENTE / CNPJ", x + 2, y + 7);
   x += colWidths[1];
-  doc.text("ENDEREÇO", x + 3, y + 7);
+  doc.text("ENDEREÇO", x + 2, y + 7);
   x += colWidths[2];
-  doc.text("NFs | CAIXAS", x + 3, y + 7);
+  doc.text("NFs/CX", x + 2, y + 7);
   x += colWidths[3];
-  doc.text("STATUS", x + 3, y + 7);
+  doc.text("PESO", x + 2, y + 7);
+  x += colWidths[4];
+  doc.text("VOLUME", x + 2, y + 7);
+  x += colWidths[5];
+  doc.text("", x + 2, y + 7);
 
   y += 10;
 
@@ -148,15 +169,19 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
       doc.setFont("helvetica", "bold");
 
       x = MARGIN;
-      doc.text("#", x + 4, y + 7);
+      doc.text("#", x + 3, y + 7);
       x += colWidths[0];
-      doc.text("CLIENTE / CNPJ", x + 3, y + 7);
+      doc.text("CLIENTE / CNPJ", x + 2, y + 7);
       x += colWidths[1];
-      doc.text("ENDEREÇO", x + 3, y + 7);
+      doc.text("ENDEREÇO", x + 2, y + 7);
       x += colWidths[2];
-      doc.text("NFs | CAIXAS", x + 3, y + 7);
+      doc.text("NFs/CX", x + 2, y + 7);
       x += colWidths[3];
-      doc.text("STATUS", x + 3, y + 7);
+      doc.text("PESO", x + 2, y + 7);
+      x += colWidths[4];
+      doc.text("VOLUME", x + 2, y + 7);
+      x += colWidths[5];
+      doc.text("", x + 2, y + 7);
 
       y += 10;
       doc.setTextColor(0, 0, 0);
@@ -169,36 +194,43 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
     }
 
     x = MARGIN;
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text(String(parada.ordem || i + 1), x + 4, y + 6);
+    doc.text(String(parada.ordem || i + 1), x + 3, y + 6);
 
     x += colWidths[0];
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text(truncateText(parada.razaoSocial, 25), x + 3, y + 5);
-    doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
-    doc.text(parada.cnpjDestinatario, x + 3, y + 10);
+    doc.setFont("helvetica", "bold");
+    doc.text(truncateText(parada.razaoSocial, 22), x + 2, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.text(parada.cnpjDestinatario, x + 2, y + 10);
 
     x += colWidths[1];
-    doc.setFontSize(7);
+    doc.setFontSize(6);
     // Split address into multiple lines if needed
-    const addressLines = doc.splitTextToSize(parada.enderecoCompleto, colWidths[2] - 6);
-    doc.text(addressLines.slice(0, 2), x + 3, y + 5);
+    const addressLines = doc.splitTextToSize(parada.enderecoCompleto, colWidths[2] - 4);
+    doc.text(addressLines.slice(0, 2), x + 2, y + 5);
 
     x += colWidths[2];
-    doc.setFontSize(8);
-    doc.text(`${parada.totalNfs} NFs`, x + 3, y + 5);
-    doc.text(`${parada.totalCaixas} cx`, x + 3, y + 10);
+    doc.setFontSize(7);
+    doc.text(`${parada.totalNfs} NFs`, x + 2, y + 5);
+    doc.text(`${parada.totalCaixas} cx`, x + 2, y + 10);
 
     x += colWidths[3];
+    doc.setFontSize(7);
+    doc.text(`${parada.pesoTotalKg.toFixed(1)}kg`, x + 2, y + 7);
+
+    x += colWidths[4];
+    doc.text(`${parada.volumeTotalM3.toFixed(2)}m³`, x + 2, y + 7);
+
+    x += colWidths[5];
     if (parada.latitude) {
       doc.setTextColor(22, 163, 74); // Green
-      doc.text("Geocodificado", x + 3, y + 7);
+      doc.text("✓", x + 3, y + 7);
     } else {
       doc.setTextColor(234, 179, 8); // Yellow
-      doc.text("Sem coord.", x + 3, y + 7);
+      doc.text("!", x + 3, y + 7);
     }
     doc.setTextColor(0, 0, 0);
 
@@ -211,14 +243,16 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
   doc.rect(MARGIN, y, CONTENT_WIDTH, 12, "F");
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
 
-  const totalNfs = paradas.reduce((sum, p) => sum + p.totalNfs, 0);
-  const totalCaixas = paradas.reduce((sum, p) => sum + p.totalCaixas, 0);
+  const totalNfsFooter = paradas.reduce((sum, p) => sum + p.totalNfs, 0);
+  const totalCaixasFooter = paradas.reduce((sum, p) => sum + p.totalCaixas, 0);
+  const totalPesoFooter = paradas.reduce((sum, p) => sum + p.pesoTotalKg, 0);
+  const totalVolumeFooter = paradas.reduce((sum, p) => sum + p.volumeTotalM3, 0);
 
   doc.text(
-    `TOTAL: ${paradas.length} paradas | ${totalNfs} NFs | ${totalCaixas} caixas`,
+    `TOTAL: ${paradas.length} paradas | ${totalNfsFooter} NFs | ${totalCaixasFooter} cx | ${totalPesoFooter.toFixed(1)} kg | ${totalVolumeFooter.toFixed(2)} m³`,
     MARGIN + 5,
     y + 8
   );

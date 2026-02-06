@@ -23,6 +23,8 @@ import {
   Clock,
   Package,
   FileText,
+  Weight,
+  Box,
 } from "lucide-react";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
@@ -45,6 +47,8 @@ interface Entrega {
   longitude: number | null;
   totalNfs: number;
   totalCaixas: number;
+  pesoTotalKg: number;
+  volumeTotalM3: number;
   ordem?: number;
 }
 
@@ -52,6 +56,8 @@ interface Roteirizacao {
   id: string;
   distanciaTotalKm: number;
   tempoEstimadoMin: number;
+  pesoTotalKg: number;
+  volumeTotalM3: number;
   paradas: Entrega[];
 }
 
@@ -150,6 +156,8 @@ export default function Roteirizacao() {
             longitude: null,
             totalNfs: 0,
             totalCaixas: 0,
+            pesoTotalKg: 0,
+            volumeTotalM3: 0,
           });
         }
 
@@ -316,6 +324,19 @@ export default function Roteirizacao() {
 
       if (rotError) throw rotError;
 
+      // Calculate totals
+      const pesoTotal = orderedEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+      const volumeTotal = orderedEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+
+      // Update roteirizacao with totals
+      await supabase
+        .from("roteirizacoes")
+        .update({
+          peso_total_kg: pesoTotal,
+          volume_total_m3: volumeTotal,
+        })
+        .eq("id", rotData.id);
+
       // Save paradas
       const paradasInsert = orderedEntregas.map((e, index) => ({
         roteirizacao_id: rotData.id,
@@ -327,6 +348,8 @@ export default function Roteirizacao() {
         ordem: e.ordem || index + 1,
         total_nfs: e.totalNfs,
         total_caixas: e.totalCaixas,
+        peso_total_kg: e.pesoTotalKg,
+        volume_total_m3: e.volumeTotalM3,
       }));
 
       await supabase.from("roteirizacao_paradas").insert(paradasInsert);
@@ -335,6 +358,8 @@ export default function Roteirizacao() {
         id: rotData.id,
         distanciaTotalKm: distanciaKm,
         tempoEstimadoMin: tempoMin,
+        pesoTotalKg: pesoTotal,
+        volumeTotalM3: volumeTotal,
         paradas: orderedEntregas,
       });
 
@@ -369,6 +394,8 @@ export default function Roteirizacao() {
         cdLng: parseFloat(cdLng),
         distanciaTotalKm: roteirizacao.distanciaTotalKm,
         tempoEstimadoMin: roteirizacao.tempoEstimadoMin,
+        pesoTotalKg: roteirizacao.pesoTotalKg,
+        volumeTotalM3: roteirizacao.volumeTotalM3,
         paradas: roteirizacao.paradas,
       });
 
@@ -398,6 +425,8 @@ export default function Roteirizacao() {
 
   const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
   const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+  const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
 
   return (
     <MainLayout>
@@ -475,22 +504,34 @@ export default function Roteirizacao() {
             </Card>
 
             {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Entregas</p>
-                <p className="text-3xl font-bold">{entregas.length}</p>
+                <p className="text-2xl font-bold">{entregas.length}</p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Total NFs</p>
-                <p className="text-3xl font-bold">{totalNfs}</p>
+                <p className="text-2xl font-bold">{totalNfs}</p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Total Caixas</p>
-                <p className="text-3xl font-bold">{totalCaixas}</p>
+                <p className="text-2xl font-bold">{totalCaixas}</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Weight className="w-3 h-3" /> Peso Total
+                </p>
+                <p className="text-2xl font-bold">{totalPeso.toFixed(1)} kg</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Box className="w-3 h-3" /> Volume Total
+                </p>
+                <p className="text-2xl font-bold">{totalVolume.toFixed(2)} m³</p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Geocodificados</p>
-                <p className="text-3xl font-bold">
+                <p className="text-2xl font-bold">
                   {entregas.filter((e) => e.latitude).length}
                 </p>
               </div>
