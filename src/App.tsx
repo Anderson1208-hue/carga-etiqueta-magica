@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { MobileRedirect } from "@/components/layout/MobileRedirect";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Cargas from "./pages/Cargas";
@@ -139,7 +140,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppRoutes />
+          <MobileRedirect>
+            <AppRoutes />
+          </MobileRedirect>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
