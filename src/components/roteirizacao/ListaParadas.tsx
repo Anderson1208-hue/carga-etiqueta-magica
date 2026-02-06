@@ -210,6 +210,17 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
                   );
                 })}
               </TableBody>
+              <tfoot>
+                <tr className="border-t-2 border-primary/30 bg-primary/5 font-semibold text-sm">
+                  <td className="p-3" colSpan={2}>Total MR {grupo.macroRegiao}</td>
+                  <td className="p-3" colSpan={2}></td>
+                  <td className="p-3 text-center">{grupo.totalNfs}</td>
+                  <td className="p-3 text-center">{grupo.totalCaixas}</td>
+                  <td className="p-3 text-right">{grupo.pesoTotalKg.toFixed(1)} kg</td>
+                  <td className="p-3 text-right">{grupo.volumeTotalM3.toFixed(2)} m³</td>
+                  <td className="p-3"></td>
+                </tr>
+              </tfoot>
             </Table>
           </div>
         </div>
