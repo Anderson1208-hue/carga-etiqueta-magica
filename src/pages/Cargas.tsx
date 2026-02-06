@@ -158,26 +158,27 @@ export default function Cargas() {
       // Build the payload for the RPC
       const nfsPayload = successFiles.map((file) => {
         const nf = file.data;
-        const totalCaixasByItem: Record<string, number> = {};
         
-        // Pre-calculate boxes for each item
+        // Group items by cProd to avoid duplicate etiquetas
+        // If same cProd appears multiple times, sum quantities
+        const groupedItems: Record<string, { xProd: string; qCom: number }> = {};
         nf.itens.forEach((item) => {
-          totalCaixasByItem[item.cProd] = calculateBoxes(item.qCom);
+          if (groupedItems[item.cProd]) {
+            groupedItems[item.cProd].qCom += item.qCom;
+          } else {
+            groupedItems[item.cProd] = { xProd: item.xProd, qCom: item.qCom };
+          }
         });
 
-        // Build etiquetas array
+        // Build etiquetas array from grouped items
         const etiquetas: { c_prod: string; x_prod: string; seq: number; total: number; qr_payload: string }[] = [];
-        nf.itens.forEach((item) => {
-          const totalCaixas = totalCaixasByItem[item.cProd];
+        Object.entries(groupedItems).forEach(([cProd, { xProd, qCom }]) => {
+          const totalCaixas = calculateBoxes(qCom);
           for (let seq = 1; seq <= totalCaixas; seq++) {
-            // qr_payload uses a placeholder for carga_id that will be replaced in the RPC
-            // Actually, we need carga_id which is generated in DB. We'll use a placeholder pattern
-            // and the RPC will construct this. For now, we pass the components separately.
-            // The RPC constructs qr_payload as: carga_id;numero_nf;c_prod;seq;total;chave_acesso
-            const qrPayload = `{CARGA_ID};${nf.numeroNf};${item.cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
+            const qrPayload = `{CARGA_ID};${nf.numeroNf};${cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
             etiquetas.push({
-              c_prod: item.cProd,
-              x_prod: item.xProd,
+              c_prod: cProd,
+              x_prod: xProd,
               seq,
               total: totalCaixas,
               qr_payload: qrPayload,
