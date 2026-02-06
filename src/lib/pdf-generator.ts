@@ -116,8 +116,8 @@ export async function generateRomaneioPDF(
 
     x = MARGIN;
 
-    // Cod Produto
-    doc.text(truncateText(item.cProd, 35), x + 4, y);
+    // Cod Produto (display without leading zeros)
+    doc.text(truncateText(formatCProdDisplay(item.cProd), 35), x + 4, y);
     x += colWidths[0];
 
     // Descrição
@@ -256,7 +256,7 @@ export async function generateNotaDeCargaPDF(
       }
 
       x = MARGIN;
-      doc.text(truncateText(item.cProd, 25), x + 3, y);
+      doc.text(truncateText(formatCProdDisplay(item.cProd), 25), x + 3, y);
       x += colWidths[0];
       doc.text(truncateText(item.xProd, 65), x + 3, y);
       x += colWidths[1];
@@ -336,10 +336,10 @@ export async function generateEtiquetasPDF(
     doc.text(`NF: ${etiqueta.numeroNf}`, LABEL_MARGIN, y);
     y += 6;
 
-    // Product code (increased font size)
+    // Product code (increased font size, display without leading zeros)
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(etiqueta.cProd, 22)}`, LABEL_MARGIN, y);
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 22)}`, LABEL_MARGIN, y);
     y += 5;
 
     // Product description (up to 2 lines)
@@ -381,6 +381,12 @@ export async function generateEtiquetasPDF(
   }
 
   return doc.output("blob");
+}
+
+// Remove leading zeros for display only (does not affect stored value or QR code)
+function formatCProdDisplay(cProd: string): string {
+  const num = parseInt(cProd, 10);
+  return isNaN(num) ? cProd : num.toString();
 }
 
 function truncateText(text: string, maxLength: number): string {
