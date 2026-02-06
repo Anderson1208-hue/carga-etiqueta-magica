@@ -26,6 +26,7 @@ import {
   Smartphone,
   FileText,
   ChevronRight,
+  Search,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -84,6 +85,7 @@ export default function Conferencia() {
   const [loadingNfDetails, setLoadingNfDetails] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
+  const [nfSearch, setNfSearch] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
 
   useEffect(() => {
@@ -353,6 +355,11 @@ export default function Conferencia() {
       ? Math.round((selectedNfData.conferidas / selectedNfData.total) * 100)
       : 0;
 
+  // Filter NFs based on search
+  const filteredNfProgress = nfProgress.filter((nf) =>
+    nf.numeroNf.toLowerCase().includes(nfSearch.toLowerCase().trim())
+  );
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -439,27 +446,43 @@ export default function Conferencia() {
             <div className="grid gap-6 lg:grid-cols-2">
               {/* NF List */}
               <Card>
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="w-5 h-5" />
                     Notas Fiscais ({nfProgress.length})
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="space-y-3">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar NF..."
+                      value={nfSearch}
+                      onChange={(e) => setNfSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  
                   {loading ? (
                     <div className="flex justify-center py-8">
                       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                     </div>
                   ) : (
-                    <ScrollArea className="h-[400px]">
-                      <div className="divide-y">
-                        {nfProgress.map((nf) => {
-                          const nfPercent =
-                            nf.total > 0
-                              ? Math.round((nf.conferidas / nf.total) * 100)
-                              : 0;
-                          const isComplete = nf.conferidas === nf.total;
-                          const isSelected = selectedNf === nf.numeroNf;
+                    <ScrollArea className="h-[350px]">
+                      <div className="divide-y border rounded-md">
+                        {filteredNfProgress.length === 0 ? (
+                          <div className="p-4 text-center text-muted-foreground">
+                            {nfSearch ? "Nenhuma NF encontrada" : "Nenhuma NF disponível"}
+                          </div>
+                        ) : (
+                          filteredNfProgress.map((nf) => {
+                            const nfPercent =
+                              nf.total > 0
+                                ? Math.round((nf.conferidas / nf.total) * 100)
+                                : 0;
+                            const isComplete = nf.conferidas === nf.total;
+                            const isSelected = selectedNf === nf.numeroNf;
 
                           return (
                             <button
@@ -496,7 +519,8 @@ export default function Conferencia() {
                               />
                             </button>
                           );
-                        })}
+                        })
+                        )}
                       </div>
                     </ScrollArea>
                   )}
