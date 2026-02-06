@@ -15,6 +15,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -31,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { Plus, Truck, Loader2, FileText, Eye } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -51,12 +61,15 @@ interface Carga {
 }
 
 export default function Cargas() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [cargas, setCargas] = useState<Carga[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [cargaToDelete, setCargaToDelete] = useState<Carga | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -273,6 +286,46 @@ export default function Cargas() {
     }
   }
 
+  function handleDeleteClick(carga: Carga) {
+    setCargaToDelete(carga);
+    setDeleteDialogOpen(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (!cargaToDelete) return;
+
+    setDeleting(true);
+    try {
+      // CASCADE delete will automatically remove:
+      // - notas_fiscais (and their itens_nf via cascade)
+      // - etiquetas
+      const { error } = await supabase
+        .from("cargas")
+        .delete()
+        .eq("id", cargaToDelete.id);
+
+      if (error) throw error;
+
+      setCargas((prev) => prev.filter((c) => c.id !== cargaToDelete.id));
+
+      toast({
+        title: "Carga excluída",
+        description: "A carga e todos os dados vinculados foram removidos com sucesso.",
+      });
+    } catch (error: any) {
+      console.error("Error deleting carga:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir carga",
+        description: error.message || "Tente novamente.",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setCargaToDelete(null);
+    }
+  }
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -473,6 +526,16 @@ export default function Cargas() {
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteClick(carga)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -481,6 +544,51 @@ export default function Cargas() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>
+                  Tem certeza que deseja excluir a carga{" "}
+                  <strong>{cargaToDelete?.placa}</strong> de{" "}
+                  <strong>
+                    {cargaToDelete &&
+                      format(new Date(cargaToDelete.data), "dd/MM/yyyy", {
+                        locale: ptBR,
+                      })}
+                  </strong>
+                  ?
+                </p>
+                <p className="text-destructive font-medium">
+                  Esta ação irá excluir permanentemente:
+                </p>
+                <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                  <li>A carga e suas informações</li>
+                  <li>Todas as NFs vinculadas ({cargaToDelete?._count?.nfs || 0})</li>
+                  <li>Todos os itens das NFs ({cargaToDelete?._count?.itens || 0})</li>
+                  <li>Todas as etiquetas geradas</li>
+                </ul>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Esta ação não pode ser desfeita.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Excluir Carga
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
