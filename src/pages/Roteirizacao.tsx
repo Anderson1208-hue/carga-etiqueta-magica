@@ -133,13 +133,15 @@ export default function Roteirizacao() {
         `)
         .eq("carga_id", cargaId);
 
-      // Group by CEP do destinatário
+      // Group by CEP + CNPJ (mesmo CEP mas CNPJs diferentes = entregas separadas)
       const entregasMap = new Map<string, Entrega>();
 
       (nfsData || []).forEach((nf) => {
         const cep = nf.dest_cep || "SEM_CEP";
+        const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
+        const chave = `${cep}|${cnpj}`;
         
-        if (!entregasMap.has(cep)) {
+        if (!entregasMap.has(chave)) {
           const endereco = [
             nf.dest_logradouro,
             nf.dest_numero,
@@ -151,9 +153,9 @@ export default function Roteirizacao() {
             .filter(Boolean)
             .join(", ");
 
-          entregasMap.set(cep, {
+          entregasMap.set(chave, {
             cep,
-            cnpjDestinatario: nf.cnpj_destinatario || "SEM_CNPJ",
+            cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
             latitude: null,
@@ -165,7 +167,7 @@ export default function Roteirizacao() {
           });
         }
 
-        const entrega = entregasMap.get(cep)!;
+        const entrega = entregasMap.get(chave)!;
         entrega.totalNfs++;
         
         // Add NF weight (from transp/vol in XML)
