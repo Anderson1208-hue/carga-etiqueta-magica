@@ -25,12 +25,19 @@ import {
   FileText,
   Weight,
   Box,
+  Filter,
 } from "lucide-react";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
+import {
+  getMacroRegiao,
+  getMacroRegiaoLabel,
+  getAllMacroRegioes,
+} from "@/lib/macro-regioes";
+import { Badge } from "@/components/ui/badge";
 
 interface Carga {
   id: string;
@@ -44,12 +51,15 @@ interface Entrega {
   cnpjDestinatario: string;
   razaoSocial: string;
   enderecoCompleto: string;
+  bairro: string;
+  macroRegiao: number;
   latitude: number | null;
   longitude: number | null;
   totalNfs: number;
   totalCaixas: number;
   pesoTotalKg: number;
   volumeTotalM3: number;
+  nfs: string[];
   ordem?: number;
 }
 
@@ -74,6 +84,7 @@ export default function Roteirizacao() {
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [filtroMacroRegiao, setFiltroMacroRegiao] = useState<string>("todas");
 
   // CD coordinates (default: São Paulo)
   const [cdLat, setCdLat] = useState<string>("-23.5505");
@@ -102,6 +113,7 @@ export default function Roteirizacao() {
   async function loadEntregas(cargaId: string) {
     setLoading(true);
     setRoteirizacao(null);
+    setFiltroMacroRegiao("todas");
     try {
       const { data: cargaData } = await supabase
         .from("cargas")
@@ -139,8 +151,9 @@ export default function Roteirizacao() {
       (nfsData || []).forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
         const chave = cnpj;
-        
+
         if (!entregasMap.has(chave)) {
+          const bairro = nf.dest_bairro || "";
           const endereco = [
             nf.dest_logradouro,
             nf.dest_numero,
@@ -157,18 +170,22 @@ export default function Roteirizacao() {
             cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
+            bairro,
+            macroRegiao: getMacroRegiao(bairro),
             latitude: null,
             longitude: null,
             totalNfs: 0,
             totalCaixas: 0,
             pesoTotalKg: 0,
             volumeTotalM3: 0,
+            nfs: [],
           });
         }
 
         const entrega = entregasMap.get(chave)!;
         entrega.totalNfs++;
-        
+        entrega.nfs.push(nf.numero_nf);
+
         // Add NF weight (from transp/vol in XML)
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
 
@@ -179,12 +196,8 @@ export default function Roteirizacao() {
         });
       });
 
-      // Ordenação inicial por CNPJ numérico
-      const entregasList = Array.from(entregasMap.values()).sort((a, b) => {
-        const cnpjA = parseInt((a.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
-        const cnpjB = parseInt((b.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
-        return cnpjA - cnpjB;
-      });
+      // Ordenação: macroRegião crescente → bairro A-Z → razão social A-Z
+      const entregasList = sortByMacroRegiao(Array.from(entregasMap.values()));
       setEntregas(entregasList);
     } catch (error) {
       console.error("Error loading entregas:", error);
@@ -198,6 +211,26 @@ export default function Roteirizacao() {
     }
   }
 
+  /**
+   * Ordenação por Macro Região → Bairro → Razão Social
+   * Macro Região 99 fica no final.
+   */
+  function sortByMacroRegiao(list: Entrega[]): Entrega[] {
+    return list
+      .sort((a, b) => {
+        // Macro região crescente (99 vai pro final)
+        if (a.macroRegiao !== b.macroRegiao) {
+          return a.macroRegiao - b.macroRegiao;
+        }
+        // Bairro A-Z
+        const bairroComp = (a.bairro || "").localeCompare(b.bairro || "", "pt-BR");
+        if (bairroComp !== 0) return bairroComp;
+        // Razão social A-Z
+        return (a.razaoSocial || "").localeCompare(b.razaoSocial || "", "pt-BR");
+      })
+      .map((e, i) => ({ ...e, ordem: i + 1 }));
+  }
+
   async function geocodeAddresses() {
     setGeocoding(true);
     const updatedEntregas = [...entregas];
@@ -208,7 +241,6 @@ export default function Roteirizacao() {
       if (entrega.enderecoCompleto === "Endereço não informado") continue;
 
       try {
-        // Use Nominatim (OpenStreetMap) for geocoding - free, no API key needed
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
             entrega.enderecoCompleto + ", Brasil"
@@ -229,31 +261,22 @@ export default function Roteirizacao() {
           };
         }
 
-        // Respect rate limiting
         await new Promise((r) => setTimeout(r, 1100));
       } catch (error) {
         console.error("Geocoding error:", error);
       }
     }
 
-    // After geocoding, sort by nearest-neighbor from CD to group nearby deliveries
-    const cdLatNum = parseFloat(cdLat);
-    const cdLngNum = parseFloat(cdLng);
-    const sortedEntregas = clusterAndSort(updatedEntregas, cdLatNum, cdLngNum);
-
-    setEntregas(sortedEntregas);
+    setEntregas(updatedEntregas);
     setGeocoding(false);
     toast({
       title: "Geocodificação concluída",
-      description: `${sortedEntregas.filter((e) => e.latitude).length} de ${
-        sortedEntregas.length
+      description: `${updatedEntregas.filter((e) => e.latitude).length} de ${
+        updatedEntregas.length
       } endereços localizados`,
     });
   }
 
-  /**
-   * Haversine distance in km between two points.
-   */
   function haversineDistance(
     lat1: number,
     lng1: number,
@@ -272,18 +295,11 @@ export default function Roteirizacao() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  /**
-   * Detects whether the delivery set is urban or rural based on
-   * average inter-point distance. Returns adaptive cluster radius in km.
-   * Urban (avg < 10km): 6 km radius
-   * Interior (avg >= 10km): 17 km radius
-   */
   function detectClusterRadius(points: Entrega[]): number {
     if (points.length < 2) return 6;
 
     let totalDist = 0;
     let count = 0;
-    // Sample distances (limit to avoid O(n²) for large sets)
     const sampleSize = Math.min(points.length, 30);
     for (let i = 0; i < sampleSize; i++) {
       for (let j = i + 1; j < sampleSize; j++) {
@@ -296,19 +312,10 @@ export default function Roteirizacao() {
     }
 
     const avgDist = totalDist / count;
-    // Urban: avg distance between points < 10km → radius 6km
-    // Interior: avg distance >= 10km → radius 17km
     if (avgDist < 10) return 6;
     return 17;
   }
 
-  /**
-   * Cluster-based sort with adaptive radius:
-   * 1. Detects urban (5-8km) vs interior (15-20km) based on point density
-   * 2. Groups nearby deliveries into geographic clusters
-   * 3. Orders clusters by proximity to CD (nearest-neighbor)
-   * 4. Within each cluster, orders stops by nearest-neighbor
-   */
   function clusterAndSort(
     list: Entrega[],
     startLat: number,
@@ -319,15 +326,11 @@ export default function Roteirizacao() {
 
     if (geocoded.length === 0) return list;
 
-    // --- Step 1: Detect adaptive radius ---
     const clusterRadius = detectClusterRadius(geocoded);
-
-    // --- Step 2: Build geographic clusters ---
     const clusters: Entrega[][] = [];
     const unassigned = [...geocoded];
 
     while (unassigned.length > 0) {
-      // Seed: pick the point closest to CD (first cluster) or last cluster centroid
       const refLat = clusters.length === 0
         ? startLat
         : clusters[clusters.length - 1].reduce((s, e) => s + e.latitude!, 0) /
@@ -349,7 +352,6 @@ export default function Roteirizacao() {
       let centroidLat = seed.latitude!;
       let centroidLng = seed.longitude!;
 
-      // Greedily absorb nearby points within adaptive radius
       let changed = true;
       while (changed) {
         changed = false;
@@ -367,7 +369,6 @@ export default function Roteirizacao() {
       clusters.push(cluster);
     }
 
-    // --- Step 3: Order clusters by nearest-neighbor from CD ---
     const orderedClusters: Entrega[][] = [];
     const remainingClusters = [...clusters];
     let curLat = startLat;
@@ -392,7 +393,6 @@ export default function Roteirizacao() {
       curLng = cLng;
     }
 
-    // --- Step 4: Within each cluster, order by nearest-neighbor ---
     const result: Entrega[] = [];
     let nnLat = startLat;
     let nnLng = startLng;
@@ -413,7 +413,6 @@ export default function Roteirizacao() {
       }
     }
 
-    // Append non-geocoded sorted by CNPJ
     const sortedNotGeocoded = notGeocoded.sort((a, b) => {
       const cnpjA = parseInt((a.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
       const cnpjB = parseInt((b.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
@@ -451,13 +450,11 @@ export default function Roteirizacao() {
         return;
       }
 
-      // Build waypoints for OSRM
       const coordinates = [
-        [cdLngNum, cdLatNum], // Start at CD
+        [cdLngNum, cdLatNum],
         ...validEntregas.map((e) => [e.longitude!, e.latitude!]),
       ];
 
-      // Use OSRM for route optimization (trip endpoint)
       const coordStr = coordinates.map((c) => c.join(",")).join(";");
       const response = await fetch(
         `https://router.project-osrm.org/trip/v1/driving/${coordStr}?overview=full&geometries=geojson&roundtrip=false&source=first`
@@ -472,17 +469,13 @@ export default function Roteirizacao() {
       const trip = data.trips[0];
       const waypoints = data.waypoints;
 
-      // Map each delivery waypoint to its optimized trip position
-      // waypoints[i] corresponds to coordinates[i] (input order)
-      // waypoints[i].waypoint_index is the position in the optimized trip
       const deliveryWaypoints = waypoints
-        .slice(1) // skip CD (first input)
+        .slice(1)
         .map((wp: any, inputIdx: number) => ({
           entrega: validEntregas[inputIdx],
           tripOrder: wp.waypoint_index,
         }));
 
-      // Sort by trip order to get the proximity-optimized sequence
       deliveryWaypoints.sort(
         (a: { tripOrder: number }, b: { tripOrder: number }) =>
           a.tripOrder - b.tripOrder
@@ -495,7 +488,6 @@ export default function Roteirizacao() {
         })
       );
 
-      // Fallback if OSRM doesn't return proper order
       if (orderedEntregas.length === 0) {
         validEntregas.forEach((e, i) => {
           orderedEntregas.push({ ...e, ordem: i + 1 });
@@ -505,7 +497,6 @@ export default function Roteirizacao() {
       const distanciaKm = trip.distance / 1000;
       const tempoMin = Math.round(trip.duration / 60);
 
-      // Save to database
       const { data: rotData, error: rotError } = await supabase
         .from("roteirizacoes")
         .insert({
@@ -523,11 +514,9 @@ export default function Roteirizacao() {
 
       if (rotError) throw rotError;
 
-      // Calculate totals
       const pesoTotal = orderedEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
       const volumeTotal = orderedEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
 
-      // Update roteirizacao with totals
       await supabase
         .from("roteirizacoes")
         .update({
@@ -536,7 +525,6 @@ export default function Roteirizacao() {
         })
         .eq("id", rotData.id);
 
-      // Save paradas
       const paradasInsert = orderedEntregas.map((e, index) => ({
         roteirizacao_id: rotData.id,
         cnpj_destinatario: e.cnpjDestinatario,
@@ -622,10 +610,75 @@ export default function Roteirizacao() {
     }
   }
 
-  const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
-  const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
-  const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
-  const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  function exportCSV() {
+    if (!selectedCarga) return;
+
+    const dataToExport = filteredEntregas;
+    const header = [
+      "Seq",
+      "Macro Região",
+      "Bairro",
+      "Destinatário",
+      "CNPJ",
+      "CEP",
+      "Endereço",
+      "Total NFs",
+      "Total Caixas",
+      "Peso (kg)",
+      "Volume (m³)",
+      "Lista NFs",
+    ].join(";");
+
+    const rows = dataToExport.map((e, i) =>
+      [
+        i + 1,
+        `MR ${e.macroRegiao}`,
+        `"${e.bairro}"`,
+        `"${e.razaoSocial}"`,
+        e.cnpjDestinatario,
+        e.cep,
+        `"${e.enderecoCompleto}"`,
+        e.totalNfs,
+        e.totalCaixas,
+        e.pesoTotalKg.toFixed(1),
+        e.volumeTotalM3.toFixed(2),
+        `"${e.nfs.join(", ")}"`,
+      ].join(";")
+    );
+
+    const csvContent = "\uFEFF" + [header, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `rota_sugerida_${selectedCarga.placa}_${format(
+      new Date(selectedCarga.data),
+      "yyyy-MM-dd"
+    )}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "CSV exportado",
+      description: "Rota sugerida exportada com sucesso",
+    });
+  }
+
+  // Filtered entregas based on macro region filter
+  const filteredEntregas =
+    filtroMacroRegiao === "todas"
+      ? entregas
+      : entregas.filter((e) => e.macroRegiao === parseInt(filtroMacroRegiao));
+
+  // Macro regiões presentes na carga (para exibir badges)
+  const macroRegioesPresentes = [...new Set(entregas.map((e) => e.macroRegiao))].sort(
+    (a, b) => a - b
+  );
+
+  const totalCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
+  const totalNfs = filteredEntregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalPeso = filteredEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+  const totalVolume = filteredEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
 
   return (
     <MainLayout>
@@ -637,7 +690,7 @@ export default function Roteirizacao() {
             Roteirização de Entregas
           </h1>
           <p className="text-muted-foreground">
-            Gere rotas otimizadas agrupando por CEP do destinatário
+            Rota sugerida por Macro Região – agrupamento por CNPJ do destinatário
           </p>
         </div>
 
@@ -702,11 +755,69 @@ export default function Roteirizacao() {
               </CardContent>
             </Card>
 
+            {/* Filtro por Macro Região */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  Filtro por Macro Região
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Select value={filtroMacroRegiao} onValueChange={setFiltroMacroRegiao}>
+                    <SelectTrigger className="max-w-sm">
+                      <SelectValue placeholder="Todas as macro regiões" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas as macro regiões</SelectItem>
+                      {getAllMacroRegioes().map((mr) => {
+                        const count = entregas.filter(
+                          (e) => e.macroRegiao === mr.value
+                        ).length;
+                        if (count === 0) return null;
+                        return (
+                          <SelectItem key={mr.value} value={String(mr.value)}>
+                            {mr.label} ({count} paradas)
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Badges das macro regiões presentes */}
+                  <div className="flex flex-wrap gap-2">
+                    {macroRegioesPresentes.map((mr) => {
+                      const count = entregas.filter(
+                        (e) => e.macroRegiao === mr
+                      ).length;
+                      const isActive =
+                        filtroMacroRegiao === String(mr);
+                      return (
+                        <Badge
+                          key={mr}
+                          variant={isActive ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() =>
+                            setFiltroMacroRegiao(
+                              isActive ? "todas" : String(mr)
+                            )
+                          }
+                        >
+                          MR {mr} ({count})
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Stats */}
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               <div className="wms-stat-card">
-                <p className="text-sm text-muted-foreground">Entregas</p>
-                <p className="text-2xl font-bold">{entregas.length}</p>
+                <p className="text-sm text-muted-foreground">Paradas</p>
+                <p className="text-2xl font-bold">{filteredEntregas.length}</p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Total NFs</p>
@@ -731,7 +842,7 @@ export default function Roteirizacao() {
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Geocodificados</p>
                 <p className="text-2xl font-bold">
-                  {entregas.filter((e) => e.latitude).length}
+                  {filteredEntregas.filter((e) => e.latitude).length}
                 </p>
               </div>
             </div>
@@ -760,6 +871,10 @@ export default function Roteirizacao() {
                   <Route className="w-4 h-4 mr-2" />
                 )}
                 Calcular Rota Otimizada
+              </Button>
+              <Button onClick={exportCSV} variant="secondary" disabled={entregas.length === 0}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Rota CSV
               </Button>
               {roteirizacao && (
                 <Button onClick={exportPDF} variant="secondary">
@@ -828,21 +943,26 @@ export default function Roteirizacao() {
                   cdLat={parseFloat(cdLat)}
                   cdLng={parseFloat(cdLng)}
                   cdNome={cdNome}
-                  entregas={entregas}
+                  entregas={filteredEntregas}
                 />
               </CardContent>
             </Card>
 
-            {/* Stops List */}
+            {/* Rota Sugerida - Stops List */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Package className="w-4 h-4" />
-                  Lista de Paradas
+                  Rota Sugerida – Paradas por CNPJ
+                  {filtroMacroRegiao !== "todas" && (
+                    <Badge variant="secondary">
+                      Filtro: MR {filtroMacroRegiao}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ListaParadas entregas={entregas} />
+                <ListaParadas entregas={filteredEntregas} />
               </CardContent>
             </Card>
           </>
