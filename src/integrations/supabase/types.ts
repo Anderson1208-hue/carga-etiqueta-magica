@@ -258,11 +258,13 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           ordem: number
+          peso_total_kg: number | null
           razao_social: string | null
           roteirizacao_id: string
           tempo_anterior_min: number | null
           total_caixas: number | null
           total_nfs: number | null
+          volume_total_m3: number | null
         }
         Insert: {
           cnpj_destinatario: string
@@ -272,11 +274,13 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           ordem: number
+          peso_total_kg?: number | null
           razao_social?: string | null
           roteirizacao_id: string
           tempo_anterior_min?: number | null
           total_caixas?: number | null
           total_nfs?: number | null
+          volume_total_m3?: number | null
         }
         Update: {
           cnpj_destinatario?: string
@@ -286,11 +290,13 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           ordem?: number
+          peso_total_kg?: number | null
           razao_social?: string | null
           roteirizacao_id?: string
           tempo_anterior_min?: number | null
           total_caixas?: number | null
           total_nfs?: number | null
+          volume_total_m3?: number | null
         }
         Relationships: [
           {
@@ -309,11 +315,13 @@ export type Database = {
           created_by: string | null
           distancia_total_km: number | null
           id: string
+          peso_total_kg: number | null
           ponto_inicial_lat: number | null
           ponto_inicial_lng: number | null
           ponto_inicial_nome: string | null
           status: string | null
           tempo_estimado_min: number | null
+          volume_total_m3: number | null
         }
         Insert: {
           carga_id: string
@@ -321,11 +329,13 @@ export type Database = {
           created_by?: string | null
           distancia_total_km?: number | null
           id?: string
+          peso_total_kg?: number | null
           ponto_inicial_lat?: number | null
           ponto_inicial_lng?: number | null
           ponto_inicial_nome?: string | null
           status?: string | null
           tempo_estimado_min?: number | null
+          volume_total_m3?: number | null
         }
         Update: {
           carga_id?: string
@@ -333,11 +343,13 @@ export type Database = {
           created_by?: string | null
           distancia_total_km?: number | null
           id?: string
+          peso_total_kg?: number | null
           ponto_inicial_lat?: number | null
           ponto_inicial_lng?: number | null
           ponto_inicial_nome?: string | null
           status?: string | null
           tempo_estimado_min?: number | null
+          volume_total_m3?: number | null
         }
         Relationships: [
           {

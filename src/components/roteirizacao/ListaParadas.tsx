@@ -1,4 +1,4 @@
-import { MapPin, Package, FileText } from "lucide-react";
+import { MapPin, Package, FileText, Weight, Box } from "lucide-react";
 
 interface Entrega {
   cnpjDestinatario: string;
@@ -8,6 +8,8 @@ interface Entrega {
   longitude: number | null;
   totalNfs: number;
   totalCaixas: number;
+  pesoTotalKg: number;
+  volumeTotalM3: number;
   ordem?: number;
 }
 
@@ -63,7 +65,7 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
           </div>
 
           {/* Stats */}
-          <div className="flex items-center gap-4 text-sm shrink-0">
+          <div className="flex flex-wrap items-center gap-3 text-sm shrink-0">
             <div className="flex items-center gap-1">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <span>{entrega.totalNfs} NFs</span>
@@ -71,6 +73,14 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
             <div className="flex items-center gap-1">
               <Package className="w-4 h-4 text-muted-foreground" />
               <span>{entrega.totalCaixas} cx</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Weight className="w-4 h-4 text-muted-foreground" />
+              <span>{entrega.pesoTotalKg.toFixed(1)} kg</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Box className="w-4 h-4 text-muted-foreground" />
+              <span>{entrega.volumeTotalM3.toFixed(2)} m³</span>
             </div>
             {entrega.latitude ? (
               <span className="text-success text-xs">📍</span>
