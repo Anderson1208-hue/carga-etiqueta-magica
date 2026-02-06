@@ -236,14 +236,90 @@ export default function Roteirizacao() {
       }
     }
 
-    setEntregas(updatedEntregas);
+    // After geocoding, sort by nearest-neighbor from CD to group nearby deliveries
+    const cdLatNum = parseFloat(cdLat);
+    const cdLngNum = parseFloat(cdLng);
+    const sortedEntregas = nearestNeighborSort(updatedEntregas, cdLatNum, cdLngNum);
+
+    setEntregas(sortedEntregas);
     setGeocoding(false);
     toast({
       title: "Geocodificação concluída",
-      description: `${updatedEntregas.filter((e) => e.latitude).length} de ${
-        updatedEntregas.length
+      description: `${sortedEntregas.filter((e) => e.latitude).length} de ${
+        sortedEntregas.length
       } endereços localizados`,
     });
+  }
+
+  /**
+   * Nearest-neighbor heuristic: starting from CD, always pick the closest
+   * unvisited delivery. Non-geocoded deliveries are appended at the end
+   * sorted by CEP.
+   */
+  function nearestNeighborSort(
+    list: Entrega[],
+    startLat: number,
+    startLng: number
+  ): Entrega[] {
+    const geocoded = list.filter((e) => e.latitude && e.longitude);
+    const notGeocoded = list.filter((e) => !e.latitude || !e.longitude);
+
+    if (geocoded.length === 0) return list;
+
+    const haversineDistance = (
+      lat1: number,
+      lng1: number,
+      lat2: number,
+      lng2: number
+    ) => {
+      const toRad = (v: number) => (v * Math.PI) / 180;
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const ordered: Entrega[] = [];
+    const remaining = [...geocoded];
+    let currentLat = startLat;
+    let currentLng = startLng;
+
+    while (remaining.length > 0) {
+      let nearestIdx = 0;
+      let nearestDist = Infinity;
+
+      for (let i = 0; i < remaining.length; i++) {
+        const dist = haversineDistance(
+          currentLat,
+          currentLng,
+          remaining[i].latitude!,
+          remaining[i].longitude!
+        );
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestIdx = i;
+        }
+      }
+
+      const nearest = remaining.splice(nearestIdx, 1)[0];
+      ordered.push(nearest);
+      currentLat = nearest.latitude!;
+      currentLng = nearest.longitude!;
+    }
+
+    // Append non-geocoded sorted by CEP
+    const sortedNotGeocoded = notGeocoded.sort((a, b) => {
+      const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
+      const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
+      return cepA - cepB;
+    });
+
+    return [...ordered, ...sortedNotGeocoded];
   }
 
   async function calculateRoute() {
@@ -295,19 +371,30 @@ export default function Roteirizacao() {
       const trip = data.trips[0];
       const waypoints = data.waypoints;
 
-      // Sort entregas by optimized order
-      const orderedEntregas: Entrega[] = [];
-      waypoints.slice(1).forEach((wp: any, index: number) => {
-        const originalIndex = wp.waypoint_index - 1; // -1 because CD is first
-        if (originalIndex >= 0 && originalIndex < validEntregas.length) {
-          orderedEntregas.push({
-            ...validEntregas[originalIndex],
-            ordem: index + 1,
-          });
-        }
-      });
+      // Map each delivery waypoint to its optimized trip position
+      // waypoints[i] corresponds to coordinates[i] (input order)
+      // waypoints[i].waypoint_index is the position in the optimized trip
+      const deliveryWaypoints = waypoints
+        .slice(1) // skip CD (first input)
+        .map((wp: any, inputIdx: number) => ({
+          entrega: validEntregas[inputIdx],
+          tripOrder: wp.waypoint_index,
+        }));
 
-      // If OSRM doesn't return proper order, use original order
+      // Sort by trip order to get the proximity-optimized sequence
+      deliveryWaypoints.sort(
+        (a: { tripOrder: number }, b: { tripOrder: number }) =>
+          a.tripOrder - b.tripOrder
+      );
+
+      const orderedEntregas: Entrega[] = deliveryWaypoints.map(
+        (dw: { entrega: Entrega; tripOrder: number }, i: number) => ({
+          ...dw.entrega,
+          ordem: i + 1,
+        })
+      );
+
+      // Fallback if OSRM doesn't return proper order
       if (orderedEntregas.length === 0) {
         validEntregas.forEach((e, i) => {
           orderedEntregas.push({ ...e, ordem: i + 1 });
