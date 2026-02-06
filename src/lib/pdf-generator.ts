@@ -361,7 +361,7 @@ export async function generateEtiquetasPDF(
     doc.text(descLines.slice(0, 2).join("\n"), LABEL_MARGIN + 1, y);
 
     // Box number - prominent at bottom
-    doc.setFontSize(16);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
