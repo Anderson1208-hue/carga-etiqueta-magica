@@ -164,9 +164,26 @@ export default function Cargas() {
 
       const cargaId = cargaData.id;
 
+      // Track imported and skipped NFs
+      let importedCount = 0;
+      const skippedNfs: string[] = [];
+
       // 2. Insert NFs and Items
       for (const file of successFiles) {
         const nf = file.data;
+
+        // Check if this chave_acesso already exists in the database
+        const { data: existingNf } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf")
+          .eq("chave_acesso", nf.chaveAcesso)
+          .maybeSingle();
+
+        if (existingNf) {
+          // Skip this NF - already imported
+          skippedNfs.push(nf.numeroNf);
+          continue;
+        }
 
         const { data: nfData, error: nfError } = await supabase
           .from("notas_fiscais")
@@ -193,6 +210,7 @@ export default function Cargas() {
         if (nfError) throw nfError;
 
         const nfId = nfData.id;
+        importedCount++;
 
         // Insert items
         const itensToInsert = nf.itens.map((item) => ({
@@ -241,10 +259,28 @@ export default function Cargas() {
         }
       }
 
-      toast({
-        title: "Carga criada com sucesso!",
-        description: `${successFiles.length} NF(s) importada(s).`,
-      });
+      // Show appropriate message based on results
+      if (importedCount === 0 && skippedNfs.length > 0) {
+        // All NFs were skipped - delete the empty carga
+        await supabase.from("cargas").delete().eq("id", cargaId);
+        
+        toast({
+          variant: "destructive",
+          title: "Nenhuma NF importada",
+          description: `Todos os XMLs já foram importados anteriormente: NF ${skippedNfs.join(", NF ")}`,
+        });
+      } else {
+        // Build success message
+        let description = `${importedCount} NF(s) importada(s).`;
+        if (skippedNfs.length > 0) {
+          description += ` ${skippedNfs.length} XML(s) ignorado(s) (já importados): NF ${skippedNfs.join(", NF ")}`;
+        }
+
+        toast({
+          title: "Carga criada com sucesso!",
+          description,
+        });
+      }
 
       // Reset form
       setFormData({
