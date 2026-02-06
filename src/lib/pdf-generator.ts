@@ -360,13 +360,13 @@ export async function generateEtiquetasPDF(
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), LABEL_MARGIN + 1, y);
 
-    // Box number - prominent at bottom
+    // Box number - prominent at bottom (offset increased for ZD220 unprintable margin)
     doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
       LABEL_MARGIN + 1,
-      LABEL_HEIGHT - LABEL_MARGIN - 1
+      LABEL_HEIGHT - LABEL_MARGIN - 5
     );
 
     // QR Code (right side, vertically centered)
