@@ -10,6 +10,7 @@ interface Carga {
 }
 
 interface Parada {
+  cep: string;
   cnpjDestinatario: string;
   razaoSocial: string;
   enderecoCompleto: string;
@@ -134,7 +135,7 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
 
   doc.text("#", x + 3, y + 7);
   x += colWidths[0];
-  doc.text("CLIENTE / CNPJ", x + 2, y + 7);
+  doc.text("CLIENTE / CEP", x + 2, y + 7);
   x += colWidths[1];
   doc.text("ENDEREÇO", x + 2, y + 7);
   x += colWidths[2];
@@ -171,7 +172,7 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
       x = MARGIN;
       doc.text("#", x + 3, y + 7);
       x += colWidths[0];
-      doc.text("CLIENTE / CNPJ", x + 2, y + 7);
+      doc.text("CLIENTE / CEP", x + 2, y + 7);
       x += colWidths[1];
       doc.text("ENDEREÇO", x + 2, y + 7);
       x += colWidths[2];
@@ -204,7 +205,7 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
     doc.text(truncateText(parada.razaoSocial, 22), x + 2, y + 5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6);
-    doc.text(parada.cnpjDestinatario, x + 2, y + 10);
+    doc.text(parada.cep, x + 2, y + 10);
 
     x += colWidths[1];
     doc.setFontSize(6);

@@ -1,6 +1,7 @@
 import { MapPin, Package, FileText, Weight, Box } from "lucide-react";
 
 interface Entrega {
+  cep: string;
   cnpjDestinatario: string;
   razaoSocial: string;
   enderecoCompleto: string;
@@ -36,7 +37,7 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
     <div className="space-y-3">
       {sortedEntregas.map((entrega, index) => (
         <div
-          key={entrega.cnpjDestinatario}
+          key={entrega.cep}
           className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
         >
           {/* Order number */}
@@ -54,7 +55,7 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
           <div className="flex-1 min-w-0">
             <h4 className="font-medium truncate">{entrega.razaoSocial}</h4>
             <p className="text-sm text-muted-foreground font-mono">
-              {entrega.cnpjDestinatario}
+              CEP: {entrega.cep} | CNPJ: {entrega.cnpjDestinatario}
             </p>
             <div className="flex items-start gap-1 mt-1">
               <MapPin className="w-3.5 h-3.5 mt-0.5 text-muted-foreground shrink-0" />

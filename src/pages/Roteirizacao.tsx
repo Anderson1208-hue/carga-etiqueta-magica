@@ -40,6 +40,7 @@ interface Carga {
 }
 
 interface Entrega {
+  cep: string;
   cnpjDestinatario: string;
   razaoSocial: string;
   enderecoCompleto: string;
@@ -132,13 +133,13 @@ export default function Roteirizacao() {
         `)
         .eq("carga_id", cargaId);
 
-      // Group by CNPJ destinatário
+      // Group by CEP do destinatário
       const entregasMap = new Map<string, Entrega>();
 
       (nfsData || []).forEach((nf) => {
-        const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
+        const cep = nf.dest_cep || "SEM_CEP";
         
-        if (!entregasMap.has(cnpj)) {
+        if (!entregasMap.has(cep)) {
           const endereco = [
             nf.dest_logradouro,
             nf.dest_numero,
@@ -150,8 +151,9 @@ export default function Roteirizacao() {
             .filter(Boolean)
             .join(", ");
 
-          entregasMap.set(cnpj, {
-            cnpjDestinatario: cnpj,
+          entregasMap.set(cep, {
+            cep,
+            cnpjDestinatario: nf.cnpj_destinatario || "SEM_CNPJ",
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
             latitude: null,
@@ -163,7 +165,7 @@ export default function Roteirizacao() {
           });
         }
 
-        const entrega = entregasMap.get(cnpj)!;
+        const entrega = entregasMap.get(cep)!;
         entrega.totalNfs++;
         
         // Add NF weight (from transp/vol in XML)
@@ -441,7 +443,7 @@ export default function Roteirizacao() {
             Roteirização de Entregas
           </h1>
           <p className="text-muted-foreground">
-            Gere rotas otimizadas agrupando por CNPJ do destinatário
+            Gere rotas otimizadas agrupando por CEP do destinatário
           </p>
         </div>
 
