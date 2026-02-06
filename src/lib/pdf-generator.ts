@@ -320,6 +320,9 @@ export async function generateEtiquetasPDF(
     return a.seq - b.seq;
   });
 
+  const qrSize = 20; // 20mm QR code
+  const textAreaWidth = LABEL_WIDTH - LABEL_MARGIN * 2 - qrSize - 2; // text area left of QR
+
   for (let i = 0; i < sortedEtiquetas.length; i++) {
     const etiqueta = sortedEtiquetas[i];
 
@@ -327,38 +330,46 @@ export async function generateEtiquetasPDF(
       doc.addPage([LABEL_WIDTH, LABEL_HEIGHT], "landscape");
     }
 
-    const contentWidth = LABEL_WIDTH - LABEL_MARGIN * 2;
-    let y = LABEL_MARGIN + 2;
+    // Border rectangle for better thermal print definition
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.rect(0.5, 0.5, LABEL_WIDTH - 1, LABEL_HEIGHT - 1);
 
-    // NF number - prominent (increased font size)
+    let y = LABEL_MARGIN + 3;
+
+    // NF number - prominent
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(`NF: ${etiqueta.numeroNf}`, LABEL_MARGIN, y);
+    doc.text(`NF: ${etiqueta.numeroNf}`, LABEL_MARGIN + 1, y);
     y += 6;
 
-    // Product code (increased font size, display without leading zeros)
+    // Thin separator under NF
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.2);
+    doc.line(LABEL_MARGIN, y - 2, LABEL_WIDTH - LABEL_MARGIN - qrSize - 1, y - 2);
+
+    // Product code
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 22)}`, LABEL_MARGIN, y);
-    y += 5;
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 18)}`, LABEL_MARGIN + 1, y + 1);
+    y += 6;
 
-    // Product description (up to 2 lines)
+    // Product description (up to 2 lines, constrained to left of QR)
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    const descLines = doc.splitTextToSize(etiqueta.xProd, contentWidth - 22);
-    doc.text(descLines.slice(0, 2).join("\n"), LABEL_MARGIN, y);
-    y += descLines.length > 1 ? 6 : 3;
+    const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
+    doc.text(descLines.slice(0, 2).join("\n"), LABEL_MARGIN + 1, y);
 
-    // Box number
-    doc.setFontSize(11);
+    // Box number - prominent at bottom
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text(
-      `CAIXA ${etiqueta.seq}/${etiqueta.total}`,
-      LABEL_MARGIN,
-      LABEL_HEIGHT - LABEL_MARGIN - 2
+      `CX ${etiqueta.seq}/${etiqueta.total}`,
+      LABEL_MARGIN + 1,
+      LABEL_HEIGHT - LABEL_MARGIN - 1
     );
 
-    // QR Code (right side) - same size and position
+    // QR Code (right side, vertically centered)
     try {
       const qrDataUrl = await QRCode.toDataURL(etiqueta.qrPayload, {
         width: 80,
@@ -366,15 +377,9 @@ export async function generateEtiquetasPDF(
         errorCorrectionLevel: "M",
       });
 
-      const qrSize = 20; // 20mm for QR with quiet zone (unchanged)
-      doc.addImage(
-        qrDataUrl,
-        "PNG",
-        LABEL_WIDTH - LABEL_MARGIN - qrSize,
-        LABEL_MARGIN + 2,
-        qrSize,
-        qrSize
-      );
+      const qrX = LABEL_WIDTH - LABEL_MARGIN - qrSize;
+      const qrY = (LABEL_HEIGHT - qrSize) / 2; // vertically centered
+      doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
     } catch (error) {
       console.error("Error generating QR code:", error);
     }
