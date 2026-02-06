@@ -27,10 +27,12 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
     );
   }
 
-  // Sort by ordem if available, otherwise by razaoSocial
+  // Sort by ordem if available, otherwise by CEP ascending (numeric)
   const sortedEntregas = [...entregas].sort((a, b) => {
     if (a.ordem && b.ordem) return a.ordem - b.ordem;
-    return a.razaoSocial.localeCompare(b.razaoSocial);
+    const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
+    const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
+    return cepA - cepB;
   });
 
   return (
