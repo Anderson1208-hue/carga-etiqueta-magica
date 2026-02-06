@@ -20,6 +20,7 @@ export type Database = {
           created_by: string | null
           data: string
           id: string
+          import_batch_id: string | null
           motorista: string
           observacao: string | null
           placa: string
@@ -31,6 +32,7 @@ export type Database = {
           created_by?: string | null
           data?: string
           id?: string
+          import_batch_id?: string | null
           motorista: string
           observacao?: string | null
           placa: string
@@ -42,6 +44,7 @@ export type Database = {
           created_by?: string | null
           data?: string
           id?: string
+          import_batch_id?: string | null
           motorista?: string
           observacao?: string | null
           placa?: string
@@ -352,6 +355,7 @@ export type Database = {
     }
     Functions: {
       has_profile: { Args: never; Returns: boolean }
+      importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
     }
     Enums: {

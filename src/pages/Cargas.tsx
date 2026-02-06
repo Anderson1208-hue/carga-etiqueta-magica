@@ -135,6 +135,9 @@ export default function Cargas() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    // Prevent double clicks - button already disabled, but extra safety
+    if (saving) return;
+
     const successFiles = parsedFiles.filter((f) => f.status === "success");
     if (successFiles.length === 0) {
       toast({
@@ -147,133 +150,117 @@ export default function Cargas() {
 
     setSaving(true);
     try {
-      // 1. Create carga
-      const { data: cargaData, error: cargaError } = await supabase
-        .from("cargas")
-        .insert({
-          data: formData.data,
-          placa: formData.placa.toUpperCase(),
-          motorista: formData.motorista,
-          observacao: formData.observacao || null,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+      // Generate a unique batch id based on chave_acesso set + timestamp
+      const chavesAcesso = successFiles.map((f) => f.data.chaveAcesso).sort();
+      const batchSource = `${chavesAcesso.join("|")}|${formData.data}|${Date.now()}`;
+      const importBatchId = await generateHash(batchSource);
 
-      if (cargaError) throw cargaError;
-
-      const cargaId = cargaData.id;
-
-      // Track imported and skipped NFs
-      let importedCount = 0;
-      const skippedNfs: string[] = [];
-
-      // 2. Insert NFs and Items
-      for (const file of successFiles) {
+      // Build the payload for the RPC
+      const nfsPayload = successFiles.map((file) => {
         const nf = file.data;
+        const totalCaixasByItem: Record<string, number> = {};
+        
+        // Pre-calculate boxes for each item
+        nf.itens.forEach((item) => {
+          totalCaixasByItem[item.cProd] = calculateBoxes(item.qCom);
+        });
 
-        // Check if this chave_acesso already exists in the database
-        const { data: existingNf } = await supabase
-          .from("notas_fiscais")
-          .select("id, numero_nf")
-          .eq("chave_acesso", nf.chaveAcesso)
-          .maybeSingle();
-
-        if (existingNf) {
-          // Skip this NF - already imported
-          skippedNfs.push(nf.numeroNf);
-          continue;
-        }
-
-        const { data: nfData, error: nfError } = await supabase
-          .from("notas_fiscais")
-          .insert({
-            carga_id: cargaId,
-            numero_nf: nf.numeroNf,
-            chave_acesso: nf.chaveAcesso,
-            razao_social_emitente: nf.razaoSocialEmitente,
-            cnpj_emitente: nf.cnpjEmitente,
-            cnpj_destinatario: nf.cnpjDestinatario,
-            data_emissao: nf.dataEmissao,
-            // Address fields from destinatário
-            dest_razao_social: nf.destinatario?.razaoSocial || null,
-            dest_logradouro: nf.destinatario?.logradouro || null,
-            dest_numero: nf.destinatario?.numero || null,
-            dest_bairro: nf.destinatario?.bairro || null,
-            dest_cidade: nf.destinatario?.cidade || null,
-            dest_uf: nf.destinatario?.uf || null,
-            dest_cep: nf.destinatario?.cep || null,
-          })
-          .select()
-          .single();
-
-        if (nfError) throw nfError;
-
-        const nfId = nfData.id;
-        importedCount++;
-
-        // Insert items
-        const itensToInsert = nf.itens.map((item) => ({
-          nf_id: nfId,
-          c_prod: item.cProd,
-          x_prod: item.xProd,
-          q_com: item.qCom,
-          u_com: item.uCom,
-        }));
-
-        const { error: itensError } = await supabase
-          .from("itens_nf")
-          .insert(itensToInsert);
-
-        if (itensError) throw itensError;
-
-        // 3. Generate etiquetas
-        const etiquetasToInsert: any[] = [];
-
-        for (const item of nf.itens) {
-          const totalCaixas = calculateBoxes(item.qCom);
-
+        // Build etiquetas array
+        const etiquetas: { c_prod: string; x_prod: string; seq: number; total: number; qr_payload: string }[] = [];
+        nf.itens.forEach((item) => {
+          const totalCaixas = totalCaixasByItem[item.cProd];
           for (let seq = 1; seq <= totalCaixas; seq++) {
-            const qrPayload = `${cargaId};${nf.numeroNf};${item.cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
-
-            etiquetasToInsert.push({
-              carga_id: cargaId,
-              nf_id: nfId,
+            // qr_payload uses a placeholder for carga_id that will be replaced in the RPC
+            // Actually, we need carga_id which is generated in DB. We'll use a placeholder pattern
+            // and the RPC will construct this. For now, we pass the components separately.
+            // The RPC constructs qr_payload as: carga_id;numero_nf;c_prod;seq;total;chave_acesso
+            const qrPayload = `{CARGA_ID};${nf.numeroNf};${item.cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
+            etiquetas.push({
               c_prod: item.cProd,
               x_prod: item.xProd,
-              numero_nf: nf.numeroNf,
-              chave_acesso: nf.chaveAcesso,
               seq,
               total: totalCaixas,
               qr_payload: qrPayload,
             });
           }
-        }
+        });
 
-        if (etiquetasToInsert.length > 0) {
-          const { error: etiquetasError } = await supabase
-            .from("etiquetas")
-            .insert(etiquetasToInsert);
+        return {
+          chave_acesso: nf.chaveAcesso,
+          numero_nf: nf.numeroNf,
+          cnpj_emitente: nf.cnpjEmitente,
+          razao_social_emitente: nf.razaoSocialEmitente,
+          data_emissao: nf.dataEmissao || null,
+          cnpj_destinatario: nf.cnpjDestinatario || null,
+          dest_razao_social: nf.destinatario?.razaoSocial || null,
+          dest_logradouro: nf.destinatario?.logradouro || null,
+          dest_numero: nf.destinatario?.numero || null,
+          dest_bairro: nf.destinatario?.bairro || null,
+          dest_cidade: nf.destinatario?.cidade || null,
+          dest_uf: nf.destinatario?.uf || null,
+          dest_cep: nf.destinatario?.cep || null,
+          itens: nf.itens.map((item) => ({
+            c_prod: item.cProd,
+            x_prod: item.xProd,
+            u_com: item.uCom,
+            q_com: item.qCom,
+          })),
+          etiquetas,
+        };
+      });
 
-          if (etiquetasError) throw etiquetasError;
-        }
-      }
+      const payload = {
+        carga: {
+          motorista: formData.motorista,
+          placa: formData.placa.toUpperCase(),
+          observacao: formData.observacao || null,
+          data: formData.data,
+          import_batch_id: importBatchId,
+        },
+        nfs: nfsPayload,
+      };
 
-      // Show appropriate message based on results
-      if (importedCount === 0 && skippedNfs.length > 0) {
-        // All NFs were skipped - delete the empty carga
-        await supabase.from("cargas").delete().eq("id", cargaId);
+      // Call the atomic RPC
+      const { data: rpcResult, error: rpcError } = await supabase.rpc(
+        "importar_carga_xml_lote",
+        { payload }
+      );
+
+      if (rpcError) throw rpcError;
+
+      // Type the result
+      const result = rpcResult as {
+        status: string;
+        carga_id?: string;
+        total_enviados?: number;
+        importados?: number;
+        ignorados_duplicidade?: number;
+        duplicados?: { numero_nf: string; chave_acesso: string }[];
+      };
+
+      // Handle response
+      if (result.status === "already_processed") {
+        toast({
+          title: "Importação já processada",
+          description: "Esta mesma combinação de XMLs já foi importada anteriormente.",
+        });
+      } else if (result.status === "no_valid_nfs") {
+        // Build list of duplicates
+        const duplicados = result.duplicados || [];
+        const nfsList = duplicados.map((d) => `NF ${d.numero_nf}`).join(", ");
         
         toast({
           variant: "destructive",
           title: "Nenhuma NF importada",
-          description: `Todos os XMLs já foram importados anteriormente: NF ${skippedNfs.join(", NF ")}`,
+          description: `Todos os XMLs já foram importados anteriormente: ${nfsList}`,
         });
       } else {
-        // Build success message
-        let description = `${importedCount} NF(s) importada(s).`;
-        if (skippedNfs.length > 0) {
-          description += ` ${skippedNfs.length} XML(s) ignorado(s) (já importados): NF ${skippedNfs.join(", NF ")}`;
+        // Success - build summary message
+        let description = `${result.importados} NF(s) importada(s).`;
+        if ((result.ignorados_duplicidade || 0) > 0) {
+          const duplicados = result.duplicados || [];
+          const nfsList = duplicados.map((d) => `NF ${d.numero_nf}`).join(", ");
+          description += ` ${result.ignorados_duplicidade} XML(s) ignorado(s) (já importados): ${nfsList}`;
         }
 
         toast({
@@ -282,7 +269,7 @@ export default function Cargas() {
         });
       }
 
-      // Reset form
+      // Reset form (even for already_processed to allow new attempt)
       setFormData({
         data: format(new Date(), "yyyy-MM-dd"),
         placa: "",
@@ -302,6 +289,15 @@ export default function Cargas() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // Simple hash function for batch id
+  async function generateHash(str: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
   async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada") {
