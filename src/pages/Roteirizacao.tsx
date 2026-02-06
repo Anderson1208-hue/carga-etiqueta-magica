@@ -106,7 +106,7 @@ export default function Roteirizacao() {
         setSelectedCarga(cargaData);
       }
 
-      // Fetch NFs with address data
+      // Fetch NFs with address data AND items in a single query (avoids 1000 row limit issue)
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select(`
@@ -119,15 +119,10 @@ export default function Roteirizacao() {
           dest_bairro,
           dest_cidade,
           dest_uf,
-          dest_cep
+          dest_cep,
+          itens_nf(q_com)
         `)
         .eq("carga_id", cargaId);
-
-      // Fetch items for box counting
-      const { data: itensData } = await supabase
-        .from("itens_nf")
-        .select("nf_id, q_com")
-        .in("nf_id", (nfsData || []).map((nf) => nf.id));
 
       // Group by CNPJ destinatário
       const entregasMap = new Map<string, Entrega>();
@@ -161,8 +156,8 @@ export default function Roteirizacao() {
         const entrega = entregasMap.get(cnpj)!;
         entrega.totalNfs++;
 
-        // Count boxes from items - using same calculateBoxes function as Romaneio
-        const nfItems = (itensData || []).filter((item) => item.nf_id === nf.id);
+        // Count boxes from items embedded in the NF query (avoids 1000 row limit)
+        const nfItems = (nf.itens_nf || []) as { q_com: number }[];
         const caixas = nfItems.reduce(
           (sum, item) => sum + calculateBoxes(Number(item.q_com)),
           0
