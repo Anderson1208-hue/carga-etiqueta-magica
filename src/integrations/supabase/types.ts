@@ -125,6 +125,8 @@ export type Database = {
           created_at: string
           id: string
           nf_id: string
+          peso_bruto: number | null
+          peso_liquido: number | null
           q_com: number
           u_com: string
           x_prod: string
@@ -134,6 +136,8 @@ export type Database = {
           created_at?: string
           id?: string
           nf_id: string
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           q_com: number
           u_com: string
           x_prod: string
@@ -143,6 +147,8 @@ export type Database = {
           created_at?: string
           id?: string
           nf_id?: string
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           q_com?: number
           u_com?: string
           x_prod?: string
