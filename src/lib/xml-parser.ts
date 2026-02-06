@@ -19,6 +19,8 @@ export interface NFeParsed {
   dataEmissao: string | null;
   itens: ItemNFParsed[];
   destinatario?: DestinatarioEndereco;
+  pesoBruto: number;
+  pesoLiquido: number;
 }
 
 export interface ItemNFParsed {
@@ -26,8 +28,6 @@ export interface ItemNFParsed {
   xProd: string;
   qCom: number;
   uCom: string;
-  pesoBruto: number;
-  pesoLiquido: number;
 }
 
 export function parseNFeXML(xmlString: string): NFeParsed {
@@ -124,6 +124,14 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     dataEmissao = dEmi.textContent;
   }
 
+  // Extract transport weight from transp/vol (total NF weight)
+  const transp = xmlDoc.querySelector("transp");
+  const vol = transp?.querySelector("vol");
+  const pesoBrutoStr = vol?.querySelector("pesoB")?.textContent || "0";
+  const pesoLiquidoStr = vol?.querySelector("pesoL")?.textContent || "0";
+  const pesoBruto = parseFloat(pesoBrutoStr) || 0;
+  const pesoLiquido = parseFloat(pesoLiquidoStr) || 0;
+
   // Extract items (det elements)
   const detElements = xmlDoc.querySelectorAll("det");
   const itens: ItemNFParsed[] = [];
@@ -135,12 +143,8 @@ export function parseNFeXML(xmlString: string): NFeParsed {
       const xProd = prod.querySelector("xProd")?.textContent || "";
       const qComStr = prod.querySelector("qCom")?.textContent || "0";
       const uCom = prod.querySelector("uCom")?.textContent || "UN";
-      const pesoBrutoStr = prod.querySelector("pesoB")?.textContent || "0";
-      const pesoLiquidoStr = prod.querySelector("pesoL")?.textContent || "0";
 
       const qCom = parseFloat(qComStr);
-      const pesoBruto = parseFloat(pesoBrutoStr) || 0;
-      const pesoLiquido = parseFloat(pesoLiquidoStr) || 0;
 
       if (cProd && xProd && qCom > 0) {
         itens.push({
@@ -148,8 +152,6 @@ export function parseNFeXML(xmlString: string): NFeParsed {
           xProd,
           qCom,
           uCom,
-          pesoBruto,
-          pesoLiquido,
         });
       }
     }
@@ -168,6 +170,8 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     dataEmissao,
     itens,
     destinatario,
+    pesoBruto,
+    pesoLiquido,
   };
 }
 

@@ -180,6 +180,8 @@ export type Database = {
           dest_uf: string | null
           id: string
           numero_nf: string
+          peso_bruto: number | null
+          peso_liquido: number | null
           razao_social_emitente: string
         }
         Insert: {
@@ -198,6 +200,8 @@ export type Database = {
           dest_uf?: string | null
           id?: string
           numero_nf: string
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           razao_social_emitente: string
         }
         Update: {
@@ -216,6 +220,8 @@ export type Database = {
           dest_uf?: string | null
           id?: string
           numero_nf?: string
+          peso_bruto?: number | null
+          peso_liquido?: number | null
           razao_social_emitente?: string
         }
         Relationships: [

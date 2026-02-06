@@ -200,13 +200,13 @@ export default function Cargas() {
           dest_cidade: nf.destinatario?.cidade || null,
           dest_uf: nf.destinatario?.uf || null,
           dest_cep: nf.destinatario?.cep || null,
+          peso_bruto: nf.pesoBruto || 0,
+          peso_liquido: nf.pesoLiquido || 0,
           itens: nf.itens.map((item) => ({
             c_prod: item.cProd,
             x_prod: item.xProd,
             u_com: item.uCom,
             q_com: item.qCom,
-            peso_bruto: item.pesoBruto || 0,
-            peso_liquido: item.pesoLiquido || 0,
           })),
           etiquetas,
         };
