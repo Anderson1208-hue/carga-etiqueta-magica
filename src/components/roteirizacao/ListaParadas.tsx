@@ -27,12 +27,12 @@ export function ListaParadas({ entregas }: ListaParadasProps) {
     );
   }
 
-  // Sort by ordem if available, otherwise by CEP ascending (numeric)
+  // Sort by ordem if available, otherwise by CNPJ ascending (numeric)
   const sortedEntregas = [...entregas].sort((a, b) => {
     if (a.ordem && b.ordem) return a.ordem - b.ordem;
-    const cepA = parseInt((a.cep || "0").replace(/\D/g, ""), 10);
-    const cepB = parseInt((b.cep || "0").replace(/\D/g, ""), 10);
-    return cepA - cepB;
+    const cnpjA = parseInt((a.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+    const cnpjB = parseInt((b.cnpjDestinatario || "0").replace(/\D/g, ""), 10);
+    return cnpjA - cnpjB;
   });
 
   return (
