@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { generateEtiquetasPDF, downloadBlob } from "@/lib/pdf-generator";
-import { Tags, Download, Loader2, Package, FileText } from "lucide-react";
+import { Tags, Download, Loader2, Package, FileText, Printer } from "lucide-react";
 import { format } from "date-fns";
 
 interface Carga {
@@ -55,6 +55,7 @@ export default function Etiquetas() {
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [selectedNfs, setSelectedNfs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -220,6 +221,59 @@ export default function Etiquetas() {
     }
   }
 
+  async function handlePrintEtiquetas() {
+    if (!selectedCarga || selectedNfs.size === 0) {
+      toast({
+        variant: "destructive",
+        title: "Nenhuma NF selecionada",
+        description: "Selecione pelo menos uma NF para imprimir.",
+      });
+      return;
+    }
+
+    const etiquetasToGenerate = etiquetas.filter((e) => selectedNfs.has(e.numeroNf));
+
+    if (etiquetasToGenerate.length === 0) return;
+
+    setPrinting(true);
+    try {
+      const etiquetasData = etiquetasToGenerate.map((e) => ({
+        numeroNf: e.numeroNf,
+        cProd: e.cProd,
+        xProd: e.xProd,
+        seq: e.seq,
+        total: e.total,
+        qrPayload: e.qrPayload,
+        cnpjDestinatario: e.cnpjDestinatario,
+      }));
+
+      const blob = await generateEtiquetasPDF(etiquetasData);
+      const url = URL.createObjectURL(blob);
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.addEventListener("load", () => {
+          printWindow.focus();
+          printWindow.print();
+        });
+      }
+
+      toast({
+        title: "Impressão iniciada",
+        description: `${etiquetasToGenerate.length} etiquetas enviadas para impressão.`,
+      });
+    } catch (error) {
+      console.error("Error printing etiquetas:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao imprimir",
+      });
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   const pendentes = etiquetas.filter((e) => e.status === "pendente").length;
   const conferidas = etiquetas.filter((e) => e.status === "conferido").length;
 
@@ -287,14 +341,26 @@ export default function Etiquetas() {
                 <Button
                   variant="outline"
                   onClick={() => handleGenerateEtiquetas(true)}
-                  disabled={generating || selectedNfs.size === 0}
+                  disabled={generating || printing || selectedNfs.size === 0}
                 >
                   {generating ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
                     <FileText className="w-4 h-4 mr-2" />
                   )}
-                  Gerar Selecionadas ({selectedNfs.size})
+                  Baixar Selecionadas ({selectedNfs.size})
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handlePrintEtiquetas}
+                  disabled={generating || printing || selectedNfs.size === 0}
+                >
+                  {printing ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Printer className="w-4 h-4 mr-2" />
+                  )}
+                  Imprimir Selecionadas
                 </Button>
               </div>
             )}
