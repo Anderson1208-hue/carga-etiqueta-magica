@@ -205,6 +205,8 @@ export default function Cargas() {
             x_prod: item.xProd,
             u_com: item.uCom,
             q_com: item.qCom,
+            peso_bruto: item.pesoBruto || 0,
+            peso_liquido: item.pesoLiquido || 0,
           })),
           etiquetas,
         };
