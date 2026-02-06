@@ -97,32 +97,52 @@ export default function Etiquetas() {
         setSelectedCarga(cargaData);
       }
 
-      const { data: etiquetasData } = await supabase
-        .from("etiquetas")
-        .select(`
-          *,
-          notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario)
-        `)
-        .eq("carga_id", cargaId)
-        .order("c_prod", { ascending: true })
-        .order("seq", { ascending: true });
+      // Paginated fetch to overcome 1000 row limit
+      const PAGE_SIZE = 1000;
+      let allEtiquetas: any[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (etiquetasData) {
-        const mapped = etiquetasData.map((e: any) => ({
-          id: e.id,
-          numeroNf: e.numero_nf,
-          cProd: e.c_prod,
-          xProd: e.x_prod,
-          seq: e.seq,
-          total: e.total,
-          qrPayload: e.qr_payload,
-          status: e.status as "pendente" | "conferido",
-          cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
-        }));
-        setEtiquetas(mapped);
-        // Reset selection when loading new carga
-        setSelectedNfs(new Set());
+      while (hasMore) {
+        const { data: etiquetasPage, error } = await supabase
+          .from("etiquetas")
+          .select(`
+            *,
+            notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario)
+          `)
+          .eq("carga_id", cargaId)
+          .order("c_prod", { ascending: true })
+          .order("seq", { ascending: true })
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+        if (error) {
+          console.error("Error fetching etiquetas page:", error);
+          break;
+        }
+
+        if (etiquetasPage && etiquetasPage.length > 0) {
+          allEtiquetas = [...allEtiquetas, ...etiquetasPage];
+          hasMore = etiquetasPage.length === PAGE_SIZE;
+          page++;
+        } else {
+          hasMore = false;
+        }
       }
+
+      const mapped = allEtiquetas.map((e: any) => ({
+        id: e.id,
+        numeroNf: e.numero_nf,
+        cProd: e.c_prod,
+        xProd: e.x_prod,
+        seq: e.seq,
+        total: e.total,
+        qrPayload: e.qr_payload,
+        status: e.status as "pendente" | "conferido",
+        cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
+      }));
+      setEtiquetas(mapped);
+      // Reset selection when loading new carga
+      setSelectedNfs(new Set());
     } catch (error) {
       console.error("Error loading etiquetas:", error);
       toast({
