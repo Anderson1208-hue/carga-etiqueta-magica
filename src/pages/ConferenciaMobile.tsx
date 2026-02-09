@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import {
@@ -22,6 +24,9 @@ import {
   Package,
   Loader2,
   Smartphone,
+  FileText,
+  ChevronLeft,
+  Search,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -30,6 +35,12 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+}
+
+interface NfProgress {
+  numeroNf: string;
+  total: number;
+  conferidas: number;
 }
 
 interface ConferenciaStats {
@@ -52,6 +63,9 @@ export default function ConferenciaMobile() {
   const [cargas, setCargas] = useState<Carga[]>([]);
   const [selectedCargaId, setSelectedCargaId] = useState<string>("");
   const [selectedCarga, setSelectedCarga] = useState<Carga | null>(null);
+  const [selectedNf, setSelectedNf] = useState<string | null>(null);
+  const [nfProgress, setNfProgress] = useState<NfProgress[]>([]);
+  const [nfSearch, setNfSearch] = useState("");
   const [stats, setStats] = useState<ConferenciaStats>({
     total: 0,
     conferidas: 0,
@@ -69,6 +83,9 @@ export default function ConferenciaMobile() {
 
   useEffect(() => {
     if (selectedCargaId) {
+      setSelectedNf(null);
+      setScanHistory([]);
+      setLastResult(null);
       loadConferenciaData(selectedCargaId);
     }
   }, [selectedCargaId]);
@@ -96,26 +113,52 @@ export default function ConferenciaMobile() {
         setSelectedCarga(cargaData);
       }
 
-      // Use count queries to get accurate totals without row limits
-      const { count: totalCount } = await supabase
-        .from("etiquetas")
-        .select("*", { count: "exact", head: true })
-        .eq("carga_id", cargaId);
+      // Fetch ALL etiquetas using pagination
+      let allEtiquetas: { status: string; numero_nf: string }[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      const { count: conferidoCount } = await supabase
-        .from("etiquetas")
-        .select("*", { count: "exact", head: true })
-        .eq("carga_id", cargaId)
-        .eq("status", "conferido");
+      while (hasMore) {
+        const { data: batch } = await supabase
+          .from("etiquetas")
+          .select("status, numero_nf")
+          .eq("carga_id", cargaId)
+          .range(page * pageSize, (page + 1) * pageSize - 1);
 
-      const total = totalCount || 0;
-      const conferidas = conferidoCount || 0;
+        if (batch && batch.length > 0) {
+          allEtiquetas = [...allEtiquetas, ...batch];
+          hasMore = batch.length === pageSize;
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
 
-      setStats({
-        total,
-        conferidas,
-        pendentes: total - conferidas,
+      const total = allEtiquetas.length;
+      const conferidas = allEtiquetas.filter(
+        (e) => e.status === "conferido"
+      ).length;
+
+      setStats({ total, conferidas, pendentes: total - conferidas });
+
+      // Calculate NF progress
+      const nfMap = new Map<string, NfProgress>();
+      allEtiquetas.forEach((e) => {
+        if (!nfMap.has(e.numero_nf)) {
+          nfMap.set(e.numero_nf, { numeroNf: e.numero_nf, total: 0, conferidas: 0 });
+        }
+        const nf = nfMap.get(e.numero_nf)!;
+        nf.total++;
+        if (e.status === "conferido") nf.conferidas++;
       });
+
+      const nfList = Array.from(nfMap.values()).sort((a, b) => {
+        const numA = parseInt(a.numeroNf.replace(/\D/g, "") || "0", 10);
+        const numB = parseInt(b.numeroNf.replace(/\D/g, "") || "0", 10);
+        return numA - numB;
+      });
+      setNfProgress(nfList);
     } catch (error) {
       console.error("Error loading conferencia data:", error);
     } finally {
@@ -124,13 +167,12 @@ export default function ConferenciaMobile() {
   }
 
   async function processScan(qrData: string) {
-    if (!qrData.trim() || !selectedCargaId) return;
+    if (!qrData.trim() || !selectedCargaId || !selectedNf) return;
 
     setScanning(true);
     setLastResult(null);
 
     try {
-      // Parse QR payload: carga_id;numero_nf;cProd;seq;total;chave_acesso
       const parts = qrData.trim().split(";");
 
       if (parts.length < 6) {
@@ -152,7 +194,20 @@ export default function ConferenciaMobile() {
         const result: ScanResult = {
           type: "warning",
           message: "Etiqueta de outra carga",
-          details: `Esta etiqueta pertence a outra carga`,
+          details: "Esta etiqueta pertence a outra carga",
+        };
+        setLastResult(result);
+        addToHistory(result);
+        playSound("warning");
+        return;
+      }
+
+      // Validate NF - MUST match selected NF
+      if (numeroNf !== selectedNf) {
+        const result: ScanResult = {
+          type: "warning",
+          message: "Etiqueta de outra NF",
+          details: `Esta etiqueta é da NF ${numeroNf}. Selecione a NF correta para conferí-la.`,
         };
         setLastResult(result);
         addToHistory(result);
@@ -203,9 +258,7 @@ export default function ConferenciaMobile() {
         })
         .eq("id", etiqueta.id);
 
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
       const result: ScanResult = {
         type: "success",
@@ -217,7 +270,23 @@ export default function ConferenciaMobile() {
       playSound("success");
 
       // Reload data
-      loadConferenciaData(selectedCargaId);
+      await loadConferenciaData(selectedCargaId);
+
+      // Check if NF is now complete
+      const updatedNf = nfProgress.find((nf) => nf.numeroNf === selectedNf);
+      // +1 because we just conferiu one more
+      if (updatedNf && updatedNf.conferidas + 1 === updatedNf.total) {
+        setTimeout(() => {
+          const completeResult: ScanResult = {
+            type: "success",
+            message: `✅ NF ${selectedNf} COMPLETA!`,
+            details: `Todas as ${updatedNf.total} etiquetas foram conferidas.`,
+          };
+          setLastResult(completeResult);
+          addToHistory(completeResult);
+          playSound("success");
+        }, 500);
+      }
     } catch (error) {
       console.error("Error scanning:", error);
       const result: ScanResult = {
@@ -249,6 +318,16 @@ export default function ConferenciaMobile() {
     inputRef.current?.focus();
   }
 
+  const selectedNfData = nfProgress.find((nf) => nf.numeroNf === selectedNf);
+  const selectedNfPercent =
+    selectedNfData && selectedNfData.total > 0
+      ? Math.round((selectedNfData.conferidas / selectedNfData.total) * 100)
+      : 0;
+
+  const filteredNfProgress = nfProgress.filter((nf) =>
+    nf.numeroNf.toLowerCase().includes(nfSearch.toLowerCase().trim())
+  );
+
   const progressPercent =
     stats.total > 0 ? Math.round((stats.conferidas / stats.total) * 100) : 0;
 
@@ -258,8 +337,25 @@ export default function ConferenciaMobile() {
       <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Smartphone className="w-5 h-5" />
-            <h1 className="text-lg font-semibold">Conferência Mobile</h1>
+            {selectedNf ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-sidebar-foreground h-8 w-8"
+                onClick={() => {
+                  setSelectedNf(null);
+                  setLastResult(null);
+                  setScanHistory([]);
+                }}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            ) : (
+              <Smartphone className="w-5 h-5" />
+            )}
+            <h1 className="text-lg font-semibold">
+              {selectedNf ? `NF ${selectedNf}` : "Conferência Mobile"}
+            </h1>
           </div>
           <MobileLogoutButton />
         </div>
@@ -285,27 +381,117 @@ export default function ConferenciaMobile() {
           </CardContent>
         </Card>
 
-        {selectedCarga && (
+        {selectedCarga && !selectedNf && (
           <>
-            {/* Progress */}
+            {/* Overall Progress */}
             <Card>
               <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {stats.conferidas} de {stats.total}
+                      Progresso geral: {stats.conferidas}/{stats.total}
                     </span>
-                    <span className="font-bold text-lg">{progressPercent}%</span>
+                    <span className="font-bold">{progressPercent}%</span>
                   </div>
-                  <Progress value={progressPercent} className="h-4" />
-                  <div className="flex justify-between text-xs">
-                    <span className="text-pending">
-                      Pendentes: {stats.pendentes}
+                  <Progress value={progressPercent} className="h-3" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* NF Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar NF..."
+                value={nfSearch}
+                onChange={(e) => setNfSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* NF List */}
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredNfProgress.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                      {nfSearch ? "Nenhuma NF encontrada" : "Nenhuma NF disponível"}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filteredNfProgress.map((nf) => {
+                    const nfPercent =
+                      nf.total > 0 ? Math.round((nf.conferidas / nf.total) * 100) : 0;
+                    const isComplete = nf.conferidas === nf.total;
+
+                    return (
+                      <button
+                        key={nf.numeroNf}
+                        onClick={() => {
+                          setSelectedNf(nf.numeroNf);
+                          setLastResult(null);
+                          setScanHistory([]);
+                        }}
+                        className="w-full"
+                      >
+                        <Card className={`transition-colors hover:border-primary ${isComplete ? "border-success/50 bg-success/5" : ""}`}>
+                          <CardContent className="py-3 px-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                {isComplete ? (
+                                  <CheckCircle2 className="w-5 h-5 text-success" />
+                                ) : (
+                                  <FileText className="w-5 h-5 text-muted-foreground" />
+                                )}
+                                <span className="font-semibold text-base">
+                                  NF {nf.numeroNf}
+                                </span>
+                              </div>
+                              <Badge
+                                variant={isComplete ? "default" : "secondary"}
+                                className={isComplete ? "bg-success" : ""}
+                              >
+                                {nf.conferidas}/{nf.total}
+                              </Badge>
+                            </div>
+                            <Progress
+                              value={nfPercent}
+                              className={`h-2 ${isComplete ? "[&>div]:bg-success" : ""}`}
+                            />
+                          </CardContent>
+                        </Card>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {selectedCarga && selectedNf && (
+          <>
+            {/* NF Progress */}
+            <Card>
+              <CardContent className="pt-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {selectedNfData?.conferidas || 0} de {selectedNfData?.total || 0} etiquetas
                     </span>
-                    <span className="text-success">
-                      Conferidas: {stats.conferidas}
-                    </span>
+                    <span className="font-bold text-lg">{selectedNfPercent}%</span>
                   </div>
+                  <Progress value={selectedNfPercent} className="h-4" />
+                  {selectedNfData && selectedNfData.conferidas === selectedNfData.total && (
+                    <div className="flex items-center gap-2 text-success font-semibold mt-2">
+                      <CheckCircle2 className="w-5 h-5" />
+                      NF Completa!
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -321,12 +507,12 @@ export default function ConferenciaMobile() {
               <CardContent>
                 <CameraScanner
                   onScan={processScan}
-                  enabled={!!selectedCargaId}
+                  enabled={!!selectedNf}
                 />
               </CardContent>
             </Card>
 
-            {/* Manual Input (for USB scanners or typing) */}
+            {/* Manual Input */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
