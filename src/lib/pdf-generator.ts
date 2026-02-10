@@ -298,18 +298,12 @@ export async function generateNotaDeCargaPDF(
 export async function generateEtiquetasPDF(
   etiquetas: EtiquetaData[]
 ): Promise<Blob> {
-  // Physical label is 60x40mm; we scale content to 90% to ensure it fits when printed
+  // Zebra ZD220: physical label 60x40mm
+  // The printer + browser print dialog consume ~2-3mm per edge
+  // Safe printable area: 50x30mm (5mm margin each side)
   const LABEL_WIDTH = 60;
   const LABEL_HEIGHT = 40;
-  const SCALE = 0.90;
-  const CONTENT_W = LABEL_WIDTH * SCALE;  // 54
-  const CONTENT_H = LABEL_HEIGHT * SCALE; // 36
-  const OFFSET_X = (LABEL_WIDTH - CONTENT_W) / 2;  // 3mm centering
-  const OFFSET_Y = (LABEL_HEIGHT - CONTENT_H) / 2; // 2mm centering
-  const MARGIN_LEFT = OFFSET_X + 1;
-  const MARGIN_RIGHT = OFFSET_X + 1;
-  const MARGIN_TOP = OFFSET_Y + 1;
-  const MARGIN_BOTTOM = OFFSET_Y + 1;
+  const SAFE = 5; // 5mm safe margin for ZD220
 
   // jsPDF format expects [shorter, longer] side; orientation controls layout
   const doc = new jsPDF({
@@ -318,9 +312,12 @@ export async function generateEtiquetasPDF(
     format: [LABEL_HEIGHT, LABEL_WIDTH],
   });
 
-  const qrSize = 26 * SCALE;  // ~23.4mm
-  const printableWidth = LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
-  const textAreaWidth = printableWidth - qrSize - 3;
+  const qrSize = 20; // 20mm QR - still scannable, fits safely
+  const safeRight = LABEL_WIDTH - SAFE;
+  const safeBottom = LABEL_HEIGHT - SAFE;
+  const qrX = safeRight - qrSize;
+  const textMaxX = qrX - 2; // 2mm gap before QR
+  const textAreaWidth = textMaxX - SAFE;
 
   // Sort: MR → bairro → CNPJ → NF → cProd → seq (same as Nota de Carga)
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
@@ -345,13 +342,12 @@ export async function generateEtiquetasPDF(
       doc.addPage([LABEL_HEIGHT, LABEL_WIDTH], "l");
     }
 
-    // QR Code on the right side - large for easy mobile scanning
-    const qrX = LABEL_WIDTH - MARGIN_RIGHT - qrSize;
-    const qrY = (LABEL_HEIGHT - qrSize) / 2;
+    // QR Code - vertically centered in safe area
+    const qrY = SAFE + (safeBottom - SAFE - qrSize) / 2;
 
     try {
       const qrDataUrl = await QRCode.toDataURL(etiqueta.qrPayload, {
-        width: 120,
+        width: 100,
         margin: 1,
         errorCorrectionLevel: "M",
       });
@@ -360,35 +356,35 @@ export async function generateEtiquetasPDF(
       console.error("Error generating QR code:", error);
     }
 
-    // Text area on the left side
-    let y = MARGIN_TOP + 5;
+    // Text area on the left side - all within safe margins
+    let y = SAFE + 4;
 
-    doc.setFontSize(12 * SCALE);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
-    y += 4 * SCALE;
+    doc.text(`NF: ${etiqueta.numeroNf}`, SAFE, y);
+    y += 3.5;
 
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
-    doc.line(MARGIN_LEFT, y, qrX - 2, y);
-    y += 4 * SCALE;
+    doc.line(SAFE, y, textMaxX, y);
+    y += 3.5;
 
-    doc.setFontSize(8 * SCALE);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 14)}`, MARGIN_LEFT, y);
-    y += 4 * SCALE;
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 12)}`, SAFE, y);
+    y += 3.5;
 
-    doc.setFontSize(6 * SCALE);
+    doc.setFontSize(5);
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
-    doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
+    doc.text(descLines.slice(0, 2).join("\n"), SAFE, y);
 
-    doc.setFontSize(14 * SCALE);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
-      MARGIN_LEFT,
-      LABEL_HEIGHT - MARGIN_BOTTOM - 2
+      SAFE,
+      safeBottom - 1
     );
   }
 
