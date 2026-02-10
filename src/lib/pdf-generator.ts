@@ -289,10 +289,14 @@ export async function generateNotaDeCargaPDF(
 export async function generateEtiquetasPDF(
   etiquetas: EtiquetaData[]
 ): Promise<Blob> {
-  // Label size: 60mm x 40mm (unchanged)
+  // Label size: 60mm x 40mm for Zebra ZD220
   const LABEL_WIDTH = 60;
   const LABEL_HEIGHT = 40;
-  const LABEL_MARGIN = 2;
+  // ZD220 unprintable margins: ~3mm top/bottom, ~2mm left/right
+  const MARGIN_LEFT = 3;
+  const MARGIN_RIGHT = 3;
+  const MARGIN_TOP = 3;
+  const MARGIN_BOTTOM = 3;
 
   const doc = new jsPDF({
     orientation: "landscape",
@@ -300,28 +304,20 @@ export async function generateEtiquetasPDF(
     format: [LABEL_WIDTH, LABEL_HEIGHT],
   });
 
+  const qrSize = 18; // slightly smaller QR for better fit
+  const printableWidth = LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
+  const textAreaWidth = printableWidth - qrSize - 3; // text area left of QR
+
   // CRITICAL: Sort by CNPJ destinatário FIRST, then by numero_nf, then by cProd, then by seq
-  // This ensures all labels of one CNPJ are generated before starting the next CNPJ
-  // And all labels of one NF are generated before starting the next NF
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
-    // 1. First sort by CNPJ destinatário (numeric)
     const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
     if (cnpjCompare !== 0) return cnpjCompare;
-    
-    // 2. Within same CNPJ, sort by NF number (numeric)
     const nfCompare = numericSort(a.numeroNf, b.numeroNf);
     if (nfCompare !== 0) return nfCompare;
-    
-    // 3. Within same NF, sort by cProd (numeric)
     const prodCompare = numericSort(a.cProd, b.cProd);
     if (prodCompare !== 0) return prodCompare;
-    
-    // 4. Within same product, sort by seq (1/Y, 2/Y, ..., Y/Y)
     return a.seq - b.seq;
   });
-
-  const qrSize = 20; // 20mm QR code
-  const textAreaWidth = LABEL_WIDTH - LABEL_MARGIN * 2 - qrSize - 2; // text area left of QR
 
   for (let i = 0; i < sortedEtiquetas.length; i++) {
     const etiqueta = sortedEtiquetas[i];
@@ -330,46 +326,46 @@ export async function generateEtiquetasPDF(
       doc.addPage([LABEL_WIDTH, LABEL_HEIGHT], "landscape");
     }
 
-    // Border rectangle for better thermal print definition
+    // Border rectangle within printable area
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.3);
-    doc.rect(0.5, 0.5, LABEL_WIDTH - 1, LABEL_HEIGHT - 1);
+    doc.rect(MARGIN_LEFT - 1, MARGIN_TOP - 1, LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT + 2, LABEL_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM + 2);
 
-    let y = LABEL_MARGIN + 3;
+    let y = MARGIN_TOP + 2;
 
     // NF number - prominent
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
-    doc.text(`NF: ${etiqueta.numeroNf}`, LABEL_MARGIN + 1, y);
-    y += 6;
+    doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
+    y += 5;
 
     // Thin separator under NF
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
-    doc.line(LABEL_MARGIN, y - 2, LABEL_WIDTH - LABEL_MARGIN - qrSize - 1, y - 2);
+    doc.line(MARGIN_LEFT, y - 1, LABEL_WIDTH - MARGIN_RIGHT - qrSize - 2, y - 1);
 
     // Product code
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 18)}`, LABEL_MARGIN + 1, y + 1);
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 16)}`, MARGIN_LEFT, y + 2);
     y += 6;
 
     // Product description (up to 2 lines, constrained to left of QR)
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
-    doc.text(descLines.slice(0, 2).join("\n"), LABEL_MARGIN + 1, y);
+    doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
 
-    // Box number - prominent at bottom (offset increased for ZD220 unprintable margin)
-    doc.setFontSize(20);
+    // Box number - prominent at bottom with safe offset for ZD220
+    doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
-      LABEL_MARGIN + 1,
-      LABEL_HEIGHT - LABEL_MARGIN - 5
+      MARGIN_LEFT,
+      LABEL_HEIGHT - MARGIN_BOTTOM - 2
     );
 
-    // QR Code (right side, vertically centered)
+    // QR Code (right side, vertically centered within printable area)
     try {
       const qrDataUrl = await QRCode.toDataURL(etiqueta.qrPayload, {
         width: 80,
@@ -377,8 +373,8 @@ export async function generateEtiquetasPDF(
         errorCorrectionLevel: "M",
       });
 
-      const qrX = LABEL_WIDTH - LABEL_MARGIN - qrSize;
-      const qrY = (LABEL_HEIGHT - qrSize) / 2; // vertically centered
+      const qrX = LABEL_WIDTH - MARGIN_RIGHT - qrSize;
+      const qrY = (LABEL_HEIGHT - qrSize) / 2;
       doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
     } catch (error) {
       console.error("Error generating QR code:", error);
