@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Smartphone,
   Route,
+  CalendarClock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,7 @@ const navigation = [
   { name: "Conferência", href: "/conferencia", icon: CheckSquare },
   { name: "Conf. Mobile", href: "/conferencia-mobile", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
+  { name: "Programação", href: "/programacao", icon: CalendarClock },
 ];
 
 export function Sidebar() {
