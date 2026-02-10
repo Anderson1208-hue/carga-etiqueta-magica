@@ -14,6 +14,7 @@ import Conferencia from "./pages/Conferencia";
 import ConferenciaMobile from "./pages/ConferenciaMobile";
 import Roteirizacao from "./pages/Roteirizacao";
 import Programacao from "./pages/Programacao";
+import BaixaEntrega from "./pages/BaixaEntrega";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -134,6 +135,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Programacao />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/baixa-entrega"
+        element={
+          <ProtectedRoute>
+            <BaixaEntrega />
           </ProtectedRoute>
         }
       />
