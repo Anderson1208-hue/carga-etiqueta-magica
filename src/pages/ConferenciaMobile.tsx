@@ -103,75 +103,43 @@ export default function ConferenciaMobile() {
   async function loadConferenciaData(cargaId: string) {
     setLoading(true);
     try {
-      // Fetch carga and NFs in parallel for speed
-      const [cargaRes, nfsRes] = await Promise.all([
+      // Fetch carga info and progress counts in parallel (single DB call for counts!)
+      const [cargaRes, progressRes] = await Promise.all([
         supabase
           .from("cargas")
           .select("id, data, placa, motorista")
           .eq("id", cargaId)
           .single(),
-        supabase
-          .from("notas_fiscais")
-          .select("numero_nf")
-          .eq("carga_id", cargaId)
-          .order("numero_nf"),
+        supabase.rpc("get_conferencia_progress", { p_carga_id: cargaId }),
       ]);
 
       if (cargaRes.data) {
         setSelectedCarga(cargaRes.data);
       }
 
-      const nfs = nfsRes.data || [];
+      const progress = progressRes.data as {
+        total: number;
+        conferidas: number;
+        nfs: { numero_nf: string; total: number; conferidas: number }[];
+      } | null;
 
-      // For each NF, get counts using exact count (fast, no data transfer)
-      const nfProgressList: NfProgress[] = [];
-      let totalGeral = 0;
-      let conferidasGeral = 0;
+      if (progress) {
+        setStats({
+          total: progress.total,
+          conferidas: progress.conferidas,
+          pendentes: progress.total - progress.conferidas,
+        });
 
-      // Batch: get total and conferidas counts per NF
-      // Use a single query to get all counts grouped
-      let allEtiquetas: { status: string; numero_nf: string }[] = [];
-      let page = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data: batch } = await supabase
-          .from("etiquetas")
-          .select("status, numero_nf")
-          .eq("carga_id", cargaId)
-          .range(page * pageSize, (page + 1) * pageSize - 1);
-
-        if (batch && batch.length > 0) {
-          allEtiquetas = [...allEtiquetas, ...batch];
-          hasMore = batch.length === pageSize;
-          page++;
-        } else {
-          hasMore = false;
-        }
+        const nfList: NfProgress[] = (progress.nfs || []).map((nf) => ({
+          numeroNf: nf.numero_nf,
+          total: nf.total,
+          conferidas: nf.conferidas,
+        }));
+        setNfProgress(nfList);
+      } else {
+        setStats({ total: 0, conferidas: 0, pendentes: 0 });
+        setNfProgress([]);
       }
-
-      // Calculate NF progress from fetched data
-      const nfMap = new Map<string, NfProgress>();
-      allEtiquetas.forEach((e) => {
-        if (!nfMap.has(e.numero_nf)) {
-          nfMap.set(e.numero_nf, { numeroNf: e.numero_nf, total: 0, conferidas: 0 });
-        }
-        const nf = nfMap.get(e.numero_nf)!;
-        nf.total++;
-        if (e.status === "conferido") nf.conferidas++;
-      });
-
-      const nfList = Array.from(nfMap.values()).sort((a, b) => {
-        const numA = parseInt(a.numeroNf.replace(/\D/g, "") || "0", 10);
-        const numB = parseInt(b.numeroNf.replace(/\D/g, "") || "0", 10);
-        return numA - numB;
-      });
-      setNfProgress(nfList);
-
-      totalGeral = allEtiquetas.length;
-      conferidasGeral = allEtiquetas.filter((e) => e.status === "conferido").length;
-      setStats({ total: totalGeral, conferidas: conferidasGeral, pendentes: totalGeral - conferidasGeral });
     } catch (error) {
       console.error("Error loading conferencia data:", error);
     } finally {
