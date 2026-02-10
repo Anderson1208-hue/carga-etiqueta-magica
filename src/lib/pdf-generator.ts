@@ -354,9 +354,9 @@ export async function generateEtiquetasPDF(
     }
 
     // Text area on the left side
-    let y = MARGIN_TOP + 5;
+    let y = MARGIN_TOP + 4;
 
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
     y += 4;
@@ -364,24 +364,24 @@ export async function generateEtiquetasPDF(
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.line(MARGIN_LEFT, y, qrX - 2, y);
-    y += 4;
+    y += 3.5;
 
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 14)}`, MARGIN_LEFT, y);
-    y += 4;
+    y += 3.5;
 
-    doc.setFontSize(6);
+    doc.setFontSize(5.5);
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
 
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
       MARGIN_LEFT,
-      LABEL_HEIGHT - MARGIN_BOTTOM - 2
+      LABEL_HEIGHT - MARGIN_BOTTOM
     );
   }
 
