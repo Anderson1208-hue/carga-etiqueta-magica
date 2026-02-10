@@ -384,7 +384,7 @@ export async function generateEtiquetasPDF(
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
       SAFE,
-      safeBottom - 1
+      safeBottom - 3
     );
   }
 
