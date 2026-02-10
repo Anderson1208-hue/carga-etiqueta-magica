@@ -13,6 +13,7 @@ import {
   Smartphone,
   Route,
   CalendarClock,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -26,6 +27,7 @@ const navigation = [
   { name: "Conf. Mobile", href: "/conferencia-mobile", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Programação", href: "/programacao", icon: CalendarClock },
+  { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
 ];
 
 export function Sidebar() {
