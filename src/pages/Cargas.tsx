@@ -90,8 +90,11 @@ export default function Cargas() {
 
   useEffect(() => {
     loadCargas();
-    if (isAdmin) loadOperadores();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) loadOperadores();
+  }, [isAdmin]);
 
   async function loadOperadores() {
     const { data } = await supabase
