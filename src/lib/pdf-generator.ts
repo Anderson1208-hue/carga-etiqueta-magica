@@ -369,7 +369,7 @@ export async function generateEtiquetasPDF(
     doc.line(SAFE, y, textMaxX, y);
     y += 3.5;
 
-    doc.setFontSize(7);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 12)}`, SAFE, y);
     y += 3.5;
