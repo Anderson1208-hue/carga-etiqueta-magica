@@ -344,9 +344,9 @@ export async function generateEtiquetasPDF(
     doc.setLineWidth(0.3);
     doc.rect(MARGIN_LEFT - 1, MARGIN_TOP - 1, LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT + 2, LABEL_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM + 2);
 
-    let y = MARGIN_TOP + 2;
+    let y = MARGIN_TOP + 5;
 
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
     y += 5;
@@ -365,12 +365,12 @@ export async function generateEtiquetasPDF(
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
 
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
       MARGIN_LEFT,
-      LABEL_HEIGHT - MARGIN_BOTTOM - 2
+      LABEL_HEIGHT - MARGIN_BOTTOM - 3
     );
 
     try {
