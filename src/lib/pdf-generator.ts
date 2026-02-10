@@ -306,14 +306,14 @@ export async function generateEtiquetasPDF(
   const MARGIN_BOTTOM = 3;
 
   const doc = new jsPDF({
-    orientation: "landscape",
+    orientation: "portrait",
     unit: "mm",
     format: [LABEL_WIDTH, LABEL_HEIGHT],
   });
 
-  const qrSize = 26;
+  const qrSize = 24;
   const printableWidth = LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
-  const textAreaWidth = printableWidth - qrSize - 2;
+  const textAreaWidth = printableWidth - qrSize - 3;
 
   // Sort: MR → bairro → CNPJ → NF → cProd → seq (same as Nota de Carga)
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
@@ -335,7 +335,7 @@ export async function generateEtiquetasPDF(
     const etiqueta = sortedEtiquetas[i];
 
     if (i > 0) {
-      doc.addPage([LABEL_WIDTH, LABEL_HEIGHT], "landscape");
+      doc.addPage([LABEL_WIDTH, LABEL_HEIGHT], "portrait");
     }
 
     // QR Code on the right side - large for easy mobile scanning
