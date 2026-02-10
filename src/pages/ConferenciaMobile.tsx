@@ -103,17 +103,33 @@ export default function ConferenciaMobile() {
   async function loadConferenciaData(cargaId: string) {
     setLoading(true);
     try {
-      const { data: cargaData } = await supabase
-        .from("cargas")
-        .select("*")
-        .eq("id", cargaId)
-        .single();
+      // Fetch carga and NFs in parallel for speed
+      const [cargaRes, nfsRes] = await Promise.all([
+        supabase
+          .from("cargas")
+          .select("id, data, placa, motorista")
+          .eq("id", cargaId)
+          .single(),
+        supabase
+          .from("notas_fiscais")
+          .select("numero_nf")
+          .eq("carga_id", cargaId)
+          .order("numero_nf"),
+      ]);
 
-      if (cargaData) {
-        setSelectedCarga(cargaData);
+      if (cargaRes.data) {
+        setSelectedCarga(cargaRes.data);
       }
 
-      // Fetch ALL etiquetas using pagination
+      const nfs = nfsRes.data || [];
+
+      // For each NF, get counts using exact count (fast, no data transfer)
+      const nfProgressList: NfProgress[] = [];
+      let totalGeral = 0;
+      let conferidasGeral = 0;
+
+      // Batch: get total and conferidas counts per NF
+      // Use a single query to get all counts grouped
       let allEtiquetas: { status: string; numero_nf: string }[] = [];
       let page = 0;
       const pageSize = 1000;
@@ -135,14 +151,7 @@ export default function ConferenciaMobile() {
         }
       }
 
-      const total = allEtiquetas.length;
-      const conferidas = allEtiquetas.filter(
-        (e) => e.status === "conferido"
-      ).length;
-
-      setStats({ total, conferidas, pendentes: total - conferidas });
-
-      // Calculate NF progress
+      // Calculate NF progress from fetched data
       const nfMap = new Map<string, NfProgress>();
       allEtiquetas.forEach((e) => {
         if (!nfMap.has(e.numero_nf)) {
@@ -159,6 +168,10 @@ export default function ConferenciaMobile() {
         return numA - numB;
       });
       setNfProgress(nfList);
+
+      totalGeral = allEtiquetas.length;
+      conferidasGeral = allEtiquetas.filter((e) => e.status === "conferido").length;
+      setStats({ total: totalGeral, conferidas: conferidasGeral, pendentes: totalGeral - conferidasGeral });
     } catch (error) {
       console.error("Error loading conferencia data:", error);
     } finally {
