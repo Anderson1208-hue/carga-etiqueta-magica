@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { Plus, Truck, Loader2, FileText, Eye, Trash2 } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -53,6 +53,7 @@ interface Carga {
   motorista: string;
   observacao: string | null;
   status: "aberta" | "fechada";
+  operador_responsavel: string | null;
   created_at: string;
   _count?: {
     nfs: number;
@@ -60,10 +61,17 @@ interface Carga {
   };
 }
 
+interface Operador {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 export default function Cargas() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [cargas, setCargas] = useState<Carga[]>([]);
+  const [operadores, setOperadores] = useState<Operador[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -82,7 +90,16 @@ export default function Cargas() {
 
   useEffect(() => {
     loadCargas();
+    if (isAdmin) loadOperadores();
   }, []);
+
+  async function loadOperadores() {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .order("full_name");
+    setOperadores(data || []);
+  }
 
   async function loadCargas() {
     setLoading(true);
@@ -395,6 +412,35 @@ export default function Cargas() {
     }
   }
 
+  async function handleOperadorChange(cargaId: string, operadorId: string | null) {
+    try {
+      const { error } = await supabase
+        .from("cargas")
+        .update({ operador_responsavel: operadorId })
+        .eq("id", cargaId);
+
+      if (error) throw error;
+
+      setCargas((prev) =>
+        prev.map((c) => (c.id === cargaId ? { ...c, operador_responsavel: operadorId } : c))
+      );
+
+      const operador = operadores.find((o) => o.id === operadorId);
+      toast({
+        title: "Operador atribuído",
+        description: operadorId
+          ? `${operador?.full_name || operador?.email} atribuído à carga.`
+          : "Operador removido da carga.",
+      });
+    } catch (error) {
+      console.error("Error assigning operador:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao atribuir operador",
+      });
+    }
+  }
+
   function handleDeleteClick(carga: Carga) {
     setCargaToDelete(carga);
     setDeleteDialogOpen(true);
@@ -559,6 +605,7 @@ export default function Cargas() {
                 <TableHead>Motorista</TableHead>
                 <TableHead className="text-center">NFs</TableHead>
                 <TableHead className="text-center">Itens</TableHead>
+                {isAdmin && <TableHead>Operador</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -566,13 +613,13 @@ export default function Cargas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : cargas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Truck className="w-10 h-10 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
@@ -597,6 +644,30 @@ export default function Cargas() {
                     <TableCell className="text-center">
                       {carga._count?.itens || 0}
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <Select
+                          value={carga.operador_responsavel || "none"}
+                          onValueChange={(value) =>
+                            handleOperadorChange(carga.id, value === "none" ? null : value)
+                          }
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Sem operador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">
+                              <span className="text-muted-foreground">Sem operador</span>
+                            </SelectItem>
+                            {operadores.map((op) => (
+                              <SelectItem key={op.id} value={op.id}>
+                                {op.full_name || op.email}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Select
                         value={carga.status}
