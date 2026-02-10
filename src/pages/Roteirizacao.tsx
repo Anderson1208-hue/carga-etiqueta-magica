@@ -5,15 +5,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   MapPin,
   Route,
@@ -26,6 +25,8 @@ import {
   Weight,
   Box,
   Filter,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
@@ -38,6 +39,13 @@ import {
   getAllMacroRegioes,
 } from "@/lib/macro-regioes";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Carga {
   id: string;
@@ -63,7 +71,7 @@ interface Entrega {
   ordem?: number;
 }
 
-interface Roteirizacao {
+interface RoteirizacaoData {
   id: string;
   distanciaTotalKm: number;
   tempoEstimadoMin: number;
@@ -77,29 +85,34 @@ export default function Roteirizacao() {
   const { toast } = useToast();
 
   const [cargas, setCargas] = useState<Carga[]>([]);
-  const [selectedCargaId, setSelectedCargaId] = useState<string>("");
-  const [selectedCarga, setSelectedCarga] = useState<Carga | null>(null);
+  const [selectedCargaIds, setSelectedCargaIds] = useState<string[]>([]);
   const [entregas, setEntregas] = useState<Entrega[]>([]);
-  const [roteirizacao, setRoteirizacao] = useState<Roteirizacao | null>(null);
+  const [roteirizacao, setRoteirizacao] = useState<RoteirizacaoData | null>(null);
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [filtroMacroRegiao, setFiltroMacroRegiao] = useState<string>("todas");
+  const [cargaSearchTerm, setCargaSearchTerm] = useState("");
 
   // CD coordinates (default: São Paulo)
   const [cdLat, setCdLat] = useState<string>("-23.5505");
   const [cdLng, setCdLng] = useState<string>("-46.6333");
   const [cdNome, setCdNome] = useState<string>("Centro de Distribuição");
 
+  const selectedCargas = cargas.filter((c) => selectedCargaIds.includes(c.id));
+
   useEffect(() => {
     loadCargas();
   }, []);
 
   useEffect(() => {
-    if (selectedCargaId) {
-      loadEntregas(selectedCargaId);
+    if (selectedCargaIds.length > 0) {
+      loadEntregas(selectedCargaIds);
+    } else {
+      setEntregas([]);
+      setRoteirizacao(null);
     }
-  }, [selectedCargaId]);
+  }, [selectedCargaIds]);
 
   async function loadCargas() {
     const { data } = await supabase
@@ -110,22 +123,20 @@ export default function Roteirizacao() {
     setCargas(data || []);
   }
 
-  async function loadEntregas(cargaId: string) {
+  function toggleCarga(cargaId: string) {
+    setSelectedCargaIds((prev) =>
+      prev.includes(cargaId)
+        ? prev.filter((id) => id !== cargaId)
+        : [...prev, cargaId]
+    );
+  }
+
+  async function loadEntregas(cargaIds: string[]) {
     setLoading(true);
     setRoteirizacao(null);
     setFiltroMacroRegiao("todas");
     try {
-      const { data: cargaData } = await supabase
-        .from("cargas")
-        .select("*")
-        .eq("id", cargaId)
-        .single();
-
-      if (cargaData) {
-        setSelectedCarga(cargaData);
-      }
-
-      // Fetch NFs with address data, weight, and items
+      // Fetch NFs from all selected cargas
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select(`
@@ -143,7 +154,7 @@ export default function Roteirizacao() {
           peso_liquido,
           itens_nf(q_com)
         `)
-        .eq("carga_id", cargaId);
+        .in("carga_id", cargaIds);
 
       // Group by CNPJ — cada CNPJ é uma parada única
       const entregasMap = new Map<string, Entrega>();
@@ -186,10 +197,8 @@ export default function Roteirizacao() {
         entrega.totalNfs++;
         entrega.nfs.push(nf.numero_nf);
 
-        // Add NF weight (from transp/vol in XML)
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
 
-        // Count boxes from items
         const nfItems = (nf.itens_nf || []) as { q_com: number }[];
         nfItems.forEach((item) => {
           entrega.totalCaixas += calculateBoxes(Number(item.q_com));
@@ -211,21 +220,14 @@ export default function Roteirizacao() {
     }
   }
 
-  /**
-   * Ordenação por Macro Região → Bairro → Razão Social
-   * Macro Região 99 fica no final.
-   */
   function sortByMacroRegiao(list: Entrega[]): Entrega[] {
     return list
       .sort((a, b) => {
-        // Macro região crescente (99 vai pro final)
         if (a.macroRegiao !== b.macroRegiao) {
           return a.macroRegiao - b.macroRegiao;
         }
-        // Bairro A-Z
         const bairroComp = (a.bairro || "").localeCompare(b.bairro || "", "pt-BR");
         if (bairroComp !== 0) return bairroComp;
-        // Razão social A-Z
         return (a.razaoSocial || "").localeCompare(b.razaoSocial || "", "pt-BR");
       })
       .map((e, i) => ({ ...e, ordem: i + 1 }));
@@ -497,10 +499,11 @@ export default function Roteirizacao() {
       const distanciaKm = trip.distance / 1000;
       const tempoMin = Math.round(trip.duration / 60);
 
+      // Save roteirizacao using the first selected carga
       const { data: rotData, error: rotError } = await supabase
         .from("roteirizacoes")
         .insert({
-          carga_id: selectedCargaId,
+          carga_id: selectedCargaIds[0],
           created_by: user?.id,
           ponto_inicial_lat: cdLatNum,
           ponto_inicial_lng: cdLngNum,
@@ -571,11 +574,20 @@ export default function Roteirizacao() {
   }
 
   async function exportPDF() {
-    if (!roteirizacao || !selectedCarga) return;
+    if (!roteirizacao || selectedCargas.length === 0) return;
 
     try {
+      const cargaLabel = selectedCargas.length === 1
+        ? selectedCargas[0]
+        : {
+            id: selectedCargas[0].id,
+            data: selectedCargas[0].data,
+            placa: selectedCargas.map((c) => c.placa).join(" / "),
+            motorista: selectedCargas.map((c) => c.motorista).join(" / "),
+          };
+
       const blob = await generateRoteirizacaoPDF({
-        carga: selectedCarga,
+        carga: cargaLabel,
         cdNome,
         cdLat: parseFloat(cdLat),
         cdLng: parseFloat(cdLng),
@@ -589,8 +601,9 @@ export default function Roteirizacao() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `roteirizacao_${selectedCarga.placa}_${format(
-        new Date(selectedCarga.data),
+      const placas = selectedCargas.map((c) => c.placa).join("_");
+      link.download = `roteirizacao_${placas}_${format(
+        new Date(selectedCargas[0].data),
         "yyyy-MM-dd"
       )}.pdf`;
       link.click();
@@ -611,7 +624,7 @@ export default function Roteirizacao() {
   }
 
   function exportCSV() {
-    if (!selectedCarga) return;
+    if (selectedCargas.length === 0) return;
 
     const dataToExport = filteredEntregas;
     const header = [
@@ -651,8 +664,9 @@ export default function Roteirizacao() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `rota_sugerida_${selectedCarga.placa}_${format(
-      new Date(selectedCarga.data),
+    const placas = selectedCargas.map((c) => c.placa).join("_");
+    link.download = `rota_sugerida_${placas}_${format(
+      new Date(selectedCargas[0].data),
       "yyyy-MM-dd"
     )}.csv`;
     link.click();
@@ -680,6 +694,14 @@ export default function Roteirizacao() {
   const totalPeso = filteredEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
   const totalVolume = filteredEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
 
+  const filteredCargas = cargaSearchTerm
+    ? cargas.filter(
+        (c) =>
+          c.placa.toLowerCase().includes(cargaSearchTerm.toLowerCase()) ||
+          c.motorista.toLowerCase().includes(cargaSearchTerm.toLowerCase())
+      )
+    : cargas;
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -694,28 +716,102 @@ export default function Roteirizacao() {
           </p>
         </div>
 
-        {/* Carga Selector */}
+        {/* Multi-Carga Selector */}
         <div className="wms-card p-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex-1 min-w-[250px] max-w-sm">
-              <Select value={selectedCargaId} onValueChange={setSelectedCargaId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma carga" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cargas.map((carga) => (
-                    <SelectItem key={carga.id} value={carga.id}>
-                      {carga.placa} - {format(new Date(carga.data), "dd/MM/yyyy")}{" "}
-                      - {carga.motorista}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Selecione uma ou mais cargas</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between min-h-[40px] h-auto"
+                >
+                  <span className="text-left truncate">
+                    {selectedCargaIds.length === 0
+                      ? "Selecione as cargas..."
+                      : `${selectedCargaIds.length} carga(s) selecionada(s)`}
+                  </span>
+                  <ChevronDown className="w-4 h-4 shrink-0 ml-2 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[460px] p-0" align="start">
+                <div className="p-3 border-b">
+                  <Input
+                    placeholder="Buscar por placa ou motorista..."
+                    value={cargaSearchTerm}
+                    onChange={(e) => setCargaSearchTerm(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div className="max-h-[280px] overflow-y-auto p-2 space-y-1">
+                  {filteredCargas.map((carga) => {
+                    const isSelected = selectedCargaIds.includes(carga.id);
+                    return (
+                      <label
+                        key={carga.id}
+                        className={`flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${
+                          isSelected ? "bg-accent/50" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleCarga(carga.id)}
+                        />
+                        <span className="text-sm">
+                          <span className="font-medium">{carga.placa}</span>
+                          {" - "}
+                          {format(new Date(carga.data), "dd/MM/yyyy")}
+                          {" - "}
+                          {carga.motorista}
+                        </span>
+                      </label>
+                    );
+                  })}
+                  {filteredCargas.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhuma carga encontrada
+                    </p>
+                  )}
+                </div>
+                {selectedCargaIds.length > 0 && (
+                  <div className="p-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => setSelectedCargaIds([])}
+                    >
+                      Limpar seleção
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* Selected cargas badges */}
+            {selectedCargas.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedCargas.map((carga) => (
+                  <Badge
+                    key={carga.id}
+                    variant="secondary"
+                    className="gap-1 pr-1"
+                  >
+                    {carga.placa} - {carga.motorista}
+                    <button
+                      onClick={() => toggleCarga(carga.id)}
+                      className="ml-1 rounded-full hover:bg-muted p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {selectedCarga && (
+        {selectedCargas.length > 0 && (
           <>
             {/* CD Configuration */}
             <Card>
