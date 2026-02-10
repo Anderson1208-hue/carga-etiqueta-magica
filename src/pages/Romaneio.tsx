@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,7 @@ import {
   printBlob,
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { FileText, Download, Loader2, Printer } from "lucide-react";
 import { format } from "date-fns";
 
@@ -48,7 +49,9 @@ interface NotaFiscalData {
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
+  destBairro: string;
   dataEmissao: string | null;
+  macroRegiao: number;
   itens: {
     cProd: string;
     xProd: string;
@@ -69,6 +72,7 @@ export default function Romaneio() {
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | null>(null);
+  const [selectedMR, setSelectedMR] = useState<string>("todas");
 
   useEffect(() => {
     loadCargas();
@@ -77,8 +81,21 @@ export default function Romaneio() {
   useEffect(() => {
     if (selectedCargaId) {
       loadRomaneio(selectedCargaId);
+      setSelectedMR("todas");
     }
   }, [selectedCargaId]);
+
+  // Available MRs based on loaded NFs
+  const availableMRs = useMemo(() => {
+    const mrSet = new Set(notasFiscais.map((nf) => nf.macroRegiao));
+    return getAllMacroRegioes().filter((mr) => mrSet.has(mr.value));
+  }, [notasFiscais]);
+
+  // Filtered NFs by selected MR
+  const filteredNFs = useMemo(() => {
+    if (selectedMR === "todas") return notasFiscais;
+    return notasFiscais.filter((nf) => nf.macroRegiao === parseInt(selectedMR));
+  }, [notasFiscais, selectedMR]);
 
   async function loadCargas() {
     const { data } = await supabase
@@ -99,7 +116,6 @@ export default function Romaneio() {
   async function loadRomaneio(cargaId: string) {
     setLoading(true);
     try {
-      // Get carga info
       const { data: cargaData } = await supabase
         .from("cargas")
         .select("*")
@@ -110,7 +126,6 @@ export default function Romaneio() {
         setSelectedCarga(cargaData);
       }
 
-      // Get all NFs with items
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select(`
@@ -119,6 +134,7 @@ export default function Romaneio() {
           razao_social_emitente,
           cnpj_emitente,
           cnpj_destinatario,
+          dest_bairro,
           data_emissao,
           itens_nf(
             c_prod,
@@ -157,20 +173,35 @@ export default function Romaneio() {
 
       setRomaneioItems(sortedItems);
 
-      // Process NFs for Nota de Carga
+      // Process NFs for Nota de Carga with Macro Região
       const nfsList: NotaFiscalData[] = nfsData.map((nf) => ({
         id: nf.id,
         numeroNf: nf.numero_nf,
         razaoSocialEmitente: nf.razao_social_emitente,
         cnpjEmitente: nf.cnpj_emitente,
         cnpjDestinatario: nf.cnpj_destinatario || "",
+        destBairro: nf.dest_bairro || "",
         dataEmissao: nf.data_emissao,
+        macroRegiao: getMacroRegiao(nf.dest_bairro),
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
           qCom: item.q_com,
         })),
       }));
+
+      // Sort by MR → bairro → CNPJ → NF number
+      nfsList.sort((a, b) => {
+        if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
+        const bairroCompare = (a.destBairro || "").localeCompare(b.destBairro || "");
+        if (bairroCompare !== 0) return bairroCompare;
+        const cnpjA = parseFloat(a.cnpjDestinatario.replace(/\D/g, '')) || 0;
+        const cnpjB = parseFloat(b.cnpjDestinatario.replace(/\D/g, '')) || 0;
+        if (cnpjA !== cnpjB) return cnpjA - cnpjB;
+        const nfA = parseFloat(a.numeroNf.replace(/\D/g, '')) || 0;
+        const nfB = parseFloat(b.numeroNf.replace(/\D/g, '')) || 0;
+        return nfA - nfB;
+      });
 
       setNotasFiscais(nfsList);
     } catch (error) {
@@ -215,24 +246,29 @@ export default function Romaneio() {
     }
   }
 
+  function buildNfsPDF(nfs: NotaFiscalData[]) {
+    return nfs.map((nf) => ({
+      numeroNf: nf.numeroNf,
+      razaoSocialEmitente: nf.razaoSocialEmitente,
+      cnpjEmitente: nf.cnpjEmitente,
+      cnpjDestinatario: nf.cnpjDestinatario,
+      destBairro: nf.destBairro,
+      macroRegiao: nf.macroRegiao,
+      dataEmissao: nf.dataEmissao,
+      itens: nf.itens.map((item) => ({
+        cProd: item.cProd,
+        xProd: item.xProd,
+        qtdCaixas: calculateBoxes(item.qCom),
+      })),
+    }));
+  }
+
   async function handleGenerateNotaDeCarga() {
-    if (!selectedCarga || notasFiscais.length === 0) return;
+    if (!selectedCarga || filteredNFs.length === 0) return;
 
     setGenerating("nota");
     try {
-      const nfsPDF = notasFiscais.map((nf) => ({
-        numeroNf: nf.numeroNf,
-        razaoSocialEmitente: nf.razaoSocialEmitente,
-        cnpjEmitente: nf.cnpjEmitente,
-        cnpjDestinatario: nf.cnpjDestinatario,
-        dataEmissao: nf.dataEmissao,
-        itens: nf.itens.map((item) => ({
-          cProd: item.cProd,
-          xProd: item.xProd,
-          qtdCaixas: calculateBoxes(item.qCom),
-        })),
-      }));
-
+      const nfsPDF = buildNfsPDF(filteredNFs);
       const blob = await generateNotaDeCargaPDF(
         {
           data: selectedCarga.data,
@@ -242,11 +278,12 @@ export default function Romaneio() {
         nfsPDF
       );
 
-      downloadBlob(blob, `nota_carga_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}.pdf`);
+      const suffix = selectedMR !== "todas" ? `_MR${selectedMR}` : "";
+      downloadBlob(blob, `nota_carga_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}${suffix}.pdf`);
 
       toast({
         title: "PDF gerado com sucesso!",
-        description: "O download foi iniciado.",
+        description: `${filteredNFs.length} NFs incluídas.`,
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -282,21 +319,10 @@ export default function Romaneio() {
   }
 
   async function handlePrintNotaDeCarga() {
-    if (!selectedCarga || notasFiscais.length === 0) return;
+    if (!selectedCarga || filteredNFs.length === 0) return;
     setGenerating("print-nota");
     try {
-      const nfsPDF = notasFiscais.map((nf) => ({
-        numeroNf: nf.numeroNf,
-        razaoSocialEmitente: nf.razaoSocialEmitente,
-        cnpjEmitente: nf.cnpjEmitente,
-        cnpjDestinatario: nf.cnpjDestinatario,
-        dataEmissao: nf.dataEmissao,
-        itens: nf.itens.map((item) => ({
-          cProd: item.cProd,
-          xProd: item.xProd,
-          qtdCaixas: calculateBoxes(item.qCom),
-        })),
-      }));
+      const nfsPDF = buildNfsPDF(filteredNFs);
       const blob = await generateNotaDeCargaPDF(
         {
           data: selectedCarga.data,
@@ -335,7 +361,7 @@ export default function Romaneio() {
 
         {/* Carga Selector */}
         <div className="wms-card p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex-1 max-w-sm">
               <Select
                 value={selectedCargaId}
@@ -380,10 +406,39 @@ export default function Romaneio() {
                   )}
                   Imprimir Romaneio
                 </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Nota de Carga section with route filter */}
+        {selectedCarga && notasFiscais.length > 0 && (
+          <div className="wms-card p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h3 className="font-semibold">Nota de Carga por Rota</h3>
+              <div className="w-64">
+                <Select value={selectedMR} onValueChange={setSelectedMR}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar por rota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as Rotas ({notasFiscais.length} NFs)</SelectItem>
+                    {availableMRs.map((mr) => {
+                      const count = notasFiscais.filter((nf) => nf.macroRegiao === mr.value).length;
+                      return (
+                        <SelectItem key={mr.value} value={mr.value.toString()}>
+                          {mr.label} ({count} NFs)
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
                 <Button
                   variant="secondary"
                   onClick={handleGenerateNotaDeCarga}
-                  disabled={generating !== null || notasFiscais.length === 0}
+                  disabled={generating !== null || filteredNFs.length === 0}
                 >
                   {generating === "nota" ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -395,7 +450,7 @@ export default function Romaneio() {
                 <Button
                   variant="outline"
                   onClick={handlePrintNotaDeCarga}
-                  disabled={generating !== null || notasFiscais.length === 0}
+                  disabled={generating !== null || filteredNFs.length === 0}
                 >
                   {generating === "print-nota" ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -405,9 +460,33 @@ export default function Romaneio() {
                   Imprimir Nota de Carga
                 </Button>
               </div>
-            )}
+            </div>
+            {/* Summary of NFs by MR */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {availableMRs.map((mr) => {
+                const nfsInMR = notasFiscais.filter((nf) => nf.macroRegiao === mr.value);
+                const totalBoxes = nfsInMR.reduce((acc, nf) => 
+                  acc + nf.itens.reduce((sum, item) => sum + calculateBoxes(item.qCom), 0), 0
+                );
+                return (
+                  <div
+                    key={mr.value}
+                    className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-colors ${
+                      selectedMR === mr.value.toString()
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted border-border hover:bg-accent"
+                    }`}
+                    onClick={() => setSelectedMR(
+                      selectedMR === mr.value.toString() ? "todas" : mr.value.toString()
+                    )}
+                  >
+                    MR {mr.value} • {nfsInMR.length} NFs • {totalBoxes} cx
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Romaneio Table */}
         {selectedCarga && (
