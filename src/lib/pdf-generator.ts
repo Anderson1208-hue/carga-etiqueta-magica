@@ -31,6 +31,8 @@ interface EtiquetaData {
   total: number;
   qrPayload: string;
   cnpjDestinatario: string;
+  destBairro?: string;
+  macroRegiao?: number;
 }
 
 // A4 dimensions in mm (landscape)
@@ -315,7 +317,13 @@ export async function generateEtiquetasPDF(
 
   // Sort order is already applied by the caller (MR → bairro → CNPJ → NF → cProd → seq)
   // Fallback sort by CNPJ → NF → cProd → seq if not pre-sorted
+  // Sort: MR → bairro → CNPJ → NF → cProd → seq (same as Nota de Carga)
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
+    const mrA = a.macroRegiao ?? 99;
+    const mrB = b.macroRegiao ?? 99;
+    if (mrA !== mrB) return mrA - mrB;
+    const bairroCompare = (a.destBairro || "").localeCompare(b.destBairro || "");
+    if (bairroCompare !== 0) return bairroCompare;
     const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
     if (cnpjCompare !== 0) return cnpjCompare;
     const nfCompare = numericSort(a.numeroNf, b.numeroNf);

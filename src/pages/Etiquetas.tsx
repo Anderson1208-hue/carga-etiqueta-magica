@@ -256,6 +256,8 @@ export default function Etiquetas() {
         total: e.total,
         qrPayload: e.qrPayload,
         cnpjDestinatario: e.cnpjDestinatario,
+        destBairro: e.destBairro,
+        macroRegiao: e.macroRegiao,
       }));
 
       const blob = await generateEtiquetasPDF(etiquetasData);
@@ -306,6 +308,8 @@ export default function Etiquetas() {
         total: e.total,
         qrPayload: e.qrPayload,
         cnpjDestinatario: e.cnpjDestinatario,
+        destBairro: e.destBairro,
+        macroRegiao: e.macroRegiao,
       }));
 
       const blob = await generateEtiquetasPDF(etiquetasData);
