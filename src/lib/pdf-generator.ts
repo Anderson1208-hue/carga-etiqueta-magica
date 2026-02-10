@@ -298,12 +298,18 @@ export async function generateNotaDeCargaPDF(
 export async function generateEtiquetasPDF(
   etiquetas: EtiquetaData[]
 ): Promise<Blob> {
+  // Physical label is 60x40mm; we scale content to 90% to ensure it fits when printed
   const LABEL_WIDTH = 60;
   const LABEL_HEIGHT = 40;
-  const MARGIN_LEFT = 3;
-  const MARGIN_RIGHT = 3;
-  const MARGIN_TOP = 3;
-  const MARGIN_BOTTOM = 3;
+  const SCALE = 0.90;
+  const CONTENT_W = LABEL_WIDTH * SCALE;  // 54
+  const CONTENT_H = LABEL_HEIGHT * SCALE; // 36
+  const OFFSET_X = (LABEL_WIDTH - CONTENT_W) / 2;  // 3mm centering
+  const OFFSET_Y = (LABEL_HEIGHT - CONTENT_H) / 2; // 2mm centering
+  const MARGIN_LEFT = OFFSET_X + 1;
+  const MARGIN_RIGHT = OFFSET_X + 1;
+  const MARGIN_TOP = OFFSET_Y + 1;
+  const MARGIN_BOTTOM = OFFSET_Y + 1;
 
   // jsPDF format expects [shorter, longer] side; orientation controls layout
   const doc = new jsPDF({
@@ -312,7 +318,7 @@ export async function generateEtiquetasPDF(
     format: [LABEL_HEIGHT, LABEL_WIDTH],
   });
 
-  const qrSize = 26;
+  const qrSize = 26 * SCALE;  // ~23.4mm
   const printableWidth = LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
   const textAreaWidth = printableWidth - qrSize - 3;
 
@@ -357,27 +363,27 @@ export async function generateEtiquetasPDF(
     // Text area on the left side
     let y = MARGIN_TOP + 5;
 
-    doc.setFontSize(12);
+    doc.setFontSize(12 * SCALE);
     doc.setFont("helvetica", "bold");
     doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
-    y += 4;
+    y += 4 * SCALE;
 
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.line(MARGIN_LEFT, y, qrX - 2, y);
-    y += 4;
+    y += 4 * SCALE;
 
-    doc.setFontSize(8);
+    doc.setFontSize(8 * SCALE);
     doc.setFont("helvetica", "bold");
     doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 14)}`, MARGIN_LEFT, y);
-    y += 4;
+    y += 4 * SCALE;
 
-    doc.setFontSize(6);
+    doc.setFontSize(6 * SCALE);
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
 
-    doc.setFontSize(14);
+    doc.setFontSize(14 * SCALE);
     doc.setFont("helvetica", "bold");
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
