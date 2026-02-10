@@ -156,10 +156,21 @@ export default function Roteirizacao() {
         `)
         .in("carga_id", cargaIds);
 
+      // Fetch NFs that already have delivery confirmation (entregue)
+      const { data: baixasData } = await supabase
+        .from("baixas_entrega")
+        .select("nf_id, status")
+        .eq("status", "entregue");
+
+      const nfsEntregues = new Set((baixasData || []).map((b) => b.nf_id));
+
+      // Filter out delivered NFs
+      const nfsDisponiveis = (nfsData || []).filter((nf) => !nfsEntregues.has(nf.id));
+
       // Group by CNPJ — cada CNPJ é uma parada única
       const entregasMap = new Map<string, Entrega>();
 
-      (nfsData || []).forEach((nf) => {
+      nfsDisponiveis.forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
         const chave = cnpj;
 
