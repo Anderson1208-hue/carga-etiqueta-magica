@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      baixas_entrega: {
+        Row: {
+          created_at: string
+          foto_path: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          nf_id: string
+          ocorrencia: string | null
+          recebedor_nome: string | null
+          registrado_em: string | null
+          registrado_por: string | null
+          status: string
+          updated_at: string
+          veiculo_id: string
+        }
+        Insert: {
+          created_at?: string
+          foto_path?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nf_id: string
+          ocorrencia?: string | null
+          recebedor_nome?: string | null
+          registrado_em?: string | null
+          registrado_por?: string | null
+          status?: string
+          updated_at?: string
+          veiculo_id: string
+        }
+        Update: {
+          created_at?: string
+          foto_path?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nf_id?: string
+          ocorrencia?: string | null
+          recebedor_nome?: string | null
+          registrado_em?: string | null
+          registrado_por?: string | null
+          status?: string
+          updated_at?: string
+          veiculo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "baixas_entrega_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "baixas_entrega_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cargas: {
         Row: {
           created_at: string
@@ -376,6 +439,85 @@ export type Database = {
           },
         ]
       }
+      veiculo_nfs: {
+        Row: {
+          carga_origem_id: string
+          created_at: string
+          id: string
+          nf_id: string
+          veiculo_id: string
+        }
+        Insert: {
+          carga_origem_id: string
+          created_at?: string
+          id?: string
+          nf_id: string
+          veiculo_id: string
+        }
+        Update: {
+          carga_origem_id?: string
+          created_at?: string
+          id?: string
+          nf_id?: string
+          veiculo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "veiculo_nfs_carga_origem_id_fkey"
+            columns: ["carga_origem_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "veiculo_nfs_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: true
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "veiculo_nfs_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      veiculos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: string
+          id: string
+          motorista: string
+          placa: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          motorista: string
+          placa: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          motorista?: string
+          placa?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -389,7 +531,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "operador"
       label_status: "pendente" | "conferido"
-      load_status: "aberta" | "fechada"
+      load_status: "aberta" | "fechada" | "em_rota" | "entregue"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -519,7 +661,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "operador"],
       label_status: ["pendente", "conferido"],
-      load_status: ["aberta", "fechada"],
+      load_status: ["aberta", "fechada", "em_rota", "entregue"],
     },
   },
 } as const
