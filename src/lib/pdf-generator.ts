@@ -305,9 +305,11 @@ export async function generateEtiquetasPDF(
   const MARGIN_TOP = 3;
   const MARGIN_BOTTOM = 3;
 
+  // jsPDF format expects [shorter, longer] side; orientation controls layout
   const doc = new jsPDF({
+    orientation: "l",
     unit: "mm",
-    format: [LABEL_WIDTH, LABEL_HEIGHT],
+    format: [LABEL_HEIGHT, LABEL_WIDTH],
   });
 
   const qrSize = 26;
@@ -334,7 +336,7 @@ export async function generateEtiquetasPDF(
     const etiqueta = sortedEtiquetas[i];
 
     if (i > 0) {
-      doc.addPage([LABEL_WIDTH, LABEL_HEIGHT]);
+      doc.addPage([LABEL_HEIGHT, LABEL_WIDTH], "l");
     }
 
     // QR Code on the right side - large for easy mobile scanning
