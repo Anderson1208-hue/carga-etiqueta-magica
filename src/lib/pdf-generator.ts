@@ -357,7 +357,12 @@ export async function generateEtiquetasPDF(
     }
 
     // Text area on the left side - all within safe margins
-    let y = SAFE + 4;
+    let y = SAFE + 1.5;
+
+    doc.setFontSize(5);
+    doc.setFont("helvetica", "bold");
+    doc.text("Expresso Ebenezer", SAFE, y);
+    y += 3;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
