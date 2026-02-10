@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { generateEtiquetasPDF, downloadBlob } from "@/lib/pdf-generator";
+import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { Tags, Download, Loader2, Package, FileText, Printer } from "lucide-react";
 import { format } from "date-fns";
 
@@ -41,6 +42,8 @@ interface Etiqueta {
   qrPayload: string;
   status: "pendente" | "conferido";
   cnpjDestinatario: string;
+  destBairro: string;
+  macroRegiao: number;
 }
 
 export default function Etiquetas() {
@@ -57,6 +60,7 @@ export default function Etiquetas() {
   const [generating, setGenerating] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [selectedNfs, setSelectedNfs] = useState<Set<string>>(new Set());
+  const [selectedMR, setSelectedMR] = useState<string>("todas");
 
   useEffect(() => {
     loadCargas();
@@ -65,8 +69,21 @@ export default function Etiquetas() {
   useEffect(() => {
     if (selectedCargaId) {
       loadEtiquetas(selectedCargaId);
+      setSelectedMR("todas");
     }
   }, [selectedCargaId]);
+
+  // Available MRs based on loaded etiquetas
+  const availableMRs = useMemo(() => {
+    const mrSet = new Set(etiquetas.map((e) => e.macroRegiao));
+    return getAllMacroRegioes().filter((mr) => mrSet.has(mr.value));
+  }, [etiquetas]);
+
+  // Filtered etiquetas by selected MR
+  const filteredEtiquetas = useMemo(() => {
+    if (selectedMR === "todas") return etiquetas;
+    return etiquetas.filter((e) => e.macroRegiao === parseInt(selectedMR));
+  }, [etiquetas, selectedMR]);
 
   async function loadCargas() {
     const { data } = await supabase
@@ -108,7 +125,7 @@ export default function Etiquetas() {
           .from("etiquetas")
           .select(`
             *,
-            notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario)
+            notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario, dest_bairro)
           `)
           .eq("carga_id", cargaId)
           .order("c_prod", { ascending: true })
@@ -129,19 +146,41 @@ export default function Etiquetas() {
         }
       }
 
-      const mapped = allEtiquetas.map((e: any) => ({
-        id: e.id,
-        numeroNf: e.numero_nf,
-        cProd: e.c_prod,
-        xProd: e.x_prod,
-        seq: e.seq,
-        total: e.total,
-        qrPayload: e.qr_payload,
-        status: e.status as "pendente" | "conferido",
-        cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
-      }));
+      const mapped: Etiqueta[] = allEtiquetas.map((e: any) => {
+        const destBairro = e.notas_fiscais?.dest_bairro || "";
+        return {
+          id: e.id,
+          numeroNf: e.numero_nf,
+          cProd: e.c_prod,
+          xProd: e.x_prod,
+          seq: e.seq,
+          total: e.total,
+          qrPayload: e.qr_payload,
+          status: e.status as "pendente" | "conferido",
+          cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
+          destBairro,
+          macroRegiao: getMacroRegiao(destBairro),
+        };
+      });
+
+      // Sort by MR → bairro → CNPJ → NF → cProd → seq
+      mapped.sort((a, b) => {
+        if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
+        const bairroCompare = a.destBairro.localeCompare(b.destBairro);
+        if (bairroCompare !== 0) return bairroCompare;
+        const cnpjA = parseFloat(a.cnpjDestinatario.replace(/\D/g, '')) || 0;
+        const cnpjB = parseFloat(b.cnpjDestinatario.replace(/\D/g, '')) || 0;
+        if (cnpjA !== cnpjB) return cnpjA - cnpjB;
+        const nfA = parseFloat(a.numeroNf.replace(/\D/g, '')) || 0;
+        const nfB = parseFloat(b.numeroNf.replace(/\D/g, '')) || 0;
+        if (nfA !== nfB) return nfA - nfB;
+        const prodA = parseFloat(a.cProd.replace(/\D/g, '')) || 0;
+        const prodB = parseFloat(b.cProd.replace(/\D/g, '')) || 0;
+        if (prodA !== prodB) return prodA - prodB;
+        return a.seq - b.seq;
+      });
+
       setEtiquetas(mapped);
-      // Reset selection when loading new carga
       setSelectedNfs(new Set());
     } catch (error) {
       console.error("Error loading etiquetas:", error);
@@ -154,21 +193,22 @@ export default function Etiquetas() {
     }
   }
 
-// Get unique NFs for the checkbox list
+  // Get unique NFs for the checkbox list (filtered by MR)
   const uniqueNfs = useMemo(() => {
-    const nfMap = new Map<string, { numeroNf: string; count: number }>();
-    etiquetas.forEach((e) => {
+    const nfMap = new Map<string, { numeroNf: string; count: number; macroRegiao: number }>();
+    filteredEtiquetas.forEach((e) => {
       if (!nfMap.has(e.numeroNf)) {
-        nfMap.set(e.numeroNf, { numeroNf: e.numeroNf, count: 0 });
+        nfMap.set(e.numeroNf, { numeroNf: e.numeroNf, count: 0, macroRegiao: e.macroRegiao });
       }
       nfMap.get(e.numeroNf)!.count++;
     });
     return Array.from(nfMap.values()).sort((a, b) => {
+      if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
       const numA = parseInt(a.numeroNf.replace(/\D/g, '')) || 0;
       const numB = parseInt(b.numeroNf.replace(/\D/g, '')) || 0;
       return numA - numB;
     });
-  }, [etiquetas]);
+  }, [filteredEtiquetas]);
 
   function handleToggleNf(numeroNf: string) {
     setSelectedNfs((prev) => {
@@ -191,11 +231,11 @@ export default function Etiquetas() {
   }
 
   async function handleGenerateEtiquetas(onlySelected: boolean = false) {
-    if (!selectedCarga || etiquetas.length === 0) return;
+    if (!selectedCarga || filteredEtiquetas.length === 0) return;
 
     const etiquetasToGenerate = onlySelected
-      ? etiquetas.filter((e) => selectedNfs.has(e.numeroNf))
-      : etiquetas;
+      ? filteredEtiquetas.filter((e) => selectedNfs.has(e.numeroNf))
+      : filteredEtiquetas;
 
     if (etiquetasToGenerate.length === 0) {
       toast({
@@ -220,10 +260,11 @@ export default function Etiquetas() {
 
       const blob = await generateEtiquetasPDF(etiquetasData);
 
-      const suffix = onlySelected ? "_selecionadas" : "";
+      const mrSuffix = selectedMR !== "todas" ? `_MR${selectedMR}` : "";
+      const selSuffix = onlySelected ? "_selecionadas" : "";
       downloadBlob(
         blob,
-        `etiquetas_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}${suffix}.pdf`
+        `etiquetas_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}${mrSuffix}${selSuffix}.pdf`
       );
 
       toast({
@@ -251,7 +292,7 @@ export default function Etiquetas() {
       return;
     }
 
-    const etiquetasToGenerate = etiquetas.filter((e) => selectedNfs.has(e.numeroNf));
+    const etiquetasToGenerate = filteredEtiquetas.filter((e) => selectedNfs.has(e.numeroNf));
 
     if (etiquetasToGenerate.length === 0) return;
 
@@ -270,7 +311,6 @@ export default function Etiquetas() {
       const blob = await generateEtiquetasPDF(etiquetasData);
       const url = URL.createObjectURL(blob);
 
-      // Open PDF in new window and trigger print
       const printWindow = window.open(url, "_blank");
       if (printWindow) {
         printWindow.addEventListener("load", () => {
@@ -294,11 +334,11 @@ export default function Etiquetas() {
     }
   }
 
-  const pendentes = etiquetas.filter((e) => e.status === "pendente").length;
-  const conferidas = etiquetas.filter((e) => e.status === "conferido").length;
+  const pendentes = filteredEtiquetas.filter((e) => e.status === "pendente").length;
+  const conferidas = filteredEtiquetas.filter((e) => e.status === "conferido").length;
 
-  // Group by product for summary
-  const produtosSummary = etiquetas.reduce((acc, e) => {
+  // Group by product for summary (filtered)
+  const produtosSummary = filteredEtiquetas.reduce((acc, e) => {
     if (!acc[e.cProd]) {
       acc[e.cProd] = { cProd: e.cProd, xProd: e.xProd, total: 0 };
     }
@@ -325,7 +365,7 @@ export default function Etiquetas() {
 
         {/* Carga Selector */}
         <div className="wms-card p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex-1 max-w-sm">
               <Select
                 value={selectedCargaId}
@@ -346,17 +386,17 @@ export default function Etiquetas() {
             </div>
 
             {selectedCarga && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   onClick={() => handleGenerateEtiquetas(false)}
-                  disabled={generating || etiquetas.length === 0}
+                  disabled={generating || filteredEtiquetas.length === 0}
                 >
                   {generating ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
                     <Download className="w-4 h-4 mr-2" />
                   )}
-                  Gerar Todas
+                  Gerar Todas ({filteredEtiquetas.length})
                 </Button>
                 <Button
                   variant="outline"
@@ -386,6 +426,55 @@ export default function Etiquetas() {
             )}
           </div>
         </div>
+
+        {/* Route filter */}
+        {selectedCarga && etiquetas.length > 0 && (
+          <div className="wms-card p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h3 className="font-semibold">Filtrar por Rota</h3>
+              <div className="w-64">
+                <Select value={selectedMR} onValueChange={(v) => { setSelectedMR(v); setSelectedNfs(new Set()); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar por rota" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as Rotas ({etiquetas.length} etiq.)</SelectItem>
+                    {availableMRs.map((mr) => {
+                      const count = etiquetas.filter((e) => e.macroRegiao === mr.value).length;
+                      return (
+                        <SelectItem key={mr.value} value={mr.value.toString()}>
+                          {mr.label} ({count} etiq.)
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* MR chips */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {availableMRs.map((mr) => {
+                const count = etiquetas.filter((e) => e.macroRegiao === mr.value).length;
+                return (
+                  <div
+                    key={mr.value}
+                    className={`text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-colors ${
+                      selectedMR === mr.value.toString()
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted border-border hover:bg-accent"
+                    }`}
+                    onClick={() => {
+                      setSelectedMR(selectedMR === mr.value.toString() ? "todas" : mr.value.toString());
+                      setSelectedNfs(new Set());
+                    }}
+                  >
+                    MR {mr.value} • {count} etiq.
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* NF Selection */}
         {selectedCarga && uniqueNfs.length > 0 && (
@@ -425,11 +514,11 @@ export default function Etiquetas() {
         )}
 
         {/* Stats */}
-        {selectedCarga && etiquetas.length > 0 && (
+        {selectedCarga && filteredEtiquetas.length > 0 && (
           <div className="grid gap-4 md:grid-cols-3">
             <div className="wms-stat-card">
               <p className="text-sm text-muted-foreground">Total de Etiquetas</p>
-              <p className="text-3xl font-bold">{etiquetas.length}</p>
+              <p className="text-3xl font-bold">{filteredEtiquetas.length}</p>
             </div>
             <div className="wms-stat-card">
               <p className="text-sm text-muted-foreground">Pendentes</p>

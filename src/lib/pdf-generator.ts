@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import { getMacroRegiaoLabel } from "@/lib/macro-regioes";
 
 interface RomaneioItem {
   cProd: string;
@@ -12,6 +13,8 @@ interface NotaFiscalPDF {
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
+  destBairro?: string;
+  macroRegiao?: number;
   dataEmissao: string | null;
   itens: {
     cProd: string;
@@ -37,11 +40,10 @@ const MARGIN = 15;
 
 // Helper function for real numeric sorting
 function numericSort(a: string, b: string): number {
-  // Extract only digits for numeric comparison
   const numA = parseFloat(a.replace(/\D/g, '')) || 0;
   const numB = parseFloat(b.replace(/\D/g, '')) || 0;
   if (numA !== numB) return numA - numB;
-  return a.localeCompare(b); // fallback to string comparison if equal
+  return a.localeCompare(b);
 }
 
 export async function generateRomaneioPDF(
@@ -63,7 +65,6 @@ export async function generateRomaneioPDF(
   doc.text("ROMANEIO TOTALIZADO", A4_LANDSCAPE_WIDTH / 2, y, { align: "center" });
   y += 12;
 
-  // Load info
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
   doc.text(`Data: ${formatDate(carregamentoInfo.data)}`, MARGIN, y);
@@ -71,15 +72,13 @@ export async function generateRomaneioPDF(
   doc.text(`Motorista: ${carregamentoInfo.motorista}`, MARGIN + 150, y);
   y += 10;
 
-  // Separator line
   doc.setLineWidth(0.5);
   doc.line(MARGIN, y, A4_LANDSCAPE_WIDTH - MARGIN, y);
   y += 8;
 
-  // Table header - expanded column widths for landscape
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  const colWidths = [60, 160, 47]; // Expanded widths
+  const colWidths = [60, 160, 47];
   const headers = ["Cód. Produto", "Descrição", "Qtd Caixas"];
 
   doc.setFillColor(220, 220, 220);
@@ -92,39 +91,29 @@ export async function generateRomaneioPDF(
   });
   y += 9;
 
-  // Sort items by cProd numerically (real numeric sort)
   const sortedItens = [...itens].sort((a, b) => numericSort(a.cProd, b.cProd));
 
-  // Table rows with zebra striping
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   let totalCaixas = 0;
   const rowHeight = 7;
 
   sortedItens.forEach((item, index) => {
-    // Check if we need a new page
     if (y > A4_LANDSCAPE_HEIGHT - 30) {
       doc.addPage();
       y = MARGIN;
     }
 
-    // Zebra striping: even rows get light gray background
     if (index % 2 === 1) {
       doc.setFillColor(245, 245, 245);
       doc.rect(MARGIN, y - 5, pageWidth, rowHeight, "F");
     }
 
     x = MARGIN;
-
-    // Cod Produto (display without leading zeros)
     doc.text(truncateText(formatCProdDisplay(item.cProd), 35), x + 4, y);
     x += colWidths[0];
-
-    // Descrição
     doc.text(truncateText(item.xProd, 90), x + 4, y);
     x += colWidths[1];
-
-    // Quantidade
     doc.text(item.quantidadeTotal.toString(), x + colWidths[2] - 8, y, {
       align: "right",
     });
@@ -132,12 +121,10 @@ export async function generateRomaneioPDF(
     totalCaixas += item.quantidadeTotal;
     y += rowHeight;
 
-    // Light separator
     doc.setDrawColor(200, 200, 200);
     doc.line(MARGIN, y - 2, A4_LANDSCAPE_WIDTH - MARGIN, y - 2);
   });
 
-  // Total row
   y += 4;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -148,7 +135,6 @@ export async function generateRomaneioPDF(
     align: "right",
   });
 
-  // TOTAL GERAL DE CAIXAS DA CARGA (at the end, prominent)
   y += 15;
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
@@ -166,7 +152,6 @@ export async function generateNotaDeCargaPDF(
   carregamentoInfo: { data: string; placa: string; motorista: string },
   notasFiscais: NotaFiscalPDF[]
 ): Promise<Blob> {
-  // A4 Portrait dimensions
   const A4_WIDTH = 210;
   const A4_HEIGHT = 297;
   
@@ -178,14 +163,19 @@ export async function generateNotaDeCargaPDF(
 
   const pageWidth = A4_WIDTH - MARGIN * 2;
 
-  // CRITICAL: Sort NFs by CNPJ destinatário (numeric), then by numero_nf (numeric)
+  // Sort NFs by MR → bairro → CNPJ → NF number
   const sortedNFs = [...notasFiscais].sort((a, b) => {
-    // First sort by CNPJ destinatário (numeric)
+    const mrA = a.macroRegiao ?? 99;
+    const mrB = b.macroRegiao ?? 99;
+    if (mrA !== mrB) return mrA - mrB;
+    const bairroCompare = (a.destBairro || "").localeCompare(b.destBairro || "");
+    if (bairroCompare !== 0) return bairroCompare;
     const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
     if (cnpjCompare !== 0) return cnpjCompare;
-    // Then by numero_nf (numeric)
     return numericSort(a.numeroNf, b.numeroNf);
   });
+
+  let currentMR: number | null = null;
 
   sortedNFs.forEach((nf, nfIndex) => {
     if (nfIndex > 0) {
@@ -193,8 +183,22 @@ export async function generateNotaDeCargaPDF(
     }
 
     let y = MARGIN;
+    const mr = nf.macroRegiao ?? 99;
 
-    // Header with NF info
+    // MR header when group changes
+    if (mr !== currentMR) {
+      currentMR = mr;
+      doc.setFontSize(13);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(60, 60, 60);
+      doc.rect(MARGIN, y - 5, pageWidth, 10, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.text(getMacroRegiaoLabel(mr), MARGIN + 4, y + 1);
+      doc.setTextColor(0, 0, 0);
+      y += 12;
+    }
+
+    // NF header
     doc.setFontSize(15);
     doc.setFont("helvetica", "bold");
     doc.text(`NF: ${nf.numeroNf}`, MARGIN, y);
@@ -206,14 +210,20 @@ export async function generateNotaDeCargaPDF(
     y += 7;
     doc.text(`CNPJ Emitente: ${nf.cnpjEmitente}`, MARGIN, y);
     y += 7;
-    // Include CNPJ destinatário
     doc.text(`CNPJ Destinatário: ${nf.cnpjDestinatario || "N/A"}`, MARGIN, y);
     if (nf.dataEmissao) {
       doc.text(`Data Emissão: ${formatDate(nf.dataEmissao)}`, MARGIN + 100, y);
     }
-    y += 9;
+    y += 5;
+    // Show bairro/MR info
+    if (nf.destBairro) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.text(`Bairro: ${nf.destBairro} — MR ${mr}`, MARGIN, y + 2);
+      y += 6;
+    }
+    y += 3;
 
-    // Separator
     doc.setLineWidth(0.5);
     doc.line(MARGIN, y, A4_WIDTH - MARGIN, y);
     y += 8;
@@ -234,7 +244,6 @@ export async function generateNotaDeCargaPDF(
     });
     y += 9;
 
-    // Items sorted by cProd numerically
     const sortedItens = [...nf.itens].sort((a, b) => numericSort(a.cProd, b.cProd));
 
     doc.setFont("helvetica", "normal");
@@ -249,7 +258,6 @@ export async function generateNotaDeCargaPDF(
         y = MARGIN;
       }
 
-      // Zebra striping: even rows get light gray background
       if (index % 2 === 1) {
         doc.setFillColor(245, 245, 245);
         doc.rect(MARGIN, y - 5, pageWidth, rowHeight, "F");
@@ -271,7 +279,6 @@ export async function generateNotaDeCargaPDF(
       doc.line(MARGIN, y - 2, A4_WIDTH - MARGIN, y - 2);
     });
 
-    // Total de caixas da NF (at the end of each NF)
     y += 5;
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
@@ -289,10 +296,8 @@ export async function generateNotaDeCargaPDF(
 export async function generateEtiquetasPDF(
   etiquetas: EtiquetaData[]
 ): Promise<Blob> {
-  // Label size: 60mm x 40mm for Zebra ZD220
   const LABEL_WIDTH = 60;
   const LABEL_HEIGHT = 40;
-  // ZD220 unprintable margins: ~3mm top/bottom, ~2mm left/right
   const MARGIN_LEFT = 3;
   const MARGIN_RIGHT = 3;
   const MARGIN_TOP = 3;
@@ -304,11 +309,12 @@ export async function generateEtiquetasPDF(
     format: [LABEL_WIDTH, LABEL_HEIGHT],
   });
 
-  const qrSize = 18; // slightly smaller QR for better fit
+  const qrSize = 18;
   const printableWidth = LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT;
-  const textAreaWidth = printableWidth - qrSize - 3; // text area left of QR
+  const textAreaWidth = printableWidth - qrSize - 3;
 
-  // CRITICAL: Sort by CNPJ destinatário FIRST, then by numero_nf, then by cProd, then by seq
+  // Sort order is already applied by the caller (MR → bairro → CNPJ → NF → cProd → seq)
+  // Fallback sort by CNPJ → NF → cProd → seq if not pre-sorted
   const sortedEtiquetas = [...etiquetas].sort((a, b) => {
     const cnpjCompare = numericSort(a.cnpjDestinatario, b.cnpjDestinatario);
     if (cnpjCompare !== 0) return cnpjCompare;
@@ -326,37 +332,31 @@ export async function generateEtiquetasPDF(
       doc.addPage([LABEL_WIDTH, LABEL_HEIGHT], "landscape");
     }
 
-    // Border rectangle within printable area
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.3);
     doc.rect(MARGIN_LEFT - 1, MARGIN_TOP - 1, LABEL_WIDTH - MARGIN_LEFT - MARGIN_RIGHT + 2, LABEL_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM + 2);
 
     let y = MARGIN_TOP + 2;
 
-    // NF number - prominent
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text(`NF: ${etiqueta.numeroNf}`, MARGIN_LEFT, y);
     y += 5;
 
-    // Thin separator under NF
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.line(MARGIN_LEFT, y - 1, LABEL_WIDTH - MARGIN_RIGHT - qrSize - 2, y - 1);
 
-    // Product code
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 16)}`, MARGIN_LEFT, y + 2);
     y += 6;
 
-    // Product description (up to 2 lines, constrained to left of QR)
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), MARGIN_LEFT, y);
 
-    // Box number - prominent at bottom with safe offset for ZD220
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.text(
@@ -365,7 +365,6 @@ export async function generateEtiquetasPDF(
       LABEL_HEIGHT - MARGIN_BOTTOM - 2
     );
 
-    // QR Code (right side, vertically centered within printable area)
     try {
       const qrDataUrl = await QRCode.toDataURL(etiqueta.qrPayload, {
         width: 80,
@@ -384,7 +383,6 @@ export async function generateEtiquetasPDF(
   return doc.output("blob");
 }
 
-// Remove leading zeros for display only (does not affect stored value or QR code)
 function formatCProdDisplay(cProd: string): string {
   const num = parseInt(cProd, 10);
   return isNaN(num) ? cProd : num.toString();
