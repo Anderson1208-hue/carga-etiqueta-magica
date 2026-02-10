@@ -52,7 +52,7 @@ interface Carga {
   placa: string;
   motorista: string;
   observacao: string | null;
-  status: "aberta" | "fechada";
+  status: "aberta" | "fechada" | "em_rota" | "entregue";
   operador_responsavel: string | null;
   created_at: string;
   _count?: {
@@ -389,7 +389,7 @@ export default function Cargas() {
     return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
-  async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada") {
+  async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada" | "em_rota" | "entregue") {
     try {
       const { error } = await supabase
         .from("cargas")
@@ -674,7 +674,7 @@ export default function Cargas() {
                     <TableCell>
                       <Select
                         value={carga.status}
-                        onValueChange={(value: "aberta" | "fechada") =>
+                        onValueChange={(value: "aberta" | "fechada" | "em_rota" | "entregue") =>
                           handleStatusChange(carga.id, value)
                         }
                       >

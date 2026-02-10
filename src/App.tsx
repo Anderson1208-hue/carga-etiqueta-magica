@@ -13,6 +13,7 @@ import Etiquetas from "./pages/Etiquetas";
 import Conferencia from "./pages/Conferencia";
 import ConferenciaMobile from "./pages/ConferenciaMobile";
 import Roteirizacao from "./pages/Roteirizacao";
+import Programacao from "./pages/Programacao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -125,6 +126,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Roteirizacao />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/programacao"
+        element={
+          <ProtectedRoute>
+            <Programacao />
           </ProtectedRoute>
         }
       />
