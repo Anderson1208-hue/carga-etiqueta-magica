@@ -34,7 +34,23 @@ import {
   Weight,
   X,
   Link2,
+  ChevronDown,
+  ChevronUp,
+  MapPin,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import {
@@ -63,13 +79,27 @@ interface NfDisponivel {
   carga_data: string;
 }
 
+interface VeiculoNfDetail {
+  nf_id: string;
+  numero_nf: string;
+  razao_social: string;
+  carga_origem: string;
+  dest_cidade: string;
+  dest_uf: string;
+  dest_bairro: string;
+  peso_bruto: number;
+  totalCaixas: number;
+}
+
 interface VeiculoFormado {
   id: string;
   placa: string;
   motorista: string;
   data: string;
   status: string;
-  nfs: { nf_id: string; numero_nf: string; razao_social: string; carga_origem: string }[];
+  nfs: VeiculoNfDetail[];
+  pesoTotal: number;
+  caixasTotal: number;
 }
 
 export default function Programacao() {
@@ -201,36 +231,61 @@ export default function Programacao() {
       .in("veiculo_id", veiculoIds);
 
     const nfIds = (vnfs || []).map((v) => v.nf_id);
-    let nfMap = new Map<string, { numero_nf: string; razao_social: string }>();
+    let nfMap = new Map<string, { numero_nf: string; razao_social: string; dest_cidade: string; dest_uf: string; dest_bairro: string; peso_bruto: number; totalCaixas: number }>();
     if (nfIds.length > 0) {
       const { data: nfDetails } = await supabase
         .from("notas_fiscais")
-        .select("id, numero_nf, dest_razao_social")
+        .select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf, dest_bairro, peso_bruto, itens_nf(q_com)")
         .in("id", nfIds);
 
       nfMap = new Map(
-        (nfDetails || []).map((n) => [
-          n.id,
-          { numero_nf: n.numero_nf, razao_social: n.dest_razao_social || "N/I" },
-        ])
+        (nfDetails || []).map((n) => {
+          const items = (n.itens_nf || []) as { q_com: number }[];
+          const totalCaixas = items.reduce((sum, i) => sum + calculateBoxes(Number(i.q_com)), 0);
+          return [
+            n.id,
+            {
+              numero_nf: n.numero_nf,
+              razao_social: n.dest_razao_social || "N/I",
+              dest_cidade: n.dest_cidade || "",
+              dest_uf: n.dest_uf || "",
+              dest_bairro: n.dest_bairro || "",
+              peso_bruto: Number(n.peso_bruto) || 0,
+              totalCaixas,
+            },
+          ];
+        })
       );
     }
 
-    const result: VeiculoFormado[] = veiculos.map((v) => ({
-      id: v.id,
-      placa: v.placa,
-      motorista: v.motorista,
-      data: v.data,
-      status: v.status || "pendente",
-      nfs: (vnfs || [])
+    const result: VeiculoFormado[] = veiculos.map((v) => {
+      const vNfs = (vnfs || [])
         .filter((vn) => vn.veiculo_id === v.id)
-        .map((vn) => ({
-          nf_id: vn.nf_id,
-          numero_nf: nfMap.get(vn.nf_id)?.numero_nf || "?",
-          razao_social: nfMap.get(vn.nf_id)?.razao_social || "N/I",
-          carga_origem: vn.carga_origem_id,
-        })),
-    }));
+        .map((vn) => {
+          const detail = nfMap.get(vn.nf_id);
+          return {
+            nf_id: vn.nf_id,
+            numero_nf: detail?.numero_nf || "?",
+            razao_social: detail?.razao_social || "N/I",
+            carga_origem: vn.carga_origem_id,
+            dest_cidade: detail?.dest_cidade || "",
+            dest_uf: detail?.dest_uf || "",
+            dest_bairro: detail?.dest_bairro || "",
+            peso_bruto: detail?.peso_bruto || 0,
+            totalCaixas: detail?.totalCaixas || 0,
+          };
+        });
+      return {
+        id: v.id,
+        placa: v.placa,
+        motorista: v.motorista,
+        data: v.data,
+        status: v.status || "pendente",
+        nfs: vNfs,
+        pesoTotal: vNfs.reduce((s, n) => s + n.peso_bruto, 0),
+        caixasTotal: vNfs.reduce((s, n) => s + n.totalCaixas, 0),
+      };
+    });
 
     setVeiculosFormados(result);
   }
@@ -462,35 +517,74 @@ export default function Programacao() {
             <CardContent>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {veiculosFormados.map((v) => (
-                  <div
-                    key={v.id}
-                    className="border rounded-lg p-3 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-semibold flex items-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        {v.placa}
+                  <Collapsible key={v.id}>
+                    <div className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold flex items-center gap-2">
+                          <Truck className="w-4 h-4" />
+                          {v.placa}
+                        </div>
+                        <Badge
+                          variant={
+                            v.status === "pendente"
+                              ? "outline"
+                              : v.status === "em_rota"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {v.status}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={
-                          v.status === "pendente"
-                            ? "outline"
-                            : v.status === "em_rota"
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {v.status}
-                      </Badge>
+                      <p className="text-sm text-muted-foreground">
+                        {v.motorista} • {format(new Date(v.data + "T00:00:00"), "dd/MM/yyyy")}
+                      </p>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
+                        <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
+                        <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
+                      </div>
+                      {v.nfs.length > 0 && (
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
+                            Ver detalhes
+                            <ChevronDown className="w-3 h-3" />
+                          </Button>
+                        </CollapsibleTrigger>
+                      )}
+                      <CollapsibleContent>
+                        <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs h-8 px-2">NF</TableHead>
+                                <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
+                                <TableHead className="text-xs h-8 px-2">Local</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
+                                <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {v.nfs.map((nf) => (
+                                <TableRow key={nf.nf_id}>
+                                  <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
+                                  <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
+                                  <TableCell className="text-xs p-2">
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 shrink-0" />
+                                      {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
+                                  <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {v.motorista} • {format(new Date(v.data + "T00:00:00"), "dd/MM/yyyy")}
-                    </p>
-                    <p className="text-sm">
-                      <FileText className="w-3 h-3 inline mr-1" />
-                      {v.nfs.length} NFs vinculadas
-                    </p>
-                  </div>
+                  </Collapsible>
                 ))}
               </div>
             </CardContent>
