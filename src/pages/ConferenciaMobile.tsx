@@ -5,13 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
@@ -26,25 +19,11 @@ import {
   ChevronLeft,
   Search,
 } from "lucide-react";
-import { format } from "date-fns";
-
-interface Carga {
-  id: string;
-  data: string;
-  placa: string;
-  motorista: string;
-}
 
 interface NfProgress {
   numeroNf: string;
   total: number;
   conferidas: number;
-}
-
-interface ConferenciaStats {
-  total: number;
-  conferidas: number;
-  pendentes: number;
 }
 
 interface ScanResult {
@@ -58,90 +37,67 @@ export default function ConferenciaMobile() {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [cargas, setCargas] = useState<Carga[]>([]);
-  const [selectedCargaId, setSelectedCargaId] = useState<string>("");
-  const [selectedCarga, setSelectedCarga] = useState<Carga | null>(null);
-  const [selectedNf, setSelectedNf] = useState<string | null>(null);
   const [nfInputValue, setNfInputValue] = useState("");
-  const [nfProgress, setNfProgress] = useState<NfProgress[]>([]);
-  const [stats, setStats] = useState<ConferenciaStats>({
-    total: 0,
-    conferidas: 0,
-    pendentes: 0,
-  });
-  const [loading, setLoading] = useState(false);
+  const [selectedNf, setSelectedNf] = useState<string | null>(null);
+  const [resolvedCargaId, setResolvedCargaId] = useState<string | null>(null);
+  const [nfProgress, setNfProgress] = useState<NfProgress | null>(null);
   const [loadingNf, setLoadingNf] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
 
-  useEffect(() => {
-    loadCargas();
-  }, []);
+  async function buscarNf() {
+    const nf = nfInputValue.trim();
+    if (!nf) return;
+    setLoadingNf(true);
+    try {
+      // Find etiquetas matching this NF number across all cargas
+      const { data: etiquetas, error } = await supabase
+        .from("etiquetas")
+        .select("carga_id, status")
+        .eq("numero_nf", nf);
 
-  useEffect(() => {
-    if (selectedCargaId) {
-      setSelectedNf(null);
-      setNfInputValue("");
-      setScanHistory([]);
+      if (error) throw error;
+
+      if (!etiquetas || etiquetas.length === 0) {
+        toast({
+          title: "NF não encontrada",
+          description: `Não existe a NF ${nf} em nenhuma carga acessível.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get the carga_id (all etiquetas of same NF belong to same carga)
+      const cargaId = etiquetas[0].carga_id;
+      const total = etiquetas.length;
+      const conferidas = etiquetas.filter((e) => e.status === "conferido").length;
+
+      setResolvedCargaId(cargaId);
+      setSelectedNf(nf);
+      setNfProgress({ numeroNf: nf, total, conferidas });
       setLastResult(null);
-      setNfProgress([]);
-      loadConferenciaData(selectedCargaId);
+      setScanHistory([]);
+    } catch (error) {
+      console.error("Error searching NF:", error);
+      toast({ title: "Erro ao buscar NF", variant: "destructive" });
+    } finally {
+      setLoadingNf(false);
     }
-  }, [selectedCargaId]);
-
-  async function loadCargas() {
-    const { data } = await supabase
-      .from("cargas")
-      .select("id, data, placa, motorista")
-      .eq("status", "aberta")
-      .order("created_at", { ascending: false });
-
-    setCargas(data || []);
   }
 
-  async function loadConferenciaData(cargaId: string) {
-    setLoading(true);
-    try {
-      // Fetch carga info and progress counts in parallel (single DB call for counts!)
-      const [cargaRes, progressRes] = await Promise.all([
-        supabase
-          .from("cargas")
-          .select("id, data, placa, motorista")
-          .eq("id", cargaId)
-          .single(),
-        supabase.rpc("get_conferencia_progress", { p_carga_id: cargaId }),
-      ]);
-
-      if (cargaRes.data) {
-        setSelectedCarga(cargaRes.data);
-      }
-
-      const progress = progressRes.data as {
-        total: number;
-        conferidas: number;
-        nfs: { numero_nf: string; total: number; conferidas: number }[];
-      } | null;
-
-      if (progress) {
-        setStats({
-          total: progress.total,
-          conferidas: progress.conferidas,
-          pendentes: progress.total - progress.conferidas,
-        });
-      } else {
-        setStats({ total: 0, conferidas: 0, pendentes: 0 });
-      }
-    } catch (error) {
-      console.error("Error loading conferencia data:", error);
-    } finally {
-      setLoading(false);
-    }
+  function voltarParaBusca() {
+    setSelectedNf(null);
+    setResolvedCargaId(null);
+    setNfProgress(null);
+    setLastResult(null);
+    setScanHistory([]);
+    setNfInputValue("");
   }
 
   async function processScan(qrData: string) {
-    if (!qrData.trim() || !selectedCargaId || !selectedNf) return;
+    if (!qrData.trim() || !resolvedCargaId || !selectedNf) return;
 
     setScanning(true);
     setLastResult(null);
@@ -164,7 +120,7 @@ export default function ConferenciaMobile() {
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
 
       // Validate carga
-      if (qrCargaId !== selectedCargaId) {
+      if (qrCargaId !== resolvedCargaId) {
         const result: ScanResult = {
           type: "warning",
           message: "Etiqueta de outra carga",
@@ -193,7 +149,7 @@ export default function ConferenciaMobile() {
       const { data: etiqueta, error: findError } = await supabase
         .from("etiquetas")
         .select("*")
-        .eq("carga_id", selectedCargaId)
+        .eq("carga_id", resolvedCargaId)
         .eq("qr_payload", qrData.trim())
         .maybeSingle();
 
@@ -244,7 +200,7 @@ export default function ConferenciaMobile() {
       playSound("success");
 
       // Reload NF-specific progress
-      await reloadNfProgress(selectedCargaId, selectedNf);
+      await reloadNfProgress();
     } catch (error) {
       console.error("Error scanning:", error);
       const result: ScanResult = {
@@ -276,89 +232,34 @@ export default function ConferenciaMobile() {
     inputRef.current?.focus();
   }
 
-  async function buscarNf() {
-    if (!nfInputValue.trim() || !selectedCargaId) return;
-    setLoadingNf(true);
-    try {
-      // Check if NF exists in this carga (lightweight query)
-      const { count, error } = await supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedCargaId)
-        .eq("numero_nf", nfInputValue.trim());
+  async function reloadNfProgress() {
+    if (!resolvedCargaId || !selectedNf) return;
 
-      if (error) throw error;
-
-      if (!count || count === 0) {
-        toast({
-          title: "NF não encontrada",
-          description: `Não existe a NF ${nfInputValue.trim()} nesta carga.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Fetch only this NF's progress
-      const { count: conferidas } = await supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedCargaId)
-        .eq("numero_nf", nfInputValue.trim())
-        .eq("status", "conferido");
-
-      setNfProgress([{
-        numeroNf: nfInputValue.trim(),
-        total: count,
-        conferidas: conferidas || 0,
-      }]);
-      setSelectedNf(nfInputValue.trim());
-      setLastResult(null);
-      setScanHistory([]);
-    } catch (error) {
-      console.error("Error searching NF:", error);
-      toast({ title: "Erro ao buscar NF", variant: "destructive" });
-    } finally {
-      setLoadingNf(false);
-    }
-  }
-
-  async function reloadNfProgress(cargaId: string, nf: string) {
     const [totalRes, conferidasRes] = await Promise.all([
       supabase
         .from("etiquetas")
         .select("id", { count: "exact", head: true })
-        .eq("carga_id", cargaId)
-        .eq("numero_nf", nf),
+        .eq("carga_id", resolvedCargaId)
+        .eq("numero_nf", selectedNf),
       supabase
         .from("etiquetas")
         .select("id", { count: "exact", head: true })
-        .eq("carga_id", cargaId)
-        .eq("numero_nf", nf)
+        .eq("carga_id", resolvedCargaId)
+        .eq("numero_nf", selectedNf)
         .eq("status", "conferido"),
     ]);
 
     const total = totalRes.count || 0;
     const conferidas = conferidasRes.count || 0;
 
-    setNfProgress([{ numeroNf: nf, total, conferidas }]);
-
-    // Update general stats too
-    const progressRes = await supabase.rpc("get_conferencia_progress", { p_carga_id: cargaId });
-    const progress = progressRes.data as { total: number; conferidas: number } | null;
-    if (progress) {
-      setStats({
-        total: progress.total,
-        conferidas: progress.conferidas,
-        pendentes: progress.total - progress.conferidas,
-      });
-    }
+    setNfProgress({ numeroNf: selectedNf, total, conferidas });
 
     // Check if NF is now complete
     if (conferidas === total) {
       setTimeout(() => {
         const completeResult: ScanResult = {
           type: "success",
-          message: `✅ NF ${nf} COMPLETA!`,
+          message: `✅ NF ${selectedNf} COMPLETA!`,
           details: `Todas as ${total} etiquetas foram conferidas.`,
         };
         setLastResult(completeResult);
@@ -368,14 +269,10 @@ export default function ConferenciaMobile() {
     }
   }
 
-  const selectedNfData = nfProgress.find((nf) => nf.numeroNf === selectedNf);
-  const selectedNfPercent =
-    selectedNfData && selectedNfData.total > 0
-      ? Math.round((selectedNfData.conferidas / selectedNfData.total) * 100)
+  const nfPercent =
+    nfProgress && nfProgress.total > 0
+      ? Math.round((nfProgress.conferidas / nfProgress.total) * 100)
       : 0;
-
-  const progressPercent =
-    stats.total > 0 ? Math.round((stats.conferidas / stats.total) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -388,11 +285,7 @@ export default function ConferenciaMobile() {
                 variant="ghost"
                 size="icon"
                 className="text-sidebar-foreground h-8 w-8"
-                onClick={() => {
-                  setSelectedNf(null);
-                  setLastResult(null);
-                  setScanHistory([]);
-                }}
+                onClick={voltarParaBusca}
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
@@ -408,76 +301,41 @@ export default function ConferenciaMobile() {
       </header>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto">
-        {/* Carga Selector */}
-        <Card>
-          <CardContent className="pt-4">
-            <Select value={selectedCargaId} onValueChange={setSelectedCargaId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione uma carga" />
-              </SelectTrigger>
-              <SelectContent>
-                {cargas.map((carga) => (
-                  <SelectItem key={carga.id} value={carga.id}>
-                    {carga.placa} - {format(new Date(carga.data), "dd/MM")} -{" "}
-                    {carga.motorista}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
-        {selectedCarga && !selectedNf && (
-          <>
-            {/* Overall Progress */}
-            <Card>
-              <CardContent className="pt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Progresso geral: {stats.conferidas}/{stats.total}
-                    </span>
-                    <span className="font-bold">{progressPercent}%</span>
-                  </div>
-                  <Progress value={progressPercent} className="h-3" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* NF Input */}
-            <Card>
-              <CardContent className="pt-4">
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  Digite o número da NF para conferir
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nº da NF..."
-                    value={nfInputValue}
-                    onChange={(e) => setNfInputValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") buscarNf();
-                    }}
-                    className="flex-1 text-lg"
-                    inputMode="numeric"
-                  />
-                  <Button
-                    onClick={buscarNf}
-                    disabled={loadingNf || !nfInputValue.trim()}
-                  >
-                    {loadingNf ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Search className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </>
+        {/* NF Search (initial screen) */}
+        {!selectedNf && (
+          <Card>
+            <CardContent className="pt-4">
+              <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                Digite o número da NF para conferir
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nº da NF..."
+                  value={nfInputValue}
+                  onChange={(e) => setNfInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") buscarNf();
+                  }}
+                  className="flex-1 text-lg"
+                  inputMode="numeric"
+                  autoFocus
+                />
+                <Button
+                  onClick={buscarNf}
+                  disabled={loadingNf || !nfInputValue.trim()}
+                >
+                  {loadingNf ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Search className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {selectedCarga && selectedNf && (
+        {selectedNf && nfProgress && (
           <>
             {/* NF Progress */}
             <Card>
@@ -485,12 +343,12 @@ export default function ConferenciaMobile() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
-                      {selectedNfData?.conferidas || 0} de {selectedNfData?.total || 0} etiquetas
+                      {nfProgress.conferidas} de {nfProgress.total} etiquetas
                     </span>
-                    <span className="font-bold text-lg">{selectedNfPercent}%</span>
+                    <span className="font-bold text-lg">{nfPercent}%</span>
                   </div>
-                  <Progress value={selectedNfPercent} className="h-4" />
-                  {selectedNfData && selectedNfData.conferidas === selectedNfData.total && (
+                  <Progress value={nfPercent} className="h-4" />
+                  {nfProgress.conferidas === nfProgress.total && (
                     <div className="flex items-center gap-2 text-success font-semibold mt-2">
                       <CheckCircle2 className="w-5 h-5" />
                       NF Completa!
