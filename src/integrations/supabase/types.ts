@@ -523,6 +523,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
       get_conferencia_progress: { Args: { p_carga_id: string }; Returns: Json }
       has_profile: { Args: never; Returns: boolean }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
