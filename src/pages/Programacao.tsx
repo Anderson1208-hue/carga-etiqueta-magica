@@ -32,15 +32,14 @@ import {
   Loader2,
   CheckCircle2,
   Weight,
-  Box,
   X,
+  Link2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
-  getAllMacroRegioes,
 } from "@/lib/macro-regioes";
 
 interface NfDisponivel {
@@ -83,11 +82,18 @@ export default function Programacao() {
   const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
   const [filtroMR, setFiltroMR] = useState<string>("todas");
   const [filtroCarga, setFiltroCarga] = useState<string>("todas");
-  const [showDialog, setShowDialog] = useState(false);
+
+  // Dialog: Cadastrar Veículo
+  const [showCadastroDialog, setShowCadastroDialog] = useState(false);
   const [formPlaca, setFormPlaca] = useState("");
   const [formMotorista, setFormMotorista] = useState("");
   const [formData, setFormData] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [saving, setSaving] = useState(false);
+  const [savingCadastro, setSavingCadastro] = useState(false);
+
+  // Dialog: Vincular NFs a veículo existente
+  const [showVincularDialog, setShowVincularDialog] = useState(false);
+  const [selectedVeiculoId, setSelectedVeiculoId] = useState<string>("");
+  const [savingVinculo, setSavingVinculo] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -103,7 +109,6 @@ export default function Programacao() {
   }
 
   async function loadNfsDisponiveis() {
-    // Fetch all NFs from cargas with status 'aberta' that are NOT already assigned to a veiculo
     const { data: cargas } = await supabase
       .from("cargas")
       .select("id, placa, motorista, data")
@@ -117,7 +122,6 @@ export default function Programacao() {
     const cargaIds = cargas.map((c) => c.id);
     const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
-    // Fetch NFs
     const { data: nfs } = await supabase
       .from("notas_fiscais")
       .select(`
@@ -134,7 +138,6 @@ export default function Programacao() {
       return;
     }
 
-    // Fetch already assigned NF IDs
     const { data: assigned } = await supabase
       .from("veiculo_nfs")
       .select("nf_id");
@@ -170,7 +173,6 @@ export default function Programacao() {
         };
       });
 
-    // Sort by MR → bairro → razão social
     available.sort((a, b) => {
       if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
       const bComp = (a.dest_bairro || "").localeCompare(b.dest_bairro || "", "pt-BR");
@@ -198,7 +200,6 @@ export default function Programacao() {
       .select("veiculo_id, nf_id, carga_origem_id")
       .in("veiculo_id", veiculoIds);
 
-    // Get NF details
     const nfIds = (vnfs || []).map((v) => v.nf_id);
     let nfMap = new Map<string, { numero_nf: string; razao_social: string }>();
     if (nfIds.length > 0) {
@@ -233,6 +234,11 @@ export default function Programacao() {
 
     setVeiculosFormados(result);
   }
+
+  // Veículos disponíveis para vinculação (que ainda não estão em rota/entregue)
+  const veiculosDisponiveis = useMemo(() => {
+    return veiculosFormados.filter((v) => v.status === "pendente");
+  }, [veiculosFormados]);
 
   function toggleNf(nfId: string) {
     setSelectedNfIds((prev) => {
@@ -271,11 +277,58 @@ export default function Programacao() {
     });
   }
 
-  async function handleFormarVeiculo() {
+  // Cadastrar veículo (apenas placa + motorista, sem NFs)
+  async function handleCadastrarVeiculo() {
     if (!formPlaca.trim() || !formMotorista.trim()) {
       toast({
         title: "Dados incompletos",
         description: "Preencha placa e motorista",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingCadastro(true);
+    try {
+      const { error } = await supabase
+        .from("veiculos")
+        .insert({
+          placa: formPlaca.trim().toUpperCase(),
+          motorista: formMotorista.trim(),
+          data: formData,
+          created_by: user?.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Veículo cadastrado!",
+        description: `${formPlaca.toUpperCase()} - ${formMotorista}`,
+      });
+
+      setShowCadastroDialog(false);
+      setFormPlaca("");
+      setFormMotorista("");
+      setFormData(format(new Date(), "yyyy-MM-dd"));
+      await loadVeiculosFormados();
+    } catch (error) {
+      console.error("Error creating vehicle:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao cadastrar veículo",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCadastro(false);
+    }
+  }
+
+  // Vincular NFs selecionadas a um veículo existente
+  async function handleVincularNfs() {
+    if (!selectedVeiculoId) {
+      toast({
+        title: "Selecione um veículo",
+        description: "Escolha o veículo para vincular as NFs",
         variant: "destructive",
       });
       return;
@@ -290,52 +343,37 @@ export default function Programacao() {
       return;
     }
 
-    setSaving(true);
+    setSavingVinculo(true);
     try {
-      // Create vehicle
-      const { data: veiculo, error: vErr } = await supabase
-        .from("veiculos")
-        .insert({
-          placa: formPlaca.trim().toUpperCase(),
-          motorista: formMotorista.trim(),
-          data: formData,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
-
-      if (vErr) throw vErr;
-
-      // Link NFs
       const selectedNfs = nfsDisponiveis.filter((nf) => selectedNfIds.has(nf.id));
       const links = selectedNfs.map((nf) => ({
-        veiculo_id: veiculo.id,
+        veiculo_id: selectedVeiculoId,
         nf_id: nf.id,
         carga_origem_id: nf.carga_id,
       }));
 
-      const { error: linkErr } = await supabase.from("veiculo_nfs").insert(links);
-      if (linkErr) throw linkErr;
+      const { error } = await supabase.from("veiculo_nfs").insert(links);
+      if (error) throw error;
 
+      const veiculo = veiculosFormados.find((v) => v.id === selectedVeiculoId);
       toast({
-        title: "Veículo formado!",
-        description: `${formPlaca.toUpperCase()} com ${selectedNfs.length} NFs`,
+        title: "NFs vinculadas!",
+        description: `${selectedNfs.length} NFs vinculadas ao veículo ${veiculo?.placa || ""}`,
       });
 
-      setShowDialog(false);
+      setShowVincularDialog(false);
       setSelectedNfIds(new Set());
-      setFormPlaca("");
-      setFormMotorista("");
+      setSelectedVeiculoId("");
       await loadData();
     } catch (error) {
-      console.error("Error creating vehicle:", error);
+      console.error("Error linking NFs:", error);
       toast({
         title: "Erro",
-        description: "Erro ao formar veículo",
+        description: "Erro ao vincular NFs ao veículo",
         variant: "destructive",
       });
     } finally {
-      setSaving(false);
+      setSavingVinculo(false);
     }
   }
 
@@ -389,24 +427,36 @@ export default function Programacao() {
               Programação de Veículos
             </h1>
             <p className="text-muted-foreground">
-              Selecione NFs de múltiplas cargas para formar veículos
+              Cadastre veículos e vincule NFs para programação
             </p>
           </div>
-          {selectedNfIds.size > 0 && (
-            <Button onClick={() => setShowDialog(true)}>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowCadastroDialog(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Formar Veículo ({selectedNfIds.size} NFs)
+              Novo Veículo
             </Button>
-          )}
+            {selectedNfIds.size > 0 && veiculosDisponiveis.length > 0 && (
+              <Button onClick={() => setShowVincularDialog(true)}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Vincular ao Veículo ({selectedNfIds.size} NFs)
+              </Button>
+            )}
+            {selectedNfIds.size > 0 && veiculosDisponiveis.length === 0 && (
+              <Button onClick={() => setShowCadastroDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Cadastre um veículo primeiro
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Veículos já formados */}
+        {/* Veículos cadastrados */}
         {veiculosFormados.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
-                Veículos Formados
+                Veículos Cadastrados ({veiculosFormados.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -438,7 +488,7 @@ export default function Programacao() {
                     </p>
                     <p className="text-sm">
                       <FileText className="w-3 h-3 inline mr-1" />
-                      {v.nfs.length} NFs
+                      {v.nfs.length} NFs vinculadas
                     </p>
                   </div>
                 ))}
@@ -494,7 +544,7 @@ export default function Programacao() {
               </div>
             </div>
 
-            {/* MR Badges - click to select all NFs in that MR */}
+            {/* MR Badges */}
             <div className="flex flex-wrap gap-2 mt-3">
               {macroRegioesPresentes.map((mr) => {
                 const nfsInMR = nfsDisponiveis.filter((n) => n.macroRegiao === mr);
@@ -562,7 +612,6 @@ export default function Programacao() {
               </p>
             ) : (
               <div className="space-y-1">
-                {/* Group by MR */}
                 {(() => {
                   const grouped = new Map<number, NfDisponivel[]>();
                   filteredNfs.forEach((nf) => {
@@ -640,13 +689,13 @@ export default function Programacao() {
         </Card>
       </div>
 
-      {/* Dialog: Formar Veículo */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      {/* Dialog: Cadastrar Veículo */}
+      <Dialog open={showCadastroDialog} onOpenChange={setShowCadastroDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="w-5 h-5" />
-              Formar Veículo
+              Cadastrar Veículo
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -675,6 +724,48 @@ export default function Programacao() {
                 onChange={(e) => setFormData(e.target.value)}
               />
             </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCadastroDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCadastrarVeiculo} disabled={savingCadastro}>
+              {savingCadastro ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Plus className="w-4 h-4 mr-2" />
+              )}
+              Cadastrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Vincular NFs ao Veículo */}
+      <Dialog open={showVincularDialog} onOpenChange={setShowVincularDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="w-5 h-5" />
+              Vincular NFs ao Veículo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Selecione o Veículo</Label>
+              <Select value={selectedVeiculoId} onValueChange={setSelectedVeiculoId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Escolha um veículo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {veiculosDisponiveis.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.placa} - {v.motorista} ({v.nfs.length} NFs)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
               <p className="font-semibold">{selectedNfIds.size} NFs selecionadas</p>
               <p>{selTotalCaixas} caixas • {selTotalPeso.toFixed(1)} kg</p>
@@ -684,16 +775,16 @@ export default function Programacao() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button variant="outline" onClick={() => setShowVincularDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleFormarVeiculo} disabled={saving}>
-              {saving ? (
+            <Button onClick={handleVincularNfs} disabled={savingVinculo || !selectedVeiculoId}>
+              {savingVinculo ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <Plus className="w-4 h-4 mr-2" />
+                <Link2 className="w-4 h-4 mr-2" />
               )}
-              Formar Veículo
+              Vincular NFs
             </Button>
           </DialogFooter>
         </DialogContent>
