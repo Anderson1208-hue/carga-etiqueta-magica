@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
   Truck,
   Camera,
@@ -533,6 +534,7 @@ export default function BaixaEntrega() {
           </>
         )}
       </div>
+      <MobileBottomNav />
     </div>
   );
 }

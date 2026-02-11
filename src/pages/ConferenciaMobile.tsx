@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
   ScanLine,
   CheckCircle2,
@@ -300,7 +301,7 @@ export default function ConferenciaMobile() {
         </div>
       </header>
 
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
+      <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
         {/* NF Search (initial screen) */}
         {!selectedNf && (
           <Card>
@@ -476,6 +477,7 @@ export default function ConferenciaMobile() {
           </>
         )}
       </div>
+      <MobileBottomNav />
     </div>
   );
 }
