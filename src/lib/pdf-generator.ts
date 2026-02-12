@@ -366,7 +366,7 @@ export async function generateEtiquetasPDF(
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`NF: ${truncateText(etiqueta.numeroNf, 10)}`, SAFE, y);
+    doc.text(`NF: ${truncateText(etiqueta.numeroNf, 8)}`, SAFE, y);
     y += 3;
 
     doc.setDrawColor(0, 0, 0);
@@ -376,7 +376,7 @@ export async function generateEtiquetasPDF(
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 8)}`, SAFE, y);
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 6)}`, SAFE, y);
     y += 3;
 
     doc.setFontSize(5);
