@@ -362,22 +362,22 @@ export async function generateEtiquetasPDF(
     doc.setFontSize(5);
     doc.setFont("helvetica", "bold");
     doc.text("Expresso Ebenezer", SAFE, y);
-    y += 3;
+    y += 2.5;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`NF: ${etiqueta.numeroNf}`, SAFE, y);
-    y += 3.5;
+    doc.text(`NF: ${truncateText(etiqueta.numeroNf, 10)}`, SAFE, y);
+    y += 3;
 
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.2);
     doc.line(SAFE, y, textMaxX, y);
-    y += 3.5;
+    y += 3;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 12)}`, SAFE, y);
-    y += 3.5;
+    doc.text(`Cód: ${truncateText(formatCProdDisplay(etiqueta.cProd), 8)}`, SAFE, y);
+    y += 3;
 
     doc.setFontSize(5);
     doc.setFont("helvetica", "normal");
@@ -389,7 +389,7 @@ export async function generateEtiquetasPDF(
     doc.text(
       `CX ${etiqueta.seq}/${etiqueta.total}`,
       SAFE,
-      safeBottom - 3
+      safeBottom - 2
     );
   }
 
