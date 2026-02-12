@@ -14,6 +14,7 @@ import {
   Route,
   CalendarClock,
   ClipboardCheck,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Programação", href: "/programacao", icon: CalendarClock },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
+  { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
 export function Sidebar() {
