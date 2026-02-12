@@ -15,6 +15,7 @@ import ConferenciaMobile from "./pages/ConferenciaMobile";
 import Roteirizacao from "./pages/Roteirizacao";
 import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
+import HistoricoEntregas from "./pages/HistoricoEntregas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -143,6 +144,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <BaixaEntrega />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/historico-entregas"
+        element={
+          <ProtectedRoute>
+            <HistoricoEntregas />
           </ProtectedRoute>
         }
       />
