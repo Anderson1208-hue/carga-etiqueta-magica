@@ -15,6 +15,7 @@ import {
   CalendarClock,
   ClipboardCheck,
   History,
+  Warehouse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -25,7 +26,8 @@ const navigation = [
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
   { name: "Conferência", href: "/conferencia", icon: CheckSquare },
-  { name: "Conf. Mobile", href: "/conferencia-mobile", icon: Smartphone },
+  { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
+  { name: "Conf. Externa", href: "/conferencia-mobile", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Programação", href: "/programacao", icon: CalendarClock },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },

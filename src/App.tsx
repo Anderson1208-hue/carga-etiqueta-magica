@@ -12,6 +12,7 @@ import Romaneio from "./pages/Romaneio";
 import Etiquetas from "./pages/Etiquetas";
 import Conferencia from "./pages/Conferencia";
 import ConferenciaMobile from "./pages/ConferenciaMobile";
+import ConferenciaInterna from "./pages/ConferenciaInterna";
 import Roteirizacao from "./pages/Roteirizacao";
 import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
@@ -120,6 +121,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ConferenciaMobile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/conferencia-interna"
+        element={
+          <ProtectedRoute>
+            <ConferenciaInterna />
           </ProtectedRoute>
         }
       />

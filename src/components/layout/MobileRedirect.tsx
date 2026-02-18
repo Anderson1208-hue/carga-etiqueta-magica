@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-const ALLOWED_MOBILE_ROUTES = ["/conferencia-mobile", "/conferencia", "/login", "/baixa-entrega"];
+const ALLOWED_MOBILE_ROUTES = ["/conferencia-mobile", "/conferencia-interna", "/conferencia", "/login", "/baixa-entrega"];
 
 export function MobileRedirect({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
