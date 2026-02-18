@@ -113,12 +113,13 @@ export default function Programacao() {
   const [filtroMR, setFiltroMR] = useState<string>("todas");
   const [filtroCarga, setFiltroCarga] = useState<string>("todas");
 
-  // Dialog: Cadastrar Veículo
-  const [showCadastroDialog, setShowCadastroDialog] = useState(false);
+  // Dialog: Montar Veículo (2 etapas)
+  const [showMontarDialog, setShowMontarDialog] = useState(false);
+  const [montarStep, setMontarStep] = useState<1 | 2>(1);
   const [formPlaca, setFormPlaca] = useState("");
   const [formMotorista, setFormMotorista] = useState("");
   const [formData, setFormData] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [savingCadastro, setSavingCadastro] = useState(false);
+  const [savingMontar, setSavingMontar] = useState(false);
 
   // Dialog: Vincular NFs a veículo existente
   const [showVincularDialog, setShowVincularDialog] = useState(false);
@@ -357,49 +358,63 @@ export default function Programacao() {
     });
   }
 
-  // Cadastrar veículo (apenas placa + motorista, sem NFs)
-  async function handleCadastrarVeiculo() {
+  function openMontarDialog() {
+    if (selectedNfIds.size === 0) {
+      toast({ title: "Nenhuma NF selecionada", description: "Selecione ao menos uma NF", variant: "destructive" });
+      return;
+    }
+    setMontarStep(1);
+    setFormPlaca("");
+    setFormMotorista("");
+    setFormData(format(new Date(), "yyyy-MM-dd"));
+    setShowMontarDialog(true);
+  }
+
+  // Montar veículo: cria veículo + vincula NFs selecionadas
+  async function handleMontarVeiculo() {
     if (!formPlaca.trim() || !formMotorista.trim()) {
-      toast({
-        title: "Dados incompletos",
-        description: "Preencha placa e motorista",
-        variant: "destructive",
-      });
+      toast({ title: "Dados incompletos", description: "Preencha placa e motorista", variant: "destructive" });
       return;
     }
 
-    setSavingCadastro(true);
+    setSavingMontar(true);
     try {
-      const { error } = await supabase
+      const { data: veiculo, error: veicError } = await supabase
         .from("veiculos")
         .insert({
           placa: formPlaca.trim().toUpperCase(),
           motorista: formMotorista.trim(),
           data: formData,
           created_by: user?.id,
-        });
+        })
+        .select("id")
+        .single();
 
-      if (error) throw error;
+      if (veicError) throw veicError;
+
+      const sNfs = nfsDisponiveis.filter((nf) => selectedNfIds.has(nf.id));
+      const links = sNfs.map((nf) => ({
+        veiculo_id: veiculo.id,
+        nf_id: nf.id,
+        carga_origem_id: nf.carga_id,
+      }));
+
+      const { error: linkError } = await supabase.from("veiculo_nfs").insert(links);
+      if (linkError) throw linkError;
 
       toast({
-        title: "Veículo cadastrado!",
-        description: `${formPlaca.toUpperCase()} - ${formMotorista}`,
+        title: "Veículo montado!",
+        description: `${formPlaca.toUpperCase()} - ${formMotorista} com ${sNfs.length} NFs`,
       });
 
-      setShowCadastroDialog(false);
-      setFormPlaca("");
-      setFormMotorista("");
-      setFormData(format(new Date(), "yyyy-MM-dd"));
-      await loadVeiculosFormados();
+      setShowMontarDialog(false);
+      setSelectedNfIds(new Set());
+      await loadData();
     } catch (error) {
       console.error("Error creating vehicle:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao cadastrar veículo",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Erro ao montar veículo", variant: "destructive" });
     } finally {
-      setSavingCadastro(false);
+      setSavingMontar(false);
     }
   }
 
@@ -511,20 +526,16 @@ export default function Programacao() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowCadastroDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Veículo
-            </Button>
-            {selectedNfIds.size > 0 && veiculosDisponiveis.length > 0 && (
-              <Button onClick={() => setShowVincularDialog(true)}>
-                <Link2 className="w-4 h-4 mr-2" />
-                Vincular ao Veículo ({selectedNfIds.size} NFs)
+            {selectedNfIds.size > 0 && (
+              <Button onClick={openMontarDialog}>
+                <Truck className="w-4 h-4 mr-2" />
+                Montar Veículo ({selectedNfIds.size} NFs)
               </Button>
             )}
-            {selectedNfIds.size > 0 && veiculosDisponiveis.length === 0 && (
-              <Button onClick={() => setShowCadastroDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Cadastre um veículo primeiro
+            {selectedNfIds.size > 0 && veiculosDisponiveis.length > 0 && (
+              <Button variant="outline" onClick={() => setShowVincularDialog(true)}>
+                <Link2 className="w-4 h-4 mr-2" />
+                Vincular a Existente
               </Button>
             )}
           </div>
@@ -890,55 +901,71 @@ export default function Programacao() {
         </Card>
       </div>
 
-      {/* Dialog: Cadastrar Veículo */}
-      <Dialog open={showCadastroDialog} onOpenChange={setShowCadastroDialog}>
+      {/* Dialog: Montar Veículo (2 etapas) */}
+      <Dialog open={showMontarDialog} onOpenChange={setShowMontarDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="w-5 h-5" />
-              Cadastrar Veículo
+              {montarStep === 1 ? "Montar Veículo — Revisão" : "Montar Veículo — Vincular Placa"}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Placa</Label>
-              <Input
-                value={formPlaca}
-                onChange={(e) => setFormPlaca(e.target.value)}
-                placeholder="ABC-1234"
-                className="uppercase"
-              />
-            </div>
-            <div>
-              <Label>Motorista</Label>
-              <Input
-                value={formMotorista}
-                onChange={(e) => setFormMotorista(e.target.value)}
-                placeholder="Nome do motorista"
-              />
-            </div>
-            <div>
-              <Label>Data</Label>
-              <Input
-                type="date"
-                value={formData}
-                onChange={(e) => setFormData(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCadastroDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCadastrarVeiculo} disabled={savingCadastro}>
-              {savingCadastro ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Plus className="w-4 h-4 mr-2" />
-              )}
-              Cadastrar
-            </Button>
-          </DialogFooter>
+
+          {montarStep === 1 ? (
+            <>
+              <div className="space-y-3">
+                <div className="p-3 bg-muted/50 rounded-lg text-sm space-y-1">
+                  <p className="font-semibold">{selectedNfIds.size} NFs selecionadas</p>
+                  <p>{selTotalCaixas} caixas • {selTotalPeso.toFixed(1)} kg</p>
+                  <p className="text-muted-foreground">
+                    De {new Set(selectedNfs.map((n) => n.carga_id)).size} carga(s) origem
+                  </p>
+                </div>
+                <div className="max-h-52 overflow-auto border rounded-md">
+                  {selectedNfs.map((nf) => (
+                    <div key={nf.id} className="flex items-center justify-between px-3 py-1.5 text-xs border-b last:border-b-0">
+                      <div className="min-w-0">
+                        <span className="font-mono font-bold">NF {nf.numero_nf}</span>
+                        <span className="ml-2 text-muted-foreground truncate">{nf.dest_razao_social}</span>
+                      </div>
+                      <div className="shrink-0 text-muted-foreground">{nf.totalCaixas} cx • {nf.peso_bruto.toFixed(1)} kg</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowMontarDialog(false)}>Cancelar</Button>
+                <Button onClick={() => setMontarStep(2)}>
+                  Próximo: Vincular Placa
+                  <ChevronDown className="w-4 h-4 ml-1 rotate-[-90deg]" />
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div>
+                  <Label>Placa</Label>
+                  <Input value={formPlaca} onChange={(e) => setFormPlaca(e.target.value)} placeholder="ABC-1234" className="uppercase" />
+                </div>
+                <div>
+                  <Label>Motorista</Label>
+                  <Input value={formMotorista} onChange={(e) => setFormMotorista(e.target.value)} placeholder="Nome do motorista" />
+                </div>
+                <div>
+                  <Label>Data</Label>
+                  <Input type="date" value={formData} onChange={(e) => setFormData(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMontarStep(1)}>Voltar</Button>
+                <Button onClick={handleMontarVeiculo} disabled={savingMontar}>
+                  {savingMontar ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Montar Veículo
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
