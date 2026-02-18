@@ -332,6 +332,31 @@ export default function Programacao() {
     });
   }
 
+  function toggleEntrega(cnpj: string) {
+    const nfsEntrega = filteredNfs.filter((nf) => nf.cnpj_destinatario === cnpj);
+    const allSelected = nfsEntrega.every((nf) => selectedNfIds.has(nf.id));
+    setSelectedNfIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        nfsEntrega.forEach((nf) => next.delete(nf.id));
+      } else {
+        nfsEntrega.forEach((nf) => next.add(nf.id));
+      }
+      return next;
+    });
+  }
+
+  // Track expanded entregas
+  const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set());
+  function toggleExpandEntrega(key: string) {
+    setExpandedEntregas((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   // Cadastrar veículo (apenas placa + motorista, sem NFs)
   async function handleCadastrarVeiculo() {
     if (!formPlaca.trim() || !formMotorista.trim()) {
@@ -707,71 +732,153 @@ export default function Programacao() {
             ) : (
               <div className="space-y-1">
                 {(() => {
-                  const grouped = new Map<number, NfDisponivel[]>();
+                  // Group by MR
+                  const groupedByMR = new Map<number, NfDisponivel[]>();
                   filteredNfs.forEach((nf) => {
-                    const list = grouped.get(nf.macroRegiao) || [];
+                    const list = groupedByMR.get(nf.macroRegiao) || [];
                     list.push(nf);
-                    grouped.set(nf.macroRegiao, list);
+                    groupedByMR.set(nf.macroRegiao, list);
                   });
 
-                  return Array.from(grouped.entries())
+                  return Array.from(groupedByMR.entries())
                     .sort(([a], [b]) => a - b)
-                    .map(([mr, nfs]) => {
-                      const mrNfsSel = nfs.filter((n) => selectedNfIds.has(n.id)).length;
+                    .map(([mr, nfsMR]) => {
+                      const mrNfsSel = nfsMR.filter((n) => selectedNfIds.has(n.id)).length;
+
+                      // Group by CNPJ (entrega) within MR
+                      const entregasMap = new Map<string, NfDisponivel[]>();
+                      nfsMR.forEach((nf) => {
+                        const key = nf.cnpj_destinatario || nf.id;
+                        const list = entregasMap.get(key) || [];
+                        list.push(nf);
+                        entregasMap.set(key, list);
+                      });
+
                       return (
                         <div key={mr} className="mb-4">
+                          {/* MR Header */}
                           <div
-                            className="flex items-center gap-2 mb-2 p-2 bg-muted/50 rounded-md cursor-pointer"
+                            className="flex items-center gap-2 mb-2 p-2 bg-primary/10 rounded-md cursor-pointer border border-primary/20"
                             onClick={() => toggleMR(mr)}
                           >
                             <Checkbox
-                              checked={mrNfsSel === nfs.length}
+                              checked={mrNfsSel === nfsMR.length}
                               className="pointer-events-none"
                             />
                             <span className="font-semibold text-sm">
                               {getMacroRegiaoLabel(mr)}
                             </span>
                             <Badge variant="outline" className="ml-auto">
-                              {mrNfsSel}/{nfs.length} sel.
+                              {mrNfsSel}/{nfsMR.length} sel.
                             </Badge>
                           </div>
-                          <div className="space-y-1 pl-2">
-                            {nfs.map((nf) => (
-                              <div
-                                key={nf.id}
-                                className={`flex items-center gap-3 p-2 rounded-md border text-sm cursor-pointer transition-colors ${
-                                  selectedNfIds.has(nf.id)
-                                    ? "bg-primary/5 border-primary/30"
-                                    : "hover:bg-muted/30"
-                                }`}
-                                onClick={() => toggleNf(nf.id)}
-                              >
-                                <Checkbox
-                                  checked={selectedNfIds.has(nf.id)}
-                                  className="pointer-events-none"
-                                />
-                                <div className="flex-1 min-w-0 grid grid-cols-[80px_1fr_100px_80px_80px_120px] gap-2 items-center">
-                                  <span className="font-mono font-bold">
-                                    NF {nf.numero_nf}
-                                  </span>
-                                  <span className="truncate">
-                                    {nf.dest_razao_social}
-                                  </span>
-                                  <span className="text-muted-foreground truncate">
-                                    {nf.dest_bairro}
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    {nf.totalCaixas} cx
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    {nf.peso_bruto.toFixed(1)} kg
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {nf.carga_placa}
-                                  </span>
+
+                          {/* Entregas within MR */}
+                          <div className="space-y-2 pl-2">
+                            {Array.from(entregasMap.entries()).map(([cnpj, nfsEntrega]) => {
+                              const entregaKey = `${mr}_${cnpj}`;
+                              const first = nfsEntrega[0];
+                              const allEntregaSel = nfsEntrega.every((n) => selectedNfIds.has(n.id));
+                              const someEntregaSel = nfsEntrega.some((n) => selectedNfIds.has(n.id));
+                              const totalCaixasEntrega = nfsEntrega.reduce((s, n) => s + n.totalCaixas, 0);
+                              const totalPesoEntrega = nfsEntrega.reduce((s, n) => s + n.peso_bruto, 0);
+                              const isExpanded = expandedEntregas.has(entregaKey);
+                              const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
+
+                              return (
+                                <div key={entregaKey} className="border rounded-md">
+                                  {/* Entrega Header */}
+                                  <div
+                                    className={`flex items-center gap-2 p-2 rounded-t-md cursor-pointer transition-colors ${
+                                      allEntregaSel
+                                        ? "bg-primary/5"
+                                        : someEntregaSel
+                                        ? "bg-accent/30"
+                                        : "hover:bg-muted/30"
+                                    }`}
+                                  >
+                                    <Checkbox
+                                      checked={allEntregaSel}
+                                      className="shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleEntrega(cnpj);
+                                      }}
+                                    />
+                                    <div
+                                      className="flex-1 min-w-0 cursor-pointer"
+                                      onClick={() => toggleExpandEntrega(entregaKey)}
+                                    >
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-medium text-sm truncate">
+                                          {first.dest_razao_social}
+                                        </span>
+                                        <Badge variant="outline" className="text-xs shrink-0">
+                                          {nfsEntrega.length} NF{nfsEntrega.length > 1 ? "s" : ""}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                                        <MapPin className="w-3 h-3 shrink-0" />
+                                        <span className="truncate">
+                                          {endereco ? `${endereco} – ` : ""}{first.dest_bairro}{first.dest_cidade ? `, ${first.dest_cidade}` : ""}{first.dest_uf ? `/${first.dest_uf}` : ""}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                      <span>{totalCaixasEntrega} cx</span>
+                                      <span>{totalPesoEntrega.toFixed(1)} kg</span>
+                                      <button
+                                        className="p-0.5"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleExpandEntrega(entregaKey);
+                                        }}
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronUp className="w-4 h-4" />
+                                        ) : (
+                                          <ChevronDown className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Individual NFs (expanded) */}
+                                  {isExpanded && (
+                                    <div className="border-t px-2 py-1 space-y-1 bg-muted/20">
+                                      {nfsEntrega.map((nf) => (
+                                        <div
+                                          key={nf.id}
+                                          className={`flex items-center gap-3 p-1.5 rounded text-sm cursor-pointer transition-colors ${
+                                            selectedNfIds.has(nf.id)
+                                              ? "bg-primary/5"
+                                              : "hover:bg-muted/30"
+                                          }`}
+                                          onClick={() => toggleNf(nf.id)}
+                                        >
+                                          <Checkbox
+                                            checked={selectedNfIds.has(nf.id)}
+                                            className="pointer-events-none"
+                                          />
+                                          <span className="font-mono font-bold text-xs">
+                                            NF {nf.numero_nf}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {nf.totalCaixas} cx
+                                          </span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {nf.peso_bruto.toFixed(1)} kg
+                                          </span>
+                                          <span className="text-xs text-muted-foreground ml-auto">
+                                            {nf.carga_placa}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
