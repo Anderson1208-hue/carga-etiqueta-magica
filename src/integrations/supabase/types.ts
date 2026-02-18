@@ -125,6 +125,8 @@ export type Database = {
           carga_id: string
           chave_acesso: string
           conferido_em: string | null
+          conferido_interno_em: string | null
+          conferido_interno_por: string | null
           conferido_por: string | null
           created_at: string
           id: string
@@ -141,6 +143,8 @@ export type Database = {
           carga_id: string
           chave_acesso: string
           conferido_em?: string | null
+          conferido_interno_em?: string | null
+          conferido_interno_por?: string | null
           conferido_por?: string | null
           created_at?: string
           id?: string
@@ -157,6 +161,8 @@ export type Database = {
           carga_id?: string
           chave_acesso?: string
           conferido_em?: string | null
+          conferido_interno_em?: string | null
+          conferido_interno_por?: string | null
           conferido_por?: string | null
           created_at?: string
           id?: string
@@ -531,7 +537,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "operador"
-      label_status: "pendente" | "conferido"
+      label_status: "pendente" | "conferido_interno" | "conferido"
       load_status: "aberta" | "fechada" | "em_rota" | "entregue"
     }
     CompositeTypes: {
@@ -661,7 +667,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "operador"],
-      label_status: ["pendente", "conferido"],
+      label_status: ["pendente", "conferido_interno", "conferido"],
       load_status: ["aberta", "fechada", "em_rota", "entregue"],
     },
   },
