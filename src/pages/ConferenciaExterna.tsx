@@ -156,6 +156,7 @@ export default function ConferenciaExterna() {
 
       const nfIds = vnfs.map((v) => v.nf_id);
       const nfCargaMap = new Map(vnfs.map((v) => [v.nf_id, v.carga_origem_id]));
+      const uniqueCargaIds = [...new Set(vnfs.map((v) => v.carga_origem_id))];
 
       // Get NF details
       const { data: nfsData } = await supabase
@@ -163,11 +164,27 @@ export default function ConferenciaExterna() {
         .select("id, numero_nf, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
         .in("id", nfIds);
 
-      // Get etiqueta counts per NF - only conferido_interno ready for external conference
-      const { data: etiquetasData } = await supabase
-        .from("etiquetas")
-        .select("numero_nf, status, carga_id")
-        .in("carga_id", [...new Set(vnfs.map((v) => v.carga_origem_id))]);
+      // Use RPC to get progress for each carga (avoids 1000 row limit)
+      const progressResults = await Promise.all(
+        uniqueCargaIds.map((cargaId) =>
+          supabase.rpc("get_conferencia_progress", { p_carga_id: cargaId })
+        )
+      );
+
+      // Build a map of numero_nf+carga_id -> { total, conferidas, conferidas_interno }
+      const progressMap = new Map<string, { total: number; conferidas: number; conferidas_interno: number }>();
+      uniqueCargaIds.forEach((cargaId, idx) => {
+        const progressData = progressResults[idx].data as any;
+        if (progressData?.nfs) {
+          (progressData.nfs as any[]).forEach((nfProgress: any) => {
+            progressMap.set(`${nfProgress.numero_nf}_${cargaId}`, {
+              total: nfProgress.total || 0,
+              conferidas: nfProgress.conferidas || 0,
+              conferidas_interno: nfProgress.conferidas_interno || 0,
+            });
+          });
+        }
+      });
 
       // Get existing baixas
       const { data: baixasData } = await supabase
@@ -180,11 +197,7 @@ export default function ConferenciaExterna() {
       // Build NF list with etiqueta progress
       const result: NfConferencia[] = (nfsData || []).map((nf) => {
         const cargaId = nfCargaMap.get(nf.id) || "";
-        const nfEtiquetas = (etiquetasData || []).filter(
-          (e) => e.numero_nf === nf.numero_nf && e.carga_id === cargaId
-        );
-        const total = nfEtiquetas.length;
-        const conferidas = nfEtiquetas.filter((e) => e.status === "conferido").length;
+        const progress = progressMap.get(`${nf.numero_nf}_${cargaId}`) || { total: 0, conferidas: 0, conferidas_interno: 0 };
 
         return {
           nf_id: nf.id,
@@ -196,21 +209,16 @@ export default function ConferenciaExterna() {
           dest_cidade: nf.dest_cidade || "",
           dest_uf: nf.dest_uf || "",
           carga_id: cargaId,
-          totalEtiquetas: total,
-          conferidas,
+          totalEtiquetas: progress.total,
+          conferidas: progress.conferidas,
           baixa_status: baixasMap.get(nf.id) || null,
         };
       });
 
-      // Only show NFs that have etiquetas with conferido_interno (ready for external)
+      // Only show NFs that have etiquetas with conferido_interno or conferido (ready for external)
       const filtered = result.filter((nf) => {
-        const nfEtiquetas = (etiquetasData || []).filter(
-          (e) => e.numero_nf === nf.numero_nf && e.carga_id === nf.carga_id
-        );
-        // Show if at least one etiqueta is conferido_interno or conferido
-        return nfEtiquetas.some(
-          (e) => e.status === "conferido_interno" || e.status === "conferido"
-        );
+        const progress = progressMap.get(`${nf.numero_nf}_${nf.carga_id}`);
+        return progress && (progress.conferidas_interno > 0 || progress.conferidas > 0);
       });
 
       filtered.sort((a, b) => {
