@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const tabs = [
   { path: "/conferencia-interna", label: "Conf. Interna", icon: Warehouse },
-  { path: "/conferencia-mobile", label: "Conf. Externa", icon: ScanLine },
+  { path: "/conferencia-externa", label: "Conf. Externa", icon: ScanLine },
   { path: "/baixa-entrega", label: "Baixa Entrega", icon: Truck },
 ];
 
