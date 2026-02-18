@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { ScanLine, Truck } from "lucide-react";
+import { ScanLine, Truck, Warehouse } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
-  { path: "/conferencia-mobile", label: "Conferência", icon: ScanLine },
+  { path: "/conferencia-interna", label: "Conf. Interna", icon: Warehouse },
+  { path: "/conferencia-mobile", label: "Conf. Externa", icon: ScanLine },
   { path: "/baixa-entrega", label: "Baixa Entrega", icon: Truck },
 ];
 
