@@ -335,8 +335,20 @@ export async function generateEtiquetasPDF(
     return a.seq - b.seq;
   });
 
+  // Compute total boxes per NF for global sequencing
+  const totalPorNf = new Map<string, number>();
+  for (const et of sortedEtiquetas) {
+    totalPorNf.set(et.numeroNf, (totalPorNf.get(et.numeroNf) || 0) + 1);
+  }
+
+  // Track global sequence per NF
+  const seqGlobalPorNf = new Map<string, number>();
+
   for (let i = 0; i < sortedEtiquetas.length; i++) {
     const etiqueta = sortedEtiquetas[i];
+    const currentSeqGlobal = (seqGlobalPorNf.get(etiqueta.numeroNf) || 0) + 1;
+    seqGlobalPorNf.set(etiqueta.numeroNf, currentSeqGlobal);
+    const totalGlobalNf = totalPorNf.get(etiqueta.numeroNf) || 0;
 
     if (i > 0) {
       doc.addPage([LABEL_HEIGHT, LABEL_WIDTH], "l");
@@ -383,6 +395,11 @@ export async function generateEtiquetasPDF(
     doc.setFont("helvetica", "normal");
     const descLines = doc.splitTextToSize(etiqueta.xProd, textAreaWidth);
     doc.text(descLines.slice(0, 2).join("\n"), SAFE, y);
+
+    // Global NF sequence (top-right of text area)
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${currentSeqGlobal}/${totalGlobalNf}`, textMaxX, SAFE + 1.5, { align: "right" });
 
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
