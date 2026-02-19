@@ -11,7 +11,7 @@ export function MobileRedirect({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isMobile && !ALLOWED_MOBILE_ROUTES.includes(location.pathname)) {
-      navigate("/conferencia-mobile", { replace: true });
+      navigate("/conferencia-interna", { replace: true });
     }
   }, [isMobile, location.pathname, navigate]);
 
