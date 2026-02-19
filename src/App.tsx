@@ -86,14 +86,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/upload"
-        element={
-          <ProtectedRoute>
-            <Cargas />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/romaneio"
         element={
           <ProtectedRoute>

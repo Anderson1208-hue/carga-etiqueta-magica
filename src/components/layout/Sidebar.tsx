@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Truck,
-  Upload,
   FileText,
   Tags,
   CheckSquare,
@@ -22,7 +21,6 @@ import { Button } from "@/components/ui/button";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Cargas", href: "/cargas", icon: Truck },
-  { name: "Upload XML", href: "/upload", icon: Upload },
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
   { name: "Conferência", href: "/conferencia", icon: CheckSquare },
