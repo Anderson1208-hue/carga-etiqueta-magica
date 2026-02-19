@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
+  Search,
 } from "lucide-react";
 import {
   Collapsible,
@@ -483,13 +484,23 @@ export default function Programacao() {
     return Array.from(map.values());
   }, [nfsDisponiveis]);
 
+  const [buscaNf, setBuscaNf] = useState("");
+
   const filteredNfs = useMemo(() => {
+    const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
       if (filtroCarga !== "todas" && nf.carga_id !== filtroCarga) return false;
+      if (searchTerm) {
+        const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
+        const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
+        const matchBairro = nf.dest_bairro.toLowerCase().includes(searchTerm);
+        const matchCidade = (nf.dest_cidade || "").toLowerCase().includes(searchTerm);
+        if (!matchNf && !matchRazao && !matchBairro && !matchCidade) return false;
+      }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, filtroCarga]);
+  }, [nfsDisponiveis, filtroMR, filtroCarga, buscaNf]);
 
   const macroRegioesPresentes = useMemo(() => {
     return [...new Set(nfsDisponiveis.map((nf) => nf.macroRegiao))].sort((a, b) => a - b);
@@ -637,6 +648,18 @@ export default function Programacao() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-4 flex-wrap">
+              <div className="min-w-[200px] flex-1 max-w-sm">
+                <Label className="text-xs">Buscar NF</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nº NF, destinatário, bairro..."
+                    value={buscaNf}
+                    onChange={(e) => setBuscaNf(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
               <div className="min-w-[200px]">
                 <Label className="text-xs">Carga Origem</Label>
                 <Select value={filtroCarga} onValueChange={setFiltroCarga}>
