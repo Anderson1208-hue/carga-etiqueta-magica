@@ -5,7 +5,6 @@ import {
   Truck,
   FileText,
   Tags,
-  
   LogOut,
   User,
   LayoutDashboard,
@@ -15,16 +14,25 @@ import {
   ClipboardCheck,
   History,
   Warehouse,
+  ChevronDown,
+  Package,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
-const navigation = [
+const topNav = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Cargas", href: "/cargas", icon: Truck },
+];
+
+const depositoItems = [
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
-  
   { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
+];
+
+const transporteItems = [
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Programação", href: "/programacao", icon: CalendarClock },
@@ -32,9 +40,65 @@ const navigation = [
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
+function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean }) {
+  return (
+    <Link
+      to={item.href}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+        isActive
+          ? "bg-sidebar-accent text-sidebar-primary"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      )}
+    >
+      <item.icon className="w-5 h-5" />
+      {item.name}
+    </Link>
+  );
+}
+
+function NavGroup({
+  label,
+  icon: Icon,
+  items,
+  pathname,
+  defaultOpen,
+}: {
+  label: string;
+  icon: React.ElementType;
+  items: typeof depositoItems;
+  pathname: string;
+  defaultOpen: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-sidebar-foreground/90 hover:bg-sidebar-accent transition-colors"
+      >
+        <Icon className="w-5 h-5" />
+        <span className="flex-1 text-left">{label}</span>
+        <ChevronDown className={cn("w-4 h-4 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
+          {items.map((item) => (
+            <NavItem key={item.href} item={item} isActive={pathname === item.href} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const location = useLocation();
   const { profile, signOut, isAdmin } = useAuth();
+
+  const depositoActive = depositoItems.some((i) => location.pathname === i.href);
+  const transporteActive = transporteItems.some((i) => location.pathname === i.href);
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
@@ -48,24 +112,26 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-primary"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.name}
-            </Link>
-          );
-        })}
+        {topNav.map((item) => (
+          <NavItem key={item.href} item={item} isActive={location.pathname === item.href} />
+        ))}
+
+        <div className="pt-2 space-y-1">
+          <NavGroup
+            label="Depósito"
+            icon={Package}
+            items={depositoItems}
+            pathname={location.pathname}
+            defaultOpen={depositoActive}
+          />
+          <NavGroup
+            label="Transporte"
+            icon={MapPin}
+            items={transporteItems}
+            pathname={location.pathname}
+            defaultOpen={transporteActive}
+          />
+        </div>
       </nav>
 
       {/* User section */}
