@@ -38,6 +38,7 @@ import {
   ChevronUp,
   MapPin,
   Search,
+  Printer,
 } from "lucide-react";
 import {
   Collapsible,
@@ -58,6 +59,7 @@ import {
   getMacroRegiao,
   getMacroRegiaoLabel,
 } from "@/lib/macro-regioes";
+import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
 
 interface NfDisponivel {
   id: string;
@@ -106,6 +108,58 @@ interface VeiculoFormado {
 export default function Programacao() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [printingVeiculoId, setPrintingVeiculoId] = useState<string | null>(null);
+
+  async function handlePrintNotaCarga(veiculo: VeiculoFormado) {
+    setPrintingVeiculoId(veiculo.id);
+    try {
+      const nfIds = veiculo.nfs.map((n) => n.nf_id);
+      if (nfIds.length === 0) {
+        toast({ title: "Sem NFs", description: "Este veículo não tem NFs vinculadas", variant: "destructive" });
+        return;
+      }
+
+      const { data: nfsData } = await supabase
+        .from("notas_fiscais")
+        .select(`
+          id, numero_nf, razao_social_emitente, cnpj_emitente,
+          cnpj_destinatario, dest_bairro, data_emissao,
+          itens_nf(c_prod, x_prod, q_com)
+        `)
+        .in("id", nfIds);
+
+      if (!nfsData || nfsData.length === 0) {
+        toast({ title: "Erro", description: "Não foi possível carregar os dados das NFs", variant: "destructive" });
+        return;
+      }
+
+      const notasFiscaisPDF = nfsData.map((nf) => ({
+        numeroNf: nf.numero_nf,
+        razaoSocialEmitente: nf.razao_social_emitente,
+        cnpjEmitente: nf.cnpj_emitente,
+        cnpjDestinatario: nf.cnpj_destinatario || "",
+        destBairro: nf.dest_bairro || undefined,
+        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        dataEmissao: nf.data_emissao,
+        itens: (nf.itens_nf || []).map((item: any) => ({
+          cProd: item.c_prod,
+          xProd: item.x_prod,
+          qtdCaixas: calculateBoxes(Number(item.q_com)),
+        })),
+      }));
+
+      const blob = await generateNotaDeCargaPDF(
+        { data: veiculo.data, placa: veiculo.placa, motorista: veiculo.motorista },
+        notasFiscaisPDF
+      );
+      printBlob(blob);
+    } catch (error) {
+      console.error("Error printing nota de carga:", error);
+      toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
+    } finally {
+      setPrintingVeiculoId(null);
+    }
+  }
 
   const [nfsDisponiveis, setNfsDisponiveis] = useState<NfDisponivel[]>([]);
   const [veiculosFormados, setVeiculosFormados] = useState<VeiculoFormado[]>([]);
@@ -591,6 +645,22 @@ export default function Programacao() {
                         <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
                         <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
                       </div>
+                      {v.nfs.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full text-xs gap-1"
+                          onClick={() => handlePrintNotaCarga(v)}
+                          disabled={printingVeiculoId === v.id}
+                        >
+                          {printingVeiculoId === v.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Printer className="w-3 h-3" />
+                          )}
+                          Imprimir Nota de Carga
+                        </Button>
+                      )}
                       {v.nfs.length > 0 && (
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
