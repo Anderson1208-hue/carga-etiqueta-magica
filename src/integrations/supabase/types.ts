@@ -77,6 +77,35 @@ export type Database = {
           },
         ]
       }
+      carga_operadores: {
+        Row: {
+          carga_id: string
+          created_at: string
+          id: string
+          operador_id: string
+        }
+        Insert: {
+          carga_id: string
+          created_at?: string
+          id?: string
+          operador_id: string
+        }
+        Update: {
+          carga_id?: string
+          created_at?: string
+          id?: string
+          operador_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carga_operadores_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cargas: {
         Row: {
           created_at: string
@@ -534,6 +563,7 @@ export type Database = {
       has_profile: { Args: never; Returns: boolean }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       is_admin: { Args: never; Returns: boolean }
+      is_carga_operator: { Args: { p_carga_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "operador"

@@ -42,6 +42,8 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -59,6 +61,7 @@ interface Carga {
     nfs: number;
     itens: number;
   };
+  operadores_atribuidos?: string[];
 }
 
 interface Operador {
@@ -120,8 +123,25 @@ export default function Cargas() {
 
       if (error) throw error;
 
+      // Load operator assignments from junction table
+      const cargaIds = (data || []).map((c) => c.id);
+      let operadoresMap = new Map<string, string[]>();
+      if (cargaIds.length > 0) {
+        const { data: assignments } = await supabase
+          .from("carga_operadores")
+          .select("carga_id, operador_id")
+          .in("carga_id", cargaIds);
+        
+        (assignments || []).forEach((a) => {
+          const list = operadoresMap.get(a.carga_id) || [];
+          list.push(a.operador_id);
+          operadoresMap.set(a.carga_id, list);
+        });
+      }
+
       const cargasWithCounts = (data || []).map((carga) => ({
         ...carga,
+        operadores_atribuidos: operadoresMap.get(carga.id) || [],
         _count: {
           nfs: carga.notas_fiscais?.length || 0,
           itens: carga.notas_fiscais?.reduce(
@@ -415,32 +435,50 @@ export default function Cargas() {
     }
   }
 
-  async function handleOperadorChange(cargaId: string, operadorId: string | null) {
+  async function handleToggleOperador(cargaId: string, operadorId: string) {
+    const carga = cargas.find((c) => c.id === cargaId);
+    const currentOps = carga?.operadores_atribuidos || [];
+    const isAssigned = currentOps.includes(operadorId);
+
     try {
-      const { error } = await supabase
-        .from("cargas")
-        .update({ operador_responsavel: operadorId })
-        .eq("id", cargaId);
+      if (isAssigned) {
+        // Remove operator
+        const { error } = await supabase
+          .from("carga_operadores")
+          .delete()
+          .eq("carga_id", cargaId)
+          .eq("operador_id", operadorId);
+        if (error) throw error;
 
-      if (error) throw error;
+        setCargas((prev) =>
+          prev.map((c) =>
+            c.id === cargaId
+              ? { ...c, operadores_atribuidos: currentOps.filter((id) => id !== operadorId) }
+              : c
+          )
+        );
+        const op = operadores.find((o) => o.id === operadorId);
+        toast({ title: "Operador removido", description: `${op?.full_name || op?.email} removido da carga.` });
+      } else {
+        // Add operator
+        const { error } = await supabase
+          .from("carga_operadores")
+          .insert({ carga_id: cargaId, operador_id: operadorId });
+        if (error) throw error;
 
-      setCargas((prev) =>
-        prev.map((c) => (c.id === cargaId ? { ...c, operador_responsavel: operadorId } : c))
-      );
-
-      const operador = operadores.find((o) => o.id === operadorId);
-      toast({
-        title: "Operador atribuído",
-        description: operadorId
-          ? `${operador?.full_name || operador?.email} atribuído à carga.`
-          : "Operador removido da carga.",
-      });
+        setCargas((prev) =>
+          prev.map((c) =>
+            c.id === cargaId
+              ? { ...c, operadores_atribuidos: [...currentOps, operadorId] }
+              : c
+          )
+        );
+        const op = operadores.find((o) => o.id === operadorId);
+        toast({ title: "Operador atribuído", description: `${op?.full_name || op?.email} atribuído à carga.` });
+      }
     } catch (error) {
-      console.error("Error assigning operador:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao atribuir operador",
-      });
+      console.error("Error toggling operador:", error);
+      toast({ variant: "destructive", title: "Erro ao atribuir operador" });
     }
   }
 
@@ -649,26 +687,36 @@ export default function Cargas() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <Select
-                          value={carga.operador_responsavel || "none"}
-                          onValueChange={(value) =>
-                            handleOperadorChange(carga.id, value === "none" ? null : value)
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Sem operador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">
-                              <span className="text-muted-foreground">Sem operador</span>
-                            </SelectItem>
-                            {operadores.map((op) => (
-                              <SelectItem key={op.id} value={op.id}>
-                                {op.full_name || op.email}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="w-40 justify-start text-xs">
+                              <UserCheck className="w-3 h-3 mr-1 shrink-0" />
+                              {(carga.operadores_atribuidos || []).length > 0
+                                ? `${(carga.operadores_atribuidos || []).length} operador(es)`
+                                : <span className="text-muted-foreground">Sem operador</span>
+                              }
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-56 p-2" align="start">
+                            <div className="space-y-1 max-h-48 overflow-auto">
+                              {operadores.map((op) => {
+                                const isChecked = (carga.operadores_atribuidos || []).includes(op.id);
+                                return (
+                                  <label
+                                    key={op.id}
+                                    className="flex items-center gap-2 p-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+                                  >
+                                    <Checkbox
+                                      checked={isChecked}
+                                      onCheckedChange={() => handleToggleOperador(carga.id, op.id)}
+                                    />
+                                    <span className="truncate">{op.full_name || op.email}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </TableCell>
                     )}
                     <TableCell>
