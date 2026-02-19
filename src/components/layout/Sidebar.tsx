@@ -5,7 +5,7 @@ import {
   Truck,
   FileText,
   Tags,
-  CheckSquare,
+  
   LogOut,
   User,
   LayoutDashboard,
@@ -23,7 +23,7 @@ const navigation = [
   { name: "Cargas", href: "/cargas", icon: Truck },
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
-  { name: "Conferência", href: "/conferencia", icon: CheckSquare },
+  
   { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },

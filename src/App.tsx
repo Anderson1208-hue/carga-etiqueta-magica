@@ -10,8 +10,6 @@ import Dashboard from "./pages/Dashboard";
 import Cargas from "./pages/Cargas";
 import Romaneio from "./pages/Romaneio";
 import Etiquetas from "./pages/Etiquetas";
-import Conferencia from "./pages/Conferencia";
-import ConferenciaMobile from "./pages/ConferenciaMobile";
 import ConferenciaInterna from "./pages/ConferenciaInterna";
 import ConferenciaExterna from "./pages/ConferenciaExterna";
 import Roteirizacao from "./pages/Roteirizacao";
@@ -98,22 +96,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Etiquetas />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/conferencia"
-        element={
-          <ProtectedRoute>
-            <Conferencia />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/conferencia-mobile"
-        element={
-          <ProtectedRoute>
-            <ConferenciaMobile />
           </ProtectedRoute>
         }
       />
