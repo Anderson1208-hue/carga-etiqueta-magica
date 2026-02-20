@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/table";
 import { generateEtiquetasPDF, downloadBlob } from "@/lib/pdf-generator";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
-import { Tags, Download, Loader2, Package, FileText, Printer } from "lucide-react";
+import { Tags, Download, Loader2, Package, FileText, Printer, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 
 interface Carga {
@@ -61,6 +62,7 @@ export default function Etiquetas() {
   const [printing, setPrinting] = useState(false);
   const [selectedNfs, setSelectedNfs] = useState<Set<string>>(new Set());
   const [selectedMR, setSelectedMR] = useState<string>("todas");
+  const [searchNf, setSearchNf] = useState("");
 
   useEffect(() => {
     loadCargas();
@@ -231,37 +233,19 @@ export default function Etiquetas() {
     }
   }
 
-  async function handleGenerateSingleNf(numeroNf: string) {
-    if (!selectedCarga) return;
-    const etiquetasNf = filteredEtiquetas.filter((e) => e.numeroNf === numeroNf);
-    if (etiquetasNf.length === 0) return;
-
-    setGenerating(true);
-    try {
-      const etiquetasData = etiquetasNf.map((e) => ({
-        numeroNf: e.numeroNf,
-        cProd: e.cProd,
-        xProd: e.xProd,
-        seq: e.seq,
-        total: e.total,
-        qrPayload: e.qrPayload,
-        cnpjDestinatario: e.cnpjDestinatario,
-        destBairro: e.destBairro,
-        macroRegiao: e.macroRegiao,
-      }));
-
-      const blob = await generateEtiquetasPDF(etiquetasData);
-      downloadBlob(blob, `etiquetas_NF${numeroNf}.pdf`);
-
-      toast({
-        title: "PDF gerado!",
-        description: `${etiquetasNf.length} etiquetas da NF ${numeroNf}.`,
-      });
-    } catch (error) {
-      console.error("Error generating single NF etiquetas:", error);
-      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
-    } finally {
-      setGenerating(false);
+  function handleSearchNf() {
+    const term = searchNf.trim();
+    if (!term) return;
+    const found = uniqueNfs.find((nf) => nf.numeroNf.includes(term));
+    if (found) {
+      setSelectedNfs(new Set([found.numeroNf]));
+      // Scroll to the NF element
+      setTimeout(() => {
+        const el = document.getElementById(`nf-card-${found.numeroNf}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    } else {
+      toast({ variant: "destructive", title: "NF não encontrada", description: `Nenhuma NF contendo "${term}" nesta carga.` });
     }
   }
 
@@ -520,47 +504,48 @@ export default function Etiquetas() {
           <div className="wms-card p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm">Selecionar NFs para impressão</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSelectAllNfs}
-              >
-                {selectedNfs.size === uniqueNfs.length ? "Desmarcar Todas" : "Selecionar Todas"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Input
+                    placeholder="Buscar NF..."
+                    value={searchNf}
+                    onChange={(e) => setSearchNf(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearchNf()}
+                    className="h-8 w-36 text-sm"
+                  />
+                  <Button variant="outline" size="sm" className="h-8" onClick={handleSearchNf}>
+                    <Search className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAllNfs}
+                >
+                  {selectedNfs.size === uniqueNfs.length ? "Desmarcar Todas" : "Selecionar Todas"}
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
               {uniqueNfs.map((nf) => (
-                <div
+                <label
                   key={nf.numeroNf}
-                  className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
+                  id={`nf-card-${nf.numeroNf}`}
+                  className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
                     selectedNfs.has(nf.numeroNf)
                       ? "bg-primary/10 border-primary"
                       : "bg-background border-border hover:bg-muted"
                   }`}
                 >
-                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                    <Checkbox
-                      checked={selectedNfs.has(nf.numeroNf)}
-                      onCheckedChange={() => handleToggleNf(nf.numeroNf)}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-medium truncate">NF {nf.numeroNf}</span>
-                      <span className="text-xs text-muted-foreground">{nf.count} etiq.</span>
-                    </div>
-                  </label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
-                    title={`Gerar etiquetas da NF ${nf.numeroNf}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleGenerateSingleNf(nf.numeroNf);
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                  <Checkbox
+                    checked={selectedNfs.has(nf.numeroNf)}
+                    onCheckedChange={() => handleToggleNf(nf.numeroNf)}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">NF {nf.numeroNf}</span>
+                    <span className="text-xs text-muted-foreground">{nf.count} etiq.</span>
+                  </div>
+                </label>
               ))}
             </div>
           </div>
