@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
+import { getMacroRegiao } from "@/lib/macro-regioes";
+import { calculateBoxes } from "@/lib/xml-parser";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -40,8 +43,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
-import { calculateBoxes } from "@/lib/xml-parser";
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck } from "lucide-react";
+
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
@@ -81,6 +84,60 @@ export default function Cargas() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cargaToDelete, setCargaToDelete] = useState<Carga | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
+
+  async function handlePrintNotaCarga(carga: Carga) {
+    setPrintingCargaId(carga.id);
+    try {
+      const { data: nfsData } = await supabase
+        .from("notas_fiscais")
+        .select(`
+          id, numero_nf, razao_social_emitente, cnpj_emitente,
+          cnpj_destinatario, dest_bairro, data_emissao,
+          itens_nf(c_prod, x_prod, q_com)
+        `)
+        .eq("carga_id", carga.id)
+        .order("numero_nf", { ascending: true });
+
+      if (!nfsData || nfsData.length === 0) {
+        toast({ title: "Sem NFs", description: "Nenhuma NF encontrada nesta carga.", variant: "destructive" });
+        return;
+      }
+
+      const notasFiscaisPDF = nfsData.map((nf) => ({
+        numeroNf: nf.numero_nf,
+        razaoSocialEmitente: nf.razao_social_emitente,
+        cnpjEmitente: nf.cnpj_emitente,
+        cnpjDestinatario: nf.cnpj_destinatario || "",
+        destBairro: nf.dest_bairro || undefined,
+        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        dataEmissao: nf.data_emissao,
+        itens: (nf.itens_nf || []).map((item: any) => ({
+          cProd: item.c_prod,
+          xProd: item.x_prod,
+          qtdCaixas: calculateBoxes(Number(item.q_com)),
+        })),
+      }));
+
+      // Sort by numero_nf ascending (numeric)
+      notasFiscaisPDF.sort((a, b) => {
+        const numA = parseInt(a.numeroNf.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.numeroNf.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+
+      const blob = await generateNotaDeCargaPDF(
+        { data: carga.data, placa: carga.placa, motorista: carga.motorista },
+        notasFiscaisPDF
+      );
+      printBlob(blob);
+    } catch (error) {
+      console.error("Error printing nota de carga:", error);
+      toast({ title: "Erro", description: "Erro ao gerar PDF da Nota de Carga.", variant: "destructive" });
+    } finally {
+      setPrintingCargaId(null);
+    }
+  }
 
   // Form state
   const [formData, setFormData] = useState({
@@ -747,6 +804,19 @@ export default function Cargas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handlePrintNotaCarga(carga)}
+                          disabled={printingCargaId === carga.id}
+                          title="Imprimir Nota de Carga"
+                        >
+                          {printingCargaId === carga.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Printer className="w-4 h-4" />
+                          )}
+                        </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm">
                             <FileText className="w-4 h-4" />
