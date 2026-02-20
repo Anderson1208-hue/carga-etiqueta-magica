@@ -130,6 +130,7 @@ export default function Etiquetas() {
           .eq("carga_id", cargaId)
           .order("c_prod", { ascending: true })
           .order("seq", { ascending: true })
+          .order("id", { ascending: true })
           .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
         if (error) {
