@@ -158,6 +158,9 @@ export type Database = {
           conferido_interno_por: string | null
           conferido_por: string | null
           created_at: string
+          divergencia_em: string | null
+          divergencia_motivo: string | null
+          divergencia_por: string | null
           id: string
           nf_id: string
           numero_nf: string
@@ -176,6 +179,9 @@ export type Database = {
           conferido_interno_por?: string | null
           conferido_por?: string | null
           created_at?: string
+          divergencia_em?: string | null
+          divergencia_motivo?: string | null
+          divergencia_por?: string | null
           id?: string
           nf_id: string
           numero_nf: string
@@ -194,6 +200,9 @@ export type Database = {
           conferido_interno_por?: string | null
           conferido_por?: string | null
           created_at?: string
+          divergencia_em?: string | null
+          divergencia_motivo?: string | null
+          divergencia_por?: string | null
           id?: string
           nf_id?: string
           numero_nf?: string

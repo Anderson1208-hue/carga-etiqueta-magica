@@ -7,6 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
@@ -21,6 +29,8 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  Ban,
+  ShieldAlert,
 } from "lucide-react";
 
 interface CargaResumo {
@@ -45,7 +55,7 @@ interface ScanResult {
 }
 
 export default function ConferenciaInterna() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -68,6 +78,22 @@ export default function ConferenciaInterna() {
   // Search
   const [searchNf, setSearchNf] = useState("");
 
+  // Divergência management (admin only)
+  const [showDivergencia, setShowDivergencia] = useState(false);
+  const [pendingEtiquetas, setPendingEtiquetas] = useState<any[]>([]);
+  const [selectedEtiquetaIds, setSelectedEtiquetaIds] = useState<Set<string>>(new Set());
+  const [divergenciaMotivo, setDivergenciaMotivo] = useState("");
+  const [loadingDivergencia, setLoadingDivergencia] = useState(false);
+  const [submittingDivergencia, setSubmittingDivergencia] = useState(false);
+
+  const MOTIVOS_DIVERGENCIA = [
+    { value: "avaria", label: "Avaria" },
+    { value: "falta", label: "Falta / Não localizado" },
+    { value: "extravio", label: "Extravio" },
+    { value: "erro_emissao", label: "Erro de emissão" },
+    { value: "outros", label: "Outros" },
+  ];
+
   useEffect(() => {
     loadCargas();
   }, []);
@@ -89,10 +115,10 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // Get etiqueta counts per carga
+      // Get etiqueta counts per carga (excluding divergências)
       const resumos: CargaResumo[] = [];
       for (const c of cargasData) {
-        const [totalRes, confRes] = await Promise.all([
+        const [totalRes, confRes, divRes] = await Promise.all([
           supabase
             .from("etiquetas")
             .select("id", { count: "exact", head: true })
@@ -102,14 +128,20 @@ export default function ConferenciaInterna() {
             .select("id", { count: "exact", head: true })
             .eq("carga_id", c.id)
             .in("status", ["conferido_interno", "conferido"]),
+          supabase
+            .from("etiquetas")
+            .select("id", { count: "exact", head: true })
+            .eq("carga_id", c.id)
+            .eq("status", "divergencia" as any),
         ]);
 
+        const divergencias = divRes.count || 0;
         resumos.push({
           id: c.id,
           placa: c.placa,
           motorista: c.motorista,
           data: c.data,
-          totalEtiquetas: totalRes.count || 0,
+          totalEtiquetas: (totalRes.count || 0) - divergencias,
           conferidosInterno: confRes.count || 0,
         });
       }
@@ -140,6 +172,7 @@ export default function ConferenciaInterna() {
 
       const nfMap = new Map<string, { total: number; conferidas: number }>();
       for (const et of data || []) {
+        if (et.status === "divergencia") continue; // Exclude divergências from count
         const current = nfMap.get(et.numero_nf) || { total: 0, conferidas: 0 };
         current.total++;
         if (et.status === "conferido_interno" || et.status === "conferido") {
@@ -211,7 +244,8 @@ export default function ConferenciaInterna() {
       }
 
       const cargaId = etiquetas[0].carga_id;
-      const total = etiquetas.length;
+      const divergencias = etiquetas.filter((e) => e.status === "divergencia").length;
+      const total = etiquetas.length - divergencias;
       const conferidas = etiquetas.filter(
         (e) => e.status === "conferido_interno" || e.status === "conferido"
       ).length;
@@ -316,6 +350,19 @@ export default function ConferenciaInterna() {
         return;
       }
 
+      // Check if divergência
+      if (etiqueta.status === "divergencia") {
+        const result: ScanResult = {
+          type: "error",
+          message: "Etiqueta bloqueada (Divergência)",
+          details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}`,
+        };
+        setLastResult(result);
+        addToHistory(result);
+        playSound("error");
+        return;
+      }
+
       // Check if already scanned internally or fully
       if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
         const result: ScanResult = {
@@ -385,26 +432,22 @@ export default function ConferenciaInterna() {
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
 
-    const [totalRes, confRes] = await Promise.all([
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedCarga.id)
-        .eq("numero_nf", selectedNf),
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedCarga.id)
-        .eq("numero_nf", selectedNf)
-        .in("status", ["conferido_interno", "conferido"]),
-    ]);
+    const { data: etiquetasData } = await supabase
+      .from("etiquetas")
+      .select("id, status")
+      .eq("carga_id", selectedCarga.id)
+      .eq("numero_nf", selectedNf);
 
-    const total = totalRes.count || 0;
-    const conferidas = confRes.count || 0;
+    const all = etiquetasData || [];
+    const divergencias = all.filter((e) => e.status === "divergencia").length;
+    const total = all.length - divergencias;
+    const conferidas = all.filter(
+      (e) => e.status === "conferido_interno" || e.status === "conferido"
+    ).length;
 
     setNfProgress({ numeroNf: selectedNf, total, conferidas });
 
-    if (conferidas === total) {
+    if (conferidas === total && total > 0) {
       setTimeout(() => {
         const completeResult: ScanResult = {
           type: "success",
@@ -416,6 +459,104 @@ export default function ConferenciaInterna() {
         playSound("success");
       }, 500);
     }
+  }
+
+  // ---- DIVERGÊNCIA MANAGEMENT (Admin only) ----
+  async function loadPendingEtiquetas() {
+    if (!selectedCarga || !selectedNf) return;
+    setLoadingDivergencia(true);
+    try {
+      const { data, error } = await supabase
+        .from("etiquetas")
+        .select("id, c_prod, x_prod, seq, total, status, divergencia_motivo")
+        .eq("carga_id", selectedCarga.id)
+        .eq("numero_nf", selectedNf)
+        .order("seq", { ascending: true });
+
+      if (error) throw error;
+      setPendingEtiquetas(data || []);
+      setSelectedEtiquetaIds(new Set());
+      setDivergenciaMotivo("");
+      setShowDivergencia(true);
+    } catch (error) {
+      console.error("Erro ao carregar etiquetas:", error);
+      toast({ title: "Erro ao carregar etiquetas", variant: "destructive" });
+    } finally {
+      setLoadingDivergencia(false);
+    }
+  }
+
+  async function marcarDivergencia() {
+    if (selectedEtiquetaIds.size === 0 || !divergenciaMotivo) {
+      toast({
+        title: "Atenção",
+        description: "Selecione as etiquetas e informe o motivo.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmittingDivergencia(true);
+    try {
+      const ids = Array.from(selectedEtiquetaIds);
+      const { error } = await supabase
+        .from("etiquetas")
+        .update({
+          status: "divergencia" as any,
+          divergencia_motivo: divergenciaMotivo,
+          divergencia_por: user?.id,
+          divergencia_em: new Date().toISOString(),
+        } as any)
+        .in("id", ids);
+
+      if (error) throw error;
+
+      toast({
+        title: "Divergência registrada",
+        description: `${ids.length} etiqueta(s) bloqueada(s).`,
+      });
+
+      setShowDivergencia(false);
+      await reloadNfProgress();
+      // Reload pending list
+      await loadPendingEtiquetas();
+    } catch (error) {
+      console.error("Erro ao registrar divergência:", error);
+      toast({ title: "Erro ao registrar divergência", variant: "destructive" });
+    } finally {
+      setSubmittingDivergencia(false);
+    }
+  }
+
+  async function reverterDivergencia(etiquetaId: string) {
+    try {
+      const { error } = await supabase
+        .from("etiquetas")
+        .update({
+          status: "pendente" as any,
+          divergencia_motivo: null,
+          divergencia_por: null,
+          divergencia_em: null,
+        } as any)
+        .eq("id", etiquetaId);
+
+      if (error) throw error;
+
+      toast({ title: "Divergência revertida" });
+      await reloadNfProgress();
+      await loadPendingEtiquetas();
+    } catch (error) {
+      console.error("Erro ao reverter divergência:", error);
+      toast({ title: "Erro ao reverter", variant: "destructive" });
+    }
+  }
+
+  function toggleEtiquetaSelection(id: string) {
+    setSelectedEtiquetaIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   const nfPercent =
@@ -578,6 +719,125 @@ export default function ConferenciaInterna() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Divergência Management - Admin Only */}
+          {isAdmin && !showDivergencia && (
+            <Button
+              variant="outline"
+              className="w-full border-destructive text-destructive hover:bg-destructive/10"
+              onClick={loadPendingEtiquetas}
+              disabled={loadingDivergencia}
+            >
+              {loadingDivergencia ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ShieldAlert className="w-4 h-4 mr-2" />
+              )}
+              Registrar Divergência
+            </Button>
+          )}
+
+          {isAdmin && showDivergencia && (
+            <Card className="border-destructive">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                    <Ban className="w-4 h-4" />
+                    Bloquear Etiquetas
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDivergencia(false)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Motivo select */}
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Motivo</label>
+                  <Select value={divergenciaMotivo} onValueChange={setDivergenciaMotivo}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o motivo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOTIVOS_DIVERGENCIA.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Etiquetas list */}
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {pendingEtiquetas.map((et) => {
+                    const isDivergencia = et.status === "divergencia";
+                    const isConferido = et.status === "conferido_interno" || et.status === "conferido";
+
+                    return (
+                      <div
+                        key={et.id}
+                        className={`flex items-center gap-2 p-2 rounded text-sm ${
+                          isDivergencia
+                            ? "bg-destructive/10 opacity-80"
+                            : isConferido
+                            ? "bg-success/10 opacity-60"
+                            : "bg-muted/50"
+                        }`}
+                      >
+                        {isDivergencia ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-destructive"
+                            onClick={() => reverterDivergencia(et.id)}
+                          >
+                            Reverter
+                          </Button>
+                        ) : !isConferido ? (
+                          <Checkbox
+                            checked={selectedEtiquetaIds.has(et.id)}
+                            onCheckedChange={() => toggleEtiquetaSelection(et.id)}
+                          />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                        )}
+                        <span className="flex-1 truncate">
+                          {et.x_prod} — CX {et.seq}/{et.total}
+                        </span>
+                        {isDivergencia && (
+                          <Badge variant="destructive" className="text-xs">
+                            {et.divergencia_motivo}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Submit */}
+                {pendingEtiquetas.some((e) => e.status === "pendente") && (
+                  <Button
+                    className="w-full"
+                    variant="destructive"
+                    disabled={selectedEtiquetaIds.size === 0 || !divergenciaMotivo || submittingDivergencia}
+                    onClick={marcarDivergencia}
+                  >
+                    {submittingDivergencia ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Ban className="w-4 h-4 mr-2" />
+                    )}
+                    Bloquear {selectedEtiquetaIds.size} etiqueta(s)
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
