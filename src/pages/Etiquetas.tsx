@@ -231,6 +231,40 @@ export default function Etiquetas() {
     }
   }
 
+  async function handleGenerateSingleNf(numeroNf: string) {
+    if (!selectedCarga) return;
+    const etiquetasNf = filteredEtiquetas.filter((e) => e.numeroNf === numeroNf);
+    if (etiquetasNf.length === 0) return;
+
+    setGenerating(true);
+    try {
+      const etiquetasData = etiquetasNf.map((e) => ({
+        numeroNf: e.numeroNf,
+        cProd: e.cProd,
+        xProd: e.xProd,
+        seq: e.seq,
+        total: e.total,
+        qrPayload: e.qrPayload,
+        cnpjDestinatario: e.cnpjDestinatario,
+        destBairro: e.destBairro,
+        macroRegiao: e.macroRegiao,
+      }));
+
+      const blob = await generateEtiquetasPDF(etiquetasData);
+      downloadBlob(blob, `etiquetas_NF${numeroNf}.pdf`);
+
+      toast({
+        title: "PDF gerado!",
+        description: `${etiquetasNf.length} etiquetas da NF ${numeroNf}.`,
+      });
+    } catch (error) {
+      console.error("Error generating single NF etiquetas:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function handleGenerateEtiquetas(onlySelected: boolean = false) {
     if (!selectedCarga || filteredEtiquetas.length === 0) return;
 
@@ -496,23 +530,37 @@ export default function Etiquetas() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
               {uniqueNfs.map((nf) => (
-                <label
+                <div
                   key={nf.numeroNf}
-                  className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                  className={`flex items-center gap-2 p-2 rounded-md border transition-colors ${
                     selectedNfs.has(nf.numeroNf)
                       ? "bg-primary/10 border-primary"
                       : "bg-background border-border hover:bg-muted"
                   }`}
                 >
-                  <Checkbox
-                    checked={selectedNfs.has(nf.numeroNf)}
-                    onCheckedChange={() => handleToggleNf(nf.numeroNf)}
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">NF {nf.numeroNf}</span>
-                    <span className="text-xs text-muted-foreground">{nf.count} etiq.</span>
-                  </div>
-                </label>
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <Checkbox
+                      checked={selectedNfs.has(nf.numeroNf)}
+                      onCheckedChange={() => handleToggleNf(nf.numeroNf)}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium truncate">NF {nf.numeroNf}</span>
+                      <span className="text-xs text-muted-foreground">{nf.count} etiq.</span>
+                    </div>
+                  </label>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    title={`Gerar etiquetas da NF ${nf.numeroNf}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleGenerateSingleNf(nf.numeroNf);
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               ))}
             </div>
           </div>
