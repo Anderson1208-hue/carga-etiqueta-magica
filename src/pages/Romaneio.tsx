@@ -550,8 +550,76 @@ export default function Romaneio() {
           </div>
         )}
 
-        {/* Romaneio Table */}
-        {selectedCarga && (
+        {/* NF Detail - A4 Page View (replaces table when open) */}
+        {selectedNfDetail && nfDialogOpen ? (
+          <div className="wms-card">
+            <div className="bg-foreground text-background px-6 py-3 rounded-t-lg">
+              <p className="font-bold text-sm tracking-wide">
+                {getMacroRegiaoLabel(selectedNfDetail.macroRegiao)}
+              </p>
+            </div>
+            <div className="p-6 space-y-5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setNfDialogOpen(false); setSelectedNfDetail(null); }}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar
+              </Button>
+              <h2 className="text-xl font-bold">NF: {selectedNfDetail.numeroNf}</h2>
+              <div className="space-y-1 text-sm">
+                <p>Emitente: {selectedNfDetail.razaoSocialEmitente}</p>
+                <p>CNPJ Emitente: <span className="font-mono">{selectedNfDetail.cnpjEmitente}</span></p>
+                <div className="flex gap-8">
+                  <p>CNPJ Destinatário: <span className="font-mono">{selectedNfDetail.cnpjDestinatario || "N/A"}</span></p>
+                  {selectedNfDetail.dataEmissao && (
+                    <p>Data Emissão: {format(new Date(selectedNfDetail.dataEmissao), "dd/MM/yyyy")}</p>
+                  )}
+                </div>
+                {selectedNfDetail.destBairro && (
+                  <p className="italic text-muted-foreground text-xs">
+                    Bairro: {selectedNfDetail.destBairro} — MR {selectedNfDetail.macroRegiao}
+                  </p>
+                )}
+              </div>
+              <div className="border-t border-border" />
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-32 bg-muted font-bold">Cód. Produto</TableHead>
+                    <TableHead className="bg-muted font-bold">Descrição</TableHead>
+                    <TableHead className="w-28 text-right bg-muted font-bold">Qtd Caixas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...selectedNfDetail.itens]
+                    .sort((a, b) => {
+                      const numA = parseFloat(a.cProd.replace(/\D/g, '')) || 0;
+                      const numB = parseFloat(b.cProd.replace(/\D/g, '')) || 0;
+                      return numA - numB;
+                    })
+                    .map((item, idx) => (
+                    <TableRow key={idx} className={idx % 2 === 1 ? "bg-muted/30" : ""}>
+                      <TableCell className="font-mono text-sm">
+                        {parseInt(item.cProd, 10) || item.cProd}
+                      </TableCell>
+                      <TableCell className="text-sm">{item.xProd}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {calculateBoxes(item.qCom)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex justify-end">
+                <p className="text-base font-bold">
+                  TOTAL DE CAIXAS DA NF: {selectedNfDetail.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0)}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : selectedCarga ? (
           <div className="wms-card">
             <div className="p-4 border-b">
               <h3 className="font-semibold">Romaneio Totalizado</h3>
@@ -604,92 +672,9 @@ export default function Romaneio() {
               </TableBody>
             </Table>
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* NF Detail - A4 Page View */}
-      {selectedNfDetail && nfDialogOpen && (
-        <div className="wms-card">
-          {/* MR Header bar - dark background like PDF */}
-          <div className="bg-foreground text-background px-6 py-3 rounded-t-lg">
-            <p className="font-bold text-sm tracking-wide">
-              {getMacroRegiaoLabel(selectedNfDetail.macroRegiao)}
-            </p>
-          </div>
-
-          <div className="p-6 space-y-5">
-            {/* Back button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setNfDialogOpen(false); setSelectedNfDetail(null); }}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-
-            {/* NF Title */}
-            <h2 className="text-xl font-bold">NF: {selectedNfDetail.numeroNf}</h2>
-
-            {/* Info rows - matching PDF layout */}
-            <div className="space-y-1 text-sm">
-              <p>Emitente: {selectedNfDetail.razaoSocialEmitente}</p>
-              <p>CNPJ Emitente: <span className="font-mono">{selectedNfDetail.cnpjEmitente}</span></p>
-              <div className="flex gap-8">
-                <p>CNPJ Destinatário: <span className="font-mono">{selectedNfDetail.cnpjDestinatario || "N/A"}</span></p>
-                {selectedNfDetail.dataEmissao && (
-                  <p>Data Emissão: {format(new Date(selectedNfDetail.dataEmissao), "dd/MM/yyyy")}</p>
-                )}
-              </div>
-              {selectedNfDetail.destBairro && (
-                <p className="italic text-muted-foreground text-xs">
-                  Bairro: {selectedNfDetail.destBairro} — MR {selectedNfDetail.macroRegiao}
-                </p>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-border" />
-
-            {/* Items table - PDF style */}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-32 bg-muted font-bold">Cód. Produto</TableHead>
-                  <TableHead className="bg-muted font-bold">Descrição</TableHead>
-                  <TableHead className="w-28 text-right bg-muted font-bold">Qtd Caixas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {[...selectedNfDetail.itens]
-                  .sort((a, b) => {
-                    const numA = parseFloat(a.cProd.replace(/\D/g, '')) || 0;
-                    const numB = parseFloat(b.cProd.replace(/\D/g, '')) || 0;
-                    return numA - numB;
-                  })
-                  .map((item, idx) => (
-                  <TableRow key={idx} className={idx % 2 === 1 ? "bg-muted/30" : ""}>
-                    <TableCell className="font-mono text-sm">
-                      {parseInt(item.cProd, 10) || item.cProd}
-                    </TableCell>
-                    <TableCell className="text-sm">{item.xProd}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {calculateBoxes(item.qCom)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Total - bold, right-aligned like PDF */}
-            <div className="flex justify-end">
-              <p className="text-base font-bold">
-                TOTAL DE CAIXAS DA NF: {selectedNfDetail.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </MainLayout>
   );
 }
