@@ -27,14 +27,9 @@ import {
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
-import { FileText, Download, Loader2, Printer, Search } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+
 import { format } from "date-fns";
 
 interface Carga {
@@ -612,77 +607,89 @@ export default function Romaneio() {
         )}
       </div>
 
-      {/* NF Detail Dialog */}
-      <Dialog open={nfDialogOpen} onOpenChange={setNfDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>NF {selectedNfDetail?.numeroNf}</DialogTitle>
-          </DialogHeader>
-          {selectedNfDetail && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Emitente:</span>
-                  <p className="font-medium">{selectedNfDetail.razaoSocialEmitente}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">CNPJ Emitente:</span>
-                  <p className="font-medium font-mono">{selectedNfDetail.cnpjEmitente}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">CNPJ Destinatário:</span>
-                  <p className="font-medium font-mono">{selectedNfDetail.cnpjDestinatario || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Bairro:</span>
-                  <p className="font-medium">{selectedNfDetail.destBairro || "—"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Macro Região:</span>
-                  <p className="font-medium">MR {selectedNfDetail.macroRegiao}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Data Emissão:</span>
-                  <p className="font-medium">
-                    {selectedNfDetail.dataEmissao
-                      ? format(new Date(selectedNfDetail.dataEmissao), "dd/MM/yyyy")
-                      : "—"}
-                  </p>
-                </div>
+      {/* NF Detail - A4 Page View */}
+      {selectedNfDetail && nfDialogOpen && (
+        <div className="wms-card">
+          {/* MR Header bar - dark background like PDF */}
+          <div className="bg-foreground text-background px-6 py-3 rounded-t-lg">
+            <p className="font-bold text-sm tracking-wide">
+              {getMacroRegiaoLabel(selectedNfDetail.macroRegiao)}
+            </p>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Back button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setNfDialogOpen(false); setSelectedNfDetail(null); }}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+
+            {/* NF Title */}
+            <h2 className="text-xl font-bold">NF: {selectedNfDetail.numeroNf}</h2>
+
+            {/* Info rows - matching PDF layout */}
+            <div className="space-y-1 text-sm">
+              <p>Emitente: {selectedNfDetail.razaoSocialEmitente}</p>
+              <p>CNPJ Emitente: <span className="font-mono">{selectedNfDetail.cnpjEmitente}</span></p>
+              <div className="flex gap-8">
+                <p>CNPJ Destinatário: <span className="font-mono">{selectedNfDetail.cnpjDestinatario || "N/A"}</span></p>
+                {selectedNfDetail.dataEmissao && (
+                  <p>Data Emissão: {format(new Date(selectedNfDetail.dataEmissao), "dd/MM/yyyy")}</p>
+                )}
               </div>
-              <div>
-                <h4 className="font-semibold mb-2">Itens ({selectedNfDetail.itens.length})</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Código</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead className="text-right">Qtd</TableHead>
-                      <TableHead className="text-right">Caixas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedNfDetail.itens.map((item, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-mono text-xs">{item.cProd}</TableCell>
-                        <TableCell className="text-sm">{item.xProd}</TableCell>
-                        <TableCell className="text-right">{item.qCom}</TableCell>
-                        <TableCell className="text-right font-medium">{calculateBoxes(item.qCom)}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/50 font-semibold">
-                      <TableCell colSpan={3}>TOTAL</TableCell>
-                      <TableCell className="text-right">
-                        {selectedNfDetail.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+              {selectedNfDetail.destBairro && (
+                <p className="italic text-muted-foreground text-xs">
+                  Bairro: {selectedNfDetail.destBairro} — MR {selectedNfDetail.macroRegiao}
+                </p>
+              )}
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
+            {/* Divider */}
+            <div className="border-t border-border" />
+
+            {/* Items table - PDF style */}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-32 bg-muted font-bold">Cód. Produto</TableHead>
+                  <TableHead className="bg-muted font-bold">Descrição</TableHead>
+                  <TableHead className="w-28 text-right bg-muted font-bold">Qtd Caixas</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...selectedNfDetail.itens]
+                  .sort((a, b) => {
+                    const numA = parseFloat(a.cProd.replace(/\D/g, '')) || 0;
+                    const numB = parseFloat(b.cProd.replace(/\D/g, '')) || 0;
+                    return numA - numB;
+                  })
+                  .map((item, idx) => (
+                  <TableRow key={idx} className={idx % 2 === 1 ? "bg-muted/30" : ""}>
+                    <TableCell className="font-mono text-sm">
+                      {parseInt(item.cProd, 10) || item.cProd}
+                    </TableCell>
+                    <TableCell className="text-sm">{item.xProd}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {calculateBoxes(item.qCom)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Total - bold, right-aligned like PDF */}
+            <div className="flex justify-end">
+              <p className="text-base font-bold">
+                TOTAL DE CAIXAS DA NF: {selectedNfDetail.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }
