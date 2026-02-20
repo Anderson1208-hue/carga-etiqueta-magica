@@ -27,7 +27,14 @@ import {
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
-import { FileText, Download, Loader2, Printer } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
 
 interface Carga {
@@ -73,6 +80,9 @@ export default function Romaneio() {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | null>(null);
   const [selectedMR, setSelectedMR] = useState<string>("todas");
+  const [searchNf, setSearchNf] = useState("");
+  const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
+  const [nfDialogOpen, setNfDialogOpen] = useState(false);
 
   useEffect(() => {
     loadCargas();
@@ -411,6 +421,63 @@ export default function Romaneio() {
           </div>
         </div>
 
+        {/* Consultar NF */}
+        {selectedCarga && notasFiscais.length > 0 && (
+          <div className="wms-card p-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h3 className="font-semibold">Consultar NF</h3>
+              <div className="relative flex-1 max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Número da NF..."
+                  value={searchNf}
+                  onChange={(e) => setSearchNf(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && searchNf.trim()) {
+                      const found = notasFiscais.find(
+                        (nf) => nf.numeroNf === searchNf.trim()
+                      );
+                      if (found) {
+                        setSelectedNfDetail(found);
+                        setNfDialogOpen(true);
+                      } else {
+                        toast({
+                          variant: "destructive",
+                          title: "NF não encontrada",
+                          description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
+                        });
+                      }
+                    }
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant="outline"
+                disabled={!searchNf.trim()}
+                onClick={() => {
+                  const found = notasFiscais.find(
+                    (nf) => nf.numeroNf === searchNf.trim()
+                  );
+                  if (found) {
+                    setSelectedNfDetail(found);
+                    setNfDialogOpen(true);
+                  } else {
+                    toast({
+                      variant: "destructive",
+                      title: "NF não encontrada",
+                      description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
+                    });
+                  }
+                }}
+              >
+                <Search className="w-4 h-4 mr-2" />
+                Consultar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Nota de Carga section with route filter */}
         {selectedCarga && notasFiscais.length > 0 && (
           <div className="wms-card p-4">
@@ -544,6 +611,78 @@ export default function Romaneio() {
           </div>
         )}
       </div>
+
+      {/* NF Detail Dialog */}
+      <Dialog open={nfDialogOpen} onOpenChange={setNfDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>NF {selectedNfDetail?.numeroNf}</DialogTitle>
+          </DialogHeader>
+          {selectedNfDetail && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Emitente:</span>
+                  <p className="font-medium">{selectedNfDetail.razaoSocialEmitente}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">CNPJ Emitente:</span>
+                  <p className="font-medium font-mono">{selectedNfDetail.cnpjEmitente}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">CNPJ Destinatário:</span>
+                  <p className="font-medium font-mono">{selectedNfDetail.cnpjDestinatario || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Bairro:</span>
+                  <p className="font-medium">{selectedNfDetail.destBairro || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Macro Região:</span>
+                  <p className="font-medium">MR {selectedNfDetail.macroRegiao}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Data Emissão:</span>
+                  <p className="font-medium">
+                    {selectedNfDetail.dataEmissao
+                      ? format(new Date(selectedNfDetail.dataEmissao), "dd/MM/yyyy")
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-2">Itens ({selectedNfDetail.itens.length})</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead className="text-right">Qtd</TableHead>
+                      <TableHead className="text-right">Caixas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedNfDetail.itens.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-xs">{item.cProd}</TableCell>
+                        <TableCell className="text-sm">{item.xProd}</TableCell>
+                        <TableCell className="text-right">{item.qCom}</TableCell>
+                        <TableCell className="text-right font-medium">{calculateBoxes(item.qCom)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell colSpan={3}>TOTAL</TableCell>
+                      <TableCell className="text-right">
+                        {selectedNfDetail.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
