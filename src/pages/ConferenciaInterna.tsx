@@ -345,7 +345,7 @@ export default function ConferenciaInterna() {
     }
   }
 
-
+  async function loadCargaNfs(cargaId: string) {
     if (expandedCarga === cargaId) {
       setExpandedCarga(null);
       return;
