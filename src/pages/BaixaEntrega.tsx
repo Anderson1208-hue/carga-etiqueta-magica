@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -26,10 +27,12 @@ import {
   AlertTriangle,
   Loader2,
   Package,
-  ChevronDown,
-  ChevronUp,
   Image as ImageIcon,
   Navigation,
+  Download,
+  Upload,
+  WifiOff,
+  Wifi,
 } from "lucide-react";
 
 interface Veiculo {
@@ -67,12 +70,27 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
 export default function BaixaEntrega() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const {
+    isOnline,
+    pendingSyncCount,
+    downloadNfsForVeiculo,
+    loadOfflineNfs,
+    loadOfflineBaixas,
+    saveBaixaOffline,
+    getPendingBaixas,
+    markAsSynced,
+    hasOfflineData,
+  } = useOfflineEntregas();
 
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [selectedVeiculoId, setSelectedVeiculoId] = useState<string>("");
   const [nfs, setNfs] = useState<NfEntrega[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [vehicleHasOffline, setVehicleHasOffline] = useState(false);
 
   // Baixa form state
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
@@ -88,15 +106,27 @@ export default function BaixaEntrega() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadVeiculos();
+    if (isOnline) {
+      loadVeiculos();
+    }
     captureGPS();
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
     if (selectedVeiculoId) {
-      loadNfs(selectedVeiculoId);
+      if (isOnline && !offlineMode) {
+        loadNfs(selectedVeiculoId);
+      } else {
+        loadFromOffline(selectedVeiculoId);
+      }
+      checkOfflineData(selectedVeiculoId);
     }
-  }, [selectedVeiculoId]);
+  }, [selectedVeiculoId, offlineMode]);
+
+  async function checkOfflineData(veiculoId: string) {
+    const has = await hasOfflineData(veiculoId);
+    setVehicleHasOffline(has);
+  }
 
   async function loadVeiculos() {
     const { data } = await supabase
@@ -111,7 +141,6 @@ export default function BaixaEntrega() {
   async function loadNfs(veiculoId: string) {
     setLoading(true);
     try {
-      // Get NFs linked to this vehicle
       const { data: vnfs } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
@@ -124,13 +153,11 @@ export default function BaixaEntrega() {
 
       const nfIds = vnfs.map((v) => v.nf_id);
 
-      // Get NF details
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
         .in("id", nfIds);
 
-      // Get existing baixas for this vehicle
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
         .select("nf_id, status")
@@ -152,7 +179,6 @@ export default function BaixaEntrega() {
         baixa_status: baixasMap.get(nf.id) || null,
       }));
 
-      // Sort: pending first, then by NF number
       result.sort((a, b) => {
         if (a.baixa_status && !b.baixa_status) return 1;
         if (!a.baixa_status && b.baixa_status) return -1;
@@ -165,6 +191,154 @@ export default function BaixaEntrega() {
       toast({ title: "Erro", description: "Erro ao carregar notas fiscais", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadFromOffline(veiculoId: string) {
+    setLoading(true);
+    try {
+      const cachedNfs = await loadOfflineNfs(veiculoId);
+      const cachedBaixas = await loadOfflineBaixas(veiculoId);
+
+      const baixasMap = new Map(cachedBaixas.map((b) => [b.nf_id, b.ocorrencia]));
+
+      const result: NfEntrega[] = cachedNfs.map((nf) => ({
+        id: nf.nf_id,
+        nf_id: nf.nf_id,
+        numero_nf: nf.numero_nf,
+        dest_razao_social: nf.dest_razao_social || "Não informado",
+        dest_logradouro: nf.dest_logradouro || "",
+        dest_numero: nf.dest_numero || "",
+        dest_bairro: nf.dest_bairro || "",
+        dest_cidade: nf.dest_cidade || "",
+        dest_uf: nf.dest_uf || "",
+        cnpj_destinatario: nf.cnpj_destinatario || "",
+        baixa_status: baixasMap.get(nf.nf_id) || null,
+      }));
+
+      result.sort((a, b) => {
+        if (a.baixa_status && !b.baixa_status) return 1;
+        if (!a.baixa_status && b.baixa_status) return -1;
+        return a.numero_nf.localeCompare(b.numero_nf);
+      });
+
+      setNfs(result);
+    } catch {
+      setNfs([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDownloadOffline() {
+    if (!selectedVeiculoId) return;
+    setDownloading(true);
+    try {
+      const { data: vnfs } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id")
+        .eq("veiculo_id", selectedVeiculoId);
+
+      if (!vnfs || vnfs.length === 0) {
+        toast({ title: "Sem NFs", description: "Nenhuma NF vinculada a este veículo", variant: "destructive" });
+        return;
+      }
+
+      const nfIds = vnfs.map((v) => v.nf_id);
+
+      const { data: nfsData } = await supabase
+        .from("notas_fiscais")
+        .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
+        .in("id", nfIds);
+
+      const offlineData: OfflineNf[] = (nfsData || []).map((nf) => ({
+        nf_id: nf.id,
+        veiculo_id: selectedVeiculoId,
+        numero_nf: nf.numero_nf,
+        dest_razao_social: nf.dest_razao_social || "Não informado",
+        dest_logradouro: nf.dest_logradouro || "",
+        dest_numero: nf.dest_numero || "",
+        dest_bairro: nf.dest_bairro || "",
+        dest_cidade: nf.dest_cidade || "",
+        dest_uf: nf.dest_uf || "",
+        cnpj_destinatario: nf.cnpj_destinatario || "",
+      }));
+
+      const count = await downloadNfsForVeiculo(selectedVeiculoId, offlineData);
+      setVehicleHasOffline(true);
+
+      toast({
+        title: "Download concluído!",
+        description: `${count} NFs salvas para uso offline`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({ title: "Erro", description: "Erro ao baixar dados offline", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const pending = await getPendingBaixas();
+      if (pending.length === 0) {
+        toast({ title: "Nada para transmitir", description: "Todas as baixas já foram enviadas" });
+        setSyncing(false);
+        return;
+      }
+
+      const syncedIds: string[] = [];
+      let errors = 0;
+
+      for (const baixa of pending) {
+        const { error } = await supabase.from("baixas_entrega").insert({
+          veiculo_id: baixa.veiculo_id,
+          nf_id: baixa.nf_id,
+          status: baixa.status,
+          ocorrencia: baixa.ocorrencia,
+          recebedor_nome: baixa.recebedor_nome,
+          latitude: baixa.latitude,
+          longitude: baixa.longitude,
+          registrado_por: baixa.registrado_por,
+          registrado_em: baixa.registrado_em,
+        });
+
+        if (error) {
+          console.error("Sync error for baixa:", baixa.id, error);
+          errors++;
+        } else {
+          syncedIds.push(baixa.id);
+        }
+      }
+
+      if (syncedIds.length > 0) {
+        await markAsSynced(syncedIds);
+      }
+
+      if (errors > 0) {
+        toast({
+          title: "Transmissão parcial",
+          description: `${syncedIds.length} enviadas, ${errors} com erro`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Transmissão concluída!",
+          description: `${syncedIds.length} baixa(s) enviada(s) com sucesso`,
+        });
+      }
+
+      // Reload data
+      if (selectedVeiculoId && isOnline) {
+        loadNfs(selectedVeiculoId);
+      }
+    } catch (error) {
+      console.error("Sync error:", error);
+      toast({ title: "Erro", description: "Erro na transmissão", variant: "destructive" });
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -215,16 +389,43 @@ export default function BaixaEntrega() {
       return;
     }
 
-    if (ocorrencia === "entregue" && !fotoFile) {
+    // In offline mode, skip photo requirement
+    if (isOnline && !offlineMode && ocorrencia === "entregue" && !fotoFile) {
       toast({ title: "Atenção", description: "Foto obrigatória para entrega", variant: "destructive" });
       return;
     }
 
     setSubmitting(true);
     try {
+      // If offline or offlineMode, save locally
+      if (!isOnline || offlineMode) {
+        await saveBaixaOffline({
+          veiculo_id: selectedVeiculoId,
+          nf_id: selectedNfId,
+          status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
+          ocorrencia: ocorrencia,
+          recebedor_nome: recebedorNome || null,
+          observacao: observacao || null,
+          latitude: gpsCoords?.lat || null,
+          longitude: gpsCoords?.lng || null,
+          registrado_por: user?.id || null,
+          registrado_em: new Date().toISOString(),
+        });
+
+        toast({
+          title: "Baixa salva offline!",
+          description: `NF ${nfs.find((n) => n.nf_id === selectedNfId)?.numero_nf} - será transmitida quando houver sinal`,
+        });
+
+        resetForm();
+        // Reload from offline to update status
+        await loadFromOffline(selectedVeiculoId);
+        return;
+      }
+
+      // Online submission (original logic)
       let fotoPath: string | null = null;
 
-      // Upload photo if exists
       if (fotoFile) {
         const ext = fotoFile.name.split(".").pop() || "jpg";
         const fileName = `${selectedVeiculoId}/${selectedNfId}_${Date.now()}.${ext}`;
@@ -237,7 +438,6 @@ export default function BaixaEntrega() {
         fotoPath = fileName;
       }
 
-      // Insert baixa record
       const { error: insertError } = await supabase
         .from("baixas_entrega")
         .insert({
@@ -282,6 +482,14 @@ export default function BaixaEntrega() {
           <span className="font-semibold text-base">Baixa de Entrega</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Online/Offline indicator */}
+          <Badge
+            variant="secondary"
+            className={`text-xs gap-1 ${isOnline ? "" : "bg-orange-500 text-white"}`}
+          >
+            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            {isOnline ? "Online" : "Offline"}
+          </Badge>
           {gpsCoords && (
             <Badge variant="secondary" className="text-xs gap-1">
               <Navigation className="w-3 h-3" />
@@ -293,6 +501,35 @@ export default function BaixaEntrega() {
       </div>
 
       <div className="p-4 space-y-4 pb-24">
+        {/* Sync banner */}
+        {pendingSyncCount > 0 && isOnline && (
+          <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-orange-600" />
+                  <span className="text-sm font-medium">
+                    {pendingSyncCount} baixa(s) pendente(s) de transmissão
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {syncing ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <Upload className="w-4 h-4 mr-1" />
+                  )}
+                  Transmitir
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Vehicle Selector */}
         <Card>
           <CardContent className="pt-4">
@@ -314,6 +551,43 @@ export default function BaixaEntrega() {
 
         {selectedVeiculoId && (
           <>
+            {/* Offline actions */}
+            <div className="flex gap-2">
+              {isOnline && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleDownloadOffline}
+                  disabled={downloading}
+                >
+                  {downloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-1" />
+                  )}
+                  Baixar para Offline
+                </Button>
+              )}
+              {vehicleHasOffline && (
+                <Button
+                  variant={offlineMode ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setOfflineMode(!offlineMode)}
+                >
+                  <WifiOff className="w-4 h-4 mr-1" />
+                  {offlineMode ? "Modo Offline Ativo" : "Usar Offline"}
+                </Button>
+              )}
+            </div>
+
+            {(offlineMode || !isOnline) && (
+              <div className="text-xs text-center text-orange-600 bg-orange-50 dark:bg-orange-950/20 rounded-lg py-2 px-3">
+                ⚠️ Modo offline — baixas serão salvas localmente. Use "Transmitir" quando voltar ao sinal.
+              </div>
+            )}
+
             {/* Progress */}
             <div className="grid grid-cols-2 gap-3">
               <Card>
@@ -424,70 +698,78 @@ export default function BaixaEntrega() {
                               />
                             </div>
 
-                            {/* Photo capture */}
-                            <div>
-                              <Label className="text-sm mb-2 block">
-                                Foto do comprovante {ocorrencia === "entregue" && "*"}
-                              </Label>
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => cameraInputRef.current?.click()}
-                                  className="flex-1"
-                                >
-                                  <Camera className="w-4 h-4 mr-1" />
-                                  Câmera
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  className="flex-1"
-                                >
-                                  <ImageIcon className="w-4 h-4 mr-1" />
-                                  Galeria
-                                </Button>
-                              </div>
-                              <input
-                                ref={cameraInputRef}
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                className="hidden"
-                                onChange={handleFotoCapture}
-                              />
-                              <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleFotoCapture}
-                              />
-                              {fotoPreview && (
-                                <div className="mt-2 relative">
-                                  <img
-                                    src={fotoPreview}
-                                    alt="Comprovante"
-                                    className="w-full h-40 object-cover rounded-lg border"
-                                  />
+                            {/* Photo capture - only in online mode */}
+                            {!offlineMode && isOnline && (
+                              <div>
+                                <Label className="text-sm mb-2 block">
+                                  Foto do comprovante {ocorrencia === "entregue" && "*"}
+                                </Label>
+                                <div className="flex gap-2">
                                   <Button
                                     type="button"
-                                    variant="destructive"
+                                    variant="outline"
                                     size="sm"
-                                    className="absolute top-1 right-1 h-7 w-7 p-0"
-                                    onClick={() => {
-                                      setFotoFile(null);
-                                      setFotoPreview(null);
-                                    }}
+                                    onClick={() => cameraInputRef.current?.click()}
+                                    className="flex-1"
                                   >
-                                    <XCircle className="w-4 h-4" />
+                                    <Camera className="w-4 h-4 mr-1" />
+                                    Câmera
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex-1"
+                                  >
+                                    <ImageIcon className="w-4 h-4 mr-1" />
+                                    Galeria
                                   </Button>
                                 </div>
-                              )}
-                            </div>
+                                <input
+                                  ref={cameraInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={handleFotoCapture}
+                                />
+                                <input
+                                  ref={fileInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={handleFotoCapture}
+                                />
+                                {fotoPreview && (
+                                  <div className="mt-2 relative">
+                                    <img
+                                      src={fotoPreview}
+                                      alt="Comprovante"
+                                      className="w-full h-40 object-cover rounded-lg border"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      className="absolute top-1 right-1 h-7 w-7 p-0"
+                                      onClick={() => {
+                                        setFotoFile(null);
+                                        setFotoPreview(null);
+                                      }}
+                                    >
+                                      <XCircle className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {(offlineMode || !isOnline) && (
+                              <p className="text-xs text-muted-foreground italic">
+                                📷 Foto será solicitada quando transmitir online
+                              </p>
+                            )}
 
                             {/* GPS info */}
                             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -512,10 +794,12 @@ export default function BaixaEntrega() {
                             >
                               {submitting ? (
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : offlineMode || !isOnline ? (
+                                <Download className="w-4 h-4 mr-2" />
                               ) : (
                                 <CheckCircle2 className="w-4 h-4 mr-2" />
                               )}
-                              Registrar Baixa
+                              {offlineMode || !isOnline ? "Salvar Offline" : "Registrar Baixa"}
                             </Button>
                           </div>
                         )}
@@ -526,7 +810,9 @@ export default function BaixaEntrega() {
 
                 {nfs.length === 0 && (
                   <p className="text-center text-sm text-muted-foreground py-8">
-                    Nenhuma NF vinculada a este veículo
+                    {offlineMode || !isOnline
+                      ? "Nenhuma NF offline. Baixe os dados antes de sair."
+                      : "Nenhuma NF vinculada a este veículo"}
                   </p>
                 )}
               </div>
