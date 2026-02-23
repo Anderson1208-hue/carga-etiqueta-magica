@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,10 @@ import {
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import {
+  useOfflineConferencia,
+  type OfflineEtiqueta,
+} from "@/hooks/useOfflineConferencia";
 import {
   ScanLine,
   CheckCircle2,
@@ -31,6 +36,10 @@ import {
   ChevronUp,
   Ban,
   ShieldAlert,
+  Download,
+  Upload,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 interface CargaResumo {
@@ -58,6 +67,24 @@ export default function ConferenciaInterna() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Offline
+  const {
+    isOnline,
+    pendingSyncCount,
+    downloadEtiquetas,
+    getOfflineCargas,
+    getOfflineEtiquetas,
+    findEtiquetaByQr,
+    saveScanOffline,
+    getPendingScans,
+    markScansAsSynced,
+    hasOfflineData,
+  } = useOfflineConferencia();
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [hasLocalData, setHasLocalData] = useState(false);
 
   // Stage: list cargas or scanning
   const [cargas, setCargas] = useState<CargaResumo[]>([]);
@@ -95,7 +122,15 @@ export default function ConferenciaInterna() {
   ];
 
   useEffect(() => {
-    loadCargas();
+    if (offlineMode) {
+      loadOfflineCargas();
+    } else {
+      loadCargas();
+    }
+  }, [offlineMode]);
+
+  useEffect(() => {
+    hasOfflineData().then(setHasLocalData);
   }, []);
 
   async function loadCargas() {
@@ -155,7 +190,162 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function loadCargaNfs(cargaId: string) {
+  // ---- OFFLINE FUNCTIONS ----
+  async function downloadAllForOffline() {
+    setDownloading(true);
+    try {
+      const { data: cargasData, error } = await supabase
+        .from("cargas")
+        .select("id, placa, motorista, data")
+        .in("status", ["aberta", "fechada"])
+        .order("data", { ascending: false });
+
+      if (error) throw error;
+      if (!cargasData || cargasData.length === 0) {
+        toast({ title: "Nenhuma carga para baixar", variant: "destructive" });
+        setDownloading(false);
+        return;
+      }
+
+      // Download all etiquetas for these cargas
+      const cargaIds = cargasData.map((c) => c.id);
+      const allEtiquetas: OfflineEtiqueta[] = [];
+
+      for (const cid of cargaIds) {
+        const { data: ets, error: etError } = await supabase
+          .from("etiquetas")
+          .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
+          .eq("carga_id", cid);
+
+        if (etError) throw etError;
+        if (ets) allEtiquetas.push(...(ets as unknown as OfflineEtiqueta[]));
+      }
+
+      const count = await downloadEtiquetas(
+        cargasData.map((c) => ({ id: c.id, placa: c.placa, motorista: c.motorista, data: c.data })),
+        allEtiquetas
+      );
+
+      setHasLocalData(true);
+      toast({
+        title: "Download concluído",
+        description: `${count} etiquetas de ${cargasData.length} carga(s) salvas para uso offline.`,
+      });
+    } catch (error) {
+      console.error("Erro ao baixar dados offline:", error);
+      toast({ title: "Erro ao baixar dados", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function loadOfflineCargas() {
+    setLoadingCargas(true);
+    try {
+      const offCargas = await getOfflineCargas();
+      const allEts = await getOfflineEtiquetas();
+
+      const resumos: CargaResumo[] = offCargas.map((c) => {
+        const cargaEts = allEts.filter((e) => e.carga_id === c.id);
+        const divergencias = cargaEts.filter((e) => e.status === "divergencia").length;
+        const total = cargaEts.length - divergencias;
+        const conferidas = cargaEts.filter(
+          (e) => e.status === "conferido_interno" || e.status === "conferido"
+        ).length;
+        return {
+          id: c.id,
+          placa: c.placa,
+          motorista: c.motorista,
+          data: c.data,
+          totalEtiquetas: total,
+          conferidosInterno: conferidas,
+        };
+      });
+
+      setCargas(resumos.filter((r) => r.totalEtiquetas > 0));
+    } catch {
+      setCargas([]);
+    } finally {
+      setLoadingCargas(false);
+    }
+  }
+
+  async function loadOfflineCargaNfs(cargaId: string) {
+    if (expandedCarga === cargaId) {
+      setExpandedCarga(null);
+      return;
+    }
+    setExpandedCarga(cargaId);
+    setLoadingNfs(true);
+    try {
+      const ets = await getOfflineEtiquetas(cargaId);
+      const nfMap = new Map<string, { total: number; conferidas: number }>();
+      for (const et of ets) {
+        if (et.status === "divergencia") continue;
+        const current = nfMap.get(et.numero_nf) || { total: 0, conferidas: 0 };
+        current.total++;
+        if (et.status === "conferido_interno" || et.status === "conferido") {
+          current.conferidas++;
+        }
+        nfMap.set(et.numero_nf, current);
+      }
+      const nfs: NfProgress[] = Array.from(nfMap.entries())
+        .map(([nf, counts]) => ({ numeroNf: nf, total: counts.total, conferidas: counts.conferidas }))
+        .sort((a, b) => (parseInt(a.numeroNf) || 0) - (parseInt(b.numeroNf) || 0));
+      setCargaNfs(nfs);
+    } catch {
+      setCargaNfs([]);
+    } finally {
+      setLoadingNfs(false);
+    }
+  }
+
+  async function syncPendingScans() {
+    setSyncing(true);
+    try {
+      const pending = await getPendingScans();
+      if (pending.length === 0) {
+        toast({ title: "Nada para transmitir" });
+        setSyncing(false);
+        return;
+      }
+
+      let successCount = 0;
+      const syncedIds: string[] = [];
+
+      for (const scan of pending) {
+        const { error } = await supabase
+          .from("etiquetas")
+          .update({
+            status: "conferido_interno" as any,
+            conferido_interno_em: scan.conferido_interno_em,
+            conferido_interno_por: scan.conferido_interno_por,
+          })
+          .eq("id", scan.etiqueta_id);
+
+        if (!error) {
+          successCount++;
+          syncedIds.push(scan.id);
+        }
+      }
+
+      if (syncedIds.length > 0) {
+        await markScansAsSynced(syncedIds);
+      }
+
+      toast({
+        title: "Transmissão concluída",
+        description: `${successCount} de ${pending.length} conferência(s) sincronizada(s).`,
+      });
+    } catch (error) {
+      console.error("Erro na sincronização:", error);
+      toast({ title: "Erro na transmissão", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+
     if (expandedCarga === cargaId) {
       setExpandedCarga(null);
       return;
@@ -216,9 +406,13 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     setScanHistory([]);
     setQrInput("");
-    // Reload to refresh counts
-    loadCargas();
-    if (expandedCarga) loadCargaNfs(expandedCarga);
+    if (offlineMode) {
+      loadOfflineCargas();
+      if (expandedCarga) loadOfflineCargaNfs(expandedCarga);
+    } else {
+      loadCargas();
+      if (expandedCarga) loadCargaNfs(expandedCarga);
+    }
   }
 
   // Quick NF search across all cargas
@@ -330,84 +524,80 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // Find the etiqueta
-      const { data: etiqueta, error: findError } = await supabase
-        .from("etiquetas")
-        .select("*")
-        .eq("carga_id", selectedCarga.id)
-        .eq("qr_payload", qrData.trim())
-        .maybeSingle();
+      // ---- OFFLINE vs ONLINE scan logic ----
+      if (offlineMode || !isOnline) {
+        // Offline: use IndexedDB
+        const etiqueta = await findEtiquetaByQr(qrData.trim());
 
-      if (findError || !etiqueta) {
-        const result: ScanResult = {
-          type: "error",
-          message: "Etiqueta não encontrada",
-          details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}`,
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("error");
-        return;
-      }
+        if (!etiqueta) {
+          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
 
-      // Check if divergência
-      if (etiqueta.status === "divergencia") {
-        const result: ScanResult = {
-          type: "error",
-          message: "Etiqueta bloqueada (Divergência)",
-          details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}`,
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("error");
-        return;
-      }
+        if (etiqueta.status === "divergencia") {
+          const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
 
-      // Check if already scanned internally or fully
-      if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
-        const result: ScanResult = {
-          type: "warning",
-          message: "Já conferida (interno)",
-          details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}`,
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("warning");
-        return;
-      }
+        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
+          const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("warning"); return;
+        }
 
-      // Mark as conferido_interno
-      const { error: updateError } = await supabase
-        .from("etiquetas")
-        .update({
-          status: "conferido_interno" as any,
+        await saveScanOffline({
+          etiqueta_id: etiqueta.id,
+          carga_id: etiqueta.carga_id,
+          numero_nf: etiqueta.numero_nf,
+          conferido_interno_por: user?.id || "",
           conferido_interno_em: new Date().toISOString(),
-          conferido_interno_por: user?.id,
-        })
-        .eq("id", etiqueta.id);
+        });
 
-      if (updateError) throw updateError;
+        const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+        setLastResult(result); addToHistory(result); playSound("success");
+        await reloadNfProgress();
+      } else {
+        // Online: use Supabase
+        const { data: etiqueta, error: findError } = await supabase
+          .from("etiquetas")
+          .select("*")
+          .eq("carga_id", selectedCarga.id)
+          .eq("qr_payload", qrData.trim())
+          .maybeSingle();
 
-      const result: ScanResult = {
-        type: "success",
-        message: "Conf. Interna ✓",
-        details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}`,
-      };
-      setLastResult(result);
-      addToHistory(result);
-      playSound("success");
+        if (findError || !etiqueta) {
+          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
 
-      await reloadNfProgress();
+        if (etiqueta.status === "divergencia") {
+          const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
+
+        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
+          const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("warning"); return;
+        }
+
+        const { error: updateError } = await supabase
+          .from("etiquetas")
+          .update({
+            status: "conferido_interno" as any,
+            conferido_interno_em: new Date().toISOString(),
+            conferido_interno_por: user?.id,
+          })
+          .eq("id", etiqueta.id);
+
+        if (updateError) throw updateError;
+
+        const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+        setLastResult(result); addToHistory(result); playSound("success");
+        await reloadNfProgress();
+      }
     } catch (error) {
       console.error("Erro ao processar scan:", error);
-      const result: ScanResult = {
-        type: "error",
-        message: "Erro ao processar",
-        details: "Tente novamente",
-      };
-      setLastResult(result);
-      addToHistory(result);
-      playSound("error");
+      const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
+      setLastResult(result); addToHistory(result); playSound("error");
     } finally {
       setQrInput("");
       setScanning(false);
@@ -432,13 +622,20 @@ export default function ConferenciaInterna() {
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
 
-    const { data: etiquetasData } = await supabase
-      .from("etiquetas")
-      .select("id, status")
-      .eq("carga_id", selectedCarga.id)
-      .eq("numero_nf", selectedNf);
+    let all: { id: string; status: string }[] = [];
 
-    const all = etiquetasData || [];
+    if (offlineMode || !isOnline) {
+      const ets = await getOfflineEtiquetas(selectedCarga.id);
+      all = ets.filter((e) => e.numero_nf === selectedNf).map((e) => ({ id: e.id, status: e.status }));
+    } else {
+      const { data: etiquetasData } = await supabase
+        .from("etiquetas")
+        .select("id, status")
+        .eq("carga_id", selectedCarga.id)
+        .eq("numero_nf", selectedNf);
+      all = etiquetasData || [];
+    }
+
     const divergencias = all.filter((e) => e.status === "divergencia").length;
     const total = all.length - divergencias;
     const conferidas = all.filter(
@@ -583,6 +780,7 @@ export default function ConferenciaInterna() {
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
                   {selectedCarga.placa} • Conf. Interna
+                  {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
               </div>
             </div>
@@ -855,6 +1053,10 @@ export default function ConferenciaInterna() {
           <div className="flex items-center gap-2">
             <Warehouse className="w-5 h-5" />
             <h1 className="text-lg font-semibold">Conf. Interna</h1>
+            <Badge variant={isOnline ? "default" : "destructive"} className="text-xs">
+              {isOnline ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
+              {isOnline ? "Online" : "Offline"}
+            </Badge>
           </div>
           <MobileLogoutButton />
         </div>
@@ -892,6 +1094,75 @@ export default function ConferenciaInterna() {
           </CardContent>
         </Card>
 
+        {/* Offline Controls */}
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <WifiOff className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Modo Offline</span>
+              </div>
+              <Switch
+                checked={offlineMode}
+                onCheckedChange={setOfflineMode}
+                disabled={!hasLocalData && !offlineMode}
+              />
+            </div>
+
+            {isOnline && !offlineMode && (
+              <Button
+                onClick={downloadAllForOffline}
+                disabled={downloading}
+                variant="outline"
+                className="w-full"
+                size="sm"
+              >
+                {downloading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Baixar dados para offline
+              </Button>
+            )}
+
+            {!hasLocalData && !offlineMode && (
+              <p className="text-xs text-muted-foreground">
+                Baixe os dados antes de entrar na câmara refrigerada.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sync Banner */}
+        {isOnline && pendingSyncCount > 0 && !offlineMode && (
+          <div className="bg-warning/20 border-2 border-warning rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-warning text-sm">
+                  {pendingSyncCount} conferência(s) pendente(s)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Registradas offline, prontas para transmitir.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={syncPendingScans}
+                disabled={syncing}
+                className="bg-warning text-warning-foreground hover:bg-warning/90"
+              >
+                {syncing ? (
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-1" />
+                )}
+                Transmitir
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Cargas list */}
         {loadingCargas && cargas.length === 0 ? (
           <div className="flex justify-center py-8">
@@ -919,7 +1190,7 @@ export default function ConferenciaInterna() {
                 <CardContent className="pt-4">
                   <button
                     className="w-full text-left"
-                    onClick={() => loadCargaNfs(carga.id)}
+                    onClick={() => offlineMode ? loadOfflineCargaNfs(carga.id) : loadCargaNfs(carga.id)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div>
