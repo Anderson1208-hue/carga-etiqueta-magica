@@ -94,30 +94,35 @@ export function useOfflineConferencia() {
   }
 
   const downloadEtiquetas = useCallback(
-    async (cargas: OfflineCargaResumo[], etiquetas: OfflineEtiqueta[]): Promise<number> => {
+    async (cargas: OfflineCargaResumo[], etiquetas: OfflineEtiqueta[], appendOnly?: boolean): Promise<number> => {
       const db = await openDB();
 
-      // Save cargas
-      const txCargas = db.transaction(STORE_CARGAS, "readwrite");
-      const cargaStore = txCargas.objectStore(STORE_CARGAS);
-      cargaStore.clear();
-      for (const c of cargas) {
-        cargaStore.put(c);
+      if (!appendOnly) {
+        // Save cargas
+        const txCargas = db.transaction(STORE_CARGAS, "readwrite");
+        const cargaStore = txCargas.objectStore(STORE_CARGAS);
+        cargaStore.clear();
+        for (const c of cargas) {
+          cargaStore.put(c);
+        }
+        await new Promise<void>((resolve, reject) => {
+          txCargas.oncomplete = () => resolve();
+          txCargas.onerror = () => reject(txCargas.error);
+        });
+
+        // Clear etiquetas only on first call
+        if (etiquetas.length === 0) {
+          const txClear = db.transaction(STORE_ETIQUETAS, "readwrite");
+          txClear.objectStore(STORE_ETIQUETAS).clear();
+          await new Promise<void>((resolve, reject) => {
+            txClear.oncomplete = () => resolve();
+            txClear.onerror = () => reject(txClear.error);
+          });
+        }
       }
-      await new Promise<void>((resolve, reject) => {
-        txCargas.oncomplete = () => resolve();
-        txCargas.onerror = () => reject(txCargas.error);
-      });
 
-      // Save etiquetas in batches to avoid freezing the UI
-      const BATCH = 500;
-      const txClear = db.transaction(STORE_ETIQUETAS, "readwrite");
-      txClear.objectStore(STORE_ETIQUETAS).clear();
-      await new Promise<void>((resolve, reject) => {
-        txClear.oncomplete = () => resolve();
-        txClear.onerror = () => reject(txClear.error);
-      });
-
+      // Save etiquetas in batches of 200 to avoid freezing
+      const BATCH = 200;
       for (let i = 0; i < etiquetas.length; i += BATCH) {
         const batch = etiquetas.slice(i, i + BATCH);
         const txEt = db.transaction(STORE_ETIQUETAS, "readwrite");
@@ -130,7 +135,7 @@ export function useOfflineConferencia() {
           txEt.onerror = () => reject(txEt.error);
         });
         // Yield to UI thread between batches
-        await new Promise((r) => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 10));
       }
 
       db.close();
