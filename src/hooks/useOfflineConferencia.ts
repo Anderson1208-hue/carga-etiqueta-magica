@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const DB_NAME = "conferencia_offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_ETIQUETAS = "etiquetas_cache";
 const STORE_SCANS = "scans_pendentes";
 
