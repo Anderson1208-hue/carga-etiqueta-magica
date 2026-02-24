@@ -83,6 +83,7 @@ export default function ConferenciaInterna() {
   } = useOfflineConferencia();
   const [offlineMode, setOfflineMode] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [hasLocalData, setHasLocalData] = useState(false);
 
@@ -193,6 +194,7 @@ export default function ConferenciaInterna() {
   // ---- OFFLINE FUNCTIONS ----
   async function downloadAllForOffline() {
     setDownloading(true);
+    setDownloadProgress(0);
     try {
       const { data: cargasData, error } = await supabase
         .from("cargas")
@@ -207,27 +209,35 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // Download all etiquetas in parallel batches of 5 cargas
+      // Download all etiquetas with pagination (to bypass 1000-row limit)
       const cargaIds = cargasData.map((c) => c.id);
       const allEtiquetas: OfflineEtiqueta[] = [];
-      const BATCH_SIZE = 5;
+      const PAGE_SIZE = 1000;
 
-      for (let i = 0; i < cargaIds.length; i += BATCH_SIZE) {
-        const batch = cargaIds.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(
-          batch.map((cid) =>
-            supabase
-              .from("etiquetas")
-              .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
-              .eq("carga_id", cid)
-          )
-        );
-        for (const res of results) {
-          if (res.error) throw res.error;
-          if (res.data) allEtiquetas.push(...(res.data as unknown as OfflineEtiqueta[]));
+      for (let ci = 0; ci < cargaIds.length; ci++) {
+        const cid = cargaIds[ci];
+        let from = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from("etiquetas")
+            .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
+            .eq("carga_id", cid)
+            .order("id")
+            .range(from, from + PAGE_SIZE - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allEtiquetas.push(...(data as unknown as OfflineEtiqueta[]));
+          }
+          hasMore = (data?.length ?? 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
+          // Yield to UI thread
+          await new Promise((r) => setTimeout(r, 0));
         }
-        // Yield to UI thread between batches to prevent freezing
-        await new Promise((r) => setTimeout(r, 0));
+
+        setDownloadProgress(Math.round(((ci + 1) / cargaIds.length) * 100));
       }
 
       const count = await downloadEtiquetas(
@@ -1127,11 +1137,16 @@ export default function ConferenciaInterna() {
                 size="sm"
               >
                 {downloading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Baixando... {downloadProgress}%
+                  </>
                 ) : (
-                  <Download className="w-4 h-4 mr-2" />
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Baixar dados para offline
+                  </>
                 )}
-                Baixar dados para offline
               </Button>
             )}
 
