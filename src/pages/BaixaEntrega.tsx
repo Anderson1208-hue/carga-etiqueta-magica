@@ -358,10 +358,10 @@ export default function BaixaEntrega() {
   function handleFotoCapture(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Revoke previous URL if exists
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview);
     setFotoFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setFotoPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    setFotoPreview(URL.createObjectURL(file));
   }
 
   function resetForm() {
@@ -369,8 +369,15 @@ export default function BaixaEntrega() {
     setOcorrencia("");
     setObservacao("");
     setRecebedorNome("");
+    // Revoke object URL to free memory
+    if (fotoPreview) {
+      URL.revokeObjectURL(fotoPreview);
+    }
     setFotoFile(null);
     setFotoPreview(null);
+    // Clear file inputs so device doesn't keep temp files referenced
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }
 
   function selectNf(nfId: string) {
