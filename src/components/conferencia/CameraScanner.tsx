@@ -73,7 +73,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -84,22 +84,19 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       setCameraActive(true);
       setLoading(false);
 
-      // Start scanning loop
+      // Start scanning loop with interval instead of requestAnimationFrame to save CPU
       const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "ean_8"] });
       const scan = async () => {
-        if (!videoRef.current || videoRef.current.readyState < 2) {
-          animFrameRef.current = requestAnimationFrame(scan);
-          return;
-        }
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
         try {
           const barcodes = await detector.detect(videoRef.current);
           if (barcodes.length > 0) {
             handleDetection(barcodes[0].rawValue);
           }
         } catch {}
-        animFrameRef.current = requestAnimationFrame(scan);
       };
-      animFrameRef.current = requestAnimationFrame(scan);
+      // Scan every 400ms instead of every frame (~16ms) - much lighter on CPU
+      animFrameRef.current = window.setInterval(scan, 400) as unknown as number;
     } catch (err: any) {
       setLoading(false);
       if (err.name === "NotAllowedError") {
@@ -146,7 +143,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       streamRef.current = null;
     }
     if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
+      clearInterval(animFrameRef.current);
       animFrameRef.current = 0;
     }
     setCameraActive(false);
@@ -175,7 +172,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
       if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
+        clearInterval(animFrameRef.current);
       }
     };
   }, []);

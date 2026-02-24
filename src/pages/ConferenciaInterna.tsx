@@ -209,46 +209,61 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // Download all etiquetas with pagination (to bypass 1000-row limit)
-      const cargaIds = cargasData.map((c) => c.id);
-      const allEtiquetas: OfflineEtiqueta[] = [];
-      const PAGE_SIZE = 1000;
+      // First, get total count for progress tracking
+      let totalEstimated = 0;
+      for (const c of cargasData) {
+        const { count } = await supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", c.id);
+        totalEstimated += count || 0;
+      }
 
-      for (let ci = 0; ci < cargaIds.length; ci++) {
-        const cid = cargaIds[ci];
+      // Download etiquetas with pagination and save incrementally to IndexedDB
+      // Instead of accumulating all in memory, save each page directly
+      const cargaResumos = cargasData.map((c) => ({ id: c.id, placa: c.placa, motorista: c.motorista, data: c.data }));
+      
+      // Save cargas first
+      await downloadEtiquetas(cargaResumos, []);
+      
+      let totalDownloaded = 0;
+      const PAGE_SIZE = 500;
+
+      for (const cid of cargasData.map(c => c.id)) {
         let from = 0;
         let hasMore = true;
 
         while (hasMore) {
-          const { data, error } = await supabase
+          const { data, error: fetchError } = await supabase
             .from("etiquetas")
             .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
             .eq("carga_id", cid)
             .order("id")
             .range(from, from + PAGE_SIZE - 1);
 
-          if (error) throw error;
+          if (fetchError) throw fetchError;
+          
           if (data && data.length > 0) {
-            allEtiquetas.push(...(data as unknown as OfflineEtiqueta[]));
+            // Save this page directly to IndexedDB incrementally
+            await downloadEtiquetas([], data as unknown as OfflineEtiqueta[], true);
+            totalDownloaded += data.length;
+            setDownloadProgress(totalEstimated > 0 
+              ? Math.min(99, Math.round((totalDownloaded / totalEstimated) * 100)) 
+              : 0);
           }
+          
           hasMore = (data?.length ?? 0) === PAGE_SIZE;
           from += PAGE_SIZE;
-          // Yield to UI thread
-          await new Promise((r) => setTimeout(r, 0));
+          // Yield to UI thread - longer delay to keep phone responsive
+          await new Promise((r) => setTimeout(r, 50));
         }
-
-        setDownloadProgress(Math.round(((ci + 1) / cargaIds.length) * 100));
       }
 
-      const count = await downloadEtiquetas(
-        cargasData.map((c) => ({ id: c.id, placa: c.placa, motorista: c.motorista, data: c.data })),
-        allEtiquetas
-      );
-
+      setDownloadProgress(100);
       setHasLocalData(true);
       toast({
         title: "Download concluído",
-        description: `${count} etiquetas de ${cargasData.length} carga(s) salvas para uso offline.`,
+        description: `${totalDownloaded} etiquetas de ${cargasData.length} carga(s) salvas para uso offline.`,
       });
     } catch (error) {
       console.error("Erro ao baixar dados offline:", error);
