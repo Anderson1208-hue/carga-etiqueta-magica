@@ -531,6 +531,7 @@ export type Database = {
       }
       veiculos: {
         Row: {
+          access_code: string | null
           created_at: string
           created_by: string | null
           data: string
@@ -541,6 +542,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_code?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -551,6 +553,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_code?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
