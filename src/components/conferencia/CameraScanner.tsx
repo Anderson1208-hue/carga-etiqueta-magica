@@ -73,30 +73,13 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      // Set states first so <video> renders, then useEffect will attach the stream
       setUseNative(true);
       setCameraActive(true);
       setLoading(false);
-
-      // Start scanning loop with interval instead of requestAnimationFrame to save CPU
-      const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "ean_8"] });
-      const scan = async () => {
-        if (!videoRef.current || videoRef.current.readyState < 2) return;
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          if (barcodes.length > 0) {
-            handleDetection(barcodes[0].rawValue);
-          }
-        } catch {}
-      };
-      // Scan every 400ms instead of every frame (~16ms) - much lighter on CPU
-      animFrameRef.current = window.setInterval(scan, 400) as unknown as number;
     } catch (err: any) {
       setLoading(false);
       if (err.name === "NotAllowedError") {
@@ -107,7 +90,38 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         setError("Erro ao acessar a câmera: " + (err.message || ""));
       }
     }
-  }, [handleDetection]);
+  }, []);
+
+  // Attach stream to video element AFTER it renders, fixing the race condition
+  useEffect(() => {
+    if (!cameraActive || !useNative || !streamRef.current) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.srcObject = streamRef.current;
+    video.play().catch(() => {});
+
+    // Start scanning loop
+    const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "ean_8"] });
+    const scan = async () => {
+      if (!video || video.readyState < 2) return;
+      try {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0) {
+          handleDetection(barcodes[0].rawValue);
+        }
+      } catch {}
+    };
+    // Scan every 400ms to save CPU
+    const intervalId = window.setInterval(scan, 400);
+    animFrameRef.current = intervalId as unknown as number;
+
+    return () => {
+      clearInterval(intervalId);
+      animFrameRef.current = 0;
+    };
+  }, [cameraActive, useNative, handleDetection]);
 
   // ---- Library-based approach (needs WASM / network) ----
   const startLibraryScanner = useCallback(async () => {
@@ -256,7 +270,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       {/* Native camera view */}
       {cameraActive && useNative && !error && (
         <div className="relative rounded-lg overflow-hidden bg-black aspect-video max-w-md">
-          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-4 border-2 border-primary/50 rounded-lg">
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
