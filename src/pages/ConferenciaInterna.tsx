@@ -207,18 +207,27 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // Download all etiquetas for these cargas
+      // Download all etiquetas in parallel batches of 5 cargas
       const cargaIds = cargasData.map((c) => c.id);
       const allEtiquetas: OfflineEtiqueta[] = [];
+      const BATCH_SIZE = 5;
 
-      for (const cid of cargaIds) {
-        const { data: ets, error: etError } = await supabase
-          .from("etiquetas")
-          .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
-          .eq("carga_id", cid);
-
-        if (etError) throw etError;
-        if (ets) allEtiquetas.push(...(ets as unknown as OfflineEtiqueta[]));
+      for (let i = 0; i < cargaIds.length; i += BATCH_SIZE) {
+        const batch = cargaIds.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map((cid) =>
+            supabase
+              .from("etiquetas")
+              .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, seq, total, qr_payload, status, divergencia_motivo")
+              .eq("carga_id", cid)
+          )
+        );
+        for (const res of results) {
+          if (res.error) throw res.error;
+          if (res.data) allEtiquetas.push(...(res.data as unknown as OfflineEtiqueta[]));
+        }
+        // Yield to UI thread between batches to prevent freezing
+        await new Promise((r) => setTimeout(r, 0));
       }
 
       const count = await downloadEtiquetas(
