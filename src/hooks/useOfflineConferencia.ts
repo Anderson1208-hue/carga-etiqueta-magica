@@ -100,7 +100,6 @@ export function useOfflineConferencia() {
       // Save cargas
       const txCargas = db.transaction(STORE_CARGAS, "readwrite");
       const cargaStore = txCargas.objectStore(STORE_CARGAS);
-      // Clear all old cargas
       cargaStore.clear();
       for (const c of cargas) {
         cargaStore.put(c);
@@ -110,17 +109,29 @@ export function useOfflineConferencia() {
         txCargas.onerror = () => reject(txCargas.error);
       });
 
-      // Save etiquetas
-      const txEt = db.transaction(STORE_ETIQUETAS, "readwrite");
-      const etStore = txEt.objectStore(STORE_ETIQUETAS);
-      etStore.clear();
-      for (const et of etiquetas) {
-        etStore.put(et);
-      }
+      // Save etiquetas in batches to avoid freezing the UI
+      const BATCH = 500;
+      const txClear = db.transaction(STORE_ETIQUETAS, "readwrite");
+      txClear.objectStore(STORE_ETIQUETAS).clear();
       await new Promise<void>((resolve, reject) => {
-        txEt.oncomplete = () => resolve();
-        txEt.onerror = () => reject(txEt.error);
+        txClear.oncomplete = () => resolve();
+        txClear.onerror = () => reject(txClear.error);
       });
+
+      for (let i = 0; i < etiquetas.length; i += BATCH) {
+        const batch = etiquetas.slice(i, i + BATCH);
+        const txEt = db.transaction(STORE_ETIQUETAS, "readwrite");
+        const etStore = txEt.objectStore(STORE_ETIQUETAS);
+        for (const et of batch) {
+          etStore.put(et);
+        }
+        await new Promise<void>((resolve, reject) => {
+          txEt.oncomplete = () => resolve();
+          txEt.onerror = () => reject(txEt.error);
+        });
+        // Yield to UI thread between batches
+        await new Promise((r) => setTimeout(r, 0));
+      }
 
       db.close();
       return etiquetas.length;
