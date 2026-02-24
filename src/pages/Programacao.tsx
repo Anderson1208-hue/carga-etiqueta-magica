@@ -100,6 +100,7 @@ interface VeiculoFormado {
   motorista: string;
   data: string;
   status: string;
+  access_code: string | null;
   nfs: VeiculoNfDetail[];
   pesoTotal: number;
   caixasTotal: number;
@@ -272,7 +273,7 @@ export default function Programacao() {
   async function loadVeiculosFormados() {
     const { data: veiculos } = await supabase
       .from("veiculos")
-      .select("id, placa, motorista, data, status")
+      .select("id, placa, motorista, data, status, access_code")
       .order("created_at", { ascending: false });
 
     if (!veiculos || veiculos.length === 0) {
@@ -337,6 +338,7 @@ export default function Programacao() {
         motorista: v.motorista,
         data: v.data,
         status: v.status || "pendente",
+        access_code: (v as any).access_code || null,
         nfs: vNfs,
         pesoTotal: vNfs.reduce((s, n) => s + n.peso_bruto, 0),
         caixasTotal: vNfs.reduce((s, n) => s + n.totalCaixas, 0),
@@ -640,6 +642,14 @@ export default function Programacao() {
                       <p className="text-sm text-muted-foreground">
                         {v.motorista} • {format(new Date(v.data + "T00:00:00"), "dd/MM/yyyy")}
                       </p>
+                      {v.access_code && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Código motorista:</span>
+                          <code className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
+                            {v.access_code}
+                          </code>
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 text-sm">
                         <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
                         <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>

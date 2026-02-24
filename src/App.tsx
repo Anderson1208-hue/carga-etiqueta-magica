@@ -16,6 +16,7 @@ import Roteirizacao from "./pages/Roteirizacao";
 import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
 import HistoricoEntregas from "./pages/HistoricoEntregas";
+import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -147,6 +148,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/motorista" element={<MotoristaAcesso />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
