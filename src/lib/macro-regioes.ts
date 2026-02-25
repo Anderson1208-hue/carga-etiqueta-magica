@@ -57,6 +57,7 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "ENGENHO NOVO": 4,
   "ENGENHO DE DENTRO": 4,
   "RIO COMPRIDO": 4,
+  "CACHAMBI": 4,
 
   // Macro Região 5
   "PORTUGUESA": 5,
@@ -71,12 +72,14 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "PENHA": 5,
   "VILA DA PENHA": 5,
   "MANGUINHOS": 5,
+  "DEL CASTILHO": 5,
 
   // Macro Região 6
   "MADUREIRA": 6,
   "CASCADURA": 6,
   "VILA VALQUEIRE": 6,
   "CAMPOS DOS AFONSOS": 6,
+  "CAMPO DOS AFONSOS": 6,
   "MARECHAL HERMES": 6,
   "HONORIO GURGEL": 6,
   "HONÓRIO GURGEL": 6,
@@ -84,6 +87,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   // Macro Região 7
   "PECHINCHA": 7,
   "FREGUESIA": 7,
+  "FREGUESIA (JACAREPAGUA)": 7,
+  "FREGUESIA (JACAREPAGUÁ)": 7,
   "ANIL": 7,
 
   // Macro Região 8
