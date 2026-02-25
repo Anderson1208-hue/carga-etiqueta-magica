@@ -74,6 +74,7 @@ interface NfDisponivel {
   dest_cidade: string;
   dest_uf: string;
   peso_bruto: number;
+  volume_m3: number;
   totalCaixas: number;
   macroRegiao: number;
   carga_id: string;
@@ -91,6 +92,7 @@ interface VeiculoNfDetail {
   dest_uf: string;
   dest_bairro: string;
   peso_bruto: number;
+  volume_m3: number;
   totalCaixas: number;
 }
 
@@ -103,6 +105,7 @@ interface VeiculoFormado {
   access_code: string | null;
   nfs: VeiculoNfDetail[];
   pesoTotal: number;
+  volumeTotal: number;
   caixasTotal: number;
 }
 
@@ -215,7 +218,7 @@ export default function Programacao() {
         id, numero_nf, chave_acesso, cnpj_destinatario,
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
-        peso_bruto, carga_id,
+        peso_bruto, volume_m3, carga_id,
         itens_nf(q_com)
       `)
       .in("carga_id", cargaIds);
@@ -251,6 +254,7 @@ export default function Programacao() {
           dest_cidade: nf.dest_cidade || "",
           dest_uf: nf.dest_uf || "",
           peso_bruto: Number(nf.peso_bruto) || 0,
+          volume_m3: Number(nf.volume_m3) || 0,
           totalCaixas,
           macroRegiao: getMacroRegiao(nf.dest_bairro),
           carga_id: nf.carga_id,
@@ -288,11 +292,11 @@ export default function Programacao() {
       .in("veiculo_id", veiculoIds);
 
     const nfIds = (vnfs || []).map((v) => v.nf_id);
-    let nfMap = new Map<string, { numero_nf: string; razao_social: string; dest_cidade: string; dest_uf: string; dest_bairro: string; peso_bruto: number; totalCaixas: number }>();
+    let nfMap = new Map<string, { numero_nf: string; razao_social: string; dest_cidade: string; dest_uf: string; dest_bairro: string; peso_bruto: number; volume_m3: number; totalCaixas: number }>();
     if (nfIds.length > 0) {
       const { data: nfDetails } = await supabase
         .from("notas_fiscais")
-        .select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf, dest_bairro, peso_bruto, itens_nf(q_com)")
+        .select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf, dest_bairro, peso_bruto, volume_m3, itens_nf(q_com)")
         .in("id", nfIds);
 
       nfMap = new Map(
@@ -308,6 +312,7 @@ export default function Programacao() {
               dest_uf: n.dest_uf || "",
               dest_bairro: n.dest_bairro || "",
               peso_bruto: Number(n.peso_bruto) || 0,
+              volume_m3: Number(n.volume_m3) || 0,
               totalCaixas,
             },
           ];
@@ -329,6 +334,7 @@ export default function Programacao() {
             dest_uf: detail?.dest_uf || "",
             dest_bairro: detail?.dest_bairro || "",
             peso_bruto: detail?.peso_bruto || 0,
+            volume_m3: detail?.volume_m3 || 0,
             totalCaixas: detail?.totalCaixas || 0,
           };
         });
@@ -341,6 +347,7 @@ export default function Programacao() {
         access_code: (v as any).access_code || null,
         nfs: vNfs,
         pesoTotal: vNfs.reduce((s, n) => s + n.peso_bruto, 0),
+        volumeTotal: vNfs.reduce((s, n) => s + n.volume_m3, 0),
         caixasTotal: vNfs.reduce((s, n) => s + n.totalCaixas, 0),
       };
     });
@@ -567,6 +574,16 @@ export default function Programacao() {
   const selTotalNfs = selectedNfs.length;
   const selTotalCaixas = selectedNfs.reduce((sum, nf) => sum + nf.totalCaixas, 0);
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
+  const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
+
+  // Dashboard totals
+  const totalNfsDisponiveis = nfsDisponiveis.length;
+  const totalPesoDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.peso_bruto, 0);
+  const totalVolumeDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.volume_m3, 0);
+  const totalCaixasDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.totalCaixas, 0);
+  const totalVeiculosVolume = veiculosFormados.reduce((s, v) => s + v.volumeTotal, 0);
+  const totalVeiculosPeso = veiculosFormados.reduce((s, v) => s + v.pesoTotal, 0);
+  const totalVeiculosCaixas = veiculosFormados.reduce((s, v) => s + v.caixasTotal, 0);
 
   if (loading) {
     return (
@@ -606,6 +623,50 @@ export default function Programacao() {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Dashboard M³ */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">NFs Disponíveis</CardTitle>
+              <FileText className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalNfsDisponiveis}</div>
+              <p className="text-xs text-muted-foreground mt-1">{totalCaixasDisponivel} caixas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Disponível</CardTitle>
+              <Package className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalVolumeDisponivel.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{totalPesoDisponivel.toFixed(1)} kg</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Programado</CardTitle>
+              <Truck className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalVeiculosVolume.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{totalVeiculosPeso.toFixed(1)} kg • {totalVeiculosCaixas} cx</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Total</CardTitle>
+              <Package className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{(totalVolumeDisponivel + totalVeiculosVolume).toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{veiculosFormados.length} veículos montados</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Veículos cadastrados */}
@@ -650,10 +711,11 @@ export default function Programacao() {
                           </code>
                         </div>
                       )}
-                      <div className="flex items-center gap-3 text-sm">
+                      <div className="flex items-center gap-3 text-sm flex-wrap">
                         <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
                         <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
                         <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
+                        <span className="font-semibold text-primary">{v.volumeTotal.toFixed(2)} m³</span>
                       </div>
                       {v.nfs.length > 0 && (
                         <Button
@@ -799,7 +861,7 @@ export default function Programacao() {
 
         {/* Stats da seleção */}
         {selectedNfIds.size > 0 && (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="wms-stat-card">
               <p className="text-sm text-muted-foreground">NFs Selecionadas</p>
               <p className="text-2xl font-bold">{selTotalNfs}</p>
@@ -813,6 +875,12 @@ export default function Programacao() {
                 <Weight className="w-3 h-3" /> Peso Total
               </p>
               <p className="text-2xl font-bold">{selTotalPeso.toFixed(1)} kg</p>
+            </div>
+            <div className="wms-stat-card">
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Package className="w-3 h-3" /> Volume Total
+              </p>
+              <p className="text-2xl font-bold">{selTotalVolume.toFixed(2)} m³</p>
             </div>
             <div className="wms-stat-card">
               <p className="text-sm text-muted-foreground">Cargas Origem</p>
@@ -896,6 +964,7 @@ export default function Programacao() {
                               const someEntregaSel = nfsEntrega.some((n) => selectedNfIds.has(n.id));
                               const totalCaixasEntrega = nfsEntrega.reduce((s, n) => s + n.totalCaixas, 0);
                               const totalPesoEntrega = nfsEntrega.reduce((s, n) => s + n.peso_bruto, 0);
+                              const totalVolumeEntrega = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
                               const isExpanded = expandedEntregas.has(entregaKey);
                               const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
 
@@ -941,6 +1010,7 @@ export default function Programacao() {
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
                                       <span>{totalCaixasEntrega} cx</span>
                                       <span>{totalPesoEntrega.toFixed(1)} kg</span>
+                                      {totalVolumeEntrega > 0 && <span className="font-semibold text-primary">{totalVolumeEntrega.toFixed(2)} m³</span>}
                                       <button
                                         className="p-0.5"
                                         onClick={(e) => {
