@@ -44,7 +44,8 @@ import {
 } from "@/components/ui/select";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package } from "lucide-react";
+import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
@@ -85,6 +86,7 @@ export default function Cargas() {
   const [cargaToDelete, setCargaToDelete] = useState<Carga | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
+  const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
 
   async function handlePrintNotaCarga(carga: Carga) {
     setPrintingCargaId(carga.id);
@@ -817,6 +819,14 @@ export default function Cargas() {
                             <Printer className="w-4 h-4" />
                           )}
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setCubagemCarga(carga)}
+                          title="Importar Cubagem"
+                        >
+                          <Package className="w-4 h-4" />
+                        </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm">
                             <FileText className="w-4 h-4" />
@@ -890,6 +900,16 @@ export default function Cargas() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Upload Cubagem Dialog */}
+        {cubagemCarga && (
+          <UploadCubagemDialog
+            open={!!cubagemCarga}
+            onOpenChange={(open) => !open && setCubagemCarga(null)}
+            cargaId={cubagemCarga.id}
+            cargaPlaca={cubagemCarga.placa}
+          />
+        )}
       </div>
     </MainLayout>
   );
