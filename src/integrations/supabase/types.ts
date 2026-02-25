@@ -293,6 +293,7 @@ export type Database = {
           peso_bruto: number | null
           peso_liquido: number | null
           razao_social_emitente: string
+          volume_m3: number | null
         }
         Insert: {
           carga_id: string
@@ -313,6 +314,7 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente: string
+          volume_m3?: number | null
         }
         Update: {
           carga_id?: string
@@ -333,6 +335,7 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente?: string
+          volume_m3?: number | null
         }
         Relationships: [
           {
