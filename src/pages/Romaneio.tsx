@@ -234,7 +234,7 @@ export default function Romaneio() {
         romaneioItems
       );
 
-      downloadBlob(blob, `romaneio_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}.pdf`);
+      downloadBlob(blob, `romaneio_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`);
 
       toast({
         title: "PDF gerado com sucesso!",
@@ -284,7 +284,7 @@ export default function Romaneio() {
       );
 
       const suffix = selectedMR !== "todas" ? `_MR${selectedMR}` : "";
-      downloadBlob(blob, `nota_carga_${selectedCarga.placa}_${format(new Date(selectedCarga.data), "yyyyMMdd")}${suffix}.pdf`);
+      downloadBlob(blob, `nota_carga_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}${suffix}.pdf`);
 
       toast({
         title: "PDF gerado com sucesso!",
@@ -378,7 +378,7 @@ export default function Romaneio() {
                 <SelectContent>
                   {cargas.map((carga) => (
                     <SelectItem key={carga.id} value={carga.id}>
-                      {carga.placa} - {format(new Date(carga.data), "dd/MM/yyyy")}{" "}
+                      {carga.placa} - {format(new Date(carga.data + "T00:00:00"), "dd/MM/yyyy")}{" "}
                       - {carga.motorista}
                     </SelectItem>
                   ))}
