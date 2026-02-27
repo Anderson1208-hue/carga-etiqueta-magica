@@ -851,17 +851,7 @@ export default function Programacao() {
         </div>
 
         {/* Dashboard M³ */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Total</CardTitle>
-              <Package className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{(totalVolumeDisponivel + totalVeiculosVolume).toFixed(2)} <span className="text-lg font-normal">m³</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{(totalPesoDisponivel + totalVeiculosPeso).toFixed(1)} kg • {totalCaixasDisponivel + totalVeiculosCaixas} cx</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Volume Programado</CardTitle>
