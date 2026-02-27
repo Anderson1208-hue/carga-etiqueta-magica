@@ -44,6 +44,7 @@ import {
   Edit,
   Trash2,
   ArrowRightLeft,
+  CalendarDays,
 } from "lucide-react";
 import {
   Collapsible,
@@ -214,6 +215,11 @@ export default function Programacao() {
   const [showVincularDialog, setShowVincularDialog] = useState(false);
   const [selectedVeiculoId, setSelectedVeiculoId] = useState<string>("");
   const [savingVinculo, setSavingVinculo] = useState(false);
+
+  // Filtro de data dos veículos cadastrados
+  const [filtroVeiculoAno, setFiltroVeiculoAno] = useState<string>("");
+  const [filtroVeiculoMes, setFiltroVeiculoMes] = useState<string>("");
+  const [filtroVeiculoDia, setFiltroVeiculoDia] = useState<string>("");
 
   // Dialog: Editar placa/motorista de veículo existente
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -764,6 +770,43 @@ export default function Programacao() {
     return Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
   }, [veiculosFormados]);
 
+  // Available years/months/days for filter
+  const filtroVeiculoOptions = useMemo(() => {
+    const anos = new Set<string>();
+    const meses = new Set<string>();
+    const dias = new Set<string>();
+    veiculosFormados.forEach((v) => {
+      const [y, m, d] = v.data.split("-");
+      anos.add(y);
+      if (!filtroVeiculoAno || filtroVeiculoAno === y) {
+        meses.add(m);
+        if (!filtroVeiculoMes || filtroVeiculoMes === m) {
+          dias.add(d);
+        }
+      }
+    });
+    return {
+      anos: [...anos].sort((a, b) => b.localeCompare(a)),
+      meses: [...meses].sort((a, b) => a.localeCompare(b)),
+      dias: [...dias].sort((a, b) => a.localeCompare(b)),
+    };
+  }, [veiculosFormados, filtroVeiculoAno, filtroVeiculoMes]);
+
+  const filteredVeiculosByDate = useMemo(() => {
+    if (!filtroVeiculoAno && !filtroVeiculoMes && !filtroVeiculoDia) return veiculosByDate;
+    return veiculosByDate
+      .map(([dateStr, veiculos]) => {
+        const [y, m, d] = dateStr.split("-");
+        if (filtroVeiculoAno && y !== filtroVeiculoAno) return null;
+        if (filtroVeiculoMes && m !== filtroVeiculoMes) return null;
+        if (filtroVeiculoDia && d !== filtroVeiculoDia) return null;
+        return [dateStr, veiculos] as [string, VeiculoFormado[]];
+      })
+      .filter(Boolean) as [string, VeiculoFormado[]][];
+  }, [veiculosByDate, filtroVeiculoAno, filtroVeiculoMes, filtroVeiculoDia]);
+
+  const totalVeiculosFiltrados = filteredVeiculosByDate.reduce((s, [, vs]) => s + vs.length, 0);
+
   if (loading) {
     return (
       <MainLayout>
@@ -851,14 +894,58 @@ export default function Programacao() {
         {/* Veículos cadastrados - agrupados por data */}
         {veiculosFormados.length > 0 && (
           <Card>
-            <CardHeader>
+            <CardHeader className="space-y-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
                 Veículos Cadastrados ({veiculosFormados.length})
               </CardTitle>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                <Select value={filtroVeiculoAno} onValueChange={(v) => { setFiltroVeiculoAno(v === "todos" ? "" : v); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {filtroVeiculoOptions.anos.map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filtroVeiculoMes} onValueChange={(v) => { setFiltroVeiculoMes(v === "todos" ? "" : v); setFiltroVeiculoDia(""); }} disabled={!filtroVeiculoAno}>
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {filtroVeiculoOptions.meses.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={filtroVeiculoDia} onValueChange={(v) => setFiltroVeiculoDia(v === "todos" ? "" : v)} disabled={!filtroVeiculoMes}>
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue placeholder="Dia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    {filtroVeiculoOptions.dias.map((d) => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" onClick={() => { setFiltroVeiculoAno(""); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
+                    <X className="w-3 h-3" /> Limpar
+                  </Button>
+                )}
+                {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
+                  <span className="text-xs text-muted-foreground">{totalVeiculosFiltrados} veículo(s)</span>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {veiculosByDate.map(([dateStr, veiculos]) => (
+              {filteredVeiculosByDate.map(([dateStr, veiculos]) => (
                 <div key={dateStr}>
                   <div className="flex items-center gap-2 mb-3">
                     <Badge variant="secondary" className="text-sm px-3 py-1">
