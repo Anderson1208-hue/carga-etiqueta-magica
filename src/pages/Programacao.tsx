@@ -851,25 +851,15 @@ export default function Programacao() {
         </div>
 
         {/* Dashboard M³ */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">NFs Disponíveis</CardTitle>
-              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Total</CardTitle>
+              <Package className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalNfsDisponiveis}</div>
-              <p className="text-xs text-muted-foreground mt-1">{totalCaixasDisponivel} caixas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Disponível</CardTitle>
-              <Package className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{totalVolumeDisponivel.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{totalPesoDisponivel.toFixed(1)} kg</p>
+              <div className="text-3xl font-bold">{(totalVolumeDisponivel + totalVeiculosVolume).toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{(totalPesoDisponivel + totalVeiculosPeso).toFixed(1)} kg • {totalCaixasDisponivel + totalVeiculosCaixas} cx</p>
             </CardContent>
           </Card>
           <Card>
@@ -882,14 +872,34 @@ export default function Programacao() {
               <p className="text-xs text-muted-foreground mt-1">{totalVeiculosPeso.toFixed(1)} kg • {totalVeiculosCaixas} cx</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-primary/30 bg-primary/5">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Volume Total</CardTitle>
-              <Package className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-primary">Volume Disponível</CardTitle>
+              <Package className="h-5 w-5 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{(totalVolumeDisponivel + totalVeiculosVolume).toFixed(2)} <span className="text-lg font-normal">m³</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{filteredVeiculoStats.count} veículos montados</p>
+              <div className="text-3xl font-bold text-primary">{totalVolumeDisponivel.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{totalPesoDisponivel.toFixed(1)} kg • {totalCaixasDisponivel} cx</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">NFs Disponíveis</CardTitle>
+              <FileText className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalNfsDisponiveis}</div>
+              <p className="text-xs text-muted-foreground mt-1">{totalCaixasDisponivel} caixas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Veículos</CardTitle>
+              <Truck className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{filteredVeiculoStats.count}</div>
+              <p className="text-xs text-muted-foreground mt-1">montados</p>
             </CardContent>
           </Card>
         </div>
