@@ -1402,6 +1402,10 @@ export default function Programacao() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         toggleEntrega(cnpj);
+                                        // Auto-expand when checking, so user can see/uncheck individual NFs
+                                        if (!allEntregaSel && !isExpanded) {
+                                          toggleExpandEntrega(entregaKey);
+                                        }
                                       }}
                                     />
                                     <div
