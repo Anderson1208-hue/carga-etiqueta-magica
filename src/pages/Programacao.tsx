@@ -576,12 +576,16 @@ export default function Programacao() {
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
   const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
 
-  // Dashboard totals - filtered by selected carga
-  const dashboardNfs = filteredNfs;
-  const totalNfsDisponiveis = dashboardNfs.length;
-  const totalPesoDisponivel = dashboardNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
-  const totalVolumeDisponivel = dashboardNfs.reduce((s, nf) => s + nf.volume_m3, 0);
-  const totalCaixasDisponivel = dashboardNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
+  // Dashboard totals - filtered ONLY by selected carga (not by MR or search)
+  const cargaFilteredNfs = useMemo(() => {
+    if (filtroCarga === "todas") return nfsDisponiveis;
+    return nfsDisponiveis.filter((nf) => nf.carga_id === filtroCarga);
+  }, [nfsDisponiveis, filtroCarga]);
+
+  const totalNfsDisponiveis = cargaFilteredNfs.length;
+  const totalPesoDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
+  const totalVolumeDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.volume_m3, 0);
+  const totalCaixasDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
 
   // Filter veiculos by carga when a carga filter is active
   const dashboardVeiculos = useMemo(() => {
