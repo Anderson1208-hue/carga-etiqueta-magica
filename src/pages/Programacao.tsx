@@ -691,6 +691,30 @@ export default function Programacao() {
 
   const [buscaNf, setBuscaNf] = useState("");
 
+  // Auto-expand entregas that match the search term
+  useEffect(() => {
+    const searchTerm = buscaNf.trim().toLowerCase();
+    if (!searchTerm) return;
+
+    const matchingKeys = new Set<string>();
+    nfsDisponiveis.forEach((nf) => {
+      if (!filtroCargaIds.has(nf.carga_id)) return;
+      if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return;
+      const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
+      const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
+      const matchBairro = nf.dest_bairro.toLowerCase().includes(searchTerm);
+      const matchCidade = (nf.dest_cidade || "").toLowerCase().includes(searchTerm);
+      if (matchNf || matchRazao || matchBairro || matchCidade) {
+        const cnpj = nf.cnpj_destinatario || nf.id;
+        matchingKeys.add(`${nf.macroRegiao}_${cnpj}`);
+      }
+    });
+
+    if (matchingKeys.size > 0) {
+      setExpandedEntregas(matchingKeys);
+    }
+  }, [buscaNf, nfsDisponiveis, filtroCargaIds, filtroMR]);
+
   const filteredNfs = useMemo(() => {
     if (filtroCargaIds.size === 0) return [];
     const searchTerm = buscaNf.trim().toLowerCase();
