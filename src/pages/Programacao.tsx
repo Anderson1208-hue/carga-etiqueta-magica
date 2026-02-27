@@ -214,7 +214,8 @@ export default function Programacao() {
     const cargaIds = cargas.map((c) => c.id);
     const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
-    const [{ data: nfs }, { data: assigned }] = await Promise.all([
+    // Fetch NFs per carga to avoid 1000-row limit
+    const nfPromises = cargaIds.map((cargaId) =>
       supabase
         .from("notas_fiscais")
         .select(`
@@ -224,14 +225,20 @@ export default function Programacao() {
           peso_bruto, volume_m3, carga_id,
           itens_nf(q_com)
         `)
-        .in("carga_id", cargaIds),
-      supabase
-        .from("veiculo_nfs")
-        .select("nf_id"),
+        .eq("carga_id", cargaId)
+        .limit(2000)
+    );
+
+    const [nfResults, { data: assigned }] = await Promise.all([
+      Promise.all(nfPromises),
+      supabase.from("veiculo_nfs").select("nf_id"),
     ]);
 
-    if (!nfs) {
+    const nfs = nfResults.flatMap((r) => r.data || []);
+
+    if (nfs.length === 0) {
       setNfsDisponiveis([]);
+      setTotalNfsPorCarga(new Map());
       return;
     }
 
