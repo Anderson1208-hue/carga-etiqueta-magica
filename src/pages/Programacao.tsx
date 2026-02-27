@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -170,7 +171,7 @@ export default function Programacao() {
   const [loading, setLoading] = useState(true);
   const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
   const [filtroMR, setFiltroMR] = useState<string>("todas");
-  const [filtroCarga, setFiltroCarga] = useState<string>("todas");
+  const [filtroCargaIds, setFiltroCargaIds] = useState<Set<string>>(new Set());
 
   // Dialog: Montar Veículo (2 etapas)
   const [showMontarDialog, setShowMontarDialog] = useState(false);
@@ -550,10 +551,12 @@ export default function Programacao() {
   const [buscaNf, setBuscaNf] = useState("");
 
   const filteredNfs = useMemo(() => {
+    // Only show NFs when at least one carga is selected
+    if (filtroCargaIds.size === 0) return [];
     const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
+      if (!filtroCargaIds.has(nf.carga_id)) return false;
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
-      if (filtroCarga !== "todas" && nf.carga_id !== filtroCarga) return false;
       if (searchTerm) {
         const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
         const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
@@ -563,7 +566,7 @@ export default function Programacao() {
       }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, filtroCarga, buscaNf]);
+  }, [nfsDisponiveis, filtroMR, filtroCargaIds, buscaNf]);
 
   const macroRegioesPresentes = useMemo(() => {
     return [...new Set(nfsDisponiveis.map((nf) => nf.macroRegiao))].sort((a, b) => a - b);
@@ -576,27 +579,27 @@ export default function Programacao() {
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
   const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
 
-  // Dashboard totals - filtered ONLY by selected carga (not by MR or search)
+  // Dashboard totals - filtered ONLY by selected cargas
   const cargaFilteredNfs = useMemo(() => {
-    if (filtroCarga === "todas") return nfsDisponiveis;
-    return nfsDisponiveis.filter((nf) => nf.carga_id === filtroCarga);
-  }, [nfsDisponiveis, filtroCarga]);
+    if (filtroCargaIds.size === 0) return [];
+    return nfsDisponiveis.filter((nf) => filtroCargaIds.has(nf.carga_id));
+  }, [nfsDisponiveis, filtroCargaIds]);
 
   const totalNfsDisponiveis = cargaFilteredNfs.length;
   const totalPesoDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
   const totalVolumeDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.volume_m3, 0);
   const totalCaixasDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
 
-  // Filter veiculos by carga when a carga filter is active
+  // Filter veiculos by selected cargas
   const dashboardVeiculos = useMemo(() => {
-    if (filtroCarga === "todas") return veiculosFormados;
+    if (filtroCargaIds.size === 0) return veiculosFormados;
     return veiculosFormados.filter((v) =>
-      v.nfs.some((nf) => nf.carga_origem === filtroCarga)
+      v.nfs.some((nf) => filtroCargaIds.has(nf.carga_origem))
     );
-  }, [veiculosFormados, filtroCarga]);
+  }, [veiculosFormados, filtroCargaIds]);
 
   const filteredVeiculoStats = useMemo(() => {
-    if (filtroCarga === "todas") {
+    if (filtroCargaIds.size === 0) {
       return {
         volume: veiculosFormados.reduce((s, v) => s + v.volumeTotal, 0),
         peso: veiculosFormados.reduce((s, v) => s + v.pesoTotal, 0),
@@ -604,17 +607,16 @@ export default function Programacao() {
         count: veiculosFormados.length,
       };
     }
-    // Sum only NFs from the selected carga within each veiculo
     let volume = 0, peso = 0, caixas = 0;
     veiculosFormados.forEach((v) => {
-      v.nfs.filter((nf) => nf.carga_origem === filtroCarga).forEach((nf) => {
+      v.nfs.filter((nf) => filtroCargaIds.has(nf.carga_origem)).forEach((nf) => {
         volume += nf.volume_m3;
         peso += nf.peso_bruto;
         caixas += nf.totalCaixas;
       });
     });
     return { volume, peso, caixas, count: dashboardVeiculos.length };
-  }, [veiculosFormados, filtroCarga, dashboardVeiculos]);
+  }, [veiculosFormados, filtroCargaIds, dashboardVeiculos]);
 
   const totalVeiculosVolume = filteredVeiculoStats.volume;
   const totalVeiculosPeso = filteredVeiculoStats.peso;
@@ -837,21 +839,64 @@ export default function Programacao() {
                   />
                 </div>
               </div>
-              <div className="min-w-[200px]">
-                <Label className="text-xs">Carga Origem</Label>
-                <Select value={filtroCarga} onValueChange={setFiltroCarga}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todas">Todas as cargas</SelectItem>
-                    {cargasUnicas.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.placa} - {format(new Date(c.data + "T00:00:00"), "dd/MM/yyyy")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="min-w-[200px] flex-1 max-w-md">
+                <Label className="text-xs">Carga Origem {filtroCargaIds.size > 0 && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filtroCargaIds.size}</Badge>}</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal h-10">
+                      <Package className="w-4 h-4 mr-2 shrink-0" />
+                      {filtroCargaIds.size === 0
+                        ? "Selecione a(s) carga(s)"
+                        : filtroCargaIds.size === 1
+                        ? cargasUnicas.find((c) => filtroCargaIds.has(c.id))
+                          ? `${cargasUnicas.find((c) => filtroCargaIds.has(c.id))!.placa}`
+                          : "1 carga"
+                        : `${filtroCargaIds.size} cargas selecionadas`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-2" align="start">
+                    <div className="space-y-1">
+                      {cargasUnicas.map((c) => {
+                        const isChecked = filtroCargaIds.has(c.id);
+                        const nfCount = nfsDisponiveis.filter((nf) => nf.carga_id === c.id).length;
+                        return (
+                          <div
+                            key={c.id}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
+                            onClick={() => {
+                              setFiltroCargaIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(c.id)) next.delete(c.id);
+                                else next.add(c.id);
+                                return next;
+                              });
+                            }}
+                          >
+                            <Checkbox checked={isChecked} />
+                            <div className="flex-1 text-sm">
+                              <span className="font-medium">{c.placa}</span>
+                              <span className="text-muted-foreground ml-1">
+                                {format(new Date(c.data + "T00:00:00"), "dd/MM/yyyy")}
+                              </span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] px-1.5">{nfCount} NFs</Badge>
+                          </div>
+                        );
+                      })}
+                      {filtroCargaIds.size > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs mt-1"
+                          onClick={() => setFiltroCargaIds(new Set())}
+                        >
+                          <X className="w-3 h-3 mr-1" />
+                          Limpar seleção
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="min-w-[200px]">
                 <Label className="text-xs">Macro Região</Label>
@@ -942,7 +987,13 @@ export default function Programacao() {
             </div>
           </CardHeader>
           <CardContent>
-            {filteredNfs.length === 0 ? (
+            {filtroCargaIds.size === 0 ? (
+              <div className="text-center py-12 space-y-2">
+                <Package className="w-10 h-10 mx-auto text-muted-foreground/50" />
+                <p className="text-muted-foreground font-medium">Selecione uma ou mais cargas no filtro acima</p>
+                <p className="text-xs text-muted-foreground">As NFs disponíveis aparecerão aqui</p>
+              </div>
+            ) : filteredNfs.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
                 Nenhuma NF disponível para programação
               </p>
