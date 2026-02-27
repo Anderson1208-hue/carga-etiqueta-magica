@@ -235,6 +235,9 @@ export default function Programacao() {
   const [moveTargetVeiculoId, setMoveTargetVeiculoId] = useState<string>("");
   const [savingGerenciar, setSavingGerenciar] = useState(false);
 
+  // Veículos cadastrados - colapsável, fechado por padrão
+  const [showVeiculosCadastrados, setShowVeiculosCadastrados] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -891,206 +894,217 @@ export default function Programacao() {
           </Card>
         </div>
 
-        {/* Veículos cadastrados - agrupados por data */}
+        {/* Veículos cadastrados - agrupados por data (colapsável) */}
         {veiculosFormados.length > 0 && (
-          <Card>
-            <CardHeader className="space-y-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                Veículos Cadastrados ({veiculosFormados.length})
-              </CardTitle>
-              <div className="flex items-center gap-2 flex-wrap">
-                <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                <Select value={filtroVeiculoAno} onValueChange={(v) => { setFiltroVeiculoAno(v === "todos" ? "" : v); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
-                  <SelectTrigger className="w-[100px] h-8 text-xs">
-                    <SelectValue placeholder="Ano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {filtroVeiculoOptions.anos.map((a) => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filtroVeiculoMes} onValueChange={(v) => { setFiltroVeiculoMes(v === "todos" ? "" : v); setFiltroVeiculoDia(""); }} disabled={!filtroVeiculoAno}>
-                  <SelectTrigger className="w-[100px] h-8 text-xs">
-                    <SelectValue placeholder="Mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {filtroVeiculoOptions.meses.map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={filtroVeiculoDia} onValueChange={(v) => setFiltroVeiculoDia(v === "todos" ? "" : v)} disabled={!filtroVeiculoMes}>
-                  <SelectTrigger className="w-[100px] h-8 text-xs">
-                    <SelectValue placeholder="Dia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    {filtroVeiculoOptions.dias.map((d) => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
-                  <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" onClick={() => { setFiltroVeiculoAno(""); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
-                    <X className="w-3 h-3" /> Limpar
-                  </Button>
-                )}
-                {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
-                  <span className="text-xs text-muted-foreground">{totalVeiculosFiltrados} veículo(s)</span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {filteredVeiculosByDate.map(([dateStr, veiculos]) => (
-                <div key={dateStr}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="secondary" className="text-sm px-3 py-1">
-                      📅 {format(new Date(dateStr + "T00:00:00"), "dd/MM/yyyy")}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{veiculos.length} veículo(s)</span>
+          <Collapsible open={showVeiculosCadastrados} onOpenChange={setShowVeiculosCadastrados}>
+            <Card>
+              <CardHeader className="space-y-3">
+                <CollapsibleTrigger asChild>
+                  <button className="flex items-center justify-between w-full text-left">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Veículos Cadastrados ({veiculosFormados.length})
+                    </CardTitle>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showVeiculosCadastrados ? "rotate-180" : ""}`} />
+                  </button>
+                </CollapsibleTrigger>
+                {showVeiculosCadastrados && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                    <Select value={filtroVeiculoAno} onValueChange={(v) => { setFiltroVeiculoAno(v === "todos" ? "" : v); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
+                      <SelectTrigger className="w-[100px] h-8 text-xs">
+                        <SelectValue placeholder="Ano" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {filtroVeiculoOptions.anos.map((a) => (
+                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={filtroVeiculoMes} onValueChange={(v) => { setFiltroVeiculoMes(v === "todos" ? "" : v); setFiltroVeiculoDia(""); }} disabled={!filtroVeiculoAno}>
+                      <SelectTrigger className="w-[100px] h-8 text-xs">
+                        <SelectValue placeholder="Mês" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {filtroVeiculoOptions.meses.map((m) => (
+                          <SelectItem key={m} value={m}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={filtroVeiculoDia} onValueChange={(v) => setFiltroVeiculoDia(v === "todos" ? "" : v)} disabled={!filtroVeiculoMes}>
+                      <SelectTrigger className="w-[100px] h-8 text-xs">
+                        <SelectValue placeholder="Dia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {filtroVeiculoOptions.dias.map((d) => (
+                          <SelectItem key={d} value={d}>{d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
+                      <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" onClick={() => { setFiltroVeiculoAno(""); setFiltroVeiculoMes(""); setFiltroVeiculoDia(""); }}>
+                        <X className="w-3 h-3" /> Limpar
+                      </Button>
+                    )}
+                    {(filtroVeiculoAno || filtroVeiculoMes || filtroVeiculoDia) && (
+                      <span className="text-xs text-muted-foreground">{totalVeiculosFiltrados} veículo(s)</span>
+                    )}
                   </div>
-                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {veiculos.map((v) => (
-                      <Collapsible key={v.id}>
-                        <div className="border rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="font-semibold flex items-center gap-2">
-                              <Truck className="w-4 h-4" />
-                              {v.placa}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Badge
-                                variant={
-                                  v.status === "pendente"
-                                    ? "outline"
-                                    : v.status === "em_rota"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {v.status}
-                              </Badge>
-                              {v.status === "pendente" && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(v)} title="Editar placa/motorista">
-                                  <Edit className="w-3 h-3" />
-                                </Button>
+                )}
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-6">
+                  {filteredVeiculosByDate.map(([dateStr, veiculos]) => (
+                    <div key={dateStr}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant="secondary" className="text-sm px-3 py-1">
+                          📅 {format(new Date(dateStr + "T00:00:00"), "dd/MM/yyyy")}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{veiculos.length} veículo(s)</span>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {veiculos.map((v) => (
+                          <Collapsible key={v.id}>
+                            <div className="border rounded-lg p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold flex items-center gap-2">
+                                  <Truck className="w-4 h-4" />
+                                  {v.placa}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Badge
+                                    variant={
+                                      v.status === "pendente"
+                                        ? "outline"
+                                        : v.status === "em_rota"
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                  >
+                                    {v.status}
+                                  </Badge>
+                                  {v.status === "pendente" && (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(v)} title="Editar placa/motorista">
+                                      <Edit className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {v.motorista}
+                              </p>
+                              {v.access_code && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">Código motorista:</span>
+                                  <code className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
+                                    {v.access_code}
+                                  </code>
+                                </div>
                               )}
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {v.motorista}
-                          </p>
-                          {v.access_code && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Código motorista:</span>
-                              <code className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
-                                {v.access_code}
-                              </code>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-3 text-sm flex-wrap">
-                            <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
-                            <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
-                            <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
-                            <span className="font-semibold text-primary">{v.volumeTotal.toFixed(2)} m³</span>
-                          </div>
-                          {v.nfs.length > 0 && (
-                            <div className="flex gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 text-xs gap-1"
-                                onClick={() => handlePrintNotaCarga(v)}
-                                disabled={printingVeiculoId === v.id}
-                              >
-                                {printingVeiculoId === v.id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Printer className="w-3 h-3" />
-                                )}
-                                Imprimir
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 text-xs gap-1"
-                                onClick={() => handleDownloadNotaCarga(v)}
-                                disabled={downloadingVeiculoId === v.id}
-                              >
-                                {downloadingVeiculoId === v.id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Download className="w-3 h-3" />
-                                )}
-                                PDF
-                              </Button>
-                              {v.status === "pendente" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-xs gap-1"
-                                  onClick={() => openGerenciarNfsDialog(v)}
-                                >
-                                  <ArrowRightLeft className="w-3 h-3" />
-                                  NFs
-                                </Button>
+                              <div className="flex items-center gap-3 text-sm flex-wrap">
+                                <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
+                                <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
+                                <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
+                                <span className="font-semibold text-primary">{v.volumeTotal.toFixed(2)} m³</span>
+                              </div>
+                              {v.nfs.length > 0 && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-xs gap-1"
+                                    onClick={() => handlePrintNotaCarga(v)}
+                                    disabled={printingVeiculoId === v.id}
+                                  >
+                                    {printingVeiculoId === v.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Printer className="w-3 h-3" />
+                                    )}
+                                    Imprimir
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-xs gap-1"
+                                    onClick={() => handleDownloadNotaCarga(v)}
+                                    disabled={downloadingVeiculoId === v.id}
+                                  >
+                                    {downloadingVeiculoId === v.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Download className="w-3 h-3" />
+                                    )}
+                                    PDF
+                                  </Button>
+                                  {v.status === "pendente" && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs gap-1"
+                                      onClick={() => openGerenciarNfsDialog(v)}
+                                    >
+                                      <ArrowRightLeft className="w-3 h-3" />
+                                      NFs
+                                    </Button>
+                                  )}
+                                </div>
                               )}
+                              {v.nfs.length === 0 && v.status === "pendente" && (
+                                <p className="text-xs text-muted-foreground text-center italic">Sem NFs vinculadas</p>
+                              )}
+                              {v.nfs.length > 0 && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
+                                    Ver detalhes
+                                    <ChevronDown className="w-3 h-3" />
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                              <CollapsibleContent>
+                                <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-xs h-8 px-2">NF</TableHead>
+                                        <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
+                                        <TableHead className="text-xs h-8 px-2">Local</TableHead>
+                                        <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
+                                        <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {v.nfs.map((nf) => (
+                                        <TableRow key={nf.nf_id}>
+                                          <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
+                                          <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
+                                          <TableCell className="text-xs p-2">
+                                            <span className="flex items-center gap-1">
+                                              <MapPin className="w-3 h-3 shrink-0" />
+                                              {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
+                                            </span>
+                                          </TableCell>
+                                          <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
+                                          <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </CollapsibleContent>
                             </div>
-                          )}
-                          {v.nfs.length === 0 && v.status === "pendente" && (
-                            <p className="text-xs text-muted-foreground text-center italic">Sem NFs vinculadas</p>
-                          )}
-                          {v.nfs.length > 0 && (
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
-                                Ver detalhes
-                                <ChevronDown className="w-3 h-3" />
-                              </Button>
-                            </CollapsibleTrigger>
-                          )}
-                          <CollapsibleContent>
-                            <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs h-8 px-2">NF</TableHead>
-                                    <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
-                                    <TableHead className="text-xs h-8 px-2">Local</TableHead>
-                                    <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
-                                    <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {v.nfs.map((nf) => (
-                                    <TableRow key={nf.nf_id}>
-                                      <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
-                                      <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
-                                      <TableCell className="text-xs p-2">
-                                        <span className="flex items-center gap-1">
-                                          <MapPin className="w-3 h-3 shrink-0" />
-                                          {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
-                                        </span>
-                                      </TableCell>
-                                      <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
-                                      <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </CollapsibleContent>
-                        </div>
-                      </Collapsible>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         )}
 
         {/* Filtros */}
