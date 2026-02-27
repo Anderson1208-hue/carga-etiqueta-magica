@@ -40,6 +40,10 @@ import {
   MapPin,
   Search,
   Printer,
+  Download,
+  Edit,
+  Trash2,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   Collapsible,
@@ -60,7 +64,7 @@ import {
   getMacroRegiao,
   getMacroRegiaoLabel,
 } from "@/lib/macro-regioes";
-import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
+import { generateNotaDeCargaPDF, downloadBlob, printBlob } from "@/lib/pdf-generator";
 
 interface NfDisponivel {
   id: string;
@@ -114,45 +118,47 @@ export default function Programacao() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [printingVeiculoId, setPrintingVeiculoId] = useState<string | null>(null);
+  const [downloadingVeiculoId, setDownloadingVeiculoId] = useState<string | null>(null);
+
+  async function fetchVeiculoNfsPDF(veiculo: VeiculoFormado) {
+    const nfIds = veiculo.nfs.map((n) => n.nf_id);
+    if (nfIds.length === 0) return null;
+
+    const { data: nfsData } = await supabase
+      .from("notas_fiscais")
+      .select(`
+        id, numero_nf, razao_social_emitente, cnpj_emitente,
+        cnpj_destinatario, dest_bairro, data_emissao,
+        itens_nf(c_prod, x_prod, q_com)
+      `)
+      .in("id", nfIds);
+
+    if (!nfsData || nfsData.length === 0) return null;
+
+    return nfsData.map((nf) => ({
+      numeroNf: nf.numero_nf,
+      razaoSocialEmitente: nf.razao_social_emitente,
+      cnpjEmitente: nf.cnpj_emitente,
+      cnpjDestinatario: nf.cnpj_destinatario || "",
+      destBairro: nf.dest_bairro || undefined,
+      macroRegiao: getMacroRegiao(nf.dest_bairro),
+      dataEmissao: nf.data_emissao,
+      itens: (nf.itens_nf || []).map((item: any) => ({
+        cProd: item.c_prod,
+        xProd: item.x_prod,
+        qtdCaixas: calculateBoxes(Number(item.q_com)),
+      })),
+    }));
+  }
 
   async function handlePrintNotaCarga(veiculo: VeiculoFormado) {
     setPrintingVeiculoId(veiculo.id);
     try {
-      const nfIds = veiculo.nfs.map((n) => n.nf_id);
-      if (nfIds.length === 0) {
-        toast({ title: "Sem NFs", description: "Este veículo não tem NFs vinculadas", variant: "destructive" });
-        return;
-      }
-
-      const { data: nfsData } = await supabase
-        .from("notas_fiscais")
-        .select(`
-          id, numero_nf, razao_social_emitente, cnpj_emitente,
-          cnpj_destinatario, dest_bairro, data_emissao,
-          itens_nf(c_prod, x_prod, q_com)
-        `)
-        .in("id", nfIds);
-
-      if (!nfsData || nfsData.length === 0) {
+      const notasFiscaisPDF = await fetchVeiculoNfsPDF(veiculo);
+      if (!notasFiscaisPDF) {
         toast({ title: "Erro", description: "Não foi possível carregar os dados das NFs", variant: "destructive" });
         return;
       }
-
-      const notasFiscaisPDF = nfsData.map((nf) => ({
-        numeroNf: nf.numero_nf,
-        razaoSocialEmitente: nf.razao_social_emitente,
-        cnpjEmitente: nf.cnpj_emitente,
-        cnpjDestinatario: nf.cnpj_destinatario || "",
-        destBairro: nf.dest_bairro || undefined,
-        macroRegiao: getMacroRegiao(nf.dest_bairro),
-        dataEmissao: nf.data_emissao,
-        itens: (nf.itens_nf || []).map((item: any) => ({
-          cProd: item.c_prod,
-          xProd: item.x_prod,
-          qtdCaixas: calculateBoxes(Number(item.q_com)),
-        })),
-      }));
-
       const blob = await generateNotaDeCargaPDF(
         { data: veiculo.data, placa: veiculo.placa, motorista: veiculo.motorista },
         notasFiscaisPDF
@@ -163,6 +169,28 @@ export default function Programacao() {
       toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
       setPrintingVeiculoId(null);
+    }
+  }
+
+  async function handleDownloadNotaCarga(veiculo: VeiculoFormado) {
+    setDownloadingVeiculoId(veiculo.id);
+    try {
+      const notasFiscaisPDF = await fetchVeiculoNfsPDF(veiculo);
+      if (!notasFiscaisPDF) {
+        toast({ title: "Erro", description: "Não foi possível carregar os dados das NFs", variant: "destructive" });
+        return;
+      }
+      const blob = await generateNotaDeCargaPDF(
+        { data: veiculo.data, placa: veiculo.placa, motorista: veiculo.motorista },
+        notasFiscaisPDF
+      );
+      downloadBlob(blob, `nota_carga_${veiculo.placa}_${format(new Date(veiculo.data + "T00:00:00"), "yyyyMMdd")}.pdf`);
+      toast({ title: "PDF gerado!", description: `${notasFiscaisPDF.length} NFs incluídas.` });
+    } catch (error) {
+      console.error("Error downloading nota de carga:", error);
+      toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
+    } finally {
+      setDownloadingVeiculoId(null);
     }
   }
 
@@ -187,6 +215,20 @@ export default function Programacao() {
   const [selectedVeiculoId, setSelectedVeiculoId] = useState<string>("");
   const [savingVinculo, setSavingVinculo] = useState(false);
 
+  // Dialog: Editar placa/motorista de veículo existente
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editVeiculo, setEditVeiculo] = useState<VeiculoFormado | null>(null);
+  const [editPlaca, setEditPlaca] = useState("");
+  const [editMotorista, setEditMotorista] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Dialog: Gerenciar NFs de veículo (remover / mover)
+  const [showGerenciarNfsDialog, setShowGerenciarNfsDialog] = useState(false);
+  const [gerenciarVeiculo, setGerenciarVeiculo] = useState<VeiculoFormado | null>(null);
+  const [nfsToRemove, setNfsToRemove] = useState<Set<string>>(new Set());
+  const [moveTargetVeiculoId, setMoveTargetVeiculoId] = useState<string>("");
+  const [savingGerenciar, setSavingGerenciar] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -208,6 +250,7 @@ export default function Programacao() {
 
     if (!cargas || cargas.length === 0) {
       setNfsDisponiveis([]);
+      setTotalNfsPorCarga(new Map());
       return;
     }
 
@@ -502,27 +545,19 @@ export default function Programacao() {
   // Vincular NFs selecionadas a um veículo existente
   async function handleVincularNfs() {
     if (!selectedVeiculoId) {
-      toast({
-        title: "Selecione um veículo",
-        description: "Escolha o veículo para vincular as NFs",
-        variant: "destructive",
-      });
+      toast({ title: "Selecione um veículo", description: "Escolha o veículo para vincular as NFs", variant: "destructive" });
       return;
     }
 
     if (selectedNfIds.size === 0) {
-      toast({
-        title: "Nenhuma NF selecionada",
-        description: "Selecione ao menos uma NF",
-        variant: "destructive",
-      });
+      toast({ title: "Nenhuma NF selecionada", description: "Selecione ao menos uma NF", variant: "destructive" });
       return;
     }
 
     setSavingVinculo(true);
     try {
-      const selectedNfs = nfsDisponiveis.filter((nf) => selectedNfIds.has(nf.id));
-      const links = selectedNfs.map((nf) => ({
+      const selectedNfsArr = nfsDisponiveis.filter((nf) => selectedNfIds.has(nf.id));
+      const links = selectedNfsArr.map((nf) => ({
         veiculo_id: selectedVeiculoId,
         nf_id: nf.id,
         carga_origem_id: nf.carga_id,
@@ -534,7 +569,7 @@ export default function Programacao() {
       const veiculo = veiculosFormados.find((v) => v.id === selectedVeiculoId);
       toast({
         title: "NFs vinculadas!",
-        description: `${selectedNfs.length} NFs vinculadas ao veículo ${veiculo?.placa || ""}`,
+        description: `${selectedNfsArr.length} NFs vinculadas ao veículo ${veiculo?.placa || ""}`,
       });
 
       setShowVincularDialog(false);
@@ -543,13 +578,94 @@ export default function Programacao() {
       await loadData();
     } catch (error) {
       console.error("Error linking NFs:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao vincular NFs ao veículo",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Erro ao vincular NFs ao veículo", variant: "destructive" });
     } finally {
       setSavingVinculo(false);
+    }
+  }
+
+  // Editar placa/motorista do veículo
+  function openEditDialog(v: VeiculoFormado) {
+    setEditVeiculo(v);
+    setEditPlaca(v.placa);
+    setEditMotorista(v.motorista);
+    setShowEditDialog(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editVeiculo || !editPlaca.trim() || !editMotorista.trim()) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("veiculos")
+        .update({ placa: editPlaca.trim().toUpperCase(), motorista: editMotorista.trim() })
+        .eq("id", editVeiculo.id);
+      if (error) throw error;
+      toast({ title: "Veículo atualizado!", description: `${editPlaca.toUpperCase()} - ${editMotorista}` });
+      setShowEditDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error updating vehicle:", error);
+      toast({ title: "Erro", description: "Erro ao atualizar veículo", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  // Gerenciar NFs de veículo (remover / mover)
+  function openGerenciarNfsDialog(v: VeiculoFormado) {
+    setGerenciarVeiculo(v);
+    setNfsToRemove(new Set());
+    setMoveTargetVeiculoId("");
+    setShowGerenciarNfsDialog(true);
+  }
+
+  async function handleRemoveNfs() {
+    if (!gerenciarVeiculo || nfsToRemove.size === 0) return;
+    setSavingGerenciar(true);
+    try {
+      // Delete selected veiculo_nfs
+      for (const nfId of nfsToRemove) {
+        const { error } = await supabase
+          .from("veiculo_nfs")
+          .delete()
+          .eq("veiculo_id", gerenciarVeiculo.id)
+          .eq("nf_id", nfId);
+        if (error) throw error;
+      }
+      toast({ title: "NFs removidas!", description: `${nfsToRemove.size} NFs desvinculadas do veículo ${gerenciarVeiculo.placa}` });
+      setShowGerenciarNfsDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error removing NFs:", error);
+      toast({ title: "Erro", description: "Erro ao remover NFs", variant: "destructive" });
+    } finally {
+      setSavingGerenciar(false);
+    }
+  }
+
+  async function handleMoveNfs() {
+    if (!gerenciarVeiculo || nfsToRemove.size === 0 || !moveTargetVeiculoId) return;
+    setSavingGerenciar(true);
+    try {
+      // Move: update veiculo_id on veiculo_nfs
+      for (const nfId of nfsToRemove) {
+        const { error } = await supabase
+          .from("veiculo_nfs")
+          .update({ veiculo_id: moveTargetVeiculoId })
+          .eq("veiculo_id", gerenciarVeiculo.id)
+          .eq("nf_id", nfId);
+        if (error) throw error;
+      }
+      const target = veiculosFormados.find((v) => v.id === moveTargetVeiculoId);
+      toast({ title: "NFs movidas!", description: `${nfsToRemove.size} NFs movidas para ${target?.placa || ""}` });
+      setShowGerenciarNfsDialog(false);
+      await loadData();
+    } catch (error) {
+      console.error("Error moving NFs:", error);
+      toast({ title: "Erro", description: "Erro ao mover NFs", variant: "destructive" });
+    } finally {
+      setSavingGerenciar(false);
     }
   }
 
@@ -567,7 +683,6 @@ export default function Programacao() {
   const [buscaNf, setBuscaNf] = useState("");
 
   const filteredNfs = useMemo(() => {
-    // Only show NFs when at least one carga is selected
     if (filtroCargaIds.size === 0) return [];
     const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
@@ -637,6 +752,17 @@ export default function Programacao() {
   const totalVeiculosVolume = filteredVeiculoStats.volume;
   const totalVeiculosPeso = filteredVeiculoStats.peso;
   const totalVeiculosCaixas = filteredVeiculoStats.caixas;
+
+  // Group veículos by date
+  const veiculosByDate = useMemo(() => {
+    const groups = new Map<string, VeiculoFormado[]>();
+    veiculosFormados.forEach((v) => {
+      const list = groups.get(v.data) || [];
+      list.push(v);
+      groups.set(v.data, list);
+    });
+    return Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [veiculosFormados]);
 
   if (loading) {
     return (
@@ -722,7 +848,7 @@ export default function Programacao() {
           </Card>
         </div>
 
-        {/* Veículos cadastrados */}
+        {/* Veículos cadastrados - agrupados por data */}
         {veiculosFormados.length > 0 && (
           <Card>
             <CardHeader>
@@ -731,104 +857,151 @@ export default function Programacao() {
                 Veículos Cadastrados ({veiculosFormados.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {veiculosFormados.map((v) => (
-                  <Collapsible key={v.id}>
-                    <div className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold flex items-center gap-2">
-                          <Truck className="w-4 h-4" />
-                          {v.placa}
-                        </div>
-                        <Badge
-                          variant={
-                            v.status === "pendente"
-                              ? "outline"
-                              : v.status === "em_rota"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {v.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {v.motorista} • {format(new Date(v.data + "T00:00:00"), "dd/MM/yyyy")}
-                      </p>
-                      {v.access_code && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Código motorista:</span>
-                          <code className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
-                            {v.access_code}
-                          </code>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3 text-sm flex-wrap">
-                        <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
-                        <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
-                        <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
-                        <span className="font-semibold text-primary">{v.volumeTotal.toFixed(2)} m³</span>
-                      </div>
-                      {v.nfs.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-xs gap-1"
-                          onClick={() => handlePrintNotaCarga(v)}
-                          disabled={printingVeiculoId === v.id}
-                        >
-                          {printingVeiculoId === v.id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Printer className="w-3 h-3" />
+            <CardContent className="space-y-6">
+              {veiculosByDate.map(([dateStr, veiculos]) => (
+                <div key={dateStr}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="secondary" className="text-sm px-3 py-1">
+                      📅 {format(new Date(dateStr + "T00:00:00"), "dd/MM/yyyy")}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{veiculos.length} veículo(s)</span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    {veiculos.map((v) => (
+                      <Collapsible key={v.id}>
+                        <div className="border rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="font-semibold flex items-center gap-2">
+                              <Truck className="w-4 h-4" />
+                              {v.placa}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Badge
+                                variant={
+                                  v.status === "pendente"
+                                    ? "outline"
+                                    : v.status === "em_rota"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {v.status}
+                              </Badge>
+                              {v.status === "pendente" && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditDialog(v)} title="Editar placa/motorista">
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {v.motorista}
+                          </p>
+                          {v.access_code && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Código motorista:</span>
+                              <code className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
+                                {v.access_code}
+                              </code>
+                            </div>
                           )}
-                          Imprimir Nota de Carga
-                        </Button>
-                      )}
-                      {v.nfs.length > 0 && (
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
-                            Ver detalhes
-                            <ChevronDown className="w-3 h-3" />
-                          </Button>
-                        </CollapsibleTrigger>
-                      )}
-                      <CollapsibleContent>
-                        <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="text-xs h-8 px-2">NF</TableHead>
-                                <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
-                                <TableHead className="text-xs h-8 px-2">Local</TableHead>
-                                <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
-                                <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {v.nfs.map((nf) => (
-                                <TableRow key={nf.nf_id}>
-                                  <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
-                                  <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
-                                  <TableCell className="text-xs p-2">
-                                    <span className="flex items-center gap-1">
-                                      <MapPin className="w-3 h-3 shrink-0" />
-                                      {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
-                                  <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
+                          <div className="flex items-center gap-3 text-sm flex-wrap">
+                            <span><FileText className="w-3 h-3 inline mr-1" />{v.nfs.length} NFs</span>
+                            <span><Package className="w-3 h-3 inline mr-1" />{v.caixasTotal} cx</span>
+                            <span><Weight className="w-3 h-3 inline mr-1" />{v.pesoTotal.toFixed(1)} kg</span>
+                            <span className="font-semibold text-primary">{v.volumeTotal.toFixed(2)} m³</span>
+                          </div>
+                          {v.nfs.length > 0 && (
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 text-xs gap-1"
+                                onClick={() => handlePrintNotaCarga(v)}
+                                disabled={printingVeiculoId === v.id}
+                              >
+                                {printingVeiculoId === v.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Printer className="w-3 h-3" />
+                                )}
+                                Imprimir
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 text-xs gap-1"
+                                onClick={() => handleDownloadNotaCarga(v)}
+                                disabled={downloadingVeiculoId === v.id}
+                              >
+                                {downloadingVeiculoId === v.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Download className="w-3 h-3" />
+                                )}
+                                PDF
+                              </Button>
+                              {v.status === "pendente" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs gap-1"
+                                  onClick={() => openGerenciarNfsDialog(v)}
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  NFs
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          {v.nfs.length === 0 && v.status === "pendente" && (
+                            <p className="text-xs text-muted-foreground text-center italic">Sem NFs vinculadas</p>
+                          )}
+                          {v.nfs.length > 0 && (
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="w-full text-xs gap-1">
+                                Ver detalhes
+                                <ChevronDown className="w-3 h-3" />
+                              </Button>
+                            </CollapsibleTrigger>
+                          )}
+                          <CollapsibleContent>
+                            <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-xs h-8 px-2">NF</TableHead>
+                                    <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
+                                    <TableHead className="text-xs h-8 px-2">Local</TableHead>
+                                    <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
+                                    <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {v.nfs.map((nf) => (
+                                    <TableRow key={nf.nf_id}>
+                                      <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
+                                      <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
+                                      <TableCell className="text-xs p-2">
+                                        <span className="flex items-center gap-1">
+                                          <MapPin className="w-3 h-3 shrink-0" />
+                                          {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
+                                      <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </CollapsibleContent>
                         </div>
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                ))}
-              </div>
+                      </Collapsible>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
@@ -870,7 +1043,7 @@ export default function Programacao() {
                         : `${filtroCargaIds.size} cargas selecionadas`}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[280px] p-2" align="start">
+                  <PopoverContent className="w-[320px] p-2" align="start">
                     <div className="space-y-1">
                       {cargasUnicas.map((c) => {
                         const isChecked = filtroCargaIds.has(c.id);
@@ -1017,7 +1190,6 @@ export default function Programacao() {
             ) : (
               <div className="space-y-1">
                 {(() => {
-                  // Group by MR
                   const groupedByMR = new Map<number, NfDisponivel[]>();
                   filteredNfs.forEach((nf) => {
                     const list = groupedByMR.get(nf.macroRegiao) || [];
@@ -1030,7 +1202,6 @@ export default function Programacao() {
                     .map(([mr, nfsMR]) => {
                       const mrNfsSel = nfsMR.filter((n) => selectedNfIds.has(n.id)).length;
 
-                      // Group by CNPJ (entrega) within MR
                       const entregasMap = new Map<string, NfDisponivel[]>();
                       nfsMR.forEach((nf) => {
                         const key = nf.cnpj_destinatario || nf.id;
@@ -1041,7 +1212,6 @@ export default function Programacao() {
 
                       return (
                         <div key={mr} className="mb-4">
-                          {/* MR Header */}
                           <div
                             className="flex items-center gap-2 mb-2 p-2 bg-primary/10 rounded-md cursor-pointer border border-primary/20"
                             onClick={() => toggleMR(mr)}
@@ -1058,7 +1228,6 @@ export default function Programacao() {
                             </Badge>
                           </div>
 
-                          {/* Entregas within MR */}
                           <div className="space-y-2 pl-2">
                             {Array.from(entregasMap.entries()).map(([cnpj, nfsEntrega]) => {
                               const entregaKey = `${mr}_${cnpj}`;
@@ -1073,7 +1242,6 @@ export default function Programacao() {
 
                               return (
                                 <div key={entregaKey} className="border rounded-md">
-                                  {/* Entrega Header */}
                                   <div
                                     className={`flex items-center gap-2 p-2 rounded-t-md cursor-pointer transition-colors ${
                                       allEntregaSel
@@ -1130,7 +1298,6 @@ export default function Programacao() {
                                     </div>
                                   </div>
 
-                                  {/* Individual NFs (expanded) */}
                                   {isExpanded && (
                                     <div className="border-t px-2 py-1 space-y-1 bg-muted/20">
                                       {nfsEntrega.map((nf) => (
@@ -1229,7 +1396,7 @@ export default function Programacao() {
                   <Input value={formMotorista} onChange={(e) => setFormMotorista(e.target.value)} placeholder="Nome do motorista" />
                 </div>
                 <div>
-                  <Label>Data</Label>
+                  <Label>Data de Expedição</Label>
                   <Input type="date" value={formData} onChange={(e) => setFormData(e.target.value)} />
                 </div>
               </div>
@@ -1290,6 +1457,116 @@ export default function Programacao() {
               )}
               Vincular NFs
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Editar Veículo (placa/motorista) */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5" />
+              Editar Veículo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Placa</Label>
+              <Input value={editPlaca} onChange={(e) => setEditPlaca(e.target.value)} placeholder="ABC-1234" className="uppercase" />
+            </div>
+            <div>
+              <Label>Motorista</Label>
+              <Input value={editMotorista} onChange={(e) => setEditMotorista(e.target.value)} placeholder="Nome do motorista" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={savingEdit || !editPlaca.trim() || !editMotorista.trim()}>
+              {savingEdit ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Gerenciar NFs do Veículo (remover / mover) */}
+      <Dialog open={showGerenciarNfsDialog} onOpenChange={setShowGerenciarNfsDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" />
+              Gerenciar NFs — {gerenciarVeiculo?.placa}
+            </DialogTitle>
+          </DialogHeader>
+          {gerenciarVeiculo && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Selecione as NFs que deseja remover ou mover para outro veículo.</p>
+              <div className="max-h-60 overflow-auto border rounded-md">
+                {gerenciarVeiculo.nfs.map((nf) => (
+                  <div
+                    key={nf.nf_id}
+                    className={`flex items-center gap-3 px-3 py-2 text-xs border-b last:border-b-0 cursor-pointer transition-colors ${
+                      nfsToRemove.has(nf.nf_id) ? "bg-destructive/10" : "hover:bg-muted/30"
+                    }`}
+                    onClick={() => {
+                      setNfsToRemove((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(nf.nf_id)) next.delete(nf.nf_id);
+                        else next.add(nf.nf_id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <Checkbox checked={nfsToRemove.has(nf.nf_id)} className="pointer-events-none" />
+                    <span className="font-mono font-bold">NF {nf.numero_nf}</span>
+                    <span className="text-muted-foreground truncate">{nf.razao_social}</span>
+                    <span className="ml-auto text-muted-foreground">{nf.totalCaixas} cx</span>
+                  </div>
+                ))}
+              </div>
+
+              {nfsToRemove.size > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">{nfsToRemove.size} NF(s) selecionada(s)</p>
+
+                  <div>
+                    <Label className="text-xs">Mover para outro veículo (opcional)</Label>
+                    <Select value={moveTargetVeiculoId} onValueChange={setMoveTargetVeiculoId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Apenas desvincular..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Apenas desvincular (voltar para disponíveis)</SelectItem>
+                        {veiculosFormados
+                          .filter((v) => v.id !== gerenciarVeiculo.id && v.status === "pendente")
+                          .map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.placa} - {v.motorista} ({v.nfs.length} NFs)
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGerenciarNfsDialog(false)}>Cancelar</Button>
+            {nfsToRemove.size > 0 && (
+              moveTargetVeiculoId && moveTargetVeiculoId !== "__none__" ? (
+                <Button onClick={handleMoveNfs} disabled={savingGerenciar}>
+                  {savingGerenciar ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRightLeft className="w-4 h-4 mr-2" />}
+                  Mover {nfsToRemove.size} NF(s)
+                </Button>
+              ) : (
+                <Button variant="destructive" onClick={handleRemoveNfs} disabled={savingGerenciar}>
+                  {savingGerenciar ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Desvincular {nfsToRemove.size} NF(s)
+                </Button>
+              )
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
