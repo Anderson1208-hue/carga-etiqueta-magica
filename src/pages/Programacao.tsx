@@ -576,14 +576,45 @@ export default function Programacao() {
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
   const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
 
-  // Dashboard totals
-  const totalNfsDisponiveis = nfsDisponiveis.length;
-  const totalPesoDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.peso_bruto, 0);
-  const totalVolumeDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.volume_m3, 0);
-  const totalCaixasDisponivel = nfsDisponiveis.reduce((s, nf) => s + nf.totalCaixas, 0);
-  const totalVeiculosVolume = veiculosFormados.reduce((s, v) => s + v.volumeTotal, 0);
-  const totalVeiculosPeso = veiculosFormados.reduce((s, v) => s + v.pesoTotal, 0);
-  const totalVeiculosCaixas = veiculosFormados.reduce((s, v) => s + v.caixasTotal, 0);
+  // Dashboard totals - filtered by selected carga
+  const dashboardNfs = filteredNfs;
+  const totalNfsDisponiveis = dashboardNfs.length;
+  const totalPesoDisponivel = dashboardNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
+  const totalVolumeDisponivel = dashboardNfs.reduce((s, nf) => s + nf.volume_m3, 0);
+  const totalCaixasDisponivel = dashboardNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
+
+  // Filter veiculos by carga when a carga filter is active
+  const dashboardVeiculos = useMemo(() => {
+    if (filtroCarga === "todas") return veiculosFormados;
+    return veiculosFormados.filter((v) =>
+      v.nfs.some((nf) => nf.carga_origem === filtroCarga)
+    );
+  }, [veiculosFormados, filtroCarga]);
+
+  const filteredVeiculoStats = useMemo(() => {
+    if (filtroCarga === "todas") {
+      return {
+        volume: veiculosFormados.reduce((s, v) => s + v.volumeTotal, 0),
+        peso: veiculosFormados.reduce((s, v) => s + v.pesoTotal, 0),
+        caixas: veiculosFormados.reduce((s, v) => s + v.caixasTotal, 0),
+        count: veiculosFormados.length,
+      };
+    }
+    // Sum only NFs from the selected carga within each veiculo
+    let volume = 0, peso = 0, caixas = 0;
+    veiculosFormados.forEach((v) => {
+      v.nfs.filter((nf) => nf.carga_origem === filtroCarga).forEach((nf) => {
+        volume += nf.volume_m3;
+        peso += nf.peso_bruto;
+        caixas += nf.totalCaixas;
+      });
+    });
+    return { volume, peso, caixas, count: dashboardVeiculos.length };
+  }, [veiculosFormados, filtroCarga, dashboardVeiculos]);
+
+  const totalVeiculosVolume = filteredVeiculoStats.volume;
+  const totalVeiculosPeso = filteredVeiculoStats.peso;
+  const totalVeiculosCaixas = filteredVeiculoStats.caixas;
 
   if (loading) {
     return (
@@ -664,7 +695,7 @@ export default function Programacao() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{(totalVolumeDisponivel + totalVeiculosVolume).toFixed(2)} <span className="text-lg font-normal">m³</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{veiculosFormados.length} veículos montados</p>
+              <p className="text-xs text-muted-foreground mt-1">{filteredVeiculoStats.count} veículos montados</p>
             </CardContent>
           </Card>
         </div>
