@@ -1357,6 +1357,7 @@ export default function Programacao() {
                         list.push(nf);
                         entregasMap.set(key, list);
                       });
+                      const mrTotalEntregas = entregasMap.size;
 
                       return (
                         <div key={mr} className="mb-4">
@@ -1373,6 +1374,7 @@ export default function Programacao() {
                                 {getMacroRegiaoLabel(mr)}
                               </span>
                               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                <span>{mrTotalEntregas} entrega{mrTotalEntregas > 1 ? "s" : ""}</span>
                                 <span>{nfsMR.length} NFs</span>
                                 <span>{mrTotalCaixas} cx</span>
                                 <span>{mrTotalPeso.toFixed(1)} kg</span>
