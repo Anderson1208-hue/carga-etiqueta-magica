@@ -167,6 +167,7 @@ export default function Programacao() {
   }
 
   const [nfsDisponiveis, setNfsDisponiveis] = useState<NfDisponivel[]>([]);
+  const [totalNfsPorCarga, setTotalNfsPorCarga] = useState<Map<string, number>>(new Map());
   const [veiculosFormados, setVeiculosFormados] = useState<VeiculoFormado[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
@@ -213,25 +214,33 @@ export default function Programacao() {
     const cargaIds = cargas.map((c) => c.id);
     const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
-    const { data: nfs } = await supabase
-      .from("notas_fiscais")
-      .select(`
-        id, numero_nf, chave_acesso, cnpj_destinatario,
-        dest_razao_social, dest_bairro, dest_cep,
-        dest_logradouro, dest_numero, dest_cidade, dest_uf,
-        peso_bruto, volume_m3, carga_id,
-        itens_nf(q_com)
-      `)
-      .in("carga_id", cargaIds);
+    const [{ data: nfs }, { data: assigned }] = await Promise.all([
+      supabase
+        .from("notas_fiscais")
+        .select(`
+          id, numero_nf, chave_acesso, cnpj_destinatario,
+          dest_razao_social, dest_bairro, dest_cep,
+          dest_logradouro, dest_numero, dest_cidade, dest_uf,
+          peso_bruto, volume_m3, carga_id,
+          itens_nf(q_com)
+        `)
+        .in("carga_id", cargaIds),
+      supabase
+        .from("veiculo_nfs")
+        .select("nf_id"),
+    ]);
 
     if (!nfs) {
       setNfsDisponiveis([]);
       return;
     }
 
-    const { data: assigned } = await supabase
-      .from("veiculo_nfs")
-      .select("nf_id");
+    // Count total NFs per carga (including already assigned)
+    const totalMap = new Map<string, number>();
+    nfs.forEach((nf) => {
+      totalMap.set(nf.carga_id, (totalMap.get(nf.carga_id) || 0) + 1);
+    });
+    setTotalNfsPorCarga(totalMap);
 
     const assignedIds = new Set((assigned || []).map((a) => a.nf_id));
 
@@ -539,10 +548,10 @@ export default function Programacao() {
 
   // Filters
   const cargasUnicas = useMemo(() => {
-    const map = new Map<string, { id: string; placa: string; data: string }>();
+    const map = new Map<string, { id: string; placa: string; motorista: string; data: string }>();
     nfsDisponiveis.forEach((nf) => {
       if (!map.has(nf.carga_id)) {
-        map.set(nf.carga_id, { id: nf.carga_id, placa: nf.carga_placa, data: nf.carga_data });
+        map.set(nf.carga_id, { id: nf.carga_id, placa: nf.carga_placa, motorista: nf.carga_motorista, data: nf.carga_data });
       }
     });
     return Array.from(map.values());
@@ -858,7 +867,8 @@ export default function Programacao() {
                     <div className="space-y-1">
                       {cargasUnicas.map((c) => {
                         const isChecked = filtroCargaIds.has(c.id);
-                        const nfCount = nfsDisponiveis.filter((nf) => nf.carga_id === c.id).length;
+                        const nfAvail = nfsDisponiveis.filter((nf) => nf.carga_id === c.id).length;
+                        const nfTotal = totalNfsPorCarga.get(c.id) || nfAvail;
                         return (
                           <div
                             key={c.id}
@@ -876,10 +886,10 @@ export default function Programacao() {
                             <div className="flex-1 text-sm">
                               <span className="font-medium">{c.placa}</span>
                               <span className="text-muted-foreground ml-1">
-                                {format(new Date(c.data + "T00:00:00"), "dd/MM/yyyy")}
+                                {format(new Date(c.data + "T00:00:00"), "dd/MM/yyyy")} - {c.motorista}
                               </span>
                             </div>
-                            <Badge variant="outline" className="text-[10px] px-1.5">{nfCount} NFs</Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5">{nfAvail}/{nfTotal} NFs</Badge>
                           </div>
                         );
                       })}
