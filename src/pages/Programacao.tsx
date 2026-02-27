@@ -1346,6 +1346,9 @@ export default function Programacao() {
                     .sort(([a], [b]) => a - b)
                     .map(([mr, nfsMR]) => {
                       const mrNfsSel = nfsMR.filter((n) => selectedNfIds.has(n.id)).length;
+                      const mrTotalCaixas = nfsMR.reduce((s, n) => s + n.totalCaixas, 0);
+                      const mrTotalPeso = nfsMR.reduce((s, n) => s + n.peso_bruto, 0);
+                      const mrTotalVolume = nfsMR.reduce((s, n) => s + n.volume_m3, 0);
 
                       const entregasMap = new Map<string, NfDisponivel[]>();
                       nfsMR.forEach((nf) => {
@@ -1365,10 +1368,18 @@ export default function Programacao() {
                               checked={mrNfsSel === nfsMR.length}
                               className="pointer-events-none"
                             />
-                            <span className="font-semibold text-sm">
-                              {getMacroRegiaoLabel(mr)}
-                            </span>
-                            <Badge variant="outline" className="ml-auto">
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-sm">
+                                {getMacroRegiaoLabel(mr)}
+                              </span>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                                <span>{nfsMR.length} NFs</span>
+                                <span>{mrTotalCaixas} cx</span>
+                                <span>{mrTotalPeso.toFixed(1)} kg</span>
+                                {mrTotalVolume > 0 && <span className="font-semibold text-primary">{mrTotalVolume.toFixed(2)} m³</span>}
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="shrink-0">
                               {mrNfsSel}/{nfsMR.length} sel.
                             </Badge>
                           </div>
