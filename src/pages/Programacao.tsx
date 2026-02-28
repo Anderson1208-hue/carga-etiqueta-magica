@@ -571,7 +571,19 @@ export default function Programacao() {
               onClick={() => {
                 const nfIds = [...selectedNfIds];
                 const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
-                navigate("/roteirizacao", { state: { nfIds, cargaIds } });
+                navigate("/roteirizacao", { 
+                  state: { 
+                    nfIds, 
+                    cargaIds,
+                    totais: {
+                      nfs: selTotalNfs,
+                      caixas: selTotalCaixas,
+                      peso: selTotalPeso,
+                      volume: selTotalVolume,
+                      entregas: selTotalEntregas,
+                    }
+                  } 
+                });
               }}
             >
               <Route className="w-4 h-4 mr-2" />
