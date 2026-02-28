@@ -211,6 +211,7 @@ export default function Roteirizacao() {
           dest_cep,
           peso_bruto,
           peso_liquido,
+          volume_m3,
           itens_nf(q_com)
         `)
         .in("carga_id", cargaIds);
@@ -272,6 +273,7 @@ export default function Roteirizacao() {
         entrega.cargaIds.push(nf.carga_id);
 
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
+        entrega.volumeTotalM3 += Number(nf.volume_m3) || 0;
 
         const nfItems = (nf.itens_nf || []) as { q_com: number }[];
         nfItems.forEach((item) => {
@@ -309,7 +311,7 @@ export default function Roteirizacao() {
             id, numero_nf, carga_id, cnpj_destinatario,
             dest_razao_social, dest_logradouro, dest_numero,
             dest_bairro, dest_cidade, dest_uf, dest_cep,
-            peso_bruto, peso_liquido, itens_nf(q_com)
+            peso_bruto, peso_liquido, volume_m3, itens_nf(q_com)
           `)
           .in("id", batch);
         if (data) allNfs.push(...data);
@@ -336,6 +338,7 @@ export default function Roteirizacao() {
         entrega.nfIds.push(nf.id);
         entrega.cargaIds.push(nf.carga_id);
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
+        entrega.volumeTotalM3 += Number(nf.volume_m3) || 0;
         const nfItems = (nf.itens_nf || []) as { q_com: number }[];
         nfItems.forEach((item) => { entrega.totalCaixas += calculateBoxes(Number(item.q_com)); });
       });
@@ -922,14 +925,11 @@ export default function Roteirizacao() {
     (a, b) => a - b
   );
 
-  // Totals from ALL entregas (unfiltered)
+  // All totals from entregas (single source of truth)
   const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
-  const totalNfsFromEntregas = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
   const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
   const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
-  
-  // Use the authoritative NF count from Preparação when available, otherwise from entregas
-  const totalNfs = modoNfIds && nfIdsSelecionados.length > 0 ? nfIdsSelecionados.length : totalNfsFromEntregas;
   
   // Filtered totals for when MR filter is active
   const filteredCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
@@ -972,7 +972,12 @@ export default function Roteirizacao() {
                       Rota montada a partir da Preparação
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {nfIdsSelecionados.length} NFs selecionadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
+                      {totalNfs} NFs carregadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
+                      {nfIdsSelecionados.length !== totalNfs && totalNfs > 0 && (
+                        <span className="text-warning ml-1">
+                          (⚠️ {nfIdsSelecionados.length - totalNfs} NFs não encontradas — podem já estar emplacadas)
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
