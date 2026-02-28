@@ -16,6 +16,7 @@ import Roteirizacao from "./pages/Roteirizacao";
 import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
 import HistoricoEntregas from "./pages/HistoricoEntregas";
+import Agendamento from "./pages/Agendamento";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
 
@@ -145,6 +146,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <HistoricoEntregas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/agendamento"
+        element={
+          <ProtectedRoute>
+            <Agendamento />
           </ProtectedRoute>
         }
       />

@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      agendamentos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_agendamento: string | null
+          id: string
+          nf_id: string
+          observacao: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_agendamento?: string | null
+          id?: string
+          nf_id: string
+          observacao?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_agendamento?: string | null
+          id?: string
+          nf_id?: string
+          observacao?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       baixas_entrega: {
         Row: {
           created_at: string
@@ -296,6 +337,7 @@ export type Database = {
           peso_bruto: number | null
           peso_liquido: number | null
           razao_social_emitente: string
+          status_entrega: string
           volume_m3: number | null
         }
         Insert: {
@@ -317,6 +359,7 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente: string
+          status_entrega?: string
           volume_m3?: number | null
         }
         Update: {
@@ -338,6 +381,7 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente?: string
+          status_entrega?: string
           volume_m3?: number | null
         }
         Relationships: [
