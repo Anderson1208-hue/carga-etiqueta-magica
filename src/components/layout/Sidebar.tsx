@@ -10,7 +10,7 @@ import {
   LayoutDashboard,
   Smartphone,
   Route,
-  CalendarClock,
+  ClipboardList,
   ClipboardCheck,
   History,
   Warehouse,
@@ -35,7 +35,7 @@ const depositoItems = [
 const transporteItems = [
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
-  { name: "Programação", href: "/programacao", icon: CalendarClock },
+  { name: "Preparação", href: "/programacao", icon: ClipboardList },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
