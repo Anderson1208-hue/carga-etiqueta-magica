@@ -94,6 +94,7 @@ interface VeiculoNfDetail {
   numero_nf: string;
   razao_social: string;
   carga_origem: string;
+  cnpj_destinatario: string;
   dest_cidade: string;
   dest_uf: string;
   dest_bairro: string;
@@ -361,11 +362,11 @@ export default function Programacao() {
       .in("veiculo_id", veiculoIds);
 
     const nfIds = (vnfs || []).map((v) => v.nf_id);
-    let nfMap = new Map<string, { numero_nf: string; razao_social: string; dest_cidade: string; dest_uf: string; dest_bairro: string; peso_bruto: number; volume_m3: number; totalCaixas: number }>();
+    let nfMap = new Map<string, { numero_nf: string; razao_social: string; cnpj_destinatario: string; dest_cidade: string; dest_uf: string; dest_bairro: string; peso_bruto: number; volume_m3: number; totalCaixas: number }>();
     if (nfIds.length > 0) {
       const { data: nfDetails } = await supabase
         .from("notas_fiscais")
-        .select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf, dest_bairro, peso_bruto, volume_m3, itens_nf(q_com)")
+        .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_cidade, dest_uf, dest_bairro, peso_bruto, volume_m3, itens_nf(q_com)")
         .in("id", nfIds);
 
       nfMap = new Map(
@@ -377,6 +378,7 @@ export default function Programacao() {
             {
               numero_nf: n.numero_nf,
               razao_social: n.dest_razao_social || "N/I",
+              cnpj_destinatario: n.cnpj_destinatario || "",
               dest_cidade: n.dest_cidade || "",
               dest_uf: n.dest_uf || "",
               dest_bairro: n.dest_bairro || "",
@@ -399,6 +401,7 @@ export default function Programacao() {
             numero_nf: detail?.numero_nf || "?",
             razao_social: detail?.razao_social || "N/I",
             carga_origem: vn.carga_origem_id,
+            cnpj_destinatario: detail?.cnpj_destinatario || "",
             dest_cidade: detail?.dest_cidade || "",
             dest_uf: detail?.dest_uf || "",
             dest_bairro: detail?.dest_bairro || "",
@@ -753,6 +756,10 @@ export default function Programacao() {
   const totalPesoDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
   const totalVolumeDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.volume_m3, 0);
   const totalCaixasDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
+  const totalEntregasDisponivel = useMemo(() => {
+    const cnpjs = new Set(cargaFilteredNfs.map((nf) => nf.cnpj_destinatario || nf.id));
+    return cnpjs.size;
+  }, [cargaFilteredNfs]);
 
   // Filter veiculos by selected cargas
   const dashboardVeiculos = useMemo(() => {
@@ -875,7 +882,7 @@ export default function Programacao() {
         </div>
 
         {/* Dashboard M³ */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Volume Programado</CardTitle>
@@ -913,6 +920,16 @@ export default function Programacao() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{totalCaixasDisponivel}</div>
+              <p className="text-xs text-muted-foreground mt-1">{totalNfsDisponiveis} NFs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Entregas</CardTitle>
+              <MapPin className="h-5 w-5 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalEntregasDisponivel}</div>
               <p className="text-xs text-muted-foreground mt-1">{totalNfsDisponiveis} NFs</p>
             </CardContent>
           </Card>
@@ -1109,34 +1126,66 @@ export default function Programacao() {
                                 </CollapsibleTrigger>
                               )}
                               <CollapsibleContent>
-                                <div className="mt-2 border-t pt-2 max-h-60 overflow-auto">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="text-xs h-8 px-2">NF</TableHead>
-                                        <TableHead className="text-xs h-8 px-2">Destinatário</TableHead>
-                                        <TableHead className="text-xs h-8 px-2">Local</TableHead>
-                                        <TableHead className="text-xs h-8 px-2 text-right">Peso</TableHead>
-                                        <TableHead className="text-xs h-8 px-2 text-right">Cx</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {v.nfs.map((nf) => (
-                                        <TableRow key={nf.nf_id}>
-                                          <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
-                                          <TableCell className="text-xs p-2 max-w-[120px] truncate">{nf.razao_social}</TableCell>
-                                          <TableCell className="text-xs p-2">
-                                            <span className="flex items-center gap-1">
-                                              <MapPin className="w-3 h-3 shrink-0" />
-                                              {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
+                                <div className="mt-2 border-t pt-2 max-h-80 overflow-auto space-y-2">
+                                  {(() => {
+                                    // Group NFs by cnpj_destinatario (entrega)
+                                    const entregasMap = new Map<string, VeiculoNfDetail[]>();
+                                    v.nfs.forEach((nf) => {
+                                      const key = nf.cnpj_destinatario || nf.nf_id;
+                                      const list = entregasMap.get(key) || [];
+                                      list.push(nf);
+                                      entregasMap.set(key, list);
+                                    });
+                                    let entregaIdx = 0;
+                                    return Array.from(entregasMap.entries()).map(([cnpj, nfs]) => {
+                                      entregaIdx++;
+                                      const entregaPeso = nfs.reduce((s, n) => s + n.peso_bruto, 0);
+                                      const entregaCaixas = nfs.reduce((s, n) => s + n.totalCaixas, 0);
+                                      const entregaVolume = nfs.reduce((s, n) => s + n.volume_m3, 0);
+                                      return (
+                                        <div key={cnpj} className="border rounded p-2">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-semibold text-primary flex items-center gap-1">
+                                              <MapPin className="w-3 h-3" />
+                                              Entrega {entregaIdx}
                                             </span>
-                                          </TableCell>
-                                          <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
-                                          <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
+                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                              <span>{nfs.length} NF{nfs.length > 1 ? "s" : ""}</span>
+                                              <span>{entregaCaixas} cx</span>
+                                              <span>{entregaPeso.toFixed(1)} kg</span>
+                                              {entregaVolume > 0 && <span>{entregaVolume.toFixed(2)} m³</span>}
+                                            </div>
+                                          </div>
+                                          <p className="text-[10px] text-muted-foreground mb-1 truncate">{nfs[0].razao_social}</p>
+                                          <Table>
+                                            <TableHeader>
+                                              <TableRow>
+                                                <TableHead className="text-xs h-6 px-2">NF</TableHead>
+                                                <TableHead className="text-xs h-6 px-2">Local</TableHead>
+                                                <TableHead className="text-xs h-6 px-2 text-right">Peso</TableHead>
+                                                <TableHead className="text-xs h-6 px-2 text-right">Cx</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {nfs.map((nf) => (
+                                                <TableRow key={nf.nf_id}>
+                                                  <TableCell className="text-xs p-2 font-medium">{nf.numero_nf}</TableCell>
+                                                  <TableCell className="text-xs p-2">
+                                                    <span className="flex items-center gap-1">
+                                                      <MapPin className="w-3 h-3 shrink-0" />
+                                                      {nf.dest_bairro}{nf.dest_cidade ? ` - ${nf.dest_cidade}` : ""}{nf.dest_uf ? `/${nf.dest_uf}` : ""}
+                                                    </span>
+                                                  </TableCell>
+                                                  <TableCell className="text-xs p-2 text-right">{nf.peso_bruto.toFixed(1)}</TableCell>
+                                                  <TableCell className="text-xs p-2 text-right">{nf.totalCaixas}</TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               </CollapsibleContent>
                             </div>
