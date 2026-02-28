@@ -31,7 +31,12 @@ import {
   Save,
   Truck,
   CheckCircle2,
+  List,
+  Eye,
+  Calendar,
+  User,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
@@ -120,6 +125,16 @@ export default function Roteirizacao() {
   const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null; motorista?: string } | null>(null);
   const [motoristaDespacho, setMotoristaDespacho] = useState("");
   const [savingMotorista, setSavingMotorista] = useState(false);
+
+  // Tab & Vehicles listing
+  const [activeTab, setActiveTab] = useState("nova-rota");
+  const [veiculos, setVeiculos] = useState<any[]>([]);
+  const [loadingVeiculos, setLoadingVeiculos] = useState(false);
+  const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
+  const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
+  const [filtroDia, setFiltroDia] = useState("");
+  const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
+  const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
@@ -881,6 +896,87 @@ export default function Roteirizacao() {
     }
   }
 
+  // ========== VEHICLES LISTING ==========
+  useEffect(() => {
+    if (activeTab === "veiculos") loadVeiculos();
+  }, [activeTab, filtroAno, filtroMes, filtroDia]);
+
+  async function loadVeiculos() {
+    setLoadingVeiculos(true);
+    try {
+      let query = supabase
+        .from("veiculos")
+        .select("id, placa, motorista, data, status, access_code, created_at")
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false });
+
+      // Date filters
+      const year = parseInt(filtroAno);
+      const month = parseInt(filtroMes);
+      if (filtroDia) {
+        const day = parseInt(filtroDia);
+        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        query = query.eq("data", dateStr);
+      } else {
+        const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+        const endMonth = month === 12 ? 1 : month + 1;
+        const endYear = month === 12 ? year + 1 : year;
+        const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
+        query = query.gte("data", startDate).lt("data", endDate);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setVeiculos(data || []);
+    } catch (err) {
+      console.error("Error loading veiculos:", err);
+    } finally {
+      setLoadingVeiculos(false);
+    }
+  }
+
+  async function loadVeiculoNfs(veiculoId: string) {
+    if (veiculoNfs[veiculoId]) return;
+    try {
+      const { data } = await supabase
+        .from("veiculo_nfs")
+        .select(`
+          id, nf_id,
+          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, cnpj_destinatario)
+        `)
+        .eq("veiculo_id", veiculoId);
+      setVeiculoNfs((prev) => ({ ...prev, [veiculoId]: data || [] }));
+    } catch (err) {
+      console.error("Error loading vehicle NFs:", err);
+    }
+  }
+
+  function toggleExpandVeiculo(veiculoId: string) {
+    if (expandedVeiculoId === veiculoId) {
+      setExpandedVeiculoId(null);
+    } else {
+      setExpandedVeiculoId(veiculoId);
+      loadVeiculoNfs(veiculoId);
+    }
+  }
+
+  // Group vehicles by date for display
+  const veiculosByDate = veiculos.reduce<Record<string, typeof veiculos>>((acc, v) => {
+    const dateKey = v.data;
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(v);
+    return acc;
+  }, {});
+
+  const meses = [
+    { value: "1", label: "Janeiro" }, { value: "2", label: "Fevereiro" }, { value: "3", label: "Março" },
+    { value: "4", label: "Abril" }, { value: "5", label: "Maio" }, { value: "6", label: "Junho" },
+    { value: "7", label: "Julho" }, { value: "8", label: "Agosto" }, { value: "9", label: "Setembro" },
+    { value: "10", label: "Outubro" }, { value: "11", label: "Novembro" }, { value: "12", label: "Dezembro" },
+  ];
+
+  const diasNoMes = new Date(parseInt(filtroAno), parseInt(filtroMes), 0).getDate();
+
   async function exportPDF() {
     if (!roteirizacao || selectedCargas.length === 0) return;
 
@@ -1032,6 +1128,20 @@ export default function Roteirizacao() {
             Rota sugerida por Macro Região – agrupamento por CNPJ do destinatário
           </p>
         </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="nova-rota" className="gap-2">
+              <Route className="w-4 h-4" />
+              Nova Rota
+            </TabsTrigger>
+            <TabsTrigger value="veiculos" className="gap-2">
+              <Truck className="w-4 h-4" />
+              Veículos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="nova-rota" className="space-y-6 mt-4">
 
         {/* NF selection mode banner */}
         {modoNfIds && (
@@ -1563,6 +1673,146 @@ export default function Roteirizacao() {
             </Card>
           </>
         )}
+          </TabsContent>
+
+          <TabsContent value="veiculos" className="space-y-6 mt-4">
+            {/* Date Filters */}
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <Label className="text-xs">Ano</Label>
+                <Select value={filtroAno} onValueChange={(v) => { setFiltroAno(v); setFiltroDia(""); }}>
+                  <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[2024, 2025, 2026].map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Mês</Label>
+                <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v); setFiltroDia(""); }}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {meses.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Dia</Label>
+                <Select value={filtroDia} onValueChange={setFiltroDia}>
+                  <SelectTrigger className="w-24"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    {Array.from({ length: diasNoMes }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>{String(d).padStart(2, "0")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {loadingVeiculos ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : veiculos.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  <Truck className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p>Nenhum veículo encontrado neste período</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(veiculosByDate).map(([dateStr, veics]) => (
+                  <div key={dateStr}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}
+                      </span>
+                      <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {veics.map((v: any) => (
+                        <Card key={v.id} className="overflow-hidden">
+                          <button
+                            onClick={() => toggleExpandVeiculo(v.id)}
+                            className="w-full text-left p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Truck className="w-5 h-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-semibold">{v.placa}</p>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                  <User className="w-3 h-3" />
+                                  {v.motorista || <span className="italic">Sem motorista</span>}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {v.access_code && (
+                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                  {v.access_code}
+                                </code>
+                              )}
+                              <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
+                                {v.status}
+                              </Badge>
+                              <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
+                            </div>
+                          </button>
+
+                          {expandedVeiculoId === v.id && (
+                            <div className="border-t px-4 py-3 bg-muted/30">
+                              {!veiculoNfs[v.id] ? (
+                                <div className="flex justify-center py-4">
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                </div>
+                              ) : veiculoNfs[v.id].length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma NF vinculada</p>
+                              ) : (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                    {veiculoNfs[v.id].length} NF(s) vinculada(s)
+                                  </p>
+                                  <div className="grid gap-1">
+                                    {veiculoNfs[v.id].map((vnf: any) => {
+                                      const nf = vnf.notas_fiscais;
+                                      return (
+                                        <div key={vnf.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-background">
+                                          <div className="flex items-center gap-3">
+                                            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                            <span className="font-medium">NF {nf.numero_nf}</span>
+                                            <span className="text-muted-foreground truncate max-w-[200px]">{nf.dest_razao_social}</span>
+                                          </div>
+                                          <div className="flex gap-3 text-xs text-muted-foreground">
+                                            {nf.dest_bairro && <span>{nf.dest_bairro}</span>}
+                                            <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
+                                            <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
