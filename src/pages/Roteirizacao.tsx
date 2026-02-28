@@ -101,6 +101,10 @@ export default function Roteirizacao() {
   const [cargaSearchTerm, setCargaSearchTerm] = useState("");
   const [orderChanged, setOrderChanged] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
+  
+  // When coming from Preparação with specific NF IDs
+  const [modoNfIds, setModoNfIds] = useState(false);
+  const [nfIdsSelecionados, setNfIdsSelecionados] = useState<string[]>([]);
 
   // Emplacamento
   const [emplacPlaca, setEmplacPlaca] = useState("");
@@ -124,22 +128,41 @@ export default function Roteirizacao() {
     loadCargas();
   }, []);
 
-  // Auto-select cargas when coming from Preparação
+  // Auto-select cargas or NFs when coming from Preparação
   useEffect(() => {
     if (stateConsumedRef.current) return;
-    const state = location.state as { cargaIds?: string[] } | null;
-    if (state?.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
+    const state = location.state as { cargaIds?: string[]; nfIds?: string[] } | null;
+    if (!state) return;
+    
+    // New mode: specific NF IDs from Preparação
+    if (state.nfIds && state.nfIds.length > 0) {
+      stateConsumedRef.current = true;
+      setModoNfIds(true);
+      setNfIdsSelecionados(state.nfIds);
+      // Also set cargaIds for reference
+      if (state.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
+        const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
+        if (valid.length > 0) setSelectedCargaIds(valid);
+      }
+      loadEntregasByNfIds(state.nfIds);
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
+    
+    // Legacy mode: all NFs from selected cargas
+    if (state.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
       const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
       if (valid.length > 0) {
         setSelectedCargaIds(valid);
       }
       stateConsumedRef.current = true;
-      // Clear the navigation state properly via React Router
       navigate(location.pathname, { replace: true, state: null });
     }
   }, [cargas, location.state]);
 
   useEffect(() => {
+    // Skip if in nfIds mode - entregas already loaded by loadEntregasByNfIds
+    if (modoNfIds) return;
     if (selectedCargaIds.length > 0) {
       loadEntregas(selectedCargaIds);
     } else {
@@ -147,7 +170,7 @@ export default function Roteirizacao() {
       setRoteirizacao(null);
       setVeiculoCriado(null);
     }
-  }, [selectedCargaIds]);
+  }, [selectedCargaIds, modoNfIds]);
 
   async function loadCargas() {
     const { data } = await supabase
@@ -266,6 +289,65 @@ export default function Roteirizacao() {
         description: "Erro ao carregar entregas",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadEntregasByNfIds(nfIds: string[]) {
+    setLoading(true);
+    setRoteirizacao(null);
+    setFiltroMacroRegiao("todas");
+    try {
+      const batchSize = 500;
+      const allNfs: any[] = [];
+      for (let i = 0; i < nfIds.length; i += batchSize) {
+        const batch = nfIds.slice(i, i + batchSize);
+        const { data } = await supabase
+          .from("notas_fiscais")
+          .select(`
+            id, numero_nf, carga_id, cnpj_destinatario,
+            dest_razao_social, dest_logradouro, dest_numero,
+            dest_bairro, dest_cidade, dest_uf, dest_cep,
+            peso_bruto, peso_liquido, itens_nf(q_com)
+          `)
+          .in("id", batch);
+        if (data) allNfs.push(...data);
+      }
+
+      const entregasMap = new Map<string, Entrega>();
+      allNfs.forEach((nf) => {
+        const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
+        if (!entregasMap.has(cnpj)) {
+          const bairro = nf.dest_bairro || "";
+          const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep].filter(Boolean).join(", ");
+          entregasMap.set(cnpj, {
+            cep: nf.dest_cep || "SEM_CEP", cnpjDestinatario: cnpj,
+            razaoSocial: nf.dest_razao_social || "Cliente não identificado",
+            enderecoCompleto: endereco || "Endereço não informado", bairro,
+            macroRegiao: getMacroRegiao(bairro), latitude: null, longitude: null,
+            totalNfs: 0, totalCaixas: 0, pesoTotalKg: 0, volumeTotalM3: 0,
+            nfs: [], nfIds: [], cargaIds: [],
+          });
+        }
+        const entrega = entregasMap.get(cnpj)!;
+        entrega.totalNfs++;
+        entrega.nfs.push(nf.numero_nf);
+        entrega.nfIds.push(nf.id);
+        entrega.cargaIds.push(nf.carga_id);
+        entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
+        const nfItems = (nf.itens_nf || []) as { q_com: number }[];
+        nfItems.forEach((item) => { entrega.totalCaixas += calculateBoxes(Number(item.q_com)); });
+      });
+
+      const entregasList = sortByMacroRegiao(Array.from(entregasMap.values()));
+      setEntregas(entregasList);
+
+      const cargaIdsFromNfs = [...new Set(allNfs.map((nf) => nf.carga_id))];
+      setSelectedCargaIds((prev) => prev.length > 0 ? prev : cargaIdsFromNfs);
+    } catch (error) {
+      console.error("Error loading entregas by NF IDs:", error);
+      toast({ title: "Erro", description: "Erro ao carregar NFs selecionadas", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -867,7 +949,43 @@ export default function Roteirizacao() {
           </p>
         </div>
 
-        {/* Multi-Carga Selector */}
+        {/* NF selection mode banner */}
+        {modoNfIds && (
+          <Card className="border-primary bg-primary/5">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="font-semibold text-primary">
+                      Rota montada a partir da Preparação
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {nfIdsSelecionados.length} NFs selecionadas de {selectedCargaIds.length} carga(s)
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setModoNfIds(false);
+                    setNfIdsSelecionados([]);
+                    setEntregas([]);
+                    setSelectedCargaIds([]);
+                    setRoteirizacao(null);
+                  }}
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Limpar e selecionar cargas
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Multi-Carga Selector - hidden when in nfIds mode */}
+        {!modoNfIds && (
         <div className="wms-card p-4">
           <div className="space-y-3">
             <Label className="text-sm font-medium">Selecione uma ou mais cargas</Label>
@@ -961,8 +1079,9 @@ export default function Roteirizacao() {
             )}
           </div>
         </div>
+        )}
 
-        {selectedCargas.length > 0 && (
+        {(selectedCargas.length > 0 || modoNfIds) && (
           <>
             {/* CD Configuration */}
             <Card>

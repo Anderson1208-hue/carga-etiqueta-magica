@@ -546,8 +546,9 @@ export default function Programacao() {
               size="lg"
               className="w-full md:w-auto"
               onClick={() => {
+                const nfIds = [...selectedNfIds];
                 const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
-                navigate("/roteirizacao", { state: { cargaIds } });
+                navigate("/roteirizacao", { state: { nfIds, cargaIds } });
               }}
             >
               <Route className="w-4 h-4 mr-2" />
