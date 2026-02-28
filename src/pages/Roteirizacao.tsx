@@ -27,6 +27,7 @@ import {
   Filter,
   ChevronDown,
   X,
+  Save,
 } from "lucide-react";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
@@ -93,6 +94,8 @@ export default function Roteirizacao() {
   const [geocoding, setGeocoding] = useState(false);
   const [filtroMacroRegiao, setFiltroMacroRegiao] = useState<string>("todas");
   const [cargaSearchTerm, setCargaSearchTerm] = useState("");
+  const [orderChanged, setOrderChanged] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   // CD coordinates (default: São Paulo)
   const [cdLat, setCdLat] = useState<string>("-23.5505");
@@ -584,6 +587,43 @@ export default function Roteirizacao() {
     }
   }
 
+  function handleReorder(reordered: Entrega[]) {
+    setEntregas(reordered);
+    if (roteirizacao) {
+      setRoteirizacao({ ...roteirizacao, paradas: reordered });
+    }
+    setOrderChanged(true);
+  }
+
+  async function saveOrder() {
+    if (!roteirizacao) return;
+    setSavingOrder(true);
+    try {
+      const updates = entregas.map((e) =>
+        supabase
+          .from("roteirizacao_paradas")
+          .update({ ordem: e.ordem || 0 })
+          .eq("roteirizacao_id", roteirizacao.id)
+          .eq("cnpj_destinatario", e.cnpjDestinatario)
+      );
+      await Promise.all(updates);
+      setOrderChanged(false);
+      toast({
+        title: "Ordem salva",
+        description: "A sequência de entregas foi atualizada com sucesso",
+      });
+    } catch (error) {
+      console.error("Error saving order:", error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar a ordem das entregas",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingOrder(false);
+    }
+  }
+
   async function exportPDF() {
     if (!roteirizacao || selectedCargas.length === 0) return;
 
@@ -1058,18 +1098,37 @@ export default function Roteirizacao() {
             {/* Rota Sugerida - Stops List */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  Rota Sugerida – Paradas por CNPJ
-                  {filtroMacroRegiao !== "todas" && (
-                    <Badge variant="secondary">
-                      Filtro: MR {filtroMacroRegiao}
-                    </Badge>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Rota Sugerida – Paradas por CNPJ
+                    {filtroMacroRegiao !== "todas" && (
+                      <Badge variant="secondary">
+                        Filtro: MR {filtroMacroRegiao}
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  {roteirizacao && orderChanged && (
+                    <Button
+                      size="sm"
+                      onClick={saveOrder}
+                      disabled={savingOrder}
+                    >
+                      {savingOrder ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      Salvar Ordem
+                    </Button>
                   )}
-                </CardTitle>
+                </div>
               </CardHeader>
               <CardContent>
-                <ListaParadas entregas={filteredEntregas} />
+                <ListaParadas
+                  entregas={filteredEntregas}
+                  onReorder={roteirizacao ? handleReorder : undefined}
+                />
               </CardContent>
             </Card>
           </>
