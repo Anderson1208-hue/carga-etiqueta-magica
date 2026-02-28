@@ -379,70 +379,89 @@ export default function Roteirizacao() {
       .map((e, i) => ({ ...e, ordem: i + 1 }));
   }
 
+  async function geocodeViaCep(cep: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const cleanCep = cep.replace(/\D/g, "");
+      if (cleanCep.length !== 8) return null;
+      const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cleanCep}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      if (data.location?.coordinates?.longitude && data.location?.coordinates?.latitude) {
+        return { lat: Number(data.location.coordinates.latitude), lng: Number(data.location.coordinates.longitude) };
+      }
+      return null;
+    } catch { return null; }
+  }
+
+  async function geocodeViaNominatim(query: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`,
+        { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
+      );
+      const data = await response.json();
+      if (data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+      return null;
+    } catch { return null; }
+  }
+
   async function geocodeAddresses() {
     setGeocoding(true);
     const updatedEntregas = [...entregas];
+    let successCount = 0;
+    let failedAddresses: string[] = [];
 
     for (let i = 0; i < updatedEntregas.length; i++) {
       const entrega = updatedEntregas[i];
-      if (entrega.latitude && entrega.longitude) continue;
+      if (entrega.latitude && entrega.longitude) { successCount++; continue; }
       if (entrega.enderecoCompleto === "Endereço não informado") continue;
 
-      try {
-        // Tentativa 1: busca estruturada com street + city + state + country
+      let coords: { lat: number; lng: number } | null = null;
+
+      // Tentativa 1: CEP via BrasilAPI (mais preciso)
+      if (entrega.cep && entrega.cep !== "SEM_CEP") {
+        coords = await geocodeViaCep(entrega.cep);
+        await new Promise((r) => setTimeout(r, 300));
+      }
+
+      // Tentativa 2: Bairro + Cidade + UF via Nominatim
+      if (!coords && entrega.bairro) {
         const cidade = entrega.cidade || "Rio de Janeiro";
         const uf = entrega.uf || "RJ";
-        const params = new URLSearchParams({
-          format: "json",
-          street: entrega.logradouro || "",
-          city: cidade,
-          state: uf,
-          country: "Brazil",
-          limit: "1",
-        });
-
-        let response = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
-          { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
-        );
-        let data = await response.json();
-
-        // Tentativa 2 (fallback): bairro + cidade + UF
-        if (data.length === 0 && entrega.bairro) {
-          await new Promise((r) => setTimeout(r, 1100));
-          const fallbackParams = new URLSearchParams({
-            format: "json",
-            q: `${entrega.bairro}, ${cidade}, ${uf}, Brasil`,
-            limit: "1",
-          });
-          response = await fetch(
-            `https://nominatim.openstreetmap.org/search?${fallbackParams.toString()}`,
-            { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
-          );
-          data = await response.json();
-        }
-
-        if (data.length > 0) {
-          updatedEntregas[i] = {
-            ...entrega,
-            latitude: parseFloat(data[0].lat),
-            longitude: parseFloat(data[0].lon),
-          };
-        }
-
+        coords = await geocodeViaNominatim(`${entrega.bairro}, ${cidade}, ${uf}`);
         await new Promise((r) => setTimeout(r, 1100));
-      } catch (error) {
-        console.error("Geocoding error:", error);
+      }
+
+      // Tentativa 3: Logradouro + Cidade via Nominatim
+      if (!coords && entrega.logradouro) {
+        const cidade = entrega.cidade || "Rio de Janeiro";
+        const uf = entrega.uf || "RJ";
+        coords = await geocodeViaNominatim(`${entrega.logradouro}, ${cidade}, ${uf}`);
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+
+      if (coords) {
+        updatedEntregas[i] = { ...entrega, latitude: coords.lat, longitude: coords.lng };
+        successCount++;
+      } else {
+        failedAddresses.push(entrega.razaoSocial);
+        console.warn(`Geocoding falhou para: ${entrega.enderecoCompleto}`);
       }
     }
 
     setEntregas(updatedEntregas);
     setGeocoding(false);
+    
+    const msg = failedAddresses.length > 0
+      ? `${successCount} localizados. Falha: ${failedAddresses.join(", ")}`
+      : `Todos os ${successCount} endereços localizados com sucesso!`;
+    
     toast({
       title: "Geocodificação concluída",
-      description: `${updatedEntregas.filter((e) => e.latitude).length} de ${
-        updatedEntregas.length
-      } endereços localizados`,
+      description: msg,
+      variant: failedAddresses.length > 0 ? "destructive" : "default",
     });
   }
 
