@@ -105,6 +105,9 @@ export default function Roteirizacao() {
   // When coming from Preparação with specific NF IDs
   const [modoNfIds, setModoNfIds] = useState(false);
   const [nfIdsSelecionados, setNfIdsSelecionados] = useState<string[]>([]);
+  const [totaisPreparacao, setTotaisPreparacao] = useState<{
+    nfs: number; caixas: number; peso: number; volume: number; entregas: number;
+  } | null>(null);
 
   // Emplacamento
   const [emplacPlaca, setEmplacPlaca] = useState("");
@@ -131,7 +134,7 @@ export default function Roteirizacao() {
   // Auto-select cargas or NFs when coming from Preparação
   useEffect(() => {
     if (stateConsumedRef.current) return;
-    const state = location.state as { cargaIds?: string[]; nfIds?: string[] } | null;
+    const state = location.state as { cargaIds?: string[]; nfIds?: string[]; totais?: { nfs: number; caixas: number; peso: number; volume: number; entregas: number } } | null;
     if (!state) return;
     
     // New mode: specific NF IDs from Preparação
@@ -139,7 +142,7 @@ export default function Roteirizacao() {
       stateConsumedRef.current = true;
       setModoNfIds(true);
       setNfIdsSelecionados(state.nfIds);
-      // Also set cargaIds for reference
+      if (state.totais) setTotaisPreparacao(state.totais);
       if (state.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
         const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
         if (valid.length > 0) setSelectedCargaIds(valid);
@@ -925,11 +928,12 @@ export default function Roteirizacao() {
     (a, b) => a - b
   );
 
-  // All totals from entregas (single source of truth)
-  const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
-  const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
-  const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
-  const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  // Use totals from Preparação when available (authoritative), otherwise compute from entregas
+  const totalCaixas = totaisPreparacao ? totaisPreparacao.caixas : entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
+  const totalNfs = totaisPreparacao ? totaisPreparacao.nfs : entregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalPeso = totaisPreparacao ? totaisPreparacao.peso : entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+  const totalVolume = totaisPreparacao ? totaisPreparacao.volume : entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  const totalParadas = totaisPreparacao ? totaisPreparacao.entregas : entregas.length;
   
   // Filtered totals for when MR filter is active
   const filteredCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
@@ -972,12 +976,7 @@ export default function Roteirizacao() {
                       Rota montada a partir da Preparação
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {totalNfs} NFs carregadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
-                      {nfIdsSelecionados.length !== totalNfs && totalNfs > 0 && (
-                        <span className="text-warning ml-1">
-                          (⚠️ {nfIdsSelecionados.length - totalNfs} NFs não encontradas — podem já estar emplacadas)
-                        </span>
-                      )}
+                      {totalNfs} NFs • {totalParadas} paradas • {totalCaixas} caixas • {totalPeso.toFixed(1)} kg • {totalVolume.toFixed(2)} m³ — de {selectedCargaIds.length} carga(s)
                     </p>
                   </div>
                 </div>
@@ -987,6 +986,7 @@ export default function Roteirizacao() {
                   onClick={() => {
                     setModoNfIds(false);
                     setNfIdsSelecionados([]);
+                    setTotaisPreparacao(null);
                     setEntregas([]);
                     setSelectedCargaIds([]);
                     setRoteirizacao(null);
@@ -1200,7 +1200,7 @@ export default function Roteirizacao() {
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Paradas</p>
                 <p className="text-2xl font-bold">
-                  {isFiltered ? `${filteredEntregas.length}/${entregas.length}` : entregas.length}
+                  {isFiltered ? `${filteredEntregas.length}/${totalParadas}` : totalParadas}
                 </p>
               </div>
               <div className="wms-stat-card">
