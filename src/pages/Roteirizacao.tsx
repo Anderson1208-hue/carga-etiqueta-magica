@@ -64,6 +64,9 @@ interface Entrega {
   razaoSocial: string;
   enderecoCompleto: string;
   bairro: string;
+  cidade: string;
+  uf: string;
+  logradouro: string;
   macroRegiao: number;
   latitude: number | null;
   longitude: number | null;
@@ -256,6 +259,9 @@ export default function Roteirizacao() {
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
             bairro,
+            cidade: nf.dest_cidade || "",
+            uf: nf.dest_uf || "",
+            logradouro: nf.dest_logradouro || "",
             macroRegiao: getMacroRegiao(bairro),
             latitude: null,
             longitude: null,
@@ -330,6 +336,7 @@ export default function Roteirizacao() {
             cep: nf.dest_cep || "SEM_CEP", cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado", bairro,
+            cidade: nf.dest_cidade || "", uf: nf.dest_uf || "", logradouro: nf.dest_logradouro || "",
             macroRegiao: getMacroRegiao(bairro), latitude: null, longitude: null,
             totalNfs: 0, totalCaixas: 0, pesoTotalKg: 0, volumeTotalM3: 0,
             nfs: [], nfIds: [], cargaIds: [],
@@ -382,18 +389,39 @@ export default function Roteirizacao() {
       if (entrega.enderecoCompleto === "Endereço não informado") continue;
 
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            entrega.enderecoCompleto + ", Brasil"
-          )}&limit=1`,
-          {
-            headers: {
-              "User-Agent": "WMS-Recebimento/1.0",
-            },
-          }
-        );
+        // Tentativa 1: busca estruturada com street + city + state + country
+        const cidade = entrega.cidade || "Rio de Janeiro";
+        const uf = entrega.uf || "RJ";
+        const params = new URLSearchParams({
+          format: "json",
+          street: entrega.logradouro || "",
+          city: cidade,
+          state: uf,
+          country: "Brazil",
+          limit: "1",
+        });
 
-        const data = await response.json();
+        let response = await fetch(
+          `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+          { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
+        );
+        let data = await response.json();
+
+        // Tentativa 2 (fallback): bairro + cidade + UF
+        if (data.length === 0 && entrega.bairro) {
+          await new Promise((r) => setTimeout(r, 1100));
+          const fallbackParams = new URLSearchParams({
+            format: "json",
+            q: `${entrega.bairro}, ${cidade}, ${uf}, Brasil`,
+            limit: "1",
+          });
+          response = await fetch(
+            `https://nominatim.openstreetmap.org/search?${fallbackParams.toString()}`,
+            { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
+          );
+          data = await response.json();
+        }
+
         if (data.length > 0) {
           updatedEntregas[i] = {
             ...entrega,
