@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +29,7 @@ import {
   Search,
   FileText,
   ClipboardList,
+  Route,
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
@@ -60,6 +62,7 @@ interface NfDisponivel {
 
 export default function Programacao() {
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [nfsDisponiveis, setNfsDisponiveis] = useState<NfDisponivel[]>([]);
   const [totalNfsPorCarga, setTotalNfsPorCarga] = useState<Map<string, number>>(new Map());
@@ -508,35 +511,48 @@ export default function Programacao() {
           </CardContent>
         </Card>
 
-        {/* Stats da seleção */}
+        {/* Stats da seleção + botão roteirização */}
         {selectedNfIds.size > 0 && (
-          <div className="grid gap-4 md:grid-cols-5">
-            <div className="wms-stat-card">
-              <p className="text-sm text-muted-foreground">NFs Selecionadas</p>
-              <p className="text-2xl font-bold">{selTotalNfs}</p>
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-5">
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground">NFs Selecionadas</p>
+                <p className="text-2xl font-bold">{selTotalNfs}</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground">Total Caixas</p>
+                <p className="text-2xl font-bold">{selTotalCaixas}</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Weight className="w-3 h-3" /> Peso Total
+                </p>
+                <p className="text-2xl font-bold">{selTotalPeso.toFixed(1)} kg</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Package className="w-3 h-3" /> Volume Total
+                </p>
+                <p className="text-2xl font-bold">{selTotalVolume.toFixed(2)} m³</p>
+              </div>
+              <div className="wms-stat-card">
+                <p className="text-sm text-muted-foreground">Cargas Origem</p>
+                <p className="text-2xl font-bold">
+                  {new Set(selectedNfs.map((nf) => nf.carga_id)).size}
+                </p>
+              </div>
             </div>
-            <div className="wms-stat-card">
-              <p className="text-sm text-muted-foreground">Total Caixas</p>
-              <p className="text-2xl font-bold">{selTotalCaixas}</p>
-            </div>
-            <div className="wms-stat-card">
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Weight className="w-3 h-3" /> Peso Total
-              </p>
-              <p className="text-2xl font-bold">{selTotalPeso.toFixed(1)} kg</p>
-            </div>
-            <div className="wms-stat-card">
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Package className="w-3 h-3" /> Volume Total
-              </p>
-              <p className="text-2xl font-bold">{selTotalVolume.toFixed(2)} m³</p>
-            </div>
-            <div className="wms-stat-card">
-              <p className="text-sm text-muted-foreground">Cargas Origem</p>
-              <p className="text-2xl font-bold">
-                {new Set(selectedNfs.map((nf) => nf.carga_id)).size}
-              </p>
-            </div>
+            <Button
+              size="lg"
+              className="w-full md:w-auto"
+              onClick={() => {
+                const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
+                navigate("/roteirizacao", { state: { cargaIds } });
+              }}
+            >
+              <Route className="w-4 h-4 mr-2" />
+              Enviar para Roteirização ({selTotalNfs} NFs)
+            </Button>
           </div>
         )}
 
