@@ -196,7 +196,7 @@ export default function Programacao() {
   }
 
   function toggleMR(mr: number) {
-    const nfsInMR = nfsDisponiveis.filter((nf) => nf.macroRegiao === mr);
+    const nfsInMR = cargaFilteredNfs.filter((nf) => nf.macroRegiao === mr);
     const allSelected = nfsInMR.every((nf) => selectedNfIds.has(nf.id));
     setSelectedNfIds((prev) => {
       const next = new Set(prev);
@@ -284,9 +284,15 @@ export default function Programacao() {
     });
   }, [nfsDisponiveis, filtroMR, filtroCargaIds, buscaNf]);
 
+  // Dashboard totals - filtered by selected cargas
+  const cargaFilteredNfs = useMemo(() => {
+    if (filtroCargaIds.size === 0) return [];
+    return nfsDisponiveis.filter((nf) => filtroCargaIds.has(nf.carga_id));
+  }, [nfsDisponiveis, filtroCargaIds]);
+
   const macroRegioesPresentes = useMemo(() => {
-    return [...new Set(nfsDisponiveis.map((nf) => nf.macroRegiao))].sort((a, b) => a - b);
-  }, [nfsDisponiveis]);
+    return [...new Set(cargaFilteredNfs.map((nf) => nf.macroRegiao))].sort((a, b) => a - b);
+  }, [cargaFilteredNfs]);
 
   // Stats for selected NFs
   const selectedNfs = nfsDisponiveis.filter((nf) => selectedNfIds.has(nf.id));
@@ -298,12 +304,6 @@ export default function Programacao() {
     if (selectedNfs.length === 0) return 0;
     return new Set(selectedNfs.map((nf) => nf.cnpj_destinatario || nf.id)).size;
   }, [selectedNfs]);
-
-  // Dashboard totals - filtered by selected cargas
-  const cargaFilteredNfs = useMemo(() => {
-    if (filtroCargaIds.size === 0) return [];
-    return nfsDisponiveis.filter((nf) => filtroCargaIds.has(nf.carga_id));
-  }, [nfsDisponiveis, filtroCargaIds]);
 
   const totalNfsDisponiveis = cargaFilteredNfs.length;
   const totalPesoDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
@@ -502,7 +502,7 @@ export default function Programacao() {
                   <SelectContent>
                     <SelectItem value="todas">Todas</SelectItem>
                     {macroRegioesPresentes.map((mr) => {
-                      const count = nfsDisponiveis.filter((n) => n.macroRegiao === mr).length;
+                      const count = cargaFilteredNfs.filter((n) => n.macroRegiao === mr).length;
                       return (
                         <SelectItem key={mr} value={String(mr)}>
                           MR {mr} ({count})
@@ -517,7 +517,7 @@ export default function Programacao() {
             {/* MR Badges */}
             <div className="flex flex-wrap gap-2 mt-3">
               {macroRegioesPresentes.map((mr) => {
-                const nfsInMR = nfsDisponiveis.filter((n) => n.macroRegiao === mr);
+                const nfsInMR = cargaFilteredNfs.filter((n) => n.macroRegiao === mr);
                 const selectedInMR = nfsInMR.filter((n) => selectedNfIds.has(n.id)).length;
                 return (
                   <Badge
