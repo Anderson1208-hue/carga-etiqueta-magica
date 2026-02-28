@@ -28,6 +28,8 @@ import {
   ChevronDown,
   X,
   Save,
+  Truck,
+  CheckCircle2,
 } from "lucide-react";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
@@ -69,6 +71,8 @@ interface Entrega {
   pesoTotalKg: number;
   volumeTotalM3: number;
   nfs: string[];
+  nfIds: string[];
+  cargaIds: string[];
   ordem?: number;
 }
 
@@ -97,6 +101,13 @@ export default function Roteirizacao() {
   const [orderChanged, setOrderChanged] = useState(false);
   const [savingOrder, setSavingOrder] = useState(false);
 
+  // Emplacamento
+  const [emplacPlaca, setEmplacPlaca] = useState("");
+  const [emplacMotorista, setEmplacMotorista] = useState("");
+  const [emplacData, setEmplacData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [savingEmplac, setSavingEmplac] = useState(false);
+  const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null } | null>(null);
+
   // CD coordinates (default: São Paulo)
   const [cdLat, setCdLat] = useState<string>("-23.5505");
   const [cdLng, setCdLng] = useState<string>("-46.6333");
@@ -114,6 +125,7 @@ export default function Roteirizacao() {
     } else {
       setEntregas([]);
       setRoteirizacao(null);
+      setVeiculoCriado(null);
     }
   }, [selectedCargaIds]);
 
@@ -145,6 +157,7 @@ export default function Roteirizacao() {
         .select(`
           id,
           numero_nf,
+          carga_id,
           cnpj_destinatario,
           dest_razao_social,
           dest_logradouro,
@@ -204,12 +217,16 @@ export default function Roteirizacao() {
             pesoTotalKg: 0,
             volumeTotalM3: 0,
             nfs: [],
+            nfIds: [],
+            cargaIds: [],
           });
         }
 
         const entrega = entregasMap.get(chave)!;
         entrega.totalNfs++;
         entrega.nfs.push(nf.numero_nf);
+        entrega.nfIds.push(nf.id);
+        entrega.cargaIds.push(nf.carga_id);
 
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
 
@@ -621,6 +638,69 @@ export default function Roteirizacao() {
       });
     } finally {
       setSavingOrder(false);
+    }
+  }
+
+  async function handleEmplacar() {
+    if (!emplacPlaca.trim() || !emplacMotorista.trim()) {
+      toast({ title: "Dados incompletos", description: "Preencha placa e motorista", variant: "destructive" });
+      return;
+    }
+
+    setSavingEmplac(true);
+    try {
+      // Collect all NF IDs from entregas
+      const allNfIds: { nfId: string; cargaId: string }[] = [];
+      entregas.forEach((e) => {
+        e.nfIds.forEach((nfId, idx) => {
+          allNfIds.push({ nfId, cargaId: e.cargaIds[idx] });
+        });
+      });
+
+      if (allNfIds.length === 0) {
+        toast({ title: "Nenhuma NF", description: "Não há NFs para emplacar", variant: "destructive" });
+        return;
+      }
+
+      // Create veículo
+      const { data: veiculo, error: veicError } = await supabase
+        .from("veiculos")
+        .insert({
+          placa: emplacPlaca.trim().toUpperCase(),
+          motorista: emplacMotorista.trim(),
+          data: emplacData,
+          created_by: user?.id,
+        })
+        .select("id, access_code")
+        .single();
+
+      if (veicError) throw veicError;
+
+      // Link NFs to veículo
+      const links = allNfIds.map((item) => ({
+        veiculo_id: veiculo.id,
+        nf_id: item.nfId,
+        carga_origem_id: item.cargaId,
+      }));
+
+      const { error: linkError } = await supabase.from("veiculo_nfs").insert(links);
+      if (linkError) throw linkError;
+
+      setVeiculoCriado({
+        id: veiculo.id,
+        placa: emplacPlaca.trim().toUpperCase(),
+        accessCode: veiculo.access_code,
+      });
+
+      toast({
+        title: "Veículo emplacado!",
+        description: `${emplacPlaca.toUpperCase()} - ${emplacMotorista} com ${allNfIds.length} NFs`,
+      });
+    } catch (error) {
+      console.error("Error creating vehicle:", error);
+      toast({ title: "Erro", description: "Erro ao emplacar veículo", variant: "destructive" });
+    } finally {
+      setSavingEmplac(false);
     }
   }
 
@@ -1071,6 +1151,88 @@ export default function Roteirizacao() {
                           {roteirizacao.tempoEstimadoMin % 60}min
                         </p>
                       </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Emplacamento */}
+            {roteirizacao && !veiculoCriado && (
+              <Card className="border-primary">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Truck className="w-4 h-4" />
+                    Emplacar Veículo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Vincule uma placa e motorista às {entregas.reduce((s, e) => s + e.nfIds.length, 0)} NFs desta rota.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div>
+                      <Label>Placa</Label>
+                      <Input
+                        value={emplacPlaca}
+                        onChange={(e) => setEmplacPlaca(e.target.value.toUpperCase())}
+                        placeholder="ABC1D23"
+                        maxLength={7}
+                      />
+                    </div>
+                    <div>
+                      <Label>Motorista</Label>
+                      <Input
+                        value={emplacMotorista}
+                        onChange={(e) => setEmplacMotorista(e.target.value)}
+                        placeholder="Nome do motorista"
+                      />
+                    </div>
+                    <div>
+                      <Label>Data</Label>
+                      <Input
+                        type="date"
+                        value={emplacData}
+                        onChange={(e) => setEmplacData(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        onClick={handleEmplacar}
+                        disabled={savingEmplac || !emplacPlaca.trim() || !emplacMotorista.trim()}
+                        className="w-full"
+                      >
+                        {savingEmplac ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Truck className="w-4 h-4 mr-2" />
+                        )}
+                        Emplacar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Veículo criado */}
+            {veiculoCriado && (
+              <Card className="border-success bg-success/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-success" />
+                    <div>
+                      <p className="font-semibold text-success">
+                        Veículo {veiculoCriado.placa} emplacado com sucesso!
+                      </p>
+                      {veiculoCriado.accessCode && (
+                        <p className="text-sm text-muted-foreground">
+                          Código de acesso do motorista:{" "}
+                          <code className="font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
+                            {veiculoCriado.accessCode}
+                          </code>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
