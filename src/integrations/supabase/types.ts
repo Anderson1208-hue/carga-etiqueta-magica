@@ -118,6 +118,7 @@ export type Database = {
           operador_responsavel: string | null
           placa: string
           status: Database["public"]["Enums"]["load_status"]
+          tipo_carga: string
           updated_at: string
         }
         Insert: {
@@ -131,6 +132,7 @@ export type Database = {
           operador_responsavel?: string | null
           placa: string
           status?: Database["public"]["Enums"]["load_status"]
+          tipo_carga?: string
           updated_at?: string
         }
         Update: {
@@ -144,6 +146,7 @@ export type Database = {
           operador_responsavel?: string | null
           placa?: string
           status?: Database["public"]["Enums"]["load_status"]
+          tipo_carga?: string
           updated_at?: string
         }
         Relationships: []
