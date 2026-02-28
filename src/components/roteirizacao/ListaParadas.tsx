@@ -210,13 +210,34 @@ export function ListaParadas({ entregas, onReorder }: ListaParadasProps) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  if (entregas.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Nenhuma entrega encontrada para esta carga
-      </div>
-    );
-  }
+  // Group by macro region (maintaining current order) - must be before early return
+  const grupos: GrupoMacroRegiao[] = useMemo(() => {
+    const result: GrupoMacroRegiao[] = [];
+    let currentMR: number | null = null;
+
+    entregas.forEach((entrega) => {
+      if (entrega.macroRegiao !== currentMR) {
+        currentMR = entrega.macroRegiao;
+        result.push({
+          macroRegiao: entrega.macroRegiao,
+          label: getMacroRegiaoLabel(entrega.macroRegiao),
+          entregas: [],
+          totalNfs: 0,
+          totalCaixas: 0,
+          pesoTotalKg: 0,
+          volumeTotalM3: 0,
+        });
+      }
+      const grupo = result[result.length - 1];
+      grupo.entregas.push(entrega);
+      grupo.totalNfs += entrega.totalNfs;
+      grupo.totalCaixas += entrega.totalCaixas;
+      grupo.pesoTotalKg += entrega.pesoTotalKg;
+      grupo.volumeTotalM3 += entrega.volumeTotalM3;
+    });
+
+    return result;
+  }, [entregas]);
 
   function toggleItem(cnpj: string) {
     setOpenItems((prev) => {
@@ -254,34 +275,13 @@ export function ListaParadas({ entregas, onReorder }: ListaParadasProps) {
     onReorder(reordered);
   }
 
-  // Group by macro region (maintaining current order)
-  const grupos: GrupoMacroRegiao[] = useMemo(() => {
-    const result: GrupoMacroRegiao[] = [];
-    let currentMR: number | null = null;
-
-    entregas.forEach((entrega) => {
-      if (entrega.macroRegiao !== currentMR) {
-        currentMR = entrega.macroRegiao;
-        result.push({
-          macroRegiao: entrega.macroRegiao,
-          label: getMacroRegiaoLabel(entrega.macroRegiao),
-          entregas: [],
-          totalNfs: 0,
-          totalCaixas: 0,
-          pesoTotalKg: 0,
-          volumeTotalM3: 0,
-        });
-      }
-      const grupo = result[result.length - 1];
-      grupo.entregas.push(entrega);
-      grupo.totalNfs += entrega.totalNfs;
-      grupo.totalCaixas += entrega.totalCaixas;
-      grupo.pesoTotalKg += entrega.pesoTotalKg;
-      grupo.volumeTotalM3 += entrega.volumeTotalM3;
-    });
-
-    return result;
-  }, [entregas]);
+  if (entregas.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Nenhuma entrega encontrada para esta carga
+      </div>
+    );
+  }
 
   // When reorder is enabled, render flat list (no grouping) for easier drag
   if (canReorder) {
