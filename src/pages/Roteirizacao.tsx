@@ -922,11 +922,14 @@ export default function Roteirizacao() {
     (a, b) => a - b
   );
 
-  // Always compute totals from ALL entregas (unfiltered) to match the banner
+  // Totals from ALL entregas (unfiltered)
   const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
-  const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalNfsFromEntregas = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
   const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
   const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  
+  // Use the authoritative NF count from Preparação when available, otherwise from entregas
+  const totalNfs = modoNfIds && nfIdsSelecionados.length > 0 ? nfIdsSelecionados.length : totalNfsFromEntregas;
   
   // Filtered totals for when MR filter is active
   const filteredCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
@@ -969,7 +972,7 @@ export default function Roteirizacao() {
                       Rota montada a partir da Preparação
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {totalNfs} NFs carregadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
+                      {nfIdsSelecionados.length} NFs selecionadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
                     </p>
                   </div>
                 </div>
