@@ -922,10 +922,18 @@ export default function Roteirizacao() {
     (a, b) => a - b
   );
 
-  const totalCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
-  const totalNfs = filteredEntregas.reduce((sum, e) => sum + e.totalNfs, 0);
-  const totalPeso = filteredEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
-  const totalVolume = filteredEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  // Always compute totals from ALL entregas (unfiltered) to match the banner
+  const totalCaixas = entregas.reduce((sum, e) => sum + e.totalCaixas, 0);
+  const totalNfs = entregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const totalPeso = entregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+  const totalVolume = entregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  
+  // Filtered totals for when MR filter is active
+  const filteredCaixas = filteredEntregas.reduce((sum, e) => sum + e.totalCaixas, 0);
+  const filteredNfs = filteredEntregas.reduce((sum, e) => sum + e.totalNfs, 0);
+  const filteredPeso = filteredEntregas.reduce((sum, e) => sum + e.pesoTotalKg, 0);
+  const filteredVolume = filteredEntregas.reduce((sum, e) => sum + e.volumeTotalM3, 0);
+  const isFiltered = filtroMacroRegiao !== "todas";
 
   const filteredCargas = cargaSearchTerm
     ? cargas.filter(
@@ -961,7 +969,7 @@ export default function Roteirizacao() {
                       Rota montada a partir da Preparação
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {nfIdsSelecionados.length} NFs selecionadas de {selectedCargaIds.length} carga(s)
+                      {totalNfs} NFs carregadas ({entregas.length} paradas) de {selectedCargaIds.length} carga(s)
                     </p>
                   </div>
                 </div>
@@ -1183,27 +1191,37 @@ export default function Roteirizacao() {
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Paradas</p>
-                <p className="text-2xl font-bold">{filteredEntregas.length}</p>
+                <p className="text-2xl font-bold">
+                  {isFiltered ? `${filteredEntregas.length}/${entregas.length}` : entregas.length}
+                </p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Total NFs</p>
-                <p className="text-2xl font-bold">{totalNfs}</p>
+                <p className="text-2xl font-bold">
+                  {isFiltered ? `${filteredNfs}/${totalNfs}` : totalNfs}
+                </p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Total Caixas</p>
-                <p className="text-2xl font-bold">{totalCaixas}</p>
+                <p className="text-2xl font-bold">
+                  {isFiltered ? `${filteredCaixas}/${totalCaixas}` : totalCaixas}
+                </p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Weight className="w-3 h-3" /> Peso Total
                 </p>
-                <p className="text-2xl font-bold">{totalPeso.toFixed(1)} kg</p>
+                <p className="text-2xl font-bold">
+                  {isFiltered ? `${filteredPeso.toFixed(1)}/${totalPeso.toFixed(1)}` : totalPeso.toFixed(1)} kg
+                </p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Box className="w-3 h-3" /> Volume Total
                 </p>
-                <p className="text-2xl font-bold">{totalVolume.toFixed(2)} m³</p>
+                <p className="text-2xl font-bold">
+                  {isFiltered ? `${filteredVolume.toFixed(2)}/${totalVolume.toFixed(2)}` : totalVolume.toFixed(2)} m³
+                </p>
               </div>
               <div className="wms-stat-card">
                 <p className="text-sm text-muted-foreground">Geocodificados</p>
