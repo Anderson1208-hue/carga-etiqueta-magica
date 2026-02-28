@@ -539,7 +539,7 @@ export type Database = {
           created_by: string | null
           data: string
           id: string
-          motorista: string
+          motorista: string | null
           placa: string
           status: string
           updated_at: string
@@ -550,7 +550,7 @@ export type Database = {
           created_by?: string | null
           data?: string
           id?: string
-          motorista: string
+          motorista?: string | null
           placa: string
           status?: string
           updated_at?: string
@@ -561,7 +561,7 @@ export type Database = {
           created_by?: string | null
           data?: string
           id?: string
-          motorista?: string
+          motorista?: string | null
           placa?: string
           status?: string
           updated_at?: string

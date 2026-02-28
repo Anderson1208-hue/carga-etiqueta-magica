@@ -117,7 +117,9 @@ export default function Roteirizacao() {
   const [emplacMotorista, setEmplacMotorista] = useState("");
   const [emplacData, setEmplacData] = useState(format(new Date(), "yyyy-MM-dd"));
   const [savingEmplac, setSavingEmplac] = useState(false);
-  const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null } | null>(null);
+  const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null; motorista?: string } | null>(null);
+  const [motoristaDespacho, setMotoristaDespacho] = useState("");
+  const [savingMotorista, setSavingMotorista] = useState(false);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
@@ -797,8 +799,8 @@ export default function Roteirizacao() {
   }
 
   async function handleEmplacar() {
-    if (!emplacPlaca.trim() || !emplacMotorista.trim()) {
-      toast({ title: "Dados incompletos", description: "Preencha placa e motorista", variant: "destructive" });
+    if (!emplacPlaca.trim()) {
+      toast({ title: "Dados incompletos", description: "Preencha a placa do veículo", variant: "destructive" });
       return;
     }
 
@@ -822,7 +824,7 @@ export default function Roteirizacao() {
         .from("veiculos")
         .insert({
           placa: emplacPlaca.trim().toUpperCase(),
-          motorista: emplacMotorista.trim(),
+          motorista: emplacMotorista.trim() || "",
           data: emplacData,
           created_by: user?.id,
         })
@@ -845,17 +847,37 @@ export default function Roteirizacao() {
         id: veiculo.id,
         placa: emplacPlaca.trim().toUpperCase(),
         accessCode: veiculo.access_code,
+        motorista: emplacMotorista.trim() || undefined,
       });
+      setMotoristaDespacho("");
 
       toast({
         title: "Veículo emplacado!",
-        description: `${emplacPlaca.toUpperCase()} - ${emplacMotorista} com ${allNfIds.length} NFs`,
+        description: `${emplacPlaca.toUpperCase()}${emplacMotorista.trim() ? ` - ${emplacMotorista}` : " (sem motorista)"} com ${allNfIds.length} NFs`,
       });
     } catch (error) {
       console.error("Error creating vehicle:", error);
       toast({ title: "Erro", description: "Erro ao emplacar veículo", variant: "destructive" });
     } finally {
       setSavingEmplac(false);
+    }
+  }
+
+  async function handleAtribuirMotorista() {
+    if (!veiculoCriado || !motoristaDespacho.trim()) return;
+    setSavingMotorista(true);
+    try {
+      const { error } = await supabase
+        .from("veiculos")
+        .update({ motorista: motoristaDespacho.trim() })
+        .eq("id", veiculoCriado.id);
+      if (error) throw error;
+      setVeiculoCriado({ ...veiculoCriado, motorista: motoristaDespacho.trim() });
+      toast({ title: "Motorista atribuído!", description: `${motoristaDespacho.trim()} vinculado ao veículo ${veiculoCriado.placa}` });
+    } catch {
+      toast({ title: "Erro", description: "Erro ao atribuir motorista", variant: "destructive" });
+    } finally {
+      setSavingMotorista(false);
     }
   }
 
@@ -1380,7 +1402,7 @@ export default function Roteirizacao() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Vincule uma placa e motorista às {entregas.reduce((s, e) => s + e.nfIds.length, 0)} NFs desta rota.
+                    Vincule uma placa às {entregas.reduce((s, e) => s + e.nfIds.length, 0)} NFs desta rota. O motorista pode ser informado depois.
                   </p>
                   <div className="grid gap-4 md:grid-cols-4">
                     <div>
@@ -1393,11 +1415,11 @@ export default function Roteirizacao() {
                       />
                     </div>
                     <div>
-                      <Label>Motorista</Label>
+                      <Label>Motorista <span className="text-muted-foreground font-normal">(opcional)</span></Label>
                       <Input
                         value={emplacMotorista}
                         onChange={(e) => setEmplacMotorista(e.target.value)}
-                        placeholder="Nome do motorista"
+                        placeholder="Informar depois"
                       />
                     </div>
                     <div>
@@ -1411,7 +1433,7 @@ export default function Roteirizacao() {
                     <div className="flex items-end">
                       <Button
                         onClick={handleEmplacar}
-                        disabled={savingEmplac || !emplacPlaca.trim() || !emplacMotorista.trim()}
+                        disabled={savingEmplac || !emplacPlaca.trim()}
                         className="w-full"
                       >
                         {savingEmplac ? (
@@ -1430,16 +1452,21 @@ export default function Roteirizacao() {
             {/* Veículo criado */}
             {veiculoCriado && (
               <Card className="border-success bg-success/5">
-                <CardContent className="pt-6">
+                <CardContent className="pt-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="w-6 h-6 text-success" />
                     <div>
                       <p className="font-semibold text-success">
                         Veículo {veiculoCriado.placa} emplacado com sucesso!
                       </p>
+                      {veiculoCriado.motorista && (
+                        <p className="text-sm text-muted-foreground">
+                          Motorista: {veiculoCriado.motorista}
+                        </p>
+                      )}
                       {veiculoCriado.accessCode && (
                         <p className="text-sm text-muted-foreground">
-                          Código de acesso do motorista:{" "}
+                          Código de acesso:{" "}
                           <code className="font-mono font-bold bg-muted px-2 py-0.5 rounded tracking-wider">
                             {veiculoCriado.accessCode}
                           </code>
@@ -1447,6 +1474,35 @@ export default function Roteirizacao() {
                       )}
                     </div>
                   </div>
+
+                  {/* Assign driver later */}
+                  {!veiculoCriado.motorista && (
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <Truck className="w-4 h-4" />
+                        Atribuir motorista para despacho
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          value={motoristaDespacho}
+                          onChange={(e) => setMotoristaDespacho(e.target.value)}
+                          placeholder="Nome do motorista"
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={handleAtribuirMotorista}
+                          disabled={savingMotorista || !motoristaDespacho.trim()}
+                          size="sm"
+                        >
+                          {savingMotorista ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            "Atribuir"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
