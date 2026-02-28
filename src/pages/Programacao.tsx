@@ -294,6 +294,10 @@ export default function Programacao() {
   const selTotalCaixas = selectedNfs.reduce((sum, nf) => sum + nf.totalCaixas, 0);
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
   const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
+  const selTotalEntregas = useMemo(() => {
+    if (selectedNfs.length === 0) return 0;
+    return new Set(selectedNfs.map((nf) => nf.cnpj_destinatario || nf.id)).size;
+  }, [selectedNfs]);
 
   // Dashboard totals - filtered by selected cargas
   const cargaFilteredNfs = useMemo(() => {
@@ -309,6 +313,15 @@ export default function Programacao() {
     const cnpjs = new Set(cargaFilteredNfs.map((nf) => nf.cnpj_destinatario || nf.id));
     return cnpjs.size;
   }, [cargaFilteredNfs]);
+
+  // Dashboard shows selected when there's a selection, otherwise available
+  const hasSelection = selectedNfIds.size > 0;
+  const dashVolume = hasSelection ? selTotalVolume : totalVolumeDisponivel;
+  const dashPeso = hasSelection ? selTotalPeso : totalPesoDisponivel;
+  const dashCaixas = hasSelection ? selTotalCaixas : totalCaixasDisponivel;
+  const dashNfs = hasSelection ? selTotalNfs : totalNfsDisponiveis;
+  const dashEntregas = hasSelection ? selTotalEntregas : totalEntregasDisponivel;
+  const dashLabel = hasSelection ? "Selecionado" : "Disponível";
 
   if (loading) {
     return (
@@ -336,54 +349,64 @@ export default function Programacao() {
 
         {/* Dashboard */}
         <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : "border-primary/30 bg-primary/5"}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-primary">Volume Disponível</CardTitle>
-              <Package className="h-5 w-5 text-primary" />
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-primary"}`}>Volume {dashLabel}</CardTitle>
+              <Package className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{totalVolumeDisponivel.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{totalPesoDisponivel.toFixed(1)} kg • {totalCaixasDisponivel} cx</p>
+              <div className={`text-3xl font-bold ${hasSelection ? "text-success" : "text-primary"}`}>{dashVolume.toFixed(2)} <span className="text-lg font-normal">m³</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{dashPeso.toFixed(1)} kg • {dashCaixas} cx</p>
+              {hasSelection && <p className="text-[10px] text-muted-foreground">Disponível: {totalVolumeDisponivel.toFixed(2)} m³</p>}
             </CardContent>
           </Card>
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : "border-primary/30 bg-primary/5"}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-primary">Peso Disponível</CardTitle>
-              <Weight className="h-5 w-5 text-primary" />
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-primary"}`}>Peso {dashLabel}</CardTitle>
+              <Weight className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{totalPesoDisponivel.toFixed(1)} <span className="text-lg font-normal">kg</span></div>
-              <p className="text-xs text-muted-foreground mt-1">{totalCaixasDisponivel} caixas</p>
+              <div className={`text-3xl font-bold ${hasSelection ? "text-success" : "text-primary"}`}>{dashPeso.toFixed(1)} <span className="text-lg font-normal">kg</span></div>
+              <p className="text-xs text-muted-foreground mt-1">{dashCaixas} caixas</p>
+              {hasSelection && <p className="text-[10px] text-muted-foreground">Disponível: {totalPesoDisponivel.toFixed(1)} kg</p>}
             </CardContent>
           </Card>
-          <Card className="border-primary/30 bg-primary/5">
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : "border-primary/30 bg-primary/5"}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-primary">Caixas Disponíveis</CardTitle>
-              <Package className="h-5 w-5 text-primary" />
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-primary"}`}>Caixas {dashLabel}</CardTitle>
+              <Package className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{totalCaixasDisponivel}</div>
-              <p className="text-xs text-muted-foreground mt-1">{totalNfsDisponiveis} NFs</p>
+              <div className={`text-3xl font-bold ${hasSelection ? "text-success" : "text-primary"}`}>{dashCaixas}</div>
+              <p className="text-xs text-muted-foreground mt-1">{dashNfs} NFs</p>
+              {hasSelection && <p className="text-[10px] text-muted-foreground">Disponível: {totalCaixasDisponivel} cx</p>}
             </CardContent>
           </Card>
-          <Card>
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : ""}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Entregas</CardTitle>
-              <MapPin className="h-5 w-5 text-primary" />
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-muted-foreground"}`}>Entregas {hasSelection ? dashLabel : ""}</CardTitle>
+              <MapPin className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalEntregasDisponivel}</div>
-              <p className="text-xs text-muted-foreground mt-1">{totalNfsDisponiveis} NFs</p>
+              <div className={`text-3xl font-bold ${hasSelection ? "text-success" : ""}`}>{dashEntregas}</div>
+              <p className="text-xs text-muted-foreground mt-1">{dashNfs} NFs</p>
+              {hasSelection && <p className="text-[10px] text-muted-foreground">Disponível: {totalEntregasDisponivel} entregas</p>}
             </CardContent>
           </Card>
-          <Card>
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : ""}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">NFs Disponíveis</CardTitle>
-              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-muted-foreground"}`}>NFs {hasSelection ? dashLabel : "Disponíveis"}</CardTitle>
+              <FileText className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{totalNfsDisponiveis}</div>
-              <p className="text-xs text-muted-foreground mt-1">{cargaFilteredNfs.length > 0 ? `${new Set(cargaFilteredNfs.map((n) => n.carga_id)).size} carga(s)` : "—"}</p>
+              <div className={`text-3xl font-bold ${hasSelection ? "text-success" : ""}`}>{dashNfs}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {hasSelection
+                  ? `de ${totalNfsDisponiveis} disponíveis`
+                  : cargaFilteredNfs.length > 0
+                  ? `${new Set(cargaFilteredNfs.map((n) => n.carga_id)).size} carga(s)`
+                  : "—"}
+              </p>
             </CardContent>
           </Card>
         </div>
