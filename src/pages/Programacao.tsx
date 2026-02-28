@@ -37,6 +37,7 @@ import {
   getMacroRegiao,
   getMacroRegiaoLabel,
 } from "@/lib/macro-regioes";
+import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/TipoCargaBadge";
 
 interface NfDisponivel {
   id: string;
@@ -58,6 +59,7 @@ interface NfDisponivel {
   carga_placa: string;
   carga_motorista: string;
   carga_data: string;
+  carga_tipo_carga: string;
 }
 
 export default function Programacao() {
@@ -72,6 +74,7 @@ export default function Programacao() {
   const [filtroCargaIds, setFiltroCargaIds] = useState<Set<string>>(new Set());
   const [buscaNf, setBuscaNf] = useState("");
   const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set());
+  const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
   useEffect(() => {
     loadNfsDisponiveis();
@@ -82,7 +85,7 @@ export default function Programacao() {
     try {
       const { data: cargas } = await supabase
         .from("cargas")
-        .select("id, placa, motorista, data")
+        .select("id, placa, motorista, data, tipo_carga")
         .in("status", ["aberta", "fechada"]);
 
       if (!cargas || cargas.length === 0) {
@@ -156,6 +159,7 @@ export default function Programacao() {
             carga_placa: carga?.placa || "",
             carga_motorista: carga?.motorista || "",
             carga_data: carga?.data || "",
+            carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
           };
         });
 
@@ -273,6 +277,7 @@ export default function Programacao() {
     return nfsDisponiveis.filter((nf) => {
       if (!filtroCargaIds.has(nf.carga_id)) return false;
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
+      if (filtroTipoCarga !== "todos" && nf.carga_tipo_carga !== filtroTipoCarga) return false;
       if (searchTerm) {
         const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
         const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
@@ -282,7 +287,7 @@ export default function Programacao() {
       }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, filtroCargaIds, buscaNf]);
+  }, [nfsDisponiveis, filtroMR, filtroCargaIds, buscaNf, filtroTipoCarga]);
 
   // Dashboard totals - filtered by selected cargas
   const cargaFilteredNfs = useMemo(() => {
@@ -492,6 +497,19 @@ export default function Programacao() {
                     </div>
                   </PopoverContent>
                 </Popover>
+              </div>
+              <div className="min-w-[140px]">
+                <Label className="text-xs">Tipo Carga</Label>
+                <Select value={filtroTipoCarga} onValueChange={setFiltroTipoCarga}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="SECA">Seca</SelectItem>
+                    <SelectItem value="CHOCOLATE">Chocolate</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="min-w-[200px]">
                 <Label className="text-xs">Macro Região</Label>
@@ -764,6 +782,7 @@ export default function Programacao() {
                                           <span className="font-mono font-bold text-xs">
                                             NF {nf.numero_nf}
                                           </span>
+                                          <TipoCargaBadge tipoCarga={nf.carga_tipo_carga} />
                                           <span className="text-xs text-muted-foreground">
                                             {nf.totalCaixas} cx
                                           </span>
