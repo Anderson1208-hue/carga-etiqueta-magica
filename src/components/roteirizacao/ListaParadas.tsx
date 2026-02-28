@@ -43,6 +43,8 @@ interface Entrega {
   pesoTotalKg: number;
   volumeTotalM3: number;
   nfs: string[];
+  nfIds?: string[];
+  cargaIds?: string[];
   ordem?: number;
 }
 
