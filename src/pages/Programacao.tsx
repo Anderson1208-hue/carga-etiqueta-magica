@@ -790,6 +790,30 @@ export default function Programacao() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Floating summary bar */}
+      {hasSelection && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-card border border-border shadow-xl rounded-full px-6 py-3 flex items-center gap-4 text-sm">
+            <span className="font-semibold text-primary">{selTotalEntregas} <span className="text-muted-foreground font-normal">entreg.</span></span>
+            <span className="text-border">|</span>
+            <span className="font-semibold text-primary">{selTotalNfs} <span className="text-muted-foreground font-normal">NFs</span></span>
+            <span className="text-border">|</span>
+            <span className="font-semibold text-primary">{selTotalCaixas} <span className="text-muted-foreground font-normal">cx</span></span>
+            <span className="text-border">|</span>
+            <span className="font-semibold text-primary">{selTotalPeso.toFixed(0)} <span className="text-muted-foreground font-normal">kg</span></span>
+            <span className="text-border">|</span>
+            <span className="font-semibold text-primary">{selTotalVolume.toFixed(2)} <span className="text-muted-foreground font-normal">m³</span></span>
+            <button
+              onClick={() => setSelectedNfIds(new Set())}
+              className="ml-2 text-muted-foreground hover:text-destructive transition-colors"
+              title="Limpar seleção"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }
