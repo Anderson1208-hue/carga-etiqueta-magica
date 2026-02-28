@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { generateEtiquetasPDF, downloadBlob } from "@/lib/pdf-generator";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
+import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Tags, Download, Loader2, Package, FileText, Printer, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -31,6 +32,7 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+  tipo_carga?: string;
 }
 
 interface Etiqueta {
@@ -90,7 +92,7 @@ export default function Etiquetas() {
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
-      .select("id, data, placa, motorista")
+      .select("id, data, placa, motorista, tipo_carga")
       .order("created_at", { ascending: false });
 
     setCargas(data || []);
@@ -383,6 +385,9 @@ export default function Etiquetas() {
             <p className="text-muted-foreground">
               Gere etiquetas 60x40mm para impressão em Zebra
             </p>
+            {selectedCarga && isChocolate(selectedCarga.tipo_carga) && (
+              <TipoCargaBadge tipoCarga={selectedCarga.tipo_carga} size="md" className="mt-1" />
+            )}
           </div>
         </div>
 
@@ -400,8 +405,11 @@ export default function Etiquetas() {
                 <SelectContent>
                   {cargas.map((carga) => (
                     <SelectItem key={carga.id} value={carga.id}>
-                      {carga.placa} - {format(new Date(carga.data), "dd/MM/yyyy")}{" "}
-                      - {carga.motorista}
+                      <span className="flex items-center gap-2">
+                        {isChocolate(carga.tipo_carga) && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
+                        {carga.placa} - {format(new Date(carga.data), "dd/MM/yyyy")}{" "}
+                        - {carga.motorista}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

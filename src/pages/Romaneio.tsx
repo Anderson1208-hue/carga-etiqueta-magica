@@ -28,6 +28,7 @@ import {
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { FileText, Download, Loader2, Printer, Search, ArrowLeft } from "lucide-react";
+import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
 
 import { format } from "date-fns";
@@ -37,6 +38,7 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+  tipo_carga?: string;
 }
 
 interface RomaneioItem {
@@ -105,7 +107,7 @@ export default function Romaneio() {
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
-      .select("id, data, placa, motorista")
+      .select("id, data, placa, motorista, tipo_carga")
       .order("created_at", { ascending: false });
 
     setCargas(data || []);
@@ -361,6 +363,9 @@ export default function Romaneio() {
             <p className="text-muted-foreground">
               Gere o Romaneio Totalizado e Nota de Carga
             </p>
+            {selectedCarga && isChocolate(selectedCarga.tipo_carga) && (
+              <TipoCargaBadge tipoCarga={selectedCarga.tipo_carga} size="md" className="mt-1" />
+            )}
           </div>
         </div>
 
@@ -378,8 +383,11 @@ export default function Romaneio() {
                 <SelectContent>
                   {cargas.map((carga) => (
                     <SelectItem key={carga.id} value={carga.id}>
-                      {carga.placa} - {format(new Date(carga.data + "T00:00:00"), "dd/MM/yyyy")}{" "}
-                      - {carga.motorista}
+                      <span className="flex items-center gap-2">
+                        {isChocolate(carga.tipo_carga) && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
+                        {carga.placa} - {format(new Date(carga.data + "T00:00:00"), "dd/MM/yyyy")}{" "}
+                        - {carga.motorista}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -48,6 +48,7 @@ import {
   getAllMacroRegioes,
 } from "@/lib/macro-regioes";
 import { Badge } from "@/components/ui/badge";
+import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import {
   Select,
   SelectContent,
@@ -61,6 +62,7 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+  tipo_carga?: string;
 }
 
 interface Entrega {
@@ -198,7 +200,7 @@ export default function Roteirizacao() {
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
-      .select("id, data, placa, motorista")
+      .select("id, data, placa, motorista, tipo_carga")
       .order("created_at", { ascending: false });
 
     setCargas(data || []);
@@ -1259,8 +1261,9 @@ export default function Roteirizacao() {
                   <Badge
                     key={carga.id}
                     variant="secondary"
-                    className="gap-1 pr-1"
+                    className={`gap-1 pr-1 ${isChocolate(carga.tipo_carga) ? "bg-red-100 border-red-300 text-red-800 dark:bg-red-950 dark:text-red-300" : ""}`}
                   >
+                    {isChocolate(carga.tipo_carga) && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
                     {carga.placa} - {carga.motorista}
                     <button
                       onClick={() => toggleCarga(carga.id)}

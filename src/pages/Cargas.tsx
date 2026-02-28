@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -43,8 +42,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
+import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -60,6 +60,7 @@ interface Carga {
   observacao: string | null;
   status: "aberta" | "fechada" | "em_rota" | "entregue";
   operador_responsavel: string | null;
+  tipo_carga?: string;
   created_at: string;
   _count?: {
     nfs: number;
@@ -81,12 +82,14 @@ export default function Cargas() {
   const [operadores, setOperadores] = useState<Operador[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTipoCarga, setDialogTipoCarga] = useState<"SECA" | "CHOCOLATE">("SECA");
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cargaToDelete, setCargaToDelete] = useState<Carga | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
+  const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
   async function handlePrintNotaCarga(carga: Carga) {
     setPrintingCargaId(carga.id);
@@ -121,7 +124,6 @@ export default function Cargas() {
         })),
       }));
 
-      // Sort by numero_nf ascending (numeric)
       notasFiscaisPDF.sort((a, b) => {
         const numA = parseInt(a.numeroNf.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.numeroNf.replace(/\D/g, '')) || 0;
@@ -182,7 +184,6 @@ export default function Cargas() {
 
       if (error) throw error;
 
-      // Load operator assignments from junction table
       const cargaIds = (data || []).map((c) => c.id);
       let operadoresMap = new Map<string, string[]>();
       if (cargaIds.length > 0) {
@@ -231,10 +232,8 @@ export default function Cargas() {
     setParsedFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
-  // Input validation helpers
   function validatePlaca(placa: string): boolean {
     const cleanPlaca = placa.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    // Brazilian plates: ABC1234 (old) or ABC1D23 (Mercosul)
     return /^[A-Z]{3}[0-9]{4}$/.test(cleanPlaca) || /^[A-Z]{3}[0-9][A-Z][0-9]{2}$/.test(cleanPlaca);
   }
 
@@ -244,7 +243,7 @@ export default function Cargas() {
   }
 
   function validateCNPJ(cnpj: string): boolean {
-    if (!cnpj) return true; // Optional field
+    if (!cnpj) return true;
     const cleanCnpj = cnpj.replace(/\D/g, "");
     return cleanCnpj.length === 14;
   }
@@ -253,79 +252,60 @@ export default function Cargas() {
     return text.trim().slice(0, maxLength);
   }
 
+  function openImportDialog(tipo: "SECA" | "CHOCOLATE") {
+    setDialogTipoCarga(tipo);
+    setFormData({
+      data: format(new Date(), "yyyy-MM-dd"),
+      placa: "",
+      motorista: "",
+      observacao: "",
+    });
+    setParsedFiles([]);
+    setDialogOpen(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-
-    // Prevent double clicks - button already disabled, but extra safety
     if (saving) return;
 
     const successFiles = parsedFiles.filter((f) => f.status === "success");
     if (successFiles.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Nenhum XML válido",
-        description: "Adicione pelo menos um arquivo XML válido.",
-      });
+      toast({ variant: "destructive", title: "Nenhum XML válido", description: "Adicione pelo menos um arquivo XML válido." });
       return;
     }
 
-    // Validate placa format
     if (!validatePlaca(formData.placa)) {
-      toast({
-        variant: "destructive",
-        title: "Placa inválida",
-        description: "Formato de placa inválido. Use ABC1234 ou ABC1D23.",
-      });
+      toast({ variant: "destructive", title: "Placa inválida", description: "Formato de placa inválido. Use ABC1234 ou ABC1D23." });
       return;
     }
 
-    // Validate motorista (required, max 100 chars)
     if (!formData.motorista.trim() || formData.motorista.length > 100) {
-      toast({
-        variant: "destructive",
-        title: "Nome do motorista inválido",
-        description: "O nome do motorista é obrigatório e deve ter no máximo 100 caracteres.",
-      });
+      toast({ variant: "destructive", title: "Nome do motorista inválido", description: "O nome do motorista é obrigatório e deve ter no máximo 100 caracteres." });
       return;
     }
 
-    // Validate all XMLs have proper chave_acesso
     const invalidXmls = successFiles.filter((f) => !validateChaveAcesso(f.data.chaveAcesso));
     if (invalidXmls.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Chave de acesso inválida",
-        description: `${invalidXmls.length} XML(s) com chave de acesso inválida (deve ter 44 dígitos).`,
-      });
+      toast({ variant: "destructive", title: "Chave de acesso inválida", description: `${invalidXmls.length} XML(s) com chave de acesso inválida (deve ter 44 dígitos).` });
       return;
     }
 
-    // Validate CNPJs in XMLs
     const invalidCnpjs = successFiles.filter(
       (f) => !validateCNPJ(f.data.cnpjEmitente) || !validateCNPJ(f.data.cnpjDestinatario || "")
     );
     if (invalidCnpjs.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "CNPJ inválido",
-        description: `${invalidCnpjs.length} XML(s) com CNPJ inválido (deve ter 14 dígitos).`,
-      });
+      toast({ variant: "destructive", title: "CNPJ inválido", description: `${invalidCnpjs.length} XML(s) com CNPJ inválido (deve ter 14 dígitos).` });
       return;
     }
 
     setSaving(true);
     try {
-      // Generate a unique batch id based on chave_acesso set + timestamp
       const chavesAcesso = successFiles.map((f) => f.data.chaveAcesso).sort();
       const batchSource = `${chavesAcesso.join("|")}|${formData.data}|${Date.now()}`;
       const importBatchId = await generateHash(batchSource);
 
-      // Build the payload for the RPC
       const nfsPayload = successFiles.map((file) => {
         const nf = file.data;
-        
-        // Group items by cProd to avoid duplicate etiquetas
-        // If same cProd appears multiple times, sum quantities
         const groupedItems: Record<string, { xProd: string; qCom: number }> = {};
         nf.itens.forEach((item) => {
           if (groupedItems[item.cProd]) {
@@ -335,19 +315,12 @@ export default function Cargas() {
           }
         });
 
-        // Build etiquetas array from grouped items
         const etiquetas: { c_prod: string; x_prod: string; seq: number; total: number; qr_payload: string }[] = [];
         Object.entries(groupedItems).forEach(([cProd, { xProd, qCom }]) => {
           const totalCaixas = calculateBoxes(qCom);
           for (let seq = 1; seq <= totalCaixas; seq++) {
             const qrPayload = `{CARGA_ID};${nf.numeroNf};${cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
-            etiquetas.push({
-              c_prod: cProd,
-              x_prod: xProd,
-              seq,
-              total: totalCaixas,
-              qr_payload: qrPayload,
-            });
+            etiquetas.push({ c_prod: cProd, x_prod: xProd, seq, total: totalCaixas, qr_payload: qrPayload });
           }
         });
 
@@ -367,12 +340,7 @@ export default function Cargas() {
           dest_cep: nf.destinatario?.cep || null,
           peso_bruto: nf.pesoBruto || 0,
           peso_liquido: nf.pesoLiquido || 0,
-          itens: nf.itens.map((item) => ({
-            c_prod: item.cProd,
-            x_prod: item.xProd,
-            u_com: item.uCom,
-            q_com: item.qCom,
-          })),
+          itens: nf.itens.map((item) => ({ c_prod: item.cProd, x_prod: item.xProd, u_com: item.uCom, q_com: item.qCom })),
           etiquetas,
         };
       });
@@ -384,11 +352,11 @@ export default function Cargas() {
           observacao: formData.observacao ? sanitizeText(formData.observacao, 500) : null,
           data: formData.data,
           import_batch_id: importBatchId,
+          tipo_carga: dialogTipoCarga,
         },
         nfs: nfsPayload,
       };
 
-      // Call the atomic RPC
       const { data: rpcResult, error: rpcError } = await supabase.rpc(
         "importar_carga_xml_lote",
         { payload }
@@ -396,7 +364,6 @@ export default function Cargas() {
 
       if (rpcError) throw rpcError;
 
-      // Type the result
       const result = rpcResult as {
         status: string;
         carga_id?: string;
@@ -406,60 +373,37 @@ export default function Cargas() {
         duplicados?: { numero_nf: string; chave_acesso: string }[];
       };
 
-      // Handle response
       if (result.status === "already_processed") {
-        toast({
-          title: "Importação já processada",
-          description: "Esta mesma combinação de XMLs já foi importada anteriormente.",
-        });
+        toast({ title: "Importação já processada", description: "Esta mesma combinação de XMLs já foi importada anteriormente." });
       } else if (result.status === "no_valid_nfs") {
-        // Build list of duplicates
         const duplicados = result.duplicados || [];
         const nfsList = duplicados.map((d) => `NF ${d.numero_nf}`).join(", ");
-        
-        toast({
-          variant: "destructive",
-          title: "Nenhuma NF importada",
-          description: `Todos os XMLs já foram importados anteriormente: ${nfsList}`,
-        });
+        toast({ variant: "destructive", title: "Nenhuma NF importada", description: `Todos os XMLs já foram importados anteriormente: ${nfsList}` });
       } else {
-        // Success - build summary message
         let description = `${result.importados} NF(s) importada(s).`;
         if ((result.ignorados_duplicidade || 0) > 0) {
           const duplicados = result.duplicados || [];
           const nfsList = duplicados.map((d) => `NF ${d.numero_nf}`).join(", ");
           description += ` ${result.ignorados_duplicidade} XML(s) ignorado(s) (já importados): ${nfsList}`;
         }
-
-        toast({
-          title: "Carga criada com sucesso!",
-          description,
-        });
+        if (dialogTipoCarga === "CHOCOLATE") {
+          description += " [CHOCOLATE – TERMO SENSÍVEL]";
+        }
+        toast({ title: "Carga criada com sucesso!", description });
       }
 
-      // Reset form (even for already_processed to allow new attempt)
-      setFormData({
-        data: format(new Date(), "yyyy-MM-dd"),
-        placa: "",
-        motorista: "",
-        observacao: "",
-      });
+      setFormData({ data: format(new Date(), "yyyy-MM-dd"), placa: "", motorista: "", observacao: "" });
       setParsedFiles([]);
       setDialogOpen(false);
       loadCargas();
     } catch (error: any) {
       console.error("Error creating carga:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao criar carga",
-        description: error.message || "Tente novamente.",
-      });
+      toast({ variant: "destructive", title: "Erro ao criar carga", description: error.message || "Tente novamente." });
     } finally {
       setSaving(false);
     }
   }
 
-  // Simple hash function for batch id
   async function generateHash(str: string): Promise<string> {
     const encoder = new TextEncoder();
     const data = encoder.encode(str);
@@ -487,10 +431,7 @@ export default function Cargas() {
       });
     } catch (error) {
       console.error("Error updating status:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao atualizar status",
-      });
+      toast({ variant: "destructive", title: "Erro ao atualizar status" });
     }
   }
 
@@ -501,7 +442,6 @@ export default function Cargas() {
 
     try {
       if (isAssigned) {
-        // Remove operator
         const { error } = await supabase
           .from("carga_operadores")
           .delete()
@@ -519,7 +459,6 @@ export default function Cargas() {
         const op = operadores.find((o) => o.id === operadorId);
         toast({ title: "Operador removido", description: `${op?.full_name || op?.email} removido da carga.` });
       } else {
-        // Add operator
         const { error } = await supabase
           .from("carga_operadores")
           .insert({ carga_id: cargaId, operador_id: operadorId });
@@ -551,9 +490,6 @@ export default function Cargas() {
 
     setDeleting(true);
     try {
-      // CASCADE delete will automatically remove:
-      // - notas_fiscais (and their itens_nf via cascade)
-      // - etiquetas
       const { error } = await supabase
         .from("cargas")
         .delete()
@@ -569,11 +505,7 @@ export default function Cargas() {
       });
     } catch (error: any) {
       console.error("Error deleting carga:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao excluir carga",
-        description: error.message || "Tente novamente.",
-      });
+      toast({ variant: "destructive", title: "Erro ao excluir carga", description: error.message || "Tente novamente." });
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
@@ -581,11 +513,16 @@ export default function Cargas() {
     }
   }
 
+  const filteredCargas = cargas.filter((c) => {
+    if (filtroTipoCarga === "todos") return true;
+    return (c.tipo_carga || "SECA") === filtroTipoCarga;
+  });
+
   return (
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold">Cargas</h1>
             <p className="text-muted-foreground">
@@ -593,107 +530,129 @@ export default function Cargas() {
             </p>
           </div>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Carga
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Nova Carga</DialogTitle>
-              </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => openImportDialog("SECA")}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Carga (Seca)
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => openImportDialog("CHOCOLATE")}
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Nova Carga (Chocolate)
+            </Button>
+          </div>
+        </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Carga info */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="data">Data</Label>
-                    <Input
-                      id="data"
-                      type="date"
-                      value={formData.data}
-                      onChange={(e) =>
-                        setFormData({ ...formData, data: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="placa">Placa</Label>
-                    <Input
-                      id="placa"
-                      placeholder="ABC-1234"
-                      value={formData.placa}
-                      onChange={(e) =>
-                        setFormData({ ...formData, placa: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                </div>
+        {/* Filtro tipo carga */}
+        <div className="flex items-center gap-3">
+          <Label className="text-sm">Tipo de Carga:</Label>
+          <Select value={filtroTipoCarga} onValueChange={setFiltroTipoCarga}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="SECA">Apenas Seca</SelectItem>
+              <SelectItem value="CHOCOLATE">Apenas Chocolate</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
+        {/* Import Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {dialogTipoCarga === "CHOCOLATE" ? (
+                  <>
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <span>Nova Carga – CHOCOLATE (Termo Sensível)</span>
+                  </>
+                ) : (
+                  <span>Nova Carga (Seca)</span>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+
+            {dialogTipoCarga === "CHOCOLATE" && (
+              <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm dark:bg-red-950/30 dark:border-red-800 dark:text-red-300">
+                <strong>⚠ ATENÇÃO:</strong> Todos os XMLs importados por este fluxo serão marcados como <strong>CHOCOLATE – TERMO SENSÍVEL</strong> e destacados em vermelho em todas as telas do sistema.
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="motorista">Motorista</Label>
+                  <Label htmlFor="data">Data</Label>
                   <Input
-                    id="motorista"
-                    placeholder="Nome do motorista"
-                    value={formData.motorista}
-                    onChange={(e) =>
-                      setFormData({ ...formData, motorista: e.target.value })
-                    }
+                    id="data"
+                    type="date"
+                    value={formData.data}
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                     required
                   />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="observacao">Observação (opcional)</Label>
-                  <Textarea
-                    id="observacao"
-                    placeholder="Observações sobre a carga..."
-                    value={formData.observacao}
-                    onChange={(e) =>
-                      setFormData({ ...formData, observacao: e.target.value })
-                    }
-                    rows={2}
+                  <Label htmlFor="placa">Placa</Label>
+                  <Input
+                    id="placa"
+                    placeholder="ABC-1234"
+                    value={formData.placa}
+                    onChange={(e) => setFormData({ ...formData, placa: e.target.value })}
+                    required
                   />
                 </div>
+              </div>
 
-                {/* XML Upload */}
-                <div className="space-y-2">
-                  <Label>Arquivos XML (NF-e)</Label>
-                  <XMLDropzone
-                    onFilesProcessed={handleFilesProcessed}
-                    processedFiles={parsedFiles}
-                    onRemoveFile={handleRemoveFile}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="motorista">Motorista</Label>
+                <Input
+                  id="motorista"
+                  placeholder="Nome do motorista"
+                  value={formData.motorista}
+                  onChange={(e) => setFormData({ ...formData, motorista: e.target.value })}
+                  required
+                />
+              </div>
 
-                <div className="flex justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={
-                      saving ||
-                      parsedFiles.filter((f) => f.status === "success").length ===
-                        0
-                    }
-                  >
-                    {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Criar Carga
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="observacao">Observação (opcional)</Label>
+                <Textarea
+                  id="observacao"
+                  placeholder="Observações sobre a carga..."
+                  value={formData.observacao}
+                  onChange={(e) => setFormData({ ...formData, observacao: e.target.value })}
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Arquivos XML (NF-e)</Label>
+                <XMLDropzone
+                  onFilesProcessed={handleFilesProcessed}
+                  processedFiles={parsedFiles}
+                  onRemoveFile={handleRemoveFile}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant={dialogTipoCarga === "CHOCOLATE" ? "destructive" : "default"}
+                  disabled={saving || parsedFiles.filter((f) => f.status === "success").length === 0}
+                >
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {dialogTipoCarga === "CHOCOLATE" ? "Criar Carga (Chocolate)" : "Criar Carga"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Table */}
         <div className="wms-card">
@@ -703,6 +662,7 @@ export default function Cargas() {
                 <TableHead>Data</TableHead>
                 <TableHead>Placa</TableHead>
                 <TableHead>Motorista</TableHead>
+                <TableHead>Tipo</TableHead>
                 <TableHead className="text-center">NFs</TableHead>
                 <TableHead className="text-center">Itens</TableHead>
                 {isAdmin && <TableHead>Operador</TableHead>}
@@ -713,13 +673,13 @@ export default function Cargas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8">
+                  <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
-              ) : cargas.length === 0 ? (
+              ) : filteredCargas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8">
+                  <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Truck className="w-10 h-10 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
@@ -729,21 +689,21 @@ export default function Cargas() {
                   </TableCell>
                 </TableRow>
               ) : (
-                cargas.map((carga) => (
-                  <TableRow key={carga.id} className="wms-table-row">
+                filteredCargas.map((carga) => (
+                  <TableRow key={carga.id} className={`wms-table-row ${chocolateRowClass(carga.tipo_carga)}`}>
                     <TableCell className="font-medium">
-                      {format(new Date(carga.data), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
+                      {format(new Date(carga.data), "dd/MM/yyyy", { locale: ptBR })}
                     </TableCell>
                     <TableCell className="font-mono">{carga.placa}</TableCell>
                     <TableCell>{carga.motorista}</TableCell>
-                    <TableCell className="text-center">
-                      {carga._count?.nfs || 0}
+                    <TableCell>
+                      <TipoCargaBadge tipoCarga={carga.tipo_carga} size="md" />
+                      {(!carga.tipo_carga || carga.tipo_carga === "SECA") && (
+                        <span className="text-xs text-muted-foreground">Seca</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-center">
-                      {carga._count?.itens || 0}
-                    </TableCell>
+                    <TableCell className="text-center">{carga._count?.nfs || 0}</TableCell>
+                    <TableCell className="text-center">{carga._count?.itens || 0}</TableCell>
                     {isAdmin && (
                       <TableCell>
                         <Popover>
@@ -806,36 +766,17 @@ export default function Cargas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePrintNotaCarga(carga)}
-                          disabled={printingCargaId === carga.id}
-                          title="Imprimir Nota de Carga"
-                        >
-                          {printingCargaId === carga.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Printer className="w-4 h-4" />
-                          )}
+                        <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
+                          {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setCubagemCarga(carga)}
-                          title="Importar Cubagem"
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem">
                           <Package className="w-4 h-4" />
                         </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <FileText className="w-4 h-4" />
-                          </Button>
+                          <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
                         </Link>
                         <Link to={`/etiquetas?carga=${carga.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                          <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button>
                         </Link>
                         {isAdmin && (
                           <Button
@@ -867,9 +808,7 @@ export default function Cargas() {
                   <strong>{cargaToDelete?.placa}</strong> de{" "}
                   <strong>
                     {cargaToDelete &&
-                      format(new Date(cargaToDelete.data), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
+                      format(new Date(cargaToDelete.data), "dd/MM/yyyy", { locale: ptBR })}
                   </strong>
                   ?
                 </p>
