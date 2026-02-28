@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,6 +117,8 @@ export default function Roteirizacao() {
   const selectedCargas = cargas.filter((c) => selectedCargaIds.includes(c.id));
 
   const location = useLocation();
+  const navigate = useNavigate();
+  const stateConsumedRef = useRef(false);
 
   useEffect(() => {
     loadCargas();
@@ -124,14 +126,16 @@ export default function Roteirizacao() {
 
   // Auto-select cargas when coming from Preparação
   useEffect(() => {
+    if (stateConsumedRef.current) return;
     const state = location.state as { cargaIds?: string[] } | null;
     if (state?.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
       const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
       if (valid.length > 0) {
         setSelectedCargaIds(valid);
       }
-      // Clear the state so it doesn't re-apply on re-renders
-      window.history.replaceState({}, document.title);
+      stateConsumedRef.current = true;
+      // Clear the navigation state properly via React Router
+      navigate(location.pathname, { replace: true, state: null });
     }
   }, [cargas, location.state]);
 
