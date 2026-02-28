@@ -132,7 +132,7 @@ export default function Roteirizacao() {
   const [loadingVeiculos, setLoadingVeiculos] = useState(false);
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
-  const [filtroDia, setFiltroDia] = useState("");
+  const [filtroDia, setFiltroDia] = useState("all");
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
 
@@ -913,7 +913,7 @@ export default function Roteirizacao() {
       // Date filters
       const year = parseInt(filtroAno);
       const month = parseInt(filtroMes);
-      if (filtroDia) {
+      if (filtroDia && filtroDia !== "all") {
         const day = parseInt(filtroDia);
         const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
         query = query.eq("data", dateStr);
@@ -1680,7 +1680,7 @@ export default function Roteirizacao() {
             <div className="flex flex-wrap gap-3 items-end">
               <div>
                 <Label className="text-xs">Ano</Label>
-                <Select value={filtroAno} onValueChange={(v) => { setFiltroAno(v); setFiltroDia(""); }}>
+                <Select value={filtroAno} onValueChange={(v) => { setFiltroAno(v); setFiltroDia("all"); }}>
                   <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[2024, 2025, 2026].map((y) => (
@@ -1691,7 +1691,7 @@ export default function Roteirizacao() {
               </div>
               <div>
                 <Label className="text-xs">Mês</Label>
-                <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v); setFiltroDia(""); }}>
+                <Select value={filtroMes} onValueChange={(v) => { setFiltroMes(v); setFiltroDia("all"); }}>
                   <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {meses.map((m) => (
@@ -1705,7 +1705,7 @@ export default function Roteirizacao() {
                 <Select value={filtroDia} onValueChange={setFiltroDia}>
                   <SelectTrigger className="w-24"><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {Array.from({ length: diasNoMes }, (_, i) => i + 1).map((d) => (
                       <SelectItem key={d} value={String(d)}>{String(d).padStart(2, "0")}</SelectItem>
                     ))}
