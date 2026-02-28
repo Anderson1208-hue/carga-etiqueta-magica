@@ -119,10 +119,10 @@ export default function Roteirizacao() {
   const [savingEmplac, setSavingEmplac] = useState(false);
   const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null } | null>(null);
 
-  // CD coordinates (default: São Paulo)
-  const [cdLat, setCdLat] = useState<string>("-23.5505");
-  const [cdLng, setCdLng] = useState<string>("-46.6333");
-  const [cdNome, setCdNome] = useState<string>("Centro de Distribuição");
+  // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
+  const [cdLat, setCdLat] = useState<string>("-22.8783");
+  const [cdLng, setCdLng] = useState<string>("-43.3367");
+  const [cdNome, setCdNome] = useState<string>("CD - Rua da Regeneração, 235");
 
   const selectedCargas = cargas.filter((c) => selectedCargaIds.includes(c.id));
 
