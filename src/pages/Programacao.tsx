@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import {
   Select,
   SelectContent,
@@ -67,11 +67,11 @@ export default function Programacao() {
   const navigate = useNavigate();
 
   const [nfsDisponiveis, setNfsDisponiveis] = useState<NfDisponivel[]>([]);
-  const [totalNfsPorCarga, setTotalNfsPorCarga] = useState<Map<string, number>>(new Map());
+  
   const [loading, setLoading] = useState(true);
   const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
   const [filtroMR, setFiltroMR] = useState<string>("todas");
-  const [filtroCargaIds, setFiltroCargaIds] = useState<Set<string>>(new Set());
+  
   const [buscaNf, setBuscaNf] = useState("");
   const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set());
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
@@ -96,7 +96,6 @@ export default function Programacao() {
 
       if (!cargas || cargas.length === 0) {
         setNfsDisponiveis([]);
-        setTotalNfsPorCarga(new Map());
         return;
       }
 
@@ -106,7 +105,6 @@ export default function Programacao() {
 
       if (cargasSemRota.length === 0) {
         setNfsDisponiveis([]);
-        setTotalNfsPorCarga(new Map());
         return;
       }
 
@@ -137,15 +135,10 @@ export default function Programacao() {
 
       if (nfs.length === 0) {
         setNfsDisponiveis([]);
-        setTotalNfsPorCarga(new Map());
+        
         return;
       }
 
-      const totalMap = new Map<string, number>();
-      nfs.forEach((nf) => {
-        totalMap.set(nf.carga_id, (totalMap.get(nf.carga_id) || 0) + 1);
-      });
-      setTotalNfsPorCarga(totalMap);
 
       const assignedIds = new Set((assigned || []).map((a) => a.nf_id));
 
@@ -274,7 +267,6 @@ export default function Programacao() {
 
     const matchingKeys = new Set<string>();
     nfsDisponiveis.forEach((nf) => {
-      if (!filtroCargaIds.has(nf.carga_id)) return;
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return;
       const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
       const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
@@ -289,24 +281,12 @@ export default function Programacao() {
     if (matchingKeys.size > 0) {
       setExpandedEntregas(matchingKeys);
     }
-  }, [buscaNf, nfsDisponiveis, filtroCargaIds, filtroMR]);
+  }, [buscaNf, nfsDisponiveis, filtroMR]);
 
-  // Filters
-  const cargasUnicas = useMemo(() => {
-    const map = new Map<string, { id: string; placa: string; motorista: string; data: string }>();
-    nfsDisponiveis.forEach((nf) => {
-      if (!map.has(nf.carga_id)) {
-        map.set(nf.carga_id, { id: nf.carga_id, placa: nf.carga_placa, motorista: nf.carga_motorista, data: nf.carga_data });
-      }
-    });
-    return Array.from(map.values());
-  }, [nfsDisponiveis]);
 
   const filteredNfs = useMemo(() => {
-    if (filtroCargaIds.size === 0) return [];
     const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
-      if (!filtroCargaIds.has(nf.carga_id)) return false;
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
       if (filtroTipoCarga !== "todos" && nf.carga_tipo_carga !== filtroTipoCarga) return false;
       if (searchTerm) {
@@ -318,13 +298,10 @@ export default function Programacao() {
       }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, filtroCargaIds, buscaNf, filtroTipoCarga]);
+  }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga]);
 
-  // Dashboard totals - filtered by selected cargas
-  const cargaFilteredNfs = useMemo(() => {
-    if (filtroCargaIds.size === 0) return [];
-    return nfsDisponiveis.filter((nf) => filtroCargaIds.has(nf.carga_id));
-  }, [nfsDisponiveis, filtroCargaIds]);
+  // Dashboard totals - all available NFs
+  const cargaFilteredNfs = nfsDisponiveis;
 
   const macroRegioesPresentes = useMemo(() => {
     return [...new Set(cargaFilteredNfs.map((nf) => nf.macroRegiao))].sort((a, b) => a - b);
@@ -469,66 +446,6 @@ export default function Programacao() {
                   />
                 </div>
               </div>
-              <div className="min-w-[200px] flex-1 max-w-md">
-                <Label className="text-xs">Carga Origem {filtroCargaIds.size > 0 && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{filtroCargaIds.size}</Badge>}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start font-normal h-10">
-                      <Package className="w-4 h-4 mr-2 shrink-0" />
-                      {filtroCargaIds.size === 0
-                        ? "Selecione a(s) carga(s)"
-                        : filtroCargaIds.size === 1
-                        ? cargasUnicas.find((c) => filtroCargaIds.has(c.id))
-                          ? `${cargasUnicas.find((c) => filtroCargaIds.has(c.id))!.placa}`
-                          : "1 carga"
-                        : `${filtroCargaIds.size} cargas selecionadas`}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[320px] p-2" align="start">
-                    <div className="space-y-1">
-                      {cargasUnicas.map((c) => {
-                        const isChecked = filtroCargaIds.has(c.id);
-                        const nfAvail = nfsDisponiveis.filter((nf) => nf.carga_id === c.id).length;
-                        const nfTotal = totalNfsPorCarga.get(c.id) || nfAvail;
-                        return (
-                          <div
-                            key={c.id}
-                            className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer"
-                            onClick={() => {
-                              setFiltroCargaIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(c.id)) next.delete(c.id);
-                                else next.add(c.id);
-                                return next;
-                              });
-                            }}
-                          >
-                            <Checkbox checked={isChecked} />
-                            <div className="flex-1 text-sm">
-                              <span className="font-medium">{c.placa}</span>
-                              <span className="text-muted-foreground ml-1">
-                                {format(new Date(c.data + "T00:00:00"), "dd/MM/yyyy")} - {c.motorista}
-                              </span>
-                            </div>
-                            <Badge variant="outline" className="text-[10px] px-1.5">{nfAvail}/{nfTotal} NFs</Badge>
-                          </div>
-                        );
-                      })}
-                      {filtroCargaIds.size > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full text-xs mt-1"
-                          onClick={() => setFiltroCargaIds(new Set())}
-                        >
-                          <X className="w-3 h-3 mr-1" />
-                          Limpar seleção
-                        </Button>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
               <div className="min-w-[140px]">
                 <Label className="text-xs">Tipo Carga</Label>
                 <Select value={filtroTipoCarga} onValueChange={setFiltroTipoCarga}>
@@ -657,13 +574,7 @@ export default function Programacao() {
             </div>
           </CardHeader>
           <CardContent>
-            {filtroCargaIds.size === 0 ? (
-              <div className="text-center py-12 space-y-2">
-                <Package className="w-10 h-10 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground font-medium">Selecione uma ou mais cargas no filtro acima</p>
-                <p className="text-xs text-muted-foreground">As NFs disponíveis aparecerão aqui</p>
-              </div>
-            ) : filteredNfs.length === 0 ? (
+            {filteredNfs.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
                 Nenhuma NF disponível para programação
               </p>
