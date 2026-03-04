@@ -129,6 +129,12 @@ export default function Agendamento() {
   const [agObs, setAgObs] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Edit date dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingAgendamento, setEditingAgendamento] = useState<AgendamentoRecord | null>(null);
+  const [editDate, setEditDate] = useState<Date | undefined>(undefined);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   useEffect(() => {
     loadAgendamentos();
   }, []);
@@ -267,6 +273,32 @@ export default function Agendamento() {
     }
   }
 
+  function openEditDateDialog(ag: AgendamentoRecord) {
+    setEditingAgendamento(ag);
+    setEditDate(ag.data_agendamento ? new Date(ag.data_agendamento + "T12:00:00") : undefined);
+    setEditDialogOpen(true);
+  }
+
+  async function saveEditDate() {
+    if (!editingAgendamento) return;
+    setSavingEdit(true);
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ data_agendamento: editDate ? format(editDate, "yyyy-MM-dd") : null })
+        .eq("id", editingAgendamento.id);
+      if (error) throw error;
+      toast({ title: "Data alterada!", description: `Agendamento da NF ${editingAgendamento.numero_nf} atualizado.` });
+      setEditDialogOpen(false);
+      loadAgendamentos();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Erro ao alterar data", variant: "destructive" });
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   const filteredAgendamentos = filterStatus === "todos"
     ? agendamentos
     : agendamentos.filter(a => a.status === filterStatus);
@@ -383,6 +415,7 @@ export default function Agendamento() {
                       <TableHead>Observação</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Criado em</TableHead>
+                      <TableHead className="w-[80px]">Ação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -400,6 +433,12 @@ export default function Agendamento() {
                         <TableCell><TipoCargaBadge tipoCarga={ag.tipo_carga} /></TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {format(new Date(ag.created_at), "dd/MM/yyyy HH:mm")}
+                        </TableCell>
+                        <TableCell>
+                          <Button size="sm" variant="outline" onClick={() => openEditDateDialog(ag)}>
+                            <CalendarIcon className="w-4 h-4 mr-1" />
+                            Alterar
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -495,6 +534,58 @@ export default function Agendamento() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={saveAgendamento} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Date Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Alterar Data do Agendamento</DialogTitle>
+          </DialogHeader>
+          {editingAgendamento && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                <p className="text-sm font-medium">NF: <span className="font-mono">{editingAgendamento.numero_nf}</span></p>
+                <p className="text-sm text-muted-foreground">{editingAgendamento.dest_razao_social || "—"}</p>
+                {statusBadge(editingAgendamento.status)}
+              </div>
+              <div className="space-y-2">
+                <Label>Nova Data</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !editDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editDate ? format(editDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editDate}
+                      onSelect={setEditDate}
+                      disabled={date => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={saveEditDate} disabled={savingEdit}>
+              {savingEdit && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
               Salvar
             </Button>
           </DialogFooter>
