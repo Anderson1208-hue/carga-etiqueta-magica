@@ -83,10 +83,16 @@ export default function Programacao() {
   async function loadNfsDisponiveis() {
     setLoading(true);
     try {
-      const { data: cargas } = await supabase
-        .from("cargas")
-        .select("id, placa, motorista, data, tipo_carga")
-        .in("status", ["aberta", "fechada"]);
+      // Fetch cargas and roteirizacoes in parallel
+      const [{ data: cargas }, { data: roteirizacoes }] = await Promise.all([
+        supabase
+          .from("cargas")
+          .select("id, placa, motorista, data, tipo_carga")
+          .in("status", ["aberta", "fechada"]),
+        supabase
+          .from("roteirizacoes")
+          .select("carga_id"),
+      ]);
 
       if (!cargas || cargas.length === 0) {
         setNfsDisponiveis([]);
@@ -94,8 +100,18 @@ export default function Programacao() {
         return;
       }
 
-      const cargaIds = cargas.map((c) => c.id);
-      const cargaMap = new Map(cargas.map((c) => [c.id, c]));
+      // Exclude cargas that already have a route programmed
+      const cargasComRota = new Set((roteirizacoes || []).map((r) => r.carga_id));
+      const cargasSemRota = cargas.filter((c) => !cargasComRota.has(c.id));
+
+      if (cargasSemRota.length === 0) {
+        setNfsDisponiveis([]);
+        setTotalNfsPorCarga(new Map());
+        return;
+      }
+
+      const cargaIds = cargasSemRota.map((c) => c.id);
+      const cargaMap = new Map(cargasSemRota.map((c) => [c.id, c]));
 
       const nfPromises = cargaIds.map((cargaId) =>
         supabase
@@ -111,9 +127,10 @@ export default function Programacao() {
           .limit(2000)
       );
 
-      const [nfResults, { data: assigned }] = await Promise.all([
+      const [nfResults, { data: assigned }, { data: agendamentos }] = await Promise.all([
         Promise.all(nfPromises),
         supabase.from("veiculo_nfs").select("nf_id"),
+        supabase.from("agendamentos").select("nf_id, data_agendamento, status"),
       ]);
 
       const nfs = nfResults.flatMap((r) => r.data || []);
@@ -132,8 +149,22 @@ export default function Programacao() {
 
       const assignedIds = new Set((assigned || []).map((a) => a.nf_id));
 
+      // Build map of NF agendamentos - only the latest per NF
+      const agendamentoMap = new Map<string, { data_agendamento: string | null; status: string }>();
+      (agendamentos || []).forEach((ag) => {
+        agendamentoMap.set(ag.nf_id, { data_agendamento: ag.data_agendamento, status: ag.status });
+      });
+
+      const today = format(new Date(), "yyyy-MM-dd");
+
       const available: NfDisponivel[] = nfs
-        .filter((nf) => !assignedIds.has(nf.id))
+        .filter((nf) => {
+          if (assignedIds.has(nf.id)) return false;
+          // Check agendamento: only show if agenda date <= today
+          const ag = agendamentoMap.get(nf.id);
+          if (ag && ag.data_agendamento && ag.data_agendamento > today) return false;
+          return true;
+        })
         .map((nf) => {
           const carga = cargaMap.get(nf.carga_id);
           const items = (nf.itens_nf || []) as { q_com: number }[];
