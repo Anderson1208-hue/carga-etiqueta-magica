@@ -32,8 +32,6 @@ import {
   Warehouse,
   ChevronLeft,
   Search,
-  ChevronDown,
-  ChevronUp,
   Ban,
   ShieldAlert,
   Download,
@@ -53,6 +51,15 @@ interface CargaResumo {
 
 interface NfProgress {
   numeroNf: string;
+  total: number;
+  conferidas: number;
+}
+
+interface NfListItem {
+  numeroNf: string;
+  cargaId: string;
+  placa: string;
+  motorista: string;
   total: number;
   conferidas: number;
 }
@@ -87,12 +94,10 @@ export default function ConferenciaInterna() {
   const [syncing, setSyncing] = useState(false);
   const [hasLocalData, setHasLocalData] = useState(false);
 
-  // Stage: list cargas or scanning
-  const [cargas, setCargas] = useState<CargaResumo[]>([]);
-  const [loadingCargas, setLoadingCargas] = useState(true);
-  const [expandedCarga, setExpandedCarga] = useState<string | null>(null);
-  const [cargaNfs, setCargaNfs] = useState<NfProgress[]>([]);
-  const [loadingNfs, setLoadingNfs] = useState(false);
+  // NF list (flat, across all cargas)
+  const [allNfs, setAllNfs] = useState<NfListItem[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [nfFilter, setNfFilter] = useState("");
 
   // Scanning state
   const [selectedCarga, setSelectedCarga] = useState<CargaResumo | null>(null);
@@ -102,13 +107,6 @@ export default function ConferenciaInterna() {
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
-
-  // Search
-  const [searchNf, setSearchNf] = useState("");
-
-  // Free scan mode (scan any etiqueta without selecting carga/NF)
-  const [freeMode, setFreeMode] = useState(false);
-  const [freeScanCount, setFreeScanCount] = useState(0);
 
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
@@ -128,9 +126,9 @@ export default function ConferenciaInterna() {
 
   useEffect(() => {
     if (offlineMode) {
-      loadOfflineCargas();
+      loadOfflineNfs();
     } else {
-      loadCargas();
+      loadAllNfs();
     }
   }, [offlineMode]);
 
@@ -138,10 +136,10 @@ export default function ConferenciaInterna() {
     hasOfflineData().then(setHasLocalData);
   }, []);
 
-  async function loadCargas() {
-    setLoadingCargas(true);
+  // Load all NFs across all open/closed cargas
+  async function loadAllNfs() {
+    setLoadingList(true);
     try {
-      // Get all open cargas
       const { data: cargasData, error } = await supabase
         .from("cargas")
         .select("id, placa, motorista, data")
@@ -150,48 +148,75 @@ export default function ConferenciaInterna() {
 
       if (error) throw error;
       if (!cargasData || cargasData.length === 0) {
-        setCargas([]);
-        setLoadingCargas(false);
+        setAllNfs([]);
+        setLoadingList(false);
         return;
       }
 
-      // Get etiqueta counts per carga (excluding divergências)
-      const resumos: CargaResumo[] = [];
-      for (const c of cargasData) {
-        const [totalRes, confRes, divRes] = await Promise.all([
-          supabase
-            .from("etiquetas")
-            .select("id", { count: "exact", head: true })
-            .eq("carga_id", c.id),
-          supabase
-            .from("etiquetas")
-            .select("id", { count: "exact", head: true })
-            .eq("carga_id", c.id)
-            .in("status", ["conferido_interno", "conferido"]),
-          supabase
-            .from("etiquetas")
-            .select("id", { count: "exact", head: true })
-            .eq("carga_id", c.id)
-            .eq("status", "divergencia" as any),
-        ]);
+      // Build a map of carga info
+      const cargaMap = new Map(cargasData.map((c) => [c.id, c]));
 
-        const divergencias = divRes.count || 0;
-        resumos.push({
-          id: c.id,
-          placa: c.placa,
-          motorista: c.motorista,
-          data: c.data,
-          totalEtiquetas: (totalRes.count || 0) - divergencias,
-          conferidosInterno: confRes.count || 0,
-        });
+      // Fetch etiquetas for all cargas with pagination
+      const PAGE_SIZE = 1000;
+      const allEtiquetas: { carga_id: string; numero_nf: string; status: string }[] = [];
+
+      for (const c of cargasData) {
+        let from = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data, error: fetchErr } = await supabase
+            .from("etiquetas")
+            .select("carga_id, numero_nf, status")
+            .eq("carga_id", c.id)
+            .order("id")
+            .range(from, from + PAGE_SIZE - 1);
+          if (fetchErr) throw fetchErr;
+          if (data && data.length > 0) {
+            allEtiquetas.push(...data);
+          }
+          hasMore = (data?.length ?? 0) === PAGE_SIZE;
+          from += PAGE_SIZE;
+        }
       }
 
-      setCargas(resumos.filter((r) => r.totalEtiquetas > 0));
+      // Group by carga_id + numero_nf
+      const nfMap = new Map<string, NfListItem>();
+      for (const et of allEtiquetas) {
+        const key = `${et.carga_id}|${et.numero_nf}`;
+        if (!nfMap.has(key)) {
+          const carga = cargaMap.get(et.carga_id);
+          nfMap.set(key, {
+            numeroNf: et.numero_nf,
+            cargaId: et.carga_id,
+            placa: carga?.placa || "",
+            motorista: carga?.motorista || "",
+            total: 0,
+            conferidas: 0,
+          });
+        }
+        const item = nfMap.get(key)!;
+        if (et.status !== "divergencia") {
+          item.total++;
+          if (et.status === "conferido_interno" || et.status === "conferido") {
+            item.conferidas++;
+          }
+        }
+      }
+
+      const nfList = Array.from(nfMap.values())
+        .filter((n) => n.total > 0)
+        .sort((a, b) => {
+          const na = parseInt(a.numeroNf) || 0;
+          const nb = parseInt(b.numeroNf) || 0;
+          return na - nb;
+        });
+
+      setAllNfs(nfList);
     } catch (error) {
-      console.error("Erro ao carregar cargas:", error);
-      toast({ title: "Erro ao carregar cargas", variant: "destructive" });
+      console.error("Erro ao carregar NFs:", error);
+      toast({ title: "Erro ao carregar NFs", variant: "destructive" });
     } finally {
-      setLoadingCargas(false);
+      setLoadingList(false);
     }
   }
 
@@ -213,7 +238,6 @@ export default function ConferenciaInterna() {
         return;
       }
 
-      // First, get total count for progress tracking
       let totalEstimated = 0;
       for (const c of cargasData) {
         const { count } = await supabase
@@ -223,20 +247,15 @@ export default function ConferenciaInterna() {
         totalEstimated += count || 0;
       }
 
-      // Download etiquetas with pagination and save incrementally to IndexedDB
-      // Instead of accumulating all in memory, save each page directly
       const cargaResumos = cargasData.map((c) => ({ id: c.id, placa: c.placa, motorista: c.motorista, data: c.data }));
-      
-      // Save cargas first
       await downloadEtiquetas(cargaResumos, []);
-      
+
       let totalDownloaded = 0;
       const PAGE_SIZE = 500;
 
-      for (const cid of cargasData.map(c => c.id)) {
+      for (const cid of cargasData.map((c) => c.id)) {
         let from = 0;
         let hasMore = true;
-
         while (hasMore) {
           const { data, error: fetchError } = await supabase
             .from("etiquetas")
@@ -244,21 +263,14 @@ export default function ConferenciaInterna() {
             .eq("carga_id", cid)
             .order("id")
             .range(from, from + PAGE_SIZE - 1);
-
           if (fetchError) throw fetchError;
-          
           if (data && data.length > 0) {
-            // Save this page directly to IndexedDB incrementally
             await downloadEtiquetas([], data as unknown as OfflineEtiqueta[], true);
             totalDownloaded += data.length;
-            setDownloadProgress(totalEstimated > 0 
-              ? Math.min(99, Math.round((totalDownloaded / totalEstimated) * 100)) 
-              : 0);
+            setDownloadProgress(totalEstimated > 0 ? Math.min(99, Math.round((totalDownloaded / totalEstimated) * 100)) : 0);
           }
-          
           hasMore = (data?.length ?? 0) === PAGE_SIZE;
           from += PAGE_SIZE;
-          // Yield to UI thread - longer delay to keep phone responsive
           await new Promise((r) => setTimeout(r, 50));
         }
       }
@@ -267,7 +279,7 @@ export default function ConferenciaInterna() {
       setHasLocalData(true);
       toast({
         title: "Download concluído",
-        description: `${totalDownloaded} etiquetas de ${cargasData.length} carga(s) salvas para uso offline.`,
+        description: `${totalDownloaded} etiquetas salvas para uso offline.`,
       });
     } catch (error) {
       console.error("Erro ao baixar dados offline:", error);
@@ -277,64 +289,45 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function loadOfflineCargas() {
-    setLoadingCargas(true);
+  async function loadOfflineNfs() {
+    setLoadingList(true);
     try {
       const offCargas = await getOfflineCargas();
       const allEts = await getOfflineEtiquetas();
+      const cargaMap = new Map(offCargas.map((c) => [c.id, c]));
 
-      const resumos: CargaResumo[] = offCargas.map((c) => {
-        const cargaEts = allEts.filter((e) => e.carga_id === c.id);
-        const divergencias = cargaEts.filter((e) => e.status === "divergencia").length;
-        const total = cargaEts.length - divergencias;
-        const conferidas = cargaEts.filter(
-          (e) => e.status === "conferido_interno" || e.status === "conferido"
-        ).length;
-        return {
-          id: c.id,
-          placa: c.placa,
-          motorista: c.motorista,
-          data: c.data,
-          totalEtiquetas: total,
-          conferidosInterno: conferidas,
-        };
-      });
-
-      setCargas(resumos.filter((r) => r.totalEtiquetas > 0));
-    } catch {
-      setCargas([]);
-    } finally {
-      setLoadingCargas(false);
-    }
-  }
-
-  async function loadOfflineCargaNfs(cargaId: string) {
-    if (expandedCarga === cargaId) {
-      setExpandedCarga(null);
-      return;
-    }
-    setExpandedCarga(cargaId);
-    setLoadingNfs(true);
-    try {
-      const ets = await getOfflineEtiquetas(cargaId);
-      const nfMap = new Map<string, { total: number; conferidas: number }>();
-      for (const et of ets) {
-        if (et.status === "divergencia") continue;
-        const current = nfMap.get(et.numero_nf) || { total: 0, conferidas: 0 };
-        current.total++;
-        if (et.status === "conferido_interno" || et.status === "conferido") {
-          current.conferidas++;
+      const nfMap = new Map<string, NfListItem>();
+      for (const et of allEts) {
+        const key = `${et.carga_id}|${et.numero_nf}`;
+        if (!nfMap.has(key)) {
+          const carga = cargaMap.get(et.carga_id);
+          nfMap.set(key, {
+            numeroNf: et.numero_nf,
+            cargaId: et.carga_id,
+            placa: carga?.placa || "",
+            motorista: carga?.motorista || "",
+            total: 0,
+            conferidas: 0,
+          });
         }
-        nfMap.set(et.numero_nf, current);
+        const item = nfMap.get(key)!;
+        if (et.status !== "divergencia") {
+          item.total++;
+          if (et.status === "conferido_interno" || et.status === "conferido") {
+            item.conferidas++;
+          }
+        }
       }
-      const nfs: NfProgress[] = Array.from(nfMap.entries())
-        .map(([nf, counts]) => ({ numeroNf: nf, total: counts.total, conferidas: counts.conferidas }))
-        .sort((a, b) => (parseInt(a.numeroNf) || 0) - (parseInt(b.numeroNf) || 0));
-      setCargaNfs(nfs);
+
+      setAllNfs(
+        Array.from(nfMap.values())
+          .filter((n) => n.total > 0)
+          .sort((a, b) => (parseInt(a.numeroNf) || 0) - (parseInt(b.numeroNf) || 0))
+      );
     } catch {
-      setCargaNfs([]);
+      setAllNfs([]);
     } finally {
-      setLoadingNfs(false);
+      setLoadingList(false);
     }
   }
 
@@ -383,56 +376,18 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function loadCargaNfs(cargaId: string) {
-    if (expandedCarga === cargaId) {
-      setExpandedCarga(null);
-      return;
-    }
-    setExpandedCarga(cargaId);
-    setLoadingNfs(true);
-    try {
-      const { data, error } = await supabase
-        .from("etiquetas")
-        .select("numero_nf, status")
-        .eq("carga_id", cargaId);
-
-      if (error) throw error;
-
-      const nfMap = new Map<string, { total: number; conferidas: number }>();
-      for (const et of data || []) {
-        if (et.status === "divergencia") continue; // Exclude divergências from count
-        const current = nfMap.get(et.numero_nf) || { total: 0, conferidas: 0 };
-        current.total++;
-        if (et.status === "conferido_interno" || et.status === "conferido") {
-          current.conferidas++;
-        }
-        nfMap.set(et.numero_nf, current);
-      }
-
-      const nfs: NfProgress[] = Array.from(nfMap.entries())
-        .map(([nf, counts]) => ({
-          numeroNf: nf,
-          total: counts.total,
-          conferidas: counts.conferidas,
-        }))
-        .sort((a, b) => {
-          const na = parseInt(a.numeroNf) || 0;
-          const nb = parseInt(b.numeroNf) || 0;
-          return na - nb;
-        });
-
-      setCargaNfs(nfs);
-    } catch (error) {
-      console.error("Erro ao carregar NFs:", error);
-    } finally {
-      setLoadingNfs(false);
-    }
-  }
-
-  function iniciarConferenciaNf(carga: CargaResumo, nf: NfProgress) {
+  function iniciarConferenciaNf(nfItem: NfListItem) {
+    const carga: CargaResumo = {
+      id: nfItem.cargaId,
+      placa: nfItem.placa,
+      motorista: nfItem.motorista,
+      data: "",
+      totalEtiquetas: nfItem.total,
+      conferidosInterno: nfItem.conferidas,
+    };
     setSelectedCarga(carga);
-    setSelectedNf(nf.numeroNf);
-    setNfProgress(nf);
+    setSelectedNf(nfItem.numeroNf);
+    setNfProgress({ numeroNf: nfItem.numeroNf, total: nfItem.total, conferidas: nfItem.conferidas });
     setLastResult(null);
     setScanHistory([]);
   }
@@ -444,168 +399,14 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     setScanHistory([]);
     setQrInput("");
-    setFreeMode(false);
-    setFreeScanCount(0);
     if (offlineMode) {
-      loadOfflineCargas();
-      if (expandedCarga) loadOfflineCargaNfs(expandedCarga);
+      loadOfflineNfs();
     } else {
-      loadCargas();
-      if (expandedCarga) loadCargaNfs(expandedCarga);
-    }
-  }
-
-  function iniciarModoLivre() {
-    setFreeMode(true);
-    setFreeScanCount(0);
-    setLastResult(null);
-    setScanHistory([]);
-  }
-
-  // Quick NF search across all cargas
-  async function buscarNfDireta() {
-    const nf = searchNf.trim();
-    if (!nf) return;
-    setLoadingCargas(true);
-    try {
-      const { data: etiquetas, error } = await supabase
-        .from("etiquetas")
-        .select("carga_id, status, numero_nf")
-        .eq("numero_nf", nf);
-
-      if (error) throw error;
-      if (!etiquetas || etiquetas.length === 0) {
-        toast({
-          title: "NF não encontrada",
-          description: `NF ${nf} não existe em nenhuma carga acessível.`,
-          variant: "destructive",
-        });
-        setLoadingCargas(false);
-        return;
-      }
-
-      const cargaId = etiquetas[0].carga_id;
-      const divergencias = etiquetas.filter((e) => e.status === "divergencia").length;
-      const total = etiquetas.length - divergencias;
-      const conferidas = etiquetas.filter(
-        (e) => e.status === "conferido_interno" || e.status === "conferido"
-      ).length;
-
-      // Get carga info
-      const { data: cargaData } = await supabase
-        .from("cargas")
-        .select("id, placa, motorista, data")
-        .eq("id", cargaId)
-        .maybeSingle();
-
-      if (!cargaData) {
-        toast({ title: "Carga não encontrada", variant: "destructive" });
-        setLoadingCargas(false);
-        return;
-      }
-
-      const carga: CargaResumo = {
-        id: cargaData.id,
-        placa: cargaData.placa,
-        motorista: cargaData.motorista,
-        data: cargaData.data,
-        totalEtiquetas: total,
-        conferidosInterno: conferidas,
-      };
-
-      iniciarConferenciaNf(carga, { numeroNf: nf, total, conferidas });
-    } catch (error) {
-      console.error("Erro ao buscar NF:", error);
-      toast({ title: "Erro ao buscar NF", variant: "destructive" });
-    } finally {
-      setLoadingCargas(false);
-    }
-  }
-
-  // Free mode scan: find etiqueta by qr_payload across all cargas
-  async function processFreeScan(qrData: string) {
-    if (!qrData.trim()) return;
-    setScanning(true);
-    setLastResult(null);
-
-    try {
-      const parts = qrData.trim().split(";");
-      if (parts.length < 6) {
-        const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
-        setLastResult(result); addToHistory(result); playSound("error"); return;
-      }
-
-      const [, numeroNf, cProd, seqStr, totalStr] = parts;
-
-      if (offlineMode || !isOnline) {
-        const etiqueta = await findEtiquetaByQr(qrData.trim());
-        if (!etiqueta) {
-          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "divergencia") {
-          const result: ScanResult = { type: "error", message: "Bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
-          const result: ScanResult = { type: "warning", message: "Já conferida", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
-        }
-        await saveScanOffline({
-          etiqueta_id: etiqueta.id,
-          carga_id: etiqueta.carga_id,
-          numero_nf: etiqueta.numero_nf,
-          conferido_interno_por: user?.id || "",
-          conferido_interno_em: new Date().toISOString(),
-        });
-        setFreeScanCount((c) => c + 1);
-        const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-        setLastResult(result); addToHistory(result); playSound("success");
-      } else {
-        const { data: etiqueta, error: findError } = await supabase
-          .from("etiquetas")
-          .select("*")
-          .eq("qr_payload", qrData.trim())
-          .maybeSingle();
-
-        if (findError || !etiqueta) {
-          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "divergencia") {
-          const result: ScanResult = { type: "error", message: "Bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
-          const result: ScanResult = { type: "warning", message: "Já conferida", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
-        }
-        const { error: updateError } = await supabase
-          .from("etiquetas")
-          .update({
-            status: "conferido_interno" as any,
-            conferido_interno_em: new Date().toISOString(),
-            conferido_interno_por: user?.id,
-          })
-          .eq("id", etiqueta.id);
-
-        if (updateError) throw updateError;
-        setFreeScanCount((c) => c + 1);
-        const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-        setLastResult(result); addToHistory(result); playSound("success");
-      }
-    } catch (error) {
-      console.error("Erro ao processar scan:", error);
-      const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
-      setLastResult(result); addToHistory(result); playSound("error");
-    } finally {
-      setQrInput("");
-      setScanning(false);
+      loadAllNfs();
     }
   }
 
   async function processScan(qrData: string) {
-    if (freeMode) return processFreeScan(qrData);
     if (!qrData.trim() || !selectedCarga || !selectedNf) return;
 
     setScanning(true);
@@ -615,65 +416,38 @@ export default function ConferenciaInterna() {
       const parts = qrData.trim().split(";");
 
       if (parts.length < 6) {
-        const result: ScanResult = {
-          type: "error",
-          message: "QR Code inválido",
-          details: "Formato não reconhecido",
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("error");
-        return;
+        const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
+        setLastResult(result); addToHistory(result); playSound("error"); return;
       }
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
 
       // Validate carga
       if (qrCargaId !== selectedCarga.id) {
-        const result: ScanResult = {
-          type: "warning",
-          message: "Etiqueta de outra carga",
-          details: "Esta etiqueta pertence a outra carga",
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("warning");
-        return;
+        const result: ScanResult = { type: "warning", message: "Etiqueta de outra carga", details: "Esta etiqueta pertence a outra carga" };
+        setLastResult(result); addToHistory(result); playSound("warning"); return;
       }
 
       // Validate NF
       if (numeroNf !== selectedNf) {
-        const result: ScanResult = {
-          type: "warning",
-          message: "Etiqueta de outra NF",
-          details: `Esta etiqueta é da NF ${numeroNf}. Selecione a NF correta.`,
-        };
-        setLastResult(result);
-        addToHistory(result);
-        playSound("warning");
-        return;
+        const result: ScanResult = { type: "warning", message: "Etiqueta de outra NF", details: `Esta etiqueta é da NF ${numeroNf}. Selecione a NF correta.` };
+        setLastResult(result); addToHistory(result); playSound("warning"); return;
       }
 
-      // ---- OFFLINE vs ONLINE scan logic ----
       if (offlineMode || !isOnline) {
-        // Offline: use IndexedDB
         const etiqueta = await findEtiquetaByQr(qrData.trim());
-
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
         }
-
         if (etiqueta.status === "divergencia") {
           const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
         }
-
         if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
           const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("warning"); return;
         }
-
         await saveScanOffline({
           etiqueta_id: etiqueta.id,
           carga_id: etiqueta.carga_id,
@@ -681,12 +455,10 @@ export default function ConferenciaInterna() {
           conferido_interno_por: user?.id || "",
           conferido_interno_em: new Date().toISOString(),
         });
-
         const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
         setLastResult(result); addToHistory(result); playSound("success");
         await reloadNfProgress();
       } else {
-        // Online: use Supabase
         const { data: etiqueta, error: findError } = await supabase
           .from("etiquetas")
           .select("*")
@@ -698,12 +470,10 @@ export default function ConferenciaInterna() {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
         }
-
         if (etiqueta.status === "divergencia") {
           const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
         }
-
         if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
           const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("warning"); return;
@@ -815,11 +585,7 @@ export default function ConferenciaInterna() {
 
   async function marcarDivergencia() {
     if (selectedEtiquetaIds.size === 0 || !divergenciaMotivo) {
-      toast({
-        title: "Atenção",
-        description: "Selecione as etiquetas e informe o motivo.",
-        variant: "destructive",
-      });
+      toast({ title: "Atenção", description: "Selecione as etiquetas e informe o motivo.", variant: "destructive" });
       return;
     }
     setSubmittingDivergencia(true);
@@ -836,15 +602,9 @@ export default function ConferenciaInterna() {
         .in("id", ids);
 
       if (error) throw error;
-
-      toast({
-        title: "Divergência registrada",
-        description: `${ids.length} etiqueta(s) bloqueada(s).`,
-      });
-
+      toast({ title: "Divergência registrada", description: `${ids.length} etiqueta(s) bloqueada(s).` });
       setShowDivergencia(false);
       await reloadNfProgress();
-      // Reload pending list
       await loadPendingEtiquetas();
     } catch (error) {
       console.error("Erro ao registrar divergência:", error);
@@ -858,16 +618,9 @@ export default function ConferenciaInterna() {
     try {
       const { error } = await supabase
         .from("etiquetas")
-        .update({
-          status: "pendente" as any,
-          divergencia_motivo: null,
-          divergencia_por: null,
-          divergencia_em: null,
-        } as any)
+        .update({ status: "pendente" as any, divergencia_motivo: null, divergencia_por: null, divergencia_em: null } as any)
         .eq("id", etiquetaId);
-
       if (error) throw error;
-
       toast({ title: "Divergência revertida" });
       await reloadNfProgress();
       await loadPendingEtiquetas();
@@ -891,154 +644,6 @@ export default function ConferenciaInterna() {
       ? Math.round((nfProgress.conferidas / nfProgress.total) * 100)
       : 0;
 
-  // ---- FREE SCAN MODE VIEW ----
-  if (freeMode && !selectedCarga) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-sidebar-foreground h-8 w-8"
-                onClick={voltarParaLista}
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-lg font-semibold">Modo Livre</h1>
-                <p className="text-xs opacity-70">
-                  Escaneie qualquer etiqueta do sistema
-                  {(offlineMode || !isOnline) && " (Offline)"}
-                </p>
-              </div>
-            </div>
-            <MobileLogoutButton />
-          </div>
-        </header>
-
-        <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
-          {/* Counter */}
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-sm">Etiquetas conferidas nesta sessão</span>
-                <span className="font-bold text-2xl">{freeScanCount}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Camera Scanner */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ScanLine className="w-4 h-4" />
-                Scanner de Câmera
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <CameraScanner onScan={processScan} enabled={true} />
-            </CardContent>
-          </Card>
-
-          {/* Manual Input */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  placeholder="Escaneie ou digite..."
-                  value={qrInput}
-                  onChange={(e) => setQrInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleManualScan();
-                  }}
-                  className="flex-1 font-mono text-sm"
-                  disabled={scanning}
-                />
-                <Button
-                  onClick={handleManualScan}
-                  disabled={scanning || !qrInput}
-                  size="sm"
-                >
-                  {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Last Result */}
-          {lastResult && (
-            <div
-              className={`p-4 rounded-lg flex items-start gap-3 animate-fade-in ${
-                lastResult.type === "success"
-                  ? "bg-success/20 text-success border-2 border-success"
-                  : lastResult.type === "warning"
-                  ? "bg-warning/20 text-warning border-2 border-warning"
-                  : "bg-destructive/20 text-destructive border-2 border-destructive"
-              }`}
-            >
-              {lastResult.type === "success" ? (
-                <CheckCircle2 className="w-6 h-6 shrink-0" />
-              ) : (
-                <AlertCircle className="w-6 h-6 shrink-0" />
-              )}
-              <div>
-                <p className="font-bold text-lg">{lastResult.message}</p>
-                {lastResult.details && (
-                  <p className="text-sm opacity-80">{lastResult.details}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Scan History */}
-          {scanHistory.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  Últimas leituras
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {scanHistory.map((item, index) => (
-                    <div
-                      key={index}
-                      className={`text-xs p-2 rounded flex items-center gap-2 ${
-                        item.type === "success"
-                          ? "bg-success/10 text-success"
-                          : item.type === "warning"
-                          ? "bg-warning/10 text-warning"
-                          : "bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {item.type === "success" ? (
-                        <CheckCircle2 className="w-3 h-3" />
-                      ) : (
-                        <AlertCircle className="w-3 h-3" />
-                      )}
-                      <span className="font-medium">{item.message}</span>
-                      {item.details && (
-                        <span className="opacity-70 truncate">- {item.details}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-        <MobileBottomNav />
-      </div>
-    );
-  }
-
   // ---- SCANNING VIEW ----
   if (selectedCarga && selectedNf && nfProgress) {
     return (
@@ -1046,12 +651,7 @@ export default function ConferenciaInterna() {
         <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-sidebar-foreground h-8 w-8"
-                onClick={voltarParaLista}
-              >
+              <Button variant="ghost" size="icon" className="text-sidebar-foreground h-8 w-8" onClick={voltarParaLista}>
                 <ChevronLeft className="w-5 h-5" />
               </Button>
               <div>
@@ -1072,9 +672,7 @@ export default function ConferenciaInterna() {
             <CardContent className="pt-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {nfProgress.conferidas} de {nfProgress.total} etiquetas
-                  </span>
+                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas</span>
                   <span className="font-bold text-lg">{nfPercent}%</span>
                 </div>
                 <Progress value={nfPercent} className="h-4" />
@@ -1113,22 +711,12 @@ export default function ConferenciaInterna() {
                   placeholder="Escaneie ou digite..."
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleManualScan();
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleManualScan(); }}
                   className="flex-1 font-mono text-sm"
                   disabled={scanning}
                 />
-                <Button
-                  onClick={handleManualScan}
-                  disabled={scanning || !qrInput}
-                  size="sm"
-                >
-                  {scanning ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "OK"
-                  )}
+                <Button onClick={handleManualScan} disabled={scanning || !qrInput} size="sm">
+                  {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
                 </Button>
               </div>
             </CardContent>
@@ -1145,16 +733,10 @@ export default function ConferenciaInterna() {
                   : "bg-destructive/20 text-destructive border-2 border-destructive"
               }`}
             >
-              {lastResult.type === "success" ? (
-                <CheckCircle2 className="w-6 h-6 shrink-0" />
-              ) : (
-                <AlertCircle className="w-6 h-6 shrink-0" />
-              )}
+              {lastResult.type === "success" ? <CheckCircle2 className="w-6 h-6 shrink-0" /> : <AlertCircle className="w-6 h-6 shrink-0" />}
               <div>
                 <p className="font-bold text-lg">{lastResult.message}</p>
-                {lastResult.details && (
-                  <p className="text-sm opacity-80">{lastResult.details}</p>
-                )}
+                {lastResult.details && <p className="text-sm opacity-80">{lastResult.details}</p>}
               </div>
             </div>
           )}
@@ -1174,24 +756,14 @@ export default function ConferenciaInterna() {
                     <div
                       key={index}
                       className={`text-xs p-2 rounded flex items-center gap-2 ${
-                        item.type === "success"
-                          ? "bg-success/10 text-success"
-                          : item.type === "warning"
-                          ? "bg-warning/10 text-warning"
-                          : "bg-destructive/10 text-destructive"
+                        item.type === "success" ? "bg-success/10 text-success"
+                        : item.type === "warning" ? "bg-warning/10 text-warning"
+                        : "bg-destructive/10 text-destructive"
                       }`}
                     >
-                      {item.type === "success" ? (
-                        <CheckCircle2 className="w-3 h-3" />
-                      ) : (
-                        <AlertCircle className="w-3 h-3" />
-                      )}
+                      {item.type === "success" ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                       <span className="font-medium">{item.message}</span>
-                      {item.details && (
-                        <span className="opacity-70 truncate">
-                          - {item.details}
-                        </span>
-                      )}
+                      {item.details && <span className="opacity-70 truncate">- {item.details}</span>}
                     </div>
                   ))}
                 </div>
@@ -1207,11 +779,7 @@ export default function ConferenciaInterna() {
               onClick={loadPendingEtiquetas}
               disabled={loadingDivergencia}
             >
-              {loadingDivergencia ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ShieldAlert className="w-4 h-4 mr-2" />
-              )}
+              {loadingDivergencia ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ShieldAlert className="w-4 h-4 mr-2" />}
               Registrar Divergência
             </Button>
           )}
@@ -1224,81 +792,47 @@ export default function ConferenciaInterna() {
                     <Ban className="w-4 h-4" />
                     Bloquear Etiquetas
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowDivergencia(false)}
-                  >
-                    Cancelar
-                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowDivergencia(false)}>Cancelar</Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Motivo select */}
                 <div>
                   <label className="text-sm font-medium mb-1 block">Motivo</label>
                   <Select value={divergenciaMotivo} onValueChange={setDivergenciaMotivo}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o motivo..." />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Selecione o motivo..." /></SelectTrigger>
                     <SelectContent>
                       {MOTIVOS_DIVERGENCIA.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          {m.label}
-                        </SelectItem>
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Etiquetas list */}
                 <div className="max-h-60 overflow-y-auto space-y-1">
                   {pendingEtiquetas.map((et) => {
                     const isDivergencia = et.status === "divergencia";
                     const isConferido = et.status === "conferido_interno" || et.status === "conferido";
-
                     return (
                       <div
                         key={et.id}
                         className={`flex items-center gap-2 p-2 rounded text-sm ${
-                          isDivergencia
-                            ? "bg-destructive/10 opacity-80"
-                            : isConferido
-                            ? "bg-success/10 opacity-60"
-                            : "bg-muted/50"
+                          isDivergencia ? "bg-destructive/10 opacity-80" : isConferido ? "bg-success/10 opacity-60" : "bg-muted/50"
                         }`}
                       >
                         {isDivergencia ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2 text-xs text-destructive"
-                            onClick={() => reverterDivergencia(et.id)}
-                          >
-                            Reverter
-                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-destructive" onClick={() => reverterDivergencia(et.id)}>Reverter</Button>
                         ) : !isConferido ? (
-                          <Checkbox
-                            checked={selectedEtiquetaIds.has(et.id)}
-                            onCheckedChange={() => toggleEtiquetaSelection(et.id)}
-                          />
+                          <Checkbox checked={selectedEtiquetaIds.has(et.id)} onCheckedChange={() => toggleEtiquetaSelection(et.id)} />
                         ) : (
                           <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                         )}
-                        <span className="flex-1 truncate">
-                          {et.x_prod} — CX {et.seq}/{et.total}
-                        </span>
-                        {isDivergencia && (
-                          <Badge variant="destructive" className="text-xs">
-                            {et.divergencia_motivo}
-                          </Badge>
-                        )}
+                        <span className="flex-1 truncate">{et.x_prod} — CX {et.seq}/{et.total}</span>
+                        {isDivergencia && <Badge variant="destructive" className="text-xs">{et.divergencia_motivo}</Badge>}
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Submit */}
                 {pendingEtiquetas.some((e) => e.status === "pendente") && (
                   <Button
                     className="w-full"
@@ -1306,11 +840,7 @@ export default function ConferenciaInterna() {
                     disabled={selectedEtiquetaIds.size === 0 || !divergenciaMotivo || submittingDivergencia}
                     onClick={marcarDivergencia}
                   >
-                    {submittingDivergencia ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Ban className="w-4 h-4 mr-2" />
-                    )}
+                    {submittingDivergencia ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Ban className="w-4 h-4 mr-2" />}
                     Bloquear {selectedEtiquetaIds.size} etiqueta(s)
                   </Button>
                 )}
@@ -1323,7 +853,12 @@ export default function ConferenciaInterna() {
     );
   }
 
-  // ---- LIST VIEW ----
+  // Filter NFs by search term
+  const filteredNfs = nfFilter.trim()
+    ? allNfs.filter((nf) => nf.numeroNf.includes(nfFilter.trim()))
+    : allNfs;
+
+  // ---- LIST VIEW (flat NFs) ----
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
@@ -1341,46 +876,28 @@ export default function ConferenciaInterna() {
       </header>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
-        {/* Quick NF search */}
+        {/* NF search / filter */}
         <Card>
           <CardContent className="pt-4">
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Busca rápida por NF
+              Buscar NF
             </label>
             <div className="flex gap-2">
               <Input
                 placeholder="Nº da NF..."
-                value={searchNf}
-                onChange={(e) => setSearchNf(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") buscarNfDireta();
-                }}
+                value={nfFilter}
+                onChange={(e) => setNfFilter(e.target.value)}
                 className="flex-1 text-lg"
                 inputMode="numeric"
               />
-              <Button
-                onClick={buscarNfDireta}
-                disabled={loadingCargas || !searchNf.trim()}
-              >
-                {loadingCargas ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Search className="w-4 h-4" />
-                )}
-              </Button>
+              {nfFilter && (
+                <Button variant="ghost" size="sm" onClick={() => setNfFilter("")}>
+                  Limpar
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
-
-        {/* Free scan mode button */}
-        <Button
-          onClick={iniciarModoLivre}
-          className="w-full"
-          size="lg"
-        >
-          <ScanLine className="w-5 h-5 mr-2" />
-          Modo Livre — Conferir qualquer NF
-        </Button>
 
         {/* Offline Controls */}
         <Card>
@@ -1398,23 +915,11 @@ export default function ConferenciaInterna() {
             </div>
 
             {isOnline && !offlineMode && (
-              <Button
-                onClick={downloadAllForOffline}
-                disabled={downloading}
-                variant="outline"
-                className="w-full"
-                size="sm"
-              >
+              <Button onClick={downloadAllForOffline} disabled={downloading} variant="outline" className="w-full" size="sm">
                 {downloading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Baixando... {downloadProgress}%
-                  </>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Baixando... {downloadProgress}%</>
                 ) : (
-                  <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Baixar dados para offline
-                  </>
+                  <><Download className="w-4 h-4 mr-2" />Baixar dados para offline</>
                 )}
               </Button>
             )}
@@ -1432,145 +937,64 @@ export default function ConferenciaInterna() {
           <div className="bg-warning/20 border-2 border-warning rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-warning text-sm">
-                  {pendingSyncCount} conferência(s) pendente(s)
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Registradas offline, prontas para transmitir.
-                </p>
+                <p className="font-semibold text-warning text-sm">{pendingSyncCount} conferência(s) pendente(s)</p>
+                <p className="text-xs text-muted-foreground">Registradas offline, prontas para transmitir.</p>
               </div>
-              <Button
-                size="sm"
-                onClick={syncPendingScans}
-                disabled={syncing}
-                className="bg-warning text-warning-foreground hover:bg-warning/90"
-              >
-                {syncing ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <Upload className="w-4 h-4 mr-1" />
-                )}
+              <Button size="sm" onClick={syncPendingScans} disabled={syncing} className="bg-warning text-warning-foreground hover:bg-warning/90">
+                {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
                 Transmitir
               </Button>
             </div>
           </div>
         )}
 
-        {/* Cargas list */}
-        {loadingCargas && cargas.length === 0 ? (
+        {/* NF list */}
+        {loadingList && allNfs.length === 0 ? (
           <div className="flex justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
-        ) : cargas.length === 0 ? (
+        ) : filteredNfs.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
-              Nenhuma carga com etiquetas pendentes.
+              {nfFilter ? `Nenhuma NF encontrada para "${nfFilter}".` : "Nenhuma NF com etiquetas pendentes."}
             </CardContent>
           </Card>
         ) : (
-          cargas.map((carga) => {
-            const percent =
-              carga.totalEtiquetas > 0
-                ? Math.round(
-                    (carga.conferidosInterno / carga.totalEtiquetas) * 100
-                  )
-                : 0;
-            const isExpanded = expandedCarga === carga.id;
-            const isComplete = percent === 100;
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{filteredNfs.length} nota(s) fiscal(is)</p>
+            {filteredNfs.map((nf) => {
+              const pct = nf.total > 0 ? Math.round((nf.conferidas / nf.total) * 100) : 0;
+              const isComplete = nf.conferidas === nf.total && nf.total > 0;
 
-            return (
-              <Card key={carga.id}>
-                <CardContent className="pt-4">
-                  <button
-                    className="w-full text-left"
-                    onClick={() => offlineMode ? loadOfflineCargaNfs(carga.id) : loadCargaNfs(carga.id)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-semibold text-base">
-                          {carga.placa}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {carga.motorista} •{" "}
-                          {new Date(carga.data + "T00:00:00").toLocaleDateString(
-                            "pt-BR"
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={isComplete ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {percent}%
-                        </Badge>
-                        {isExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    </div>
-                    <Progress value={percent} className="h-2" />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {carga.conferidosInterno}/{carga.totalEtiquetas} etiquetas
-                    </p>
-                  </button>
-
-                  {/* Expanded NF list */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t space-y-2">
-                      {loadingNfs ? (
-                        <div className="flex justify-center py-2">
-                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              return (
+                <button
+                  key={`${nf.cargaId}|${nf.numeroNf}`}
+                  className="w-full text-left"
+                  onClick={() => iniciarConferenciaNf(nf)}
+                >
+                  <Card className={isComplete ? "border-success/40" : ""}>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <p className="font-semibold text-base">NF {nf.numeroNf}</p>
+                          <p className="text-xs text-muted-foreground">{nf.placa} • {nf.motorista}</p>
                         </div>
-                      ) : (
-                        cargaNfs.map((nf) => {
-                          const nfPct =
-                            nf.total > 0
-                              ? Math.round((nf.conferidas / nf.total) * 100)
-                              : 0;
-                          const nfComplete = nf.conferidas === nf.total;
-
-                          return (
-                            <button
-                              key={nf.numeroNf}
-                              className="w-full text-left p-2 rounded-lg hover:bg-accent transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                iniciarConferenciaNf(carga, nf);
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium text-sm">
-                                  NF {nf.numeroNf}
-                                </span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">
-                                    {nf.conferidas}/{nf.total}
-                                  </span>
-                                  {nfComplete ? (
-                                    <CheckCircle2 className="w-4 h-4 text-success" />
-                                  ) : (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {nfPct}%
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{nf.conferidas}/{nf.total}</span>
+                          {isComplete ? (
+                            <CheckCircle2 className="w-5 h-5 text-success" />
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">{pct}%</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Progress value={pct} className="h-1.5" />
+                    </CardContent>
+                  </Card>
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
       <MobileBottomNav />
