@@ -94,10 +94,9 @@ export default function ConferenciaInterna() {
   const [syncing, setSyncing] = useState(false);
   const [hasLocalData, setHasLocalData] = useState(false);
 
-  // NF list (flat, across all cargas)
-  const [allNfs, setAllNfs] = useState<NfListItem[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
-  const [nfFilter, setNfFilter] = useState("");
+  // Search
+  const [searchNf, setSearchNf] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Scanning state
   const [selectedCarga, setSelectedCarga] = useState<CargaResumo | null>(null);
@@ -125,98 +124,58 @@ export default function ConferenciaInterna() {
   ];
 
   useEffect(() => {
-    if (offlineMode) {
-      loadOfflineNfs();
-    } else {
-      loadAllNfs();
-    }
-  }, [offlineMode]);
-
-  useEffect(() => {
     hasOfflineData().then(setHasLocalData);
   }, []);
 
-  // Load all NFs across all open/closed cargas
-  async function loadAllNfs() {
-    setLoadingList(true);
+  // Search NF across all cargas
+  async function buscarNfDireta() {
+    const nf = searchNf.trim();
+    if (!nf) return;
+    setSearchLoading(true);
     try {
-      const { data: cargasData, error } = await supabase
-        .from("cargas")
-        .select("id, placa, motorista, data")
-        .in("status", ["aberta", "fechada"])
-        .order("data", { ascending: false });
+      const { data: etiquetas, error } = await supabase
+        .from("etiquetas")
+        .select("carga_id, status, numero_nf")
+        .eq("numero_nf", nf);
 
       if (error) throw error;
-      if (!cargasData || cargasData.length === 0) {
-        setAllNfs([]);
-        setLoadingList(false);
+      if (!etiquetas || etiquetas.length === 0) {
+        toast({ title: "NF não encontrada", description: `NF ${nf} não existe em nenhuma carga acessível.`, variant: "destructive" });
+        setSearchLoading(false);
         return;
       }
 
-      // Build a map of carga info
-      const cargaMap = new Map(cargasData.map((c) => [c.id, c]));
+      const cargaId = etiquetas[0].carga_id;
+      const divergencias = etiquetas.filter((e) => e.status === "divergencia").length;
+      const total = etiquetas.length - divergencias;
+      const conferidas = etiquetas.filter((e) => e.status === "conferido_interno" || e.status === "conferido").length;
 
-      // Fetch etiquetas for all cargas with pagination
-      const PAGE_SIZE = 1000;
-      const allEtiquetas: { carga_id: string; numero_nf: string; status: string }[] = [];
+      const { data: cargaData } = await supabase
+        .from("cargas")
+        .select("id, placa, motorista, data")
+        .eq("id", cargaId)
+        .maybeSingle();
 
-      for (const c of cargasData) {
-        let from = 0;
-        let hasMore = true;
-        while (hasMore) {
-          const { data, error: fetchErr } = await supabase
-            .from("etiquetas")
-            .select("carga_id, numero_nf, status")
-            .eq("carga_id", c.id)
-            .order("id")
-            .range(from, from + PAGE_SIZE - 1);
-          if (fetchErr) throw fetchErr;
-          if (data && data.length > 0) {
-            allEtiquetas.push(...data);
-          }
-          hasMore = (data?.length ?? 0) === PAGE_SIZE;
-          from += PAGE_SIZE;
-        }
+      if (!cargaData) {
+        toast({ title: "Carga não encontrada", variant: "destructive" });
+        setSearchLoading(false);
+        return;
       }
 
-      // Group by carga_id + numero_nf
-      const nfMap = new Map<string, NfListItem>();
-      for (const et of allEtiquetas) {
-        const key = `${et.carga_id}|${et.numero_nf}`;
-        if (!nfMap.has(key)) {
-          const carga = cargaMap.get(et.carga_id);
-          nfMap.set(key, {
-            numeroNf: et.numero_nf,
-            cargaId: et.carga_id,
-            placa: carga?.placa || "",
-            motorista: carga?.motorista || "",
-            total: 0,
-            conferidas: 0,
-          });
-        }
-        const item = nfMap.get(key)!;
-        if (et.status !== "divergencia") {
-          item.total++;
-          if (et.status === "conferido_interno" || et.status === "conferido") {
-            item.conferidas++;
-          }
-        }
-      }
-
-      const nfList = Array.from(nfMap.values())
-        .filter((n) => n.total > 0)
-        .sort((a, b) => {
-          const na = parseInt(a.numeroNf) || 0;
-          const nb = parseInt(b.numeroNf) || 0;
-          return na - nb;
-        });
-
-      setAllNfs(nfList);
+      const nfItem: NfListItem = {
+        numeroNf: nf,
+        cargaId: cargaData.id,
+        placa: cargaData.placa,
+        motorista: cargaData.motorista,
+        total,
+        conferidas,
+      };
+      iniciarConferenciaNf(nfItem);
     } catch (error) {
-      console.error("Erro ao carregar NFs:", error);
-      toast({ title: "Erro ao carregar NFs", variant: "destructive" });
+      console.error("Erro ao buscar NF:", error);
+      toast({ title: "Erro ao buscar NF", variant: "destructive" });
     } finally {
-      setLoadingList(false);
+      setSearchLoading(false);
     }
   }
 
@@ -289,47 +248,7 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function loadOfflineNfs() {
-    setLoadingList(true);
-    try {
-      const offCargas = await getOfflineCargas();
-      const allEts = await getOfflineEtiquetas();
-      const cargaMap = new Map(offCargas.map((c) => [c.id, c]));
-
-      const nfMap = new Map<string, NfListItem>();
-      for (const et of allEts) {
-        const key = `${et.carga_id}|${et.numero_nf}`;
-        if (!nfMap.has(key)) {
-          const carga = cargaMap.get(et.carga_id);
-          nfMap.set(key, {
-            numeroNf: et.numero_nf,
-            cargaId: et.carga_id,
-            placa: carga?.placa || "",
-            motorista: carga?.motorista || "",
-            total: 0,
-            conferidas: 0,
-          });
-        }
-        const item = nfMap.get(key)!;
-        if (et.status !== "divergencia") {
-          item.total++;
-          if (et.status === "conferido_interno" || et.status === "conferido") {
-            item.conferidas++;
-          }
-        }
-      }
-
-      setAllNfs(
-        Array.from(nfMap.values())
-          .filter((n) => n.total > 0)
-          .sort((a, b) => (parseInt(a.numeroNf) || 0) - (parseInt(b.numeroNf) || 0))
-      );
-    } catch {
-      setAllNfs([]);
-    } finally {
-      setLoadingList(false);
-    }
-  }
+  // (offline NF search handled via buscarNfDireta with offline fallback below)
 
   async function syncPendingScans() {
     setSyncing(true);
@@ -399,11 +318,6 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     setScanHistory([]);
     setQrInput("");
-    if (offlineMode) {
-      loadOfflineNfs();
-    } else {
-      loadAllNfs();
-    }
   }
 
   async function processScan(qrData: string) {
@@ -853,12 +767,7 @@ export default function ConferenciaInterna() {
     );
   }
 
-  // Filter NFs by search term
-  const filteredNfs = nfFilter.trim()
-    ? allNfs.filter((nf) => nf.numeroNf.includes(nfFilter.trim()))
-    : allNfs;
-
-  // ---- LIST VIEW (flat NFs) ----
+  // ---- LIST VIEW (search only) ----
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
@@ -876,25 +785,24 @@ export default function ConferenciaInterna() {
       </header>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
-        {/* NF search / filter */}
+        {/* Quick NF search */}
         <Card>
           <CardContent className="pt-4">
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Buscar NF
+              Busca rápida por NF
             </label>
             <div className="flex gap-2">
               <Input
                 placeholder="Nº da NF..."
-                value={nfFilter}
-                onChange={(e) => setNfFilter(e.target.value)}
+                value={searchNf}
+                onChange={(e) => setSearchNf(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") buscarNfDireta(); }}
                 className="flex-1 text-lg"
                 inputMode="numeric"
               />
-              {nfFilter && (
-                <Button variant="ghost" size="sm" onClick={() => setNfFilter("")}>
-                  Limpar
-                </Button>
-              )}
+              <Button onClick={buscarNfDireta} disabled={searchLoading || !searchNf.trim()}>
+                {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -948,54 +856,12 @@ export default function ConferenciaInterna() {
           </div>
         )}
 
-        {/* NF list */}
-        {loadingList && allNfs.length === 0 ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredNfs.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center text-muted-foreground">
-              {nfFilter ? `Nenhuma NF encontrada para "${nfFilter}".` : "Nenhuma NF com etiquetas pendentes."}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">{filteredNfs.length} nota(s) fiscal(is)</p>
-            {filteredNfs.map((nf) => {
-              const pct = nf.total > 0 ? Math.round((nf.conferidas / nf.total) * 100) : 0;
-              const isComplete = nf.conferidas === nf.total && nf.total > 0;
-
-              return (
-                <button
-                  key={`${nf.cargaId}|${nf.numeroNf}`}
-                  className="w-full text-left"
-                  onClick={() => iniciarConferenciaNf(nf)}
-                >
-                  <Card className={isComplete ? "border-success/40" : ""}>
-                    <CardContent className="pt-4 pb-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <div>
-                          <p className="font-semibold text-base">NF {nf.numeroNf}</p>
-                          <p className="text-xs text-muted-foreground">{nf.placa} • {nf.motorista}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{nf.conferidas}/{nf.total}</span>
-                          {isComplete ? (
-                            <CheckCircle2 className="w-5 h-5 text-success" />
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">{pct}%</Badge>
-                          )}
-                        </div>
-                      </div>
-                      <Progress value={pct} className="h-1.5" />
-                    </CardContent>
-                  </Card>
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <Card>
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">Digite o número da NF acima para iniciar a conferência.</p>
+          </CardContent>
+        </Card>
       </div>
       <MobileBottomNav />
     </div>
