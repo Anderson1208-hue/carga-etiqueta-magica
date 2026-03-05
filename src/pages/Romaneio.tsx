@@ -27,7 +27,8 @@ import {
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
 
@@ -685,11 +686,34 @@ export default function Romaneio() {
             {/* Lista de NFs */}
             {filteredNFs.length > 0 && (
               <div className="wms-card">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold">Notas Fiscais ({filteredNFs.length})</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Todas as NFs da carga{selectedMR !== "todas" ? ` — ${getMacroRegiaoLabel(parseInt(selectedMR))}` : ""}
-                  </p>
+                <div className="p-4 border-b flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">Notas Fiscais ({filteredNFs.length})</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Todas as NFs da carga{selectedMR !== "todas" ? ` — ${getMacroRegiaoLabel(parseInt(selectedMR))}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const rows = filteredNFs.map((nf) => ({
+                        "NF": nf.numeroNf,
+                        "Destinatário (CNPJ)": nf.cnpjDestinatario || "",
+                        "Bairro": nf.destBairro || "",
+                        "MR": nf.macroRegiao,
+                        "Caixas": nf.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0),
+                      }));
+                      const ws = XLSX.utils.json_to_sheet(rows);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "NFs");
+                      const suffix = selectedMR !== "todas" ? `_MR${selectedMR}` : "";
+                      XLSX.writeFile(wb, `nfs_${selectedCarga?.placa || "carga"}${suffix}.xlsx`);
+                    }}
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Exportar Excel
+                  </Button>
                 </div>
                 <Table>
                   <TableHeader>
