@@ -106,6 +106,10 @@ export default function ConferenciaInterna() {
   // Search
   const [searchNf, setSearchNf] = useState("");
 
+  // Free scan mode (scan any etiqueta without selecting carga/NF)
+  const [freeMode, setFreeMode] = useState(false);
+  const [freeScanCount, setFreeScanCount] = useState(0);
+
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
   const [pendingEtiquetas, setPendingEtiquetas] = useState<any[]>([]);
@@ -440,6 +444,8 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     setScanHistory([]);
     setQrInput("");
+    setFreeMode(false);
+    setFreeScanCount(0);
     if (offlineMode) {
       loadOfflineCargas();
       if (expandedCarga) loadOfflineCargaNfs(expandedCarga);
@@ -447,6 +453,13 @@ export default function ConferenciaInterna() {
       loadCargas();
       if (expandedCarga) loadCargaNfs(expandedCarga);
     }
+  }
+
+  function iniciarModoLivre() {
+    setFreeMode(true);
+    setFreeScanCount(0);
+    setLastResult(null);
+    setScanHistory([]);
   }
 
   // Quick NF search across all cargas
@@ -509,7 +522,90 @@ export default function ConferenciaInterna() {
     }
   }
 
+  // Free mode scan: find etiqueta by qr_payload across all cargas
+  async function processFreeScan(qrData: string) {
+    if (!qrData.trim()) return;
+    setScanning(true);
+    setLastResult(null);
+
+    try {
+      const parts = qrData.trim().split(";");
+      if (parts.length < 6) {
+        const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
+        setLastResult(result); addToHistory(result); playSound("error"); return;
+      }
+
+      const [, numeroNf, cProd, seqStr, totalStr] = parts;
+
+      if (offlineMode || !isOnline) {
+        const etiqueta = await findEtiquetaByQr(qrData.trim());
+        if (!etiqueta) {
+          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
+        if (etiqueta.status === "divergencia") {
+          const result: ScanResult = { type: "error", message: "Bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
+        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
+          const result: ScanResult = { type: "warning", message: "Já conferida", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("warning"); return;
+        }
+        await saveScanOffline({
+          etiqueta_id: etiqueta.id,
+          carga_id: etiqueta.carga_id,
+          numero_nf: etiqueta.numero_nf,
+          conferido_interno_por: user?.id || "",
+          conferido_interno_em: new Date().toISOString(),
+        });
+        setFreeScanCount((c) => c + 1);
+        const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+        setLastResult(result); addToHistory(result); playSound("success");
+      } else {
+        const { data: etiqueta, error: findError } = await supabase
+          .from("etiquetas")
+          .select("*")
+          .eq("qr_payload", qrData.trim())
+          .maybeSingle();
+
+        if (findError || !etiqueta) {
+          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
+        if (etiqueta.status === "divergencia") {
+          const result: ScanResult = { type: "error", message: "Bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
+        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
+          const result: ScanResult = { type: "warning", message: "Já conferida", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("warning"); return;
+        }
+        const { error: updateError } = await supabase
+          .from("etiquetas")
+          .update({
+            status: "conferido_interno" as any,
+            conferido_interno_em: new Date().toISOString(),
+            conferido_interno_por: user?.id,
+          })
+          .eq("id", etiqueta.id);
+
+        if (updateError) throw updateError;
+        setFreeScanCount((c) => c + 1);
+        const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+        setLastResult(result); addToHistory(result); playSound("success");
+      }
+    } catch (error) {
+      console.error("Erro ao processar scan:", error);
+      const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
+      setLastResult(result); addToHistory(result); playSound("error");
+    } finally {
+      setQrInput("");
+      setScanning(false);
+    }
+  }
+
   async function processScan(qrData: string) {
+    if (freeMode) return processFreeScan(qrData);
     if (!qrData.trim() || !selectedCarga || !selectedNf) return;
 
     setScanning(true);
@@ -794,6 +890,154 @@ export default function ConferenciaInterna() {
     nfProgress && nfProgress.total > 0
       ? Math.round((nfProgress.conferidas / nfProgress.total) * 100)
       : 0;
+
+  // ---- FREE SCAN MODE VIEW ----
+  if (freeMode && !selectedCarga) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-sidebar-foreground h-8 w-8"
+                onClick={voltarParaLista}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-lg font-semibold">Modo Livre</h1>
+                <p className="text-xs opacity-70">
+                  Escaneie qualquer etiqueta do sistema
+                  {(offlineMode || !isOnline) && " (Offline)"}
+                </p>
+              </div>
+            </div>
+            <MobileLogoutButton />
+          </div>
+        </header>
+
+        <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+          {/* Counter */}
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground text-sm">Etiquetas conferidas nesta sessão</span>
+                <span className="font-bold text-2xl">{freeScanCount}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Camera Scanner */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ScanLine className="w-4 h-4" />
+                Scanner de Câmera
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CameraScanner onScan={processScan} enabled={true} />
+            </CardContent>
+          </Card>
+
+          {/* Manual Input */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Input
+                  ref={inputRef}
+                  placeholder="Escaneie ou digite..."
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleManualScan();
+                  }}
+                  className="flex-1 font-mono text-sm"
+                  disabled={scanning}
+                />
+                <Button
+                  onClick={handleManualScan}
+                  disabled={scanning || !qrInput}
+                  size="sm"
+                >
+                  {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Last Result */}
+          {lastResult && (
+            <div
+              className={`p-4 rounded-lg flex items-start gap-3 animate-fade-in ${
+                lastResult.type === "success"
+                  ? "bg-success/20 text-success border-2 border-success"
+                  : lastResult.type === "warning"
+                  ? "bg-warning/20 text-warning border-2 border-warning"
+                  : "bg-destructive/20 text-destructive border-2 border-destructive"
+              }`}
+            >
+              {lastResult.type === "success" ? (
+                <CheckCircle2 className="w-6 h-6 shrink-0" />
+              ) : (
+                <AlertCircle className="w-6 h-6 shrink-0" />
+              )}
+              <div>
+                <p className="font-bold text-lg">{lastResult.message}</p>
+                {lastResult.details && (
+                  <p className="text-sm opacity-80">{lastResult.details}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Scan History */}
+          {scanHistory.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Últimas leituras
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {scanHistory.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`text-xs p-2 rounded flex items-center gap-2 ${
+                        item.type === "success"
+                          ? "bg-success/10 text-success"
+                          : item.type === "warning"
+                          ? "bg-warning/10 text-warning"
+                          : "bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {item.type === "success" ? (
+                        <CheckCircle2 className="w-3 h-3" />
+                      ) : (
+                        <AlertCircle className="w-3 h-3" />
+                      )}
+                      <span className="font-medium">{item.message}</span>
+                      {item.details && (
+                        <span className="opacity-70 truncate">- {item.details}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+        <MobileBottomNav />
+      </div>
+    );
+  }
 
   // ---- SCANNING VIEW ----
   if (selectedCarga && selectedNf && nfProgress) {
@@ -1127,6 +1371,16 @@ export default function ConferenciaInterna() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Free scan mode button */}
+        <Button
+          onClick={iniciarModoLivre}
+          className="w-full"
+          size="lg"
+        >
+          <ScanLine className="w-5 h-5 mr-2" />
+          Modo Livre — Conferir qualquer NF
+        </Button>
 
         {/* Offline Controls */}
         <Card>
