@@ -628,58 +628,120 @@ export default function Romaneio() {
             </div>
           </div>
         ) : selectedCarga ? (
-          <div className="wms-card">
-            <div className="p-4 border-b">
-              <h3 className="font-semibold">Romaneio Totalizado</h3>
-              <p className="text-sm text-muted-foreground">
-                {romaneioItems.length} produtos • {totalCaixas} caixas total
-              </p>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-32">Cód. Produto</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead className="w-32 text-right">Qtd Caixas</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+          <>
+            <div className="wms-card">
+              <div className="p-4 border-b">
+                <h3 className="font-semibold">Romaneio Totalizado</h3>
+                <p className="text-sm text-muted-foreground">
+                  {romaneioItems.length} produtos • {totalCaixas} caixas total
+                </p>
+              </div>
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
-                    </TableCell>
+                    <TableHead className="w-32">Cód. Produto</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead className="w-32 text-right">Qtd Caixas</TableHead>
                   </TableRow>
-                ) : romaneioItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        Nenhum item encontrado
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  romaneioItems.map((item) => (
-                    <TableRow key={item.cProd} className="wms-table-row">
-                      <TableCell className="font-mono text-sm">
-                        {item.cProd}
-                      </TableCell>
-                      <TableCell>{item.xProd}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {item.quantidadeTotal}
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-                {romaneioItems.length > 0 && (
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell colSpan={2}>TOTAL</TableCell>
-                    <TableCell className="text-right">{totalCaixas}</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : romaneioItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          Nenhum item encontrado
+                        </p>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    romaneioItems.map((item) => (
+                      <TableRow key={item.cProd} className="wms-table-row">
+                        <TableCell className="font-mono text-sm">
+                          {item.cProd}
+                        </TableCell>
+                        <TableCell>{item.xProd}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {item.quantidadeTotal}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                  {romaneioItems.length > 0 && (
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell colSpan={2}>TOTAL</TableCell>
+                      <TableCell className="text-right">{totalCaixas}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Lista de NFs */}
+            {filteredNFs.length > 0 && (
+              <div className="wms-card">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Notas Fiscais ({filteredNFs.length})</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Todas as NFs da carga{selectedMR !== "todas" ? ` — ${getMacroRegiaoLabel(parseInt(selectedMR))}` : ""}
+                  </p>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-28">NF</TableHead>
+                      <TableHead>Destinatário</TableHead>
+                      <TableHead className="hidden md:table-cell">Bairro</TableHead>
+                      <TableHead className="hidden md:table-cell w-20">MR</TableHead>
+                      <TableHead className="w-24 text-right">Caixas</TableHead>
+                      <TableHead className="w-16" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredNFs.map((nf, idx) => {
+                      const totalCaixasNf = nf.itens.reduce((acc, item) => acc + calculateBoxes(item.qCom), 0);
+                      return (
+                        <TableRow key={nf.id} className={idx % 2 === 1 ? "bg-muted/30" : ""}>
+                          <TableCell className="font-mono text-sm font-medium">{nf.numeroNf}</TableCell>
+                          <TableCell className="text-sm truncate max-w-[200px]">
+                            {nf.cnpjDestinatario || "—"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                            {nf.destBairro || "—"}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-sm">
+                            MR {nf.macroRegiao}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">{totalCaixasNf}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedNfDetail(nf); setNfDialogOpen(true); }}
+                            >
+                              <Search className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell colSpan={4}>TOTAL</TableCell>
+                      <TableCell className="text-right">
+                        {filteredNFs.reduce((acc, nf) => acc + nf.itens.reduce((sum, item) => sum + calculateBoxes(item.qCom), 0), 0)}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </>
         ) : null}
       </div>
 
