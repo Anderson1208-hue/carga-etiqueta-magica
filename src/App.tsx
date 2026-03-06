@@ -18,6 +18,7 @@ import BaixaEntrega from "./pages/BaixaEntrega";
 import HistoricoEntregas from "./pages/HistoricoEntregas";
 import Agendamento from "./pages/Agendamento";
 import ConsultaNF from "./pages/ConsultaNF";
+import Operadores from "./pages/Operadores";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
 
