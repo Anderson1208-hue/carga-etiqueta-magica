@@ -7,6 +7,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   role: "admin" | "operador";
+  ativo: boolean;
 }
 
 interface AuthContextType {
