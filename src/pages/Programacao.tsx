@@ -101,8 +101,17 @@ export default function Programacao() {
         return;
       }
 
-      const cargaIds = cargas.map((c) => c.id);
-      const cargaMap = new Map(cargas.map((c) => [c.id, c]));
+      // Excluir cargas que já possuem roteirização
+      const cargasComRota = new Set((roteirizacoes || []).map((r) => r.carga_id));
+      const cargasFiltradas = cargas.filter((c) => !cargasComRota.has(c.id));
+
+      if (cargasFiltradas.length === 0) {
+        setNfsDisponiveis([]);
+        return;
+      }
+
+      const cargaIds = cargasFiltradas.map((c) => c.id);
+      const cargaMap = new Map(cargasFiltradas.map((c) => [c.id, c]));
 
       const nfPromises = cargaIds.map((cargaId) =>
         supabase

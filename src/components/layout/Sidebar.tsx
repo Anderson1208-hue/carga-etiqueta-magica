@@ -18,6 +18,7 @@ import {
   Package,
   MapPin,
   CalendarClock,
+  FileSearch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -25,6 +26,7 @@ import { useState } from "react";
 const topNav = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Cargas", href: "/cargas", icon: Truck },
+  { name: "Consulta NF", href: "/consulta-nf", icon: FileSearch },
 ];
 
 const depositoItems = [
