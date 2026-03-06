@@ -1831,6 +1831,23 @@ export default function Roteirizacao() {
                                 variant="outline"
                                 size="sm"
                                 className="h-8 px-2"
+                                disabled={generatingPdfVeiculoId === v.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGerarNotaDeCargaVeiculo(v);
+                                }}
+                              >
+                                {generatingPdfVeiculoId === v.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5 mr-1" />
+                                )}
+                                Nota de Carga
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setAlterarRotaVeiculo(v);
