@@ -25,7 +25,7 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading, isAdmin, signOut } = useAuth();
 
   if (isLoading) {
     return (
@@ -37,6 +37,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Inactive non-admin operators see a pending screen
+  if (profile && !isAdmin && !profile.ativo) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="text-center max-w-md space-y-4">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+            <span className="text-3xl">⏳</span>
+          </div>
+          <h1 className="text-xl font-bold text-foreground">Acesso Pendente</h1>
+          <p className="text-muted-foreground">
+            Seu cadastro foi recebido. Aguarde a liberação de um administrador para acessar o sistema.
+          </p>
+          <button
+            onClick={signOut}
+            className="text-sm text-primary underline hover:no-underline"
+          >
+            Sair
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
