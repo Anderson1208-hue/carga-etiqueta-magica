@@ -89,8 +89,8 @@ export default function Programacao() {
       const [{ data: cargas }, { data: roteirizacoes }] = await Promise.all([
         supabase
           .from("cargas")
-          .select("id, placa, motorista, data, tipo_carga")
-          .in("status", ["aberta", "fechada"]),
+          .select("id, placa, motorista, data, tipo_carga, status")
+          .neq("status", "entregue"),
         supabase
           .from("roteirizacoes")
           .select("carga_id"),
@@ -120,10 +120,12 @@ export default function Programacao() {
             id, numero_nf, chave_acesso, cnpj_destinatario,
             dest_razao_social, dest_bairro, dest_cep,
             dest_logradouro, dest_numero, dest_cidade, dest_uf,
-            peso_bruto, volume_m3, carga_id,
+            peso_bruto, volume_m3, carga_id, status_entrega,
             itens_nf(q_com)
           `)
           .eq("carga_id", cargaId)
+          .neq("status_entrega", "ENTREGUE")
+          .neq("status_entrega", "RECUSADO")
           .limit(2000)
       );
 
