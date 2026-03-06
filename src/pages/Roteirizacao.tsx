@@ -56,6 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
+import { Settings2 } from "lucide-react";
 
 interface Carga {
   id: string;
@@ -137,6 +139,7 @@ export default function Roteirizacao() {
   const [filtroDia, setFiltroDia] = useState("all");
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
+  const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
