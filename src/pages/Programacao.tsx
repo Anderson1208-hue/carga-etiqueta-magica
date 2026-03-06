@@ -89,8 +89,8 @@ export default function Programacao() {
       const [{ data: cargas }, { data: roteirizacoes }] = await Promise.all([
         supabase
           .from("cargas")
-          .select("id, placa, motorista, data, tipo_carga")
-          .in("status", ["aberta", "fechada"]),
+          .select("id, placa, motorista, data, tipo_carga, status")
+          .neq("status", "entregue"),
         supabase
           .from("roteirizacoes")
           .select("carga_id"),
