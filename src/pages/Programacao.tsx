@@ -101,17 +101,8 @@ export default function Programacao() {
         return;
       }
 
-      // Exclude cargas that already have a route programmed
-      const cargasComRota = new Set((roteirizacoes || []).map((r) => r.carga_id));
-      const cargasSemRota = cargas.filter((c) => !cargasComRota.has(c.id));
-
-      if (cargasSemRota.length === 0) {
-        setNfsDisponiveis([]);
-        return;
-      }
-
-      const cargaIds = cargasSemRota.map((c) => c.id);
-      const cargaMap = new Map(cargasSemRota.map((c) => [c.id, c]));
+      const cargaIds = cargas.map((c) => c.id);
+      const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
       const nfPromises = cargaIds.map((cargaId) =>
         supabase
