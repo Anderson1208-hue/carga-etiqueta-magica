@@ -75,6 +75,8 @@ export default function Programacao() {
   const [buscaNf, setBuscaNf] = useState("");
   const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set());
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
+  const [buscaMultipla, setBuscaMultipla] = useState(false);
+  const [buscaMultiplaTexto, setBuscaMultiplaTexto] = useState("");
 
   useEffect(() => {
     loadNfsDisponiveis();
@@ -260,6 +262,49 @@ export default function Programacao() {
     });
   }
 
+  function buscarEMarcarMultiplas() {
+    const texto = buscaMultiplaTexto.trim();
+    if (!texto) return;
+    // Split by comma, semicolon, newline, space, or tab
+    const numeros = texto
+      .split(/[,;\n\r\t\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    
+    if (numeros.length === 0) return;
+
+    const encontradas: string[] = [];
+    const naoEncontradas: string[] = [];
+
+    numeros.forEach((num) => {
+      const match = nfsDisponiveis.find((nf) => nf.numero_nf === num);
+      if (match) {
+        encontradas.push(match.id);
+      } else {
+        naoEncontradas.push(num);
+      }
+    });
+
+    if (encontradas.length > 0) {
+      setSelectedNfIds((prev) => {
+        const next = new Set(prev);
+        encontradas.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+
+    toast({
+      title: `${encontradas.length} NF(s) selecionada(s)`,
+      description: naoEncontradas.length > 0
+        ? `Não encontradas: ${naoEncontradas.join(", ")}`
+        : `Todas as ${encontradas.length} NFs foram encontradas e selecionadas.`,
+      variant: naoEncontradas.length > 0 ? "destructive" : "default",
+    });
+
+    setBuscaMultiplaTexto("");
+    setBuscaMultipla(false);
+  }
+
   // Auto-expand entregas that match the search term
   useEffect(() => {
     const searchTerm = buscaNf.trim().toLowerCase();
@@ -436,15 +481,45 @@ export default function Programacao() {
             <div className="flex gap-4 flex-wrap">
               <div className="min-w-[200px] flex-1 max-w-sm">
                 <Label className="text-xs">Buscar NF</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Nº NF, destinatário, bairro..."
-                    value={buscaNf}
-                    onChange={(e) => setBuscaNf(e.target.value)}
-                    className="pl-9"
-                  />
+                <div className="relative flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Nº NF, destinatário, bairro..."
+                      value={buscaNf}
+                      onChange={(e) => setBuscaNf(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button
+                    variant={buscaMultipla ? "default" : "outline"}
+                    size="icon"
+                    title="Buscar e selecionar várias NFs de uma vez"
+                    onClick={() => setBuscaMultipla(!buscaMultipla)}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
                 </div>
+                {buscaMultipla && (
+                  <div className="mt-2 space-y-2 p-3 border rounded-md bg-muted/30">
+                    <Label className="text-xs font-semibold">Busca Múltipla — cole ou digite vários números de NF</Label>
+                    <textarea
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px] resize-y"
+                      placeholder={"Ex:\n12345\n67890\n11111\n\nOu separados por vírgula: 12345, 67890, 11111"}
+                      value={buscaMultiplaTexto}
+                      onChange={(e) => setBuscaMultiplaTexto(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={buscarEMarcarMultiplas} disabled={!buscaMultiplaTexto.trim()}>
+                        <Search className="w-3 h-3 mr-1" />
+                        Buscar e Selecionar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setBuscaMultipla(false); setBuscaMultiplaTexto(""); }}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="min-w-[140px]">
                 <Label className="text-xs">Tipo Carga</Label>
