@@ -167,6 +167,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/operadores"
+        element={
+          <ProtectedRoute>
+            <Operadores />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/motorista" element={<MotoristaAcesso />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
