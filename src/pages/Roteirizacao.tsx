@@ -56,6 +56,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
+import { Settings2 } from "lucide-react";
 
 interface Carga {
   id: string;
@@ -137,6 +139,7 @@ export default function Roteirizacao() {
   const [filtroDia, setFiltroDia] = useState("all");
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
+  const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
@@ -1767,6 +1770,18 @@ export default function Roteirizacao() {
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
                                 {v.status}
                               </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAlterarRotaVeiculo(v);
+                                }}
+                              >
+                                <Settings2 className="w-3.5 h-3.5 mr-1" />
+                                Alterar Rota
+                              </Button>
                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
                             </div>
                           </button>
@@ -1816,6 +1831,17 @@ export default function Roteirizacao() {
             )}
           </TabsContent>
         </Tabs>
+
+        <AlterarRotaDialog
+          open={!!alterarRotaVeiculo}
+          onOpenChange={(open) => { if (!open) setAlterarRotaVeiculo(null); }}
+          veiculo={alterarRotaVeiculo}
+          onUpdated={() => {
+            loadVeiculos();
+            setVeiculoNfs({});
+            setExpandedVeiculoId(null);
+          }}
+        />
       </div>
     </MainLayout>
   );
