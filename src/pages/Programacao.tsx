@@ -262,6 +262,49 @@ export default function Programacao() {
     });
   }
 
+  function buscarEMarcarMultiplas() {
+    const texto = buscaMultiplaTexto.trim();
+    if (!texto) return;
+    // Split by comma, semicolon, newline, space, or tab
+    const numeros = texto
+      .split(/[,;\n\r\t\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    
+    if (numeros.length === 0) return;
+
+    const encontradas: string[] = [];
+    const naoEncontradas: string[] = [];
+
+    numeros.forEach((num) => {
+      const match = nfsDisponiveis.find((nf) => nf.numero_nf === num);
+      if (match) {
+        encontradas.push(match.id);
+      } else {
+        naoEncontradas.push(num);
+      }
+    });
+
+    if (encontradas.length > 0) {
+      setSelectedNfIds((prev) => {
+        const next = new Set(prev);
+        encontradas.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+
+    toast({
+      title: `${encontradas.length} NF(s) selecionada(s)`,
+      description: naoEncontradas.length > 0
+        ? `Não encontradas: ${naoEncontradas.join(", ")}`
+        : `Todas as ${encontradas.length} NFs foram encontradas e selecionadas.`,
+      variant: naoEncontradas.length > 0 ? "destructive" : "default",
+    });
+
+    setBuscaMultiplaTexto("");
+    setBuscaMultipla(false);
+  }
+
   // Auto-expand entregas that match the search term
   useEffect(() => {
     const searchTerm = buscaNf.trim().toLowerCase();
