@@ -42,6 +42,7 @@ import { format } from "date-fns";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
+import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
@@ -956,6 +957,62 @@ export default function Roteirizacao() {
     }
   }
 
+  const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
+
+  async function handleGerarNotaDeCargaVeiculo(veiculo: any) {
+    setGeneratingPdfVeiculoId(veiculo.id);
+    try {
+      // Fetch NFs with items for this vehicle
+      const { data: vnfs } = await supabase
+        .from("veiculo_nfs")
+        .select(`
+          nf_id, carga_origem_id,
+          notas_fiscais!inner(
+            numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
+            dest_bairro, dest_razao_social, data_emissao, peso_bruto, volume_m3,
+            itens_nf(c_prod, x_prod, q_com)
+          )
+        `)
+        .eq("veiculo_id", veiculo.id);
+
+      if (!vnfs || vnfs.length === 0) {
+        toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
+        return;
+      }
+
+      const notasFiscais = vnfs.map((vnf: any) => {
+        const nf = vnf.notas_fiscais;
+        const bairro = nf.dest_bairro || "";
+        return {
+          numeroNf: nf.numero_nf,
+          razaoSocialEmitente: nf.razao_social_emitente,
+          cnpjEmitente: nf.cnpj_emitente,
+          cnpjDestinatario: nf.cnpj_destinatario || "",
+          destBairro: bairro,
+          macroRegiao: getMacroRegiao(bairro),
+          dataEmissao: nf.data_emissao,
+          itens: (nf.itens_nf || []).map((item: any) => ({
+            cProd: item.c_prod,
+            xProd: item.x_prod,
+            qtdCaixas: calculateBoxes(Number(item.q_com)),
+          })),
+        };
+      });
+
+      const blob = await generateNotaDeCargaPDF(
+        { data: veiculo.data, placa: veiculo.placa, motorista: veiculo.motorista || "" },
+        notasFiscais
+      );
+      downloadBlob(blob, `nota_carga_${veiculo.placa}_${veiculo.data}.pdf`);
+      toast({ title: "PDF gerado", description: `Nota de Carga do veículo ${veiculo.placa}` });
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
+    } finally {
+      setGeneratingPdfVeiculoId(null);
+    }
+  }
+
   function toggleExpandVeiculo(veiculoId: string) {
     if (expandedVeiculoId === veiculoId) {
       setExpandedVeiculoId(null);
@@ -1770,6 +1827,23 @@ export default function Roteirizacao() {
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
                                 {v.status}
                               </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
+                                disabled={generatingPdfVeiculoId === v.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGerarNotaDeCargaVeiculo(v);
+                                }}
+                              >
+                                {generatingPdfVeiculoId === v.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                ) : (
+                                  <FileText className="w-3.5 h-3.5 mr-1" />
+                                )}
+                                Nota de Carga
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
