@@ -1770,6 +1770,18 @@ export default function Roteirizacao() {
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
                                 {v.status}
                               </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAlterarRotaVeiculo(v);
+                                }}
+                              >
+                                <Settings2 className="w-3.5 h-3.5 mr-1" />
+                                Alterar Rota
+                              </Button>
                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
                             </div>
                           </button>
