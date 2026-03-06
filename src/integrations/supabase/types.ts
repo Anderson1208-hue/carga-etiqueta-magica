@@ -396,6 +396,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ativo: boolean
           created_at: string
           email: string
           full_name: string | null
@@ -404,6 +405,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ativo?: boolean
           created_at?: string
           email: string
           full_name?: string | null
@@ -412,6 +414,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ativo?: boolean
           created_at?: string
           email?: string
           full_name?: string | null
@@ -624,6 +627,7 @@ export type Database = {
       get_conferencia_progress: { Args: { p_carga_id: string }; Returns: Json }
       has_profile: { Args: never; Returns: boolean }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
+      is_active_operator: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_carga_operator: { Args: { p_carga_id: string }; Returns: boolean }
     }

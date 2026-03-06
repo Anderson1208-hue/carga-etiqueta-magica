@@ -19,6 +19,7 @@ import {
   MapPin,
   CalendarClock,
   FileSearch,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -135,6 +136,14 @@ export function Sidebar() {
             pathname={location.pathname}
             defaultOpen={transporteActive}
           />
+          {isAdmin && (
+            <div className="pt-2">
+              <NavItem
+                item={{ name: "Operadores", href: "/operadores", icon: Users }}
+                isActive={location.pathname === "/operadores"}
+              />
+            </div>
+          )}
         </div>
       </nav>
 
