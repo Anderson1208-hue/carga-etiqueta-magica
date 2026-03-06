@@ -1831,6 +1831,17 @@ export default function Roteirizacao() {
             )}
           </TabsContent>
         </Tabs>
+
+        <AlterarRotaDialog
+          open={!!alterarRotaVeiculo}
+          onOpenChange={(open) => { if (!open) setAlterarRotaVeiculo(null); }}
+          veiculo={alterarRotaVeiculo}
+          onUpdated={() => {
+            loadVeiculos();
+            setVeiculoNfs({});
+            setExpandedVeiculoId(null);
+          }}
+        />
       </div>
     </MainLayout>
   );
