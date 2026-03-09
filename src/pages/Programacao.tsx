@@ -309,7 +309,41 @@ export default function Programacao() {
     setBuscaMultipla(false);
   }
 
-  // Auto-expand entregas that match the search term
+  function exportarExcel(nfs: NfDisponivel[]) {
+    if (nfs.length === 0) return;
+
+    const rows = nfs
+      .sort((a, b) => {
+        if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
+        const cmp = (a.dest_razao_social || "").localeCompare(b.dest_razao_social || "", "pt-BR");
+        if (cmp !== 0) return cmp;
+        return (a.numero_nf || "").localeCompare(b.numero_nf || "");
+      })
+      .map((nf) => ({
+        "Macro Região": getMacroRegiaoLabel(nf.macroRegiao),
+        "CNPJ Destinatário": nf.cnpj_destinatario,
+        "Razão Social": nf.dest_razao_social,
+        "Bairro": nf.dest_bairro,
+        "Endereço": [nf.dest_logradouro, nf.dest_numero].filter(Boolean).join(", "),
+        "Cidade": nf.dest_cidade,
+        "UF": nf.dest_uf,
+        "CEP": nf.dest_cep,
+        "Nº NF": nf.numero_nf,
+        "Caixas": nf.totalCaixas,
+        "Peso (kg)": Number(nf.peso_bruto.toFixed(2)),
+        "Volume (m³)": Number(nf.volume_m3.toFixed(4)),
+        "Placa Carga": nf.carga_placa,
+        "Tipo Carga": nf.carga_tipo_carga,
+      }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Preparação");
+    XLSX.writeFile(wb, `preparacao_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
+
+    toast({ title: `${rows.length} NFs exportadas para Excel` });
+  }
+
   useEffect(() => {
     const searchTerm = buscaNf.trim().toLowerCase();
     if (!searchTerm) return;
