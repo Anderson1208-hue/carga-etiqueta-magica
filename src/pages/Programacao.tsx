@@ -201,6 +201,7 @@ export default function Programacao() {
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
           };
+        });
 
       available.sort((a, b) => {
         if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
