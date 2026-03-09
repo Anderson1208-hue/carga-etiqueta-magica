@@ -132,10 +132,11 @@ export default function Programacao() {
           .limit(2000)
       );
 
-      const [nfResults, { data: assigned }, { data: agendamentos }] = await Promise.all([
+      const [nfResults, { data: assigned }, { data: agendamentos }, { data: ctes }] = await Promise.all([
         Promise.all(nfPromises),
         supabase.from("veiculo_nfs").select("nf_id"),
         supabase.from("agendamentos").select("nf_id, data_agendamento, status"),
+        supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
       const nfs = nfResults.flatMap((r) => r.data || []);
