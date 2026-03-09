@@ -80,6 +80,7 @@ export default function Programacao() {
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
   const [buscaMultipla, setBuscaMultipla] = useState(false);
   const [buscaMultiplaTexto, setBuscaMultiplaTexto] = useState("");
+  const [filtroBairro, setFiltroBairro] = useState<string>("todos");
 
   useEffect(() => {
     loadNfsDisponiveis();
@@ -463,11 +464,27 @@ export default function Programacao() {
   }, [buscaNf, nfsDisponiveis, filtroMR]);
 
 
+  // Bairros disponíveis baseados no filtro de MR atual
+  const bairrosDisponiveis = useMemo(() => {
+    let base = nfsDisponiveis;
+    if (filtroMR !== "todas") {
+      base = base.filter((nf) => nf.macroRegiao === parseInt(filtroMR));
+    }
+    const bairros = [...new Set(base.map((nf) => nf.dest_bairro).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    return bairros;
+  }, [nfsDisponiveis, filtroMR]);
+
+  // Reset bairro filter when MR changes
+  useEffect(() => {
+    setFiltroBairro("todos");
+  }, [filtroMR]);
+
   const filteredNfs = useMemo(() => {
     const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
       if (filtroTipoCarga !== "todos" && nf.carga_tipo_carga !== filtroTipoCarga) return false;
+      if (filtroBairro !== "todos" && nf.dest_bairro !== filtroBairro) return false;
       if (searchTerm) {
         const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
         const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
@@ -477,7 +494,7 @@ export default function Programacao() {
       }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga]);
+  }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga, filtroBairro]);
 
   // Dashboard totals - all available NFs
   const cargaFilteredNfs = nfsDisponiveis;
@@ -665,6 +682,28 @@ export default function Programacao() {
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="SECA">Seca</SelectItem>
                     <SelectItem value="CHOCOLATE">Chocolate</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-[180px]">
+                <Label className="text-xs">Bairro</Label>
+                <Select value={filtroBairro} onValueChange={setFiltroBairro}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos ({bairrosDisponiveis.length})</SelectItem>
+                    {bairrosDisponiveis.map((bairro) => {
+                      const count = nfsDisponiveis.filter((n) => {
+                        if (filtroMR !== "todas" && n.macroRegiao !== parseInt(filtroMR)) return false;
+                        return n.dest_bairro === bairro;
+                      }).length;
+                      return (
+                        <SelectItem key={bairro} value={bairro}>
+                          {bairro} ({count})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
