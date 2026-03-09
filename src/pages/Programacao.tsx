@@ -333,7 +333,7 @@ export default function Programacao() {
     const headers = [
       "Macro Região", "Entrega", "Razão Social", "CNPJ Destinatário",
       "Endereço", "Bairro", "Cidade", "UF", "CEP",
-      "Nº NF", "Caixas", "Peso (kg)", "Volume (m³)", "Placa Carga", "Tipo Carga",
+      "Nº NF", "Nº CT-e", "Caixas", "Peso (kg)", "Volume (m³)", "Placa Carga", "Tipo Carga",
     ];
 
     const wsData: (string | number | null)[][] = [headers];
