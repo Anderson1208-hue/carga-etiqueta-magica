@@ -1052,6 +1052,72 @@ export default function Roteirizacao() {
             motorista: selectedCargas.map((c) => c.motorista).join(" / "),
           };
 
+      // Collect all nfIds from paradas
+      const allNfIds = roteirizacao.paradas.flatMap((p) => p.nfIds || []);
+
+      // Fetch NFs details and CTEs in parallel
+      const [nfsRes, ctesRes] = await Promise.all([
+        allNfIds.length > 0
+          ? supabase
+              .from("notas_fiscais")
+              .select("id, numero_nf, peso_bruto, volume_m3, cnpj_destinatario")
+              .in("id", allNfIds)
+          : Promise.resolve({ data: [] as any[] }),
+        selectedCargas.length > 0
+          ? supabase
+              .from("ctes")
+              .select("chave_nf_referenciada, numero_cte, razao_social_emitente, valor_frete, nf_id")
+              .in("carga_id", selectedCargaIds)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
+
+      const nfsData = nfsRes.data || [];
+      const ctesData = ctesRes.data || [];
+
+      // Build lookup maps
+      const nfsByCnpj: Record<string, { numero_nf: string; peso_bruto: number; volume_m3: number }[]> = {};
+      for (const nf of nfsData) {
+        const cnpj = nf.cnpj_destinatario || "";
+        if (!nfsByCnpj[cnpj]) nfsByCnpj[cnpj] = [];
+        nfsByCnpj[cnpj].push({
+          numero_nf: nf.numero_nf,
+          peso_bruto: nf.peso_bruto || 0,
+          volume_m3: nf.volume_m3 || 0,
+        });
+      }
+
+      // Map CTEs by nf_id
+      const ctesByNfId: Record<string, typeof ctesData> = {};
+      for (const cte of ctesData) {
+        if (cte.nf_id) {
+          if (!ctesByNfId[cte.nf_id]) ctesByNfId[cte.nf_id] = [];
+          ctesByNfId[cte.nf_id].push(cte);
+        }
+      }
+
+      // Enrich paradas with NFs and CTEs
+      const paradasEnriquecidas = roteirizacao.paradas.map((p) => {
+        const nfsDetail = nfsByCnpj[p.cnpjDestinatario] || [];
+        // Sort NFs numerically
+        nfsDetail.sort((a, b) => parseInt(a.numero_nf) - parseInt(b.numero_nf));
+
+        // Collect CTEs for this parada's NFs
+        const nfIdsParada = p.nfIds || [];
+        const ctesDetail: { numero_cte: string; razao_social_emitente: string; valor_frete: number }[] = [];
+        for (const nfId of nfIdsParada) {
+          const ctes = ctesByNfId[nfId] || [];
+          for (const cte of ctes) {
+            ctesDetail.push({
+              numero_cte: cte.numero_cte,
+              razao_social_emitente: cte.razao_social_emitente || "",
+              valor_frete: cte.valor_frete || 0,
+            });
+          }
+        }
+
+        return { ...p, nfsDetail, ctesDetail };
+      });
+
       const blob = await generateRoteirizacaoPDF({
         carga: cargaLabel,
         cdNome,
@@ -1061,7 +1127,7 @@ export default function Roteirizacao() {
         tempoEstimadoMin: roteirizacao.tempoEstimadoMin,
         pesoTotalKg: roteirizacao.pesoTotalKg,
         volumeTotalM3: roteirizacao.volumeTotalM3,
-        paradas: roteirizacao.paradas,
+        paradas: paradasEnriquecidas,
       });
 
       const url = URL.createObjectURL(blob);
