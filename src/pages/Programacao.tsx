@@ -360,6 +360,7 @@ export default function Programacao() {
           `${mrTotalEntregas} entrega(s)`,
           "", "", "", "", "", "", "",
           `${nfsMR.length} NFs`,
+          "",
           mrTotalCaixas,
           Number(mrTotalPeso.toFixed(2)),
           Number(mrTotalVolume.toFixed(4)),
