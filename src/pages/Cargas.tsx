@@ -771,7 +771,7 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
                           {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setImportXmlCarga(carga)} title="Importar XMLs">
+                        <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es">
                           <FileUp className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem">
