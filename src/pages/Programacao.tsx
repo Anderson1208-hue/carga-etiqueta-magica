@@ -312,37 +312,127 @@ export default function Programacao() {
   function exportarExcel(nfs: NfDisponivel[], label?: string) {
     if (nfs.length === 0) return;
 
-    const rows = nfs
-      .sort((a, b) => {
-        if (a.macroRegiao !== b.macroRegiao) return a.macroRegiao - b.macroRegiao;
-        const cmp = (a.dest_razao_social || "").localeCompare(b.dest_razao_social || "", "pt-BR");
-        if (cmp !== 0) return cmp;
-        return (a.numero_nf || "").localeCompare(b.numero_nf || "");
-      })
-      .map((nf) => ({
-        "Macro Região": getMacroRegiaoLabel(nf.macroRegiao),
-        "CNPJ Destinatário": nf.cnpj_destinatario,
-        "Razão Social": nf.dest_razao_social,
-        "Bairro": nf.dest_bairro,
-        "Endereço": [nf.dest_logradouro, nf.dest_numero].filter(Boolean).join(", "),
-        "Cidade": nf.dest_cidade,
-        "UF": nf.dest_uf,
-        "CEP": nf.dest_cep,
-        "Nº NF": nf.numero_nf,
-        "Caixas": nf.totalCaixas,
-        "Peso (kg)": Number(nf.peso_bruto.toFixed(2)),
-        "Volume (m³)": Number(nf.volume_m3.toFixed(4)),
-        "Placa Carga": nf.carga_placa,
-        "Tipo Carga": nf.carga_tipo_carga,
-      }));
+    // Group by MR then by entrega (CNPJ), mirroring the visual layout
+    const groupedByMR = new Map<number, NfDisponivel[]>();
+    nfs.forEach((nf) => {
+      const list = groupedByMR.get(nf.macroRegiao) || [];
+      list.push(nf);
+      groupedByMR.set(nf.macroRegiao, list);
+    });
+
+    const headers = [
+      "Macro Região", "Entrega", "Razão Social", "CNPJ Destinatário",
+      "Endereço", "Bairro", "Cidade", "UF", "CEP",
+      "Nº NF", "Caixas", "Peso (kg)", "Volume (m³)", "Placa Carga", "Tipo Carga",
+    ];
+
+    const wsData: (string | number | null)[][] = [headers];
+
+    Array.from(groupedByMR.entries())
+      .sort(([a], [b]) => a - b)
+      .forEach(([mr, nfsMR]) => {
+        const mrTotalCaixas = nfsMR.reduce((s, n) => s + n.totalCaixas, 0);
+        const mrTotalPeso = nfsMR.reduce((s, n) => s + n.peso_bruto, 0);
+        const mrTotalVolume = nfsMR.reduce((s, n) => s + n.volume_m3, 0);
+
+        const entregasMap = new Map<string, NfDisponivel[]>();
+        nfsMR.forEach((nf) => {
+          const key = nf.cnpj_destinatario || nf.id;
+          const list = entregasMap.get(key) || [];
+          list.push(nf);
+          entregasMap.set(key, list);
+        });
+        const mrTotalEntregas = entregasMap.size;
+
+        // MR header row
+        wsData.push([
+          getMacroRegiaoLabel(mr),
+          `${mrTotalEntregas} entrega(s)`,
+          "", "", "", "", "", "", "",
+          `${nfsMR.length} NFs`,
+          mrTotalCaixas,
+          Number(mrTotalPeso.toFixed(2)),
+          Number(mrTotalVolume.toFixed(4)),
+          "", "",
+        ]);
+
+        let entregaIdx = 1;
+        Array.from(entregasMap.entries()).forEach(([, nfsEntrega]) => {
+          const first = nfsEntrega[0];
+          const totalCx = nfsEntrega.reduce((s, n) => s + n.totalCaixas, 0);
+          const totalPeso = nfsEntrega.reduce((s, n) => s + n.peso_bruto, 0);
+          const totalVol = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
+          const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
+
+          // Entrega sub-header
+          wsData.push([
+            "",
+            `Entrega ${entregaIdx}`,
+            first.dest_razao_social || "",
+            first.cnpj_destinatario || "",
+            endereco,
+            first.dest_bairro || "",
+            first.dest_cidade || "",
+            first.dest_uf || "",
+            first.dest_cep || "",
+            `NFs: ${nfsEntrega.map((n) => n.numero_nf).join(", ")}`,
+            totalCx,
+            Number(totalPeso.toFixed(2)),
+            Number(totalVol.toFixed(4)),
+            first.carga_placa || "",
+            first.carga_tipo_carga || "",
+          ]);
+
+          // Individual NF rows
+          nfsEntrega.forEach((nf) => {
+            wsData.push([
+              "", "", "", "", "", "", "", "", "",
+              nf.numero_nf,
+              nf.totalCaixas,
+              Number(nf.peso_bruto.toFixed(2)),
+              Number(nf.volume_m3.toFixed(4)),
+              nf.carga_placa,
+              nf.carga_tipo_carga,
+            ]);
+          });
+
+          entregaIdx++;
+        });
+
+        // Empty separator row between MRs
+        wsData.push([]);
+      });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Auto-size columns
+    const colWidths = headers.map((h, i) => {
+      let max = h.length;
+      wsData.forEach((row) => {
+        const cell = row[i];
+        if (cell != null) {
+          const len = String(cell).length;
+          if (len > max) max = len;
+        }
+      });
+      return { wch: Math.min(max + 2, 50) };
+    });
+    ws["!cols"] = colWidths;
+
+    // Bold header row
+    for (let c = 0; c < headers.length; c++) {
+      const ref = XLSX.utils.encode_cell({ r: 0, c });
+      if (ws[ref]) {
+        ws[ref].s = { font: { bold: true } };
+      }
+    }
 
     const suffix = label ? `_${label.replace(/[^a-zA-Z0-9]/g, "_")}` : "";
-    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Preparação");
     XLSX.writeFile(wb, `preparacao${suffix}_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
 
-    toast({ title: `${rows.length} NFs exportadas para Excel` });
+    toast({ title: `${nfs.length} NFs exportadas para Excel` });
   }
 
   useEffect(() => {
