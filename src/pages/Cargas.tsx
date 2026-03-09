@@ -46,7 +46,7 @@ import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
 import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
-import { ImportarXmlCargaDialog } from "@/components/cargas/ImportarXmlCargaDialog";
+import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
