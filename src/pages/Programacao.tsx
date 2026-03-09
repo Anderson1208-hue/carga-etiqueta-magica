@@ -309,7 +309,7 @@ export default function Programacao() {
     setBuscaMultipla(false);
   }
 
-  function exportarExcel(nfs: NfDisponivel[]) {
+  function exportarExcel(nfs: NfDisponivel[], label?: string) {
     if (nfs.length === 0) return;
 
     const rows = nfs
@@ -336,10 +336,11 @@ export default function Programacao() {
         "Tipo Carga": nf.carga_tipo_carga,
       }));
 
+    const suffix = label ? `_${label.replace(/[^a-zA-Z0-9]/g, "_")}` : "";
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Preparação");
-    XLSX.writeFile(wb, `preparacao_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
+    XLSX.writeFile(wb, `preparacao${suffix}_${format(new Date(), "yyyy-MM-dd_HHmm")}.xlsx`);
 
     toast({ title: `${rows.length} NFs exportadas para Excel` });
   }
