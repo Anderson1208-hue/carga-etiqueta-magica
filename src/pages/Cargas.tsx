@@ -44,8 +44,9 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
+import { ImportarXmlCargaDialog } from "@/components/cargas/ImportarXmlCargaDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
@@ -89,6 +90,7 @@ export default function Cargas() {
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
+  const [importXmlCarga, setImportXmlCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
   async function handlePrintNotaCarga(carga: Carga) {
@@ -769,6 +771,9 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
                           {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setImportXmlCarga(carga)} title="Importar XMLs">
+                          <FileUp className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem">
                           <Package className="w-4 h-4" />
                         </Button>
@@ -847,6 +852,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setCubagemCarga(null)}
             cargaId={cubagemCarga.id}
             cargaPlaca={cubagemCarga.placa}
+          />
+        )}
+        {/* Import XML to existing Carga Dialog */}
+        {importXmlCarga && (
+          <ImportarXmlCargaDialog
+            open={!!importXmlCarga}
+            onOpenChange={(open) => !open && setImportXmlCarga(null)}
+            cargaId={importXmlCarga.id}
+            cargaPlaca={importXmlCarga.placa}
+            onSuccess={loadCargas}
           />
         )}
       </div>
