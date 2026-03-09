@@ -62,6 +62,7 @@ interface NfDisponivel {
   carga_motorista: string;
   carga_data: string;
   carga_tipo_carga: string;
+  numero_cte: string;
 }
 
 export default function Programacao() {
@@ -131,10 +132,11 @@ export default function Programacao() {
           .limit(2000)
       );
 
-      const [nfResults, { data: assigned }, { data: agendamentos }] = await Promise.all([
+      const [nfResults, { data: assigned }, { data: agendamentos }, { data: ctes }] = await Promise.all([
         Promise.all(nfPromises),
         supabase.from("veiculo_nfs").select("nf_id"),
         supabase.from("agendamentos").select("nf_id, data_agendamento, status"),
+        supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
       const nfs = nfResults.flatMap((r) => r.data || []);
@@ -147,6 +149,12 @@ export default function Programacao() {
 
 
       const assignedIds = new Set((assigned || []).map((a) => a.nf_id));
+
+      // Build map of CT-e numbers by NF id
+      const cteMap = new Map<string, string>();
+      ((ctes as any[]) || []).forEach((cte: any) => {
+        if (cte.nf_id) cteMap.set(cte.nf_id, cte.numero_cte);
+      });
 
       // Build map of NF agendamentos - only the latest per NF
       const agendamentoMap = new Map<string, { data_agendamento: string | null; status: string }>();
@@ -191,6 +199,7 @@ export default function Programacao() {
             carga_motorista: carga?.motorista || "",
             carga_data: carga?.data || "",
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
+            numero_cte: cteMap.get(nf.id) || "",
           };
         });
 
@@ -324,7 +333,7 @@ export default function Programacao() {
     const headers = [
       "Macro Região", "Entrega", "Razão Social", "CNPJ Destinatário",
       "Endereço", "Bairro", "Cidade", "UF", "CEP",
-      "Nº NF", "Caixas", "Peso (kg)", "Volume (m³)", "Placa Carga", "Tipo Carga",
+      "Nº NF", "Nº CT-e", "Caixas", "Peso (kg)", "Volume (m³)", "Placa Carga", "Tipo Carga",
     ];
 
     const wsData: (string | number | null)[][] = [headers];
@@ -351,6 +360,7 @@ export default function Programacao() {
           `${mrTotalEntregas} entrega(s)`,
           "", "", "", "", "", "", "",
           `${nfsMR.length} NFs`,
+          "",
           mrTotalCaixas,
           Number(mrTotalPeso.toFixed(2)),
           Number(mrTotalVolume.toFixed(4)),
@@ -366,6 +376,7 @@ export default function Programacao() {
           const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
 
           // Entrega sub-header
+          const ctesEntrega = nfsEntrega.map((n) => n.numero_cte).filter(Boolean);
           wsData.push([
             "",
             `Entrega ${entregaIdx}`,
@@ -377,6 +388,7 @@ export default function Programacao() {
             first.dest_uf || "",
             first.dest_cep || "",
             `NFs: ${nfsEntrega.map((n) => n.numero_nf).join(", ")}`,
+            ctesEntrega.length > 0 ? `CTes: ${ctesEntrega.join(", ")}` : "",
             totalCx,
             Number(totalPeso.toFixed(2)),
             Number(totalVol.toFixed(4)),
