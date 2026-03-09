@@ -154,14 +154,15 @@ export default function Programacao() {
         agendamentoMap.set(ag.nf_id, { data_agendamento: ag.data_agendamento, status: ag.status });
       });
 
-      const today = format(new Date(), "yyyy-MM-dd");
+      // Liberar NFs agendadas na véspera (amanhã ou antes)
+      const tomorrow = format(new Date(Date.now() + 86400000), "yyyy-MM-dd");
 
       const available: NfDisponivel[] = nfs
         .filter((nf) => {
           if (assignedIds.has(nf.id)) return false;
-          // Check agendamento: only show if agenda date <= today
+          // Check agendamento: only show if agenda date <= tomorrow (véspera)
           const ag = agendamentoMap.get(nf.id);
-          if (ag && ag.data_agendamento && ag.data_agendamento > today) return false;
+          if (ag && ag.data_agendamento && ag.data_agendamento > tomorrow) return false;
           return true;
         })
         .map((nf) => {
