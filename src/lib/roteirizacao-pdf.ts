@@ -311,9 +311,11 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
   const totalCaixasFooter = paradas.reduce((sum, p) => sum + p.totalCaixas, 0);
   const totalPesoFooter = paradas.reduce((sum, p) => sum + p.pesoTotalKg, 0);
   const totalVolumeFooter = paradas.reduce((sum, p) => sum + p.volumeTotalM3, 0);
+  const totalFreteFooter = paradas.reduce((sum, p) => sum + (p.ctesDetail || []).reduce((s, c) => s + c.valor_frete, 0), 0);
 
+  const freteStr = totalFreteFooter > 0 ? ` | Frete: R$ ${totalFreteFooter.toFixed(2)}` : "";
   doc.text(
-    `TOTAL: ${paradas.length} paradas | ${totalNfsFooter} NFs | ${totalCaixasFooter} cx | ${totalPesoFooter.toFixed(1)} kg | ${totalVolumeFooter.toFixed(2)} m³`,
+    `TOTAL: ${paradas.length} paradas | ${totalNfsFooter} NFs | ${totalCaixasFooter} cx | ${totalPesoFooter.toFixed(1)} kg | ${totalVolumeFooter.toFixed(2)} m³${freteStr}`,
     MARGIN + 5,
     y + 8
   );
