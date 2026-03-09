@@ -57,6 +57,10 @@ interface NfResult {
   };
   itens?: { c_prod: string; x_prod: string; q_com: number; u_com: string }[];
   totalCaixas: number;
+  agendamento?: {
+    status: string;
+    data_agendamento: string | null;
+  } | null;
 }
 
 const statusColors: Record<string, string> = {
