@@ -685,6 +685,28 @@ export default function Programacao() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="min-w-[180px]">
+                <Label className="text-xs">Bairro</Label>
+                <Select value={filtroBairro} onValueChange={setFiltroBairro}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos ({bairrosDisponiveis.length})</SelectItem>
+                    {bairrosDisponiveis.map((bairro) => {
+                      const count = nfsDisponiveis.filter((n) => {
+                        if (filtroMR !== "todas" && n.macroRegiao !== parseInt(filtroMR)) return false;
+                        return n.dest_bairro === bairro;
+                      }).length;
+                      return (
+                        <SelectItem key={bairro} value={bairro}>
+                          {bairro} ({count})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="min-w-[200px]">
                 <Label className="text-xs">Macro Região</Label>
                 <Select value={filtroMR} onValueChange={setFiltroMR}>
