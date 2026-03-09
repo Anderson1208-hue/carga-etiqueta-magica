@@ -192,6 +192,60 @@ export type Database = {
         }
         Relationships: []
       }
+      ctes: {
+        Row: {
+          carga_id: string
+          chave_cte: string
+          chave_nf_referenciada: string | null
+          cnpj_emitente: string | null
+          created_at: string
+          id: string
+          nf_id: string | null
+          numero_cte: string
+          razao_social_emitente: string | null
+          valor_frete: number | null
+        }
+        Insert: {
+          carga_id: string
+          chave_cte: string
+          chave_nf_referenciada?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          id?: string
+          nf_id?: string | null
+          numero_cte: string
+          razao_social_emitente?: string | null
+          valor_frete?: number | null
+        }
+        Update: {
+          carga_id?: string
+          chave_cte?: string
+          chave_nf_referenciada?: string | null
+          cnpj_emitente?: string | null
+          created_at?: string
+          id?: string
+          nf_id?: string | null
+          numero_cte?: string
+          razao_social_emitente?: string | null
+          valor_frete?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ctes_carga_id_fkey"
+            columns: ["carga_id"]
+            isOneToOne: false
+            referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ctes_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       etiquetas: {
         Row: {
           c_prod: string
