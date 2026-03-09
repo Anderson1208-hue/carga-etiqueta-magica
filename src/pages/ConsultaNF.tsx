@@ -217,9 +217,21 @@ export default function ConsultaNF() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge className={statusColors[selectedNf.status_entrega] || ""}>
-                    {selectedNf.status_entrega}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge className={statusColors[selectedNf.status_entrega] || ""}>
+                      {selectedNf.status_entrega}
+                    </Badge>
+                    {selectedNf.agendamento && (
+                      <Badge className={agendamentoColors[selectedNf.agendamento.status] || ""}>
+                        {selectedNf.agendamento.status}
+                        {selectedNf.agendamento.data_agendamento && (
+                          <span className="ml-1">
+                            ({format(new Date(selectedNf.agendamento.data_agendamento + "T00:00:00"), "dd/MM/yyyy")})
+                          </span>
+                        )}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
