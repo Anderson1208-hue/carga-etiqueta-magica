@@ -761,6 +761,12 @@ export default function Programacao() {
                                           {endereco ? `${endereco} – ` : ""}{first.dest_bairro}{first.dest_cidade ? `, ${first.dest_cidade}` : ""}{first.dest_uf ? `/${first.dest_uf}` : ""}
                                         </span>
                                       </div>
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                                        <FileText className="w-3 h-3 shrink-0" />
+                                        <span className="truncate">
+                                          NFs: {nfsEntrega.map((n) => n.numero_nf).join(", ")}
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
                                       <span>{totalCaixasEntrega} cx</span>
