@@ -889,6 +889,19 @@ export default function Programacao() {
                                 className="h-6 px-2 text-xs"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  gerarPreparacaoPdf(nfsMR, getMacroRegiaoLabel(mr));
+                                }}
+                                title={`Gerar PDF da MR ${mr}`}
+                              >
+                                <FileText className="w-3 h-3 mr-1" />
+                                PDF
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   exportarExcel(nfsMR, getMacroRegiaoLabel(mr));
                                 }}
                                 title={`Exportar MR ${mr} para Excel`}
