@@ -400,9 +400,16 @@ export default function ConsultaNF() {
                           </TableCell>
                           <TableCell className="text-sm">{nf.carga?.placa}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
-                              {nf.status_entrega}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
+                                {nf.status_entrega}
+                              </Badge>
+                              {nf.agendamento && (
+                                <Badge variant="outline" className={`text-xs ${agendamentoColors[nf.agendamento.status] || ""}`}>
+                                  {nf.agendamento.status}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">{Number(nf.peso_bruto || 0).toFixed(1)}</TableCell>
                           <TableCell className="text-right">{Number(nf.volume_m3 || 0).toFixed(3)}</TableCell>
