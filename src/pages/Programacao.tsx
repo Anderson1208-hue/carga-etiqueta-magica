@@ -40,6 +40,7 @@ import {
 } from "@/lib/macro-regioes";
 import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/TipoCargaBadge";
 import * as XLSX from "xlsx";
+import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
 
 interface NfDisponivel {
   id: string;
@@ -882,6 +883,19 @@ export default function Programacao() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  gerarPreparacaoPdf(nfsMR, getMacroRegiaoLabel(mr));
+                                }}
+                                title={`Gerar PDF da MR ${mr}`}
+                              >
+                                <FileText className="w-3 h-3 mr-1" />
+                                PDF
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
