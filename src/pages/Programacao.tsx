@@ -383,18 +383,6 @@ export default function Programacao() {
             first.carga_tipo_carga || "",
           ]);
 
-          // Individual NF rows
-          nfsEntrega.forEach((nf) => {
-            wsData.push([
-              "", "", "", "", "", "", "", "", "",
-              nf.numero_nf,
-              nf.totalCaixas,
-              Number(nf.peso_bruto.toFixed(2)),
-              Number(nf.volume_m3.toFixed(4)),
-              nf.carga_placa,
-              nf.carga_tipo_carga,
-            ]);
-          });
 
           entregaIdx++;
         });
