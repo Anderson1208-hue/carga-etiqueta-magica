@@ -90,7 +90,7 @@ export default function Cargas() {
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
-  const [importXmlCarga, setImportXmlCarga] = useState<Carga | null>(null);
+  const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
   async function handlePrintNotaCarga(carga: Carga) {
