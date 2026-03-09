@@ -97,22 +97,30 @@ export default function ConsultaNF() {
           peso_bruto, peso_liquido, volume_m3, status_entrega, data_emissao,
           created_at, carga_id,
           cargas(placa, motorista, data, status, tipo_carga),
-          itens_nf(c_prod, x_prod, q_com, u_com)
+          itens_nf(c_prod, x_prod, q_com, u_com),
+          agendamentos(status, data_agendamento)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
 
       if (error) throw error;
 
-      const results: NfResult[] = (nfs || []).map((nf: any) => ({
-        ...nf,
-        carga: nf.cargas,
-        itens: nf.itens_nf || [],
-        totalCaixas: (nf.itens_nf || []).reduce(
-          (sum: number, i: any) => sum + calculateBoxes(Number(i.q_com)),
-          0
-        ),
-      }));
+      const results: NfResult[] = (nfs || []).map((nf: any) => {
+        // Get latest agendamento if exists
+        const agendamentos = nf.agendamentos || [];
+        const latestAgendamento = agendamentos.length > 0 ? agendamentos[agendamentos.length - 1] : null;
+        
+        return {
+          ...nf,
+          carga: nf.cargas,
+          itens: nf.itens_nf || [],
+          totalCaixas: (nf.itens_nf || []).reduce(
+            (sum: number, i: any) => sum + calculateBoxes(Number(i.q_com)),
+            0
+          ),
+          agendamento: latestAgendamento,
+        };
+      });
 
       setResultados(results);
 
