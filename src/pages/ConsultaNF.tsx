@@ -57,6 +57,10 @@ interface NfResult {
   };
   itens?: { c_prod: string; x_prod: string; q_com: number; u_com: string }[];
   totalCaixas: number;
+  agendamento?: {
+    status: string;
+    data_agendamento: string | null;
+  } | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -65,6 +69,20 @@ const statusColors: Record<string, string> = {
   ENTREGUE: "bg-success/10 text-success",
   RECUSADO: "bg-destructive/10 text-destructive",
 };
+
+const agendamentoColors: Record<string, string> = {
+  "AGENDAMENTO": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  "AGUARDANDO AGENDA": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "REENTREGA": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  "DEVOLUCAO": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+
+function getDisplayStatus(nf: NfResult) {
+  if (nf.agendamento) {
+    return { label: nf.agendamento.status, colors: agendamentoColors[nf.agendamento.status] || "bg-muted text-muted-foreground" };
+  }
+  return { label: nf.status_entrega, colors: statusColors[nf.status_entrega] || "" };
+}
 
 export default function ConsultaNF() {
   const { toast } = useToast();
@@ -93,22 +111,30 @@ export default function ConsultaNF() {
           peso_bruto, peso_liquido, volume_m3, status_entrega, data_emissao,
           created_at, carga_id,
           cargas(placa, motorista, data, status, tipo_carga),
-          itens_nf(c_prod, x_prod, q_com, u_com)
+          itens_nf(c_prod, x_prod, q_com, u_com),
+          agendamentos(status, data_agendamento)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
 
       if (error) throw error;
 
-      const results: NfResult[] = (nfs || []).map((nf: any) => ({
-        ...nf,
-        carga: nf.cargas,
-        itens: nf.itens_nf || [],
-        totalCaixas: (nf.itens_nf || []).reduce(
-          (sum: number, i: any) => sum + calculateBoxes(Number(i.q_com)),
-          0
-        ),
-      }));
+      const results: NfResult[] = (nfs || []).map((nf: any) => {
+        // Get latest agendamento if exists
+        const agendamentos = nf.agendamentos || [];
+        const latestAgendamento = agendamentos.length > 0 ? agendamentos[agendamentos.length - 1] : null;
+        
+        return {
+          ...nf,
+          carga: nf.cargas,
+          itens: nf.itens_nf || [],
+          totalCaixas: (nf.itens_nf || []).reduce(
+            (sum: number, i: any) => sum + calculateBoxes(Number(i.q_com)),
+            0
+          ),
+          agendamento: latestAgendamento,
+        };
+      });
 
       setResultados(results);
 
@@ -191,9 +217,21 @@ export default function ConsultaNF() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <Badge className={statusColors[selectedNf.status_entrega] || ""}>
-                    {selectedNf.status_entrega}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge className={statusColors[selectedNf.status_entrega] || ""}>
+                      {selectedNf.status_entrega}
+                    </Badge>
+                    {selectedNf.agendamento && (
+                      <Badge className={agendamentoColors[selectedNf.agendamento.status] || ""}>
+                        {selectedNf.agendamento.status}
+                        {selectedNf.agendamento.data_agendamento && (
+                          <span className="ml-1">
+                            ({format(new Date(selectedNf.agendamento.data_agendamento + "T00:00:00"), "dd/MM/yyyy")})
+                          </span>
+                        )}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -362,9 +400,16 @@ export default function ConsultaNF() {
                           </TableCell>
                           <TableCell className="text-sm">{nf.carga?.placa}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
-                              {nf.status_entrega}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
+                                {nf.status_entrega}
+                              </Badge>
+                              {nf.agendamento && (
+                                <Badge variant="outline" className={`text-xs ${agendamentoColors[nf.agendamento.status] || ""}`}>
+                                  {nf.agendamento.status}
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right">{Number(nf.peso_bruto || 0).toFixed(1)}</TableCell>
                           <TableCell className="text-right">{Number(nf.volume_m3 || 0).toFixed(3)}</TableCell>
