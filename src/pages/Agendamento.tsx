@@ -246,11 +246,14 @@ export default function Agendamento() {
       return;
     }
 
+    // Se status é AGUARDANDO AGENDA mas tem data, automaticamente muda para AGENDAMENTO
+    const finalStatus = (agStatus === "AGUARDANDO AGENDA" && agDate) ? "AGENDAMENTO" : agStatus;
+
     setSaving(true);
     try {
       const { error } = await supabase.from("agendamentos").insert({
         nf_id: selectedNf.id,
-        status: agStatus,
+        status: finalStatus,
         data_agendamento: agDate ? format(agDate, "yyyy-MM-dd") : null,
         observacao: agObs || null,
         created_by: user.id,
