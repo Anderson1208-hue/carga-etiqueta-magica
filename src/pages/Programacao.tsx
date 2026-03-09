@@ -150,6 +150,12 @@ export default function Programacao() {
 
       const assignedIds = new Set((assigned || []).map((a) => a.nf_id));
 
+      // Build map of CT-e numbers by NF id
+      const cteMap = new Map<string, string>();
+      ((ctes as any[]) || []).forEach((cte: any) => {
+        if (cte.nf_id) cteMap.set(cte.nf_id, cte.numero_cte);
+      });
+
       // Build map of NF agendamentos - only the latest per NF
       const agendamentoMap = new Map<string, { data_agendamento: string | null; status: string }>();
       (agendamentos || []).forEach((ag) => {
