@@ -9,6 +9,18 @@ interface Carga {
   motorista: string;
 }
 
+interface NfDetail {
+  numero_nf: string;
+  peso_bruto: number;
+  volume_m3: number;
+}
+
+interface CteDetail {
+  numero_cte: string;
+  razao_social_emitente: string;
+  valor_frete: number;
+}
+
 interface Parada {
   cep: string;
   cnpjDestinatario: string;
@@ -21,6 +33,8 @@ interface Parada {
   pesoTotalKg: number;
   volumeTotalM3: number;
   ordem?: number;
+  nfsDetail?: NfDetail[];
+  ctesDetail?: CteDetail[];
 }
 
 interface RoteirizacaoData {
