@@ -464,11 +464,27 @@ export default function Programacao() {
   }, [buscaNf, nfsDisponiveis, filtroMR]);
 
 
+  // Bairros disponíveis baseados no filtro de MR atual
+  const bairrosDisponiveis = useMemo(() => {
+    let base = nfsDisponiveis;
+    if (filtroMR !== "todas") {
+      base = base.filter((nf) => nf.macroRegiao === parseInt(filtroMR));
+    }
+    const bairros = [...new Set(base.map((nf) => nf.dest_bairro).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    return bairros;
+  }, [nfsDisponiveis, filtroMR]);
+
+  // Reset bairro filter when MR changes
+  useEffect(() => {
+    setFiltroBairro("todos");
+  }, [filtroMR]);
+
   const filteredNfs = useMemo(() => {
     const searchTerm = buscaNf.trim().toLowerCase();
     return nfsDisponiveis.filter((nf) => {
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
       if (filtroTipoCarga !== "todos" && nf.carga_tipo_carga !== filtroTipoCarga) return false;
+      if (filtroBairro !== "todos" && nf.dest_bairro !== filtroBairro) return false;
       if (searchTerm) {
         const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
         const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
@@ -478,7 +494,7 @@ export default function Programacao() {
       }
       return true;
     });
-  }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga]);
+  }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga, filtroBairro]);
 
   // Dashboard totals - all available NFs
   const cargaFilteredNfs = nfsDisponiveis;
