@@ -746,9 +746,24 @@ export default function Programacao() {
                                 {mrTotalVolume > 0 && <span className="font-semibold text-primary">{mrTotalVolume.toFixed(2)} m³</span>}
                               </div>
                             </div>
-                            <Badge variant="outline" className="shrink-0">
-                              {mrNfsSel}/{nfsMR.length} sel.
-                            </Badge>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  exportarExcel(nfsMR, getMacroRegiaoLabel(mr));
+                                }}
+                                title={`Exportar MR ${mr} para Excel`}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Excel
+                              </Button>
+                              <Badge variant="outline">
+                                {mrNfsSel}/{nfsMR.length} sel.
+                              </Badge>
+                            </div>
                           </div>
 
                           <div className="space-y-2 pl-2">
