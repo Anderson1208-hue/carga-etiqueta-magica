@@ -192,6 +192,24 @@ export type Database = {
         }
         Relationships: []
       }
+      cnpj_agenda_automatica: {
+        Row: {
+          cnpj: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       ctes: {
         Row: {
           carga_id: string
