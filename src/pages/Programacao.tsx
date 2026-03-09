@@ -168,9 +168,13 @@ export default function Programacao() {
       const available: NfDisponivel[] = nfs
         .filter((nf) => {
           if (assignedIds.has(nf.id)) return false;
-          // Check agendamento: only show if agenda date <= tomorrow (véspera)
           const ag = agendamentoMap.get(nf.id);
-          if (ag && ag.data_agendamento && ag.data_agendamento > tomorrow) return false;
+          if (ag) {
+            // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
+            if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'DEVOLUCAO') return false;
+            // AGENDAMENTO ou REENTREGA: libera na véspera (data <= amanhã)
+            if ((ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA') && ag.data_agendamento && ag.data_agendamento > tomorrow) return false;
+          }
           return true;
         })
         .map((nf) => {
