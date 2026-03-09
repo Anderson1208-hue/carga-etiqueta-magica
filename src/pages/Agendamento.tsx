@@ -283,9 +283,16 @@ export default function Agendamento() {
     if (!editingAgendamento) return;
     setSavingEdit(true);
     try {
+      const updateData: Record<string, any> = { 
+        data_agendamento: editDate ? format(editDate, "yyyy-MM-dd") : null 
+      };
+      // Se estava AGUARDANDO AGENDA e recebeu uma data, muda para AGENDAMENTO
+      if (editingAgendamento.status === "AGUARDANDO AGENDA" && editDate) {
+        updateData.status = "AGENDAMENTO";
+      }
       const { error } = await supabase
         .from("agendamentos")
-        .update({ data_agendamento: editDate ? format(editDate, "yyyy-MM-dd") : null })
+        .update(updateData)
         .eq("id", editingAgendamento.id);
       if (error) throw error;
       toast({ title: "Data alterada!", description: `Agendamento da NF ${editingAgendamento.numero_nf} atualizado.` });
