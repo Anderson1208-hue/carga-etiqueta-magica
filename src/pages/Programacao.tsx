@@ -62,6 +62,7 @@ interface NfDisponivel {
   carga_motorista: string;
   carga_data: string;
   carga_tipo_carga: string;
+  numero_cte: string;
 }
 
 export default function Programacao() {
