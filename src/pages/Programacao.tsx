@@ -105,7 +105,7 @@ export default function Programacao() {
 
       // Excluir cargas que já possuem roteirização
       const cargasComRota = new Set((roteirizacoes || []).map((r) => r.carga_id));
-      const cargasFiltradas = cargas.filter((c) => !cargasComRota.has(c.id));
+      const cargasFiltradas = cargas.filter((c) => !cargasComRota.has(c.id) && c.status === "aberta");
 
       if (cargasFiltradas.length === 0) {
         setNfsDisponiveis([]);
