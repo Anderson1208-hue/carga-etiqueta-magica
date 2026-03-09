@@ -1,0 +1,1 @@
+UPDATE agendamentos SET status = 'AGENDAMENTO' WHERE status = 'AGUARDANDO AGENDA' AND data_agendamento IS NOT NULL;
