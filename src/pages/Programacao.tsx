@@ -640,16 +640,22 @@ export default function Programacao() {
         {/* NFs disponíveis */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 NFs Disponíveis ({filteredNfs.length})
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={toggleAllFiltered}>
-                {filteredNfs.every((nf) => selectedNfIds.has(nf.id))
-                  ? "Desmarcar Todos"
-                  : "Selecionar Todos"}
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportarExcel(filteredNfs)}>
+                  <Download className="w-4 h-4 mr-1" />
+                  Exportar Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={toggleAllFiltered}>
+                  {filteredNfs.every((nf) => selectedNfIds.has(nf.id))
+                    ? "Desmarcar Todos"
+                    : "Selecionar Todos"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
