@@ -80,6 +80,7 @@ export default function Programacao() {
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
   const [buscaMultipla, setBuscaMultipla] = useState(false);
   const [buscaMultiplaTexto, setBuscaMultiplaTexto] = useState("");
+  const [filtroBairro, setFiltroBairro] = useState<string>("todos");
 
   useEffect(() => {
     loadNfsDisponiveis();
