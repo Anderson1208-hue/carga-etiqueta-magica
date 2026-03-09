@@ -39,6 +39,7 @@ import {
   getMacroRegiaoLabel,
 } from "@/lib/macro-regioes";
 import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/TipoCargaBadge";
+import * as XLSX from "xlsx";
 
 interface NfDisponivel {
   id: string;
