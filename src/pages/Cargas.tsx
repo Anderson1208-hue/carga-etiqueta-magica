@@ -854,13 +854,13 @@ export default function Cargas() {
             cargaPlaca={cubagemCarga.placa}
           />
         )}
-        {/* Import XML to existing Carga Dialog */}
-        {importXmlCarga && (
-          <ImportarXmlCargaDialog
-            open={!!importXmlCarga}
-            onOpenChange={(open) => !open && setImportXmlCarga(null)}
-            cargaId={importXmlCarga.id}
-            cargaPlaca={importXmlCarga.placa}
+        {/* Import CT-e Dialog */}
+        {cteCarga && (
+          <ImportarCteDialog
+            open={!!cteCarga}
+            onOpenChange={(open) => !open && setCteCarga(null)}
+            cargaId={cteCarga.id}
+            cargaPlaca={cteCarga.placa}
             onSuccess={loadCargas}
           />
         )}
