@@ -854,6 +854,16 @@ export default function Cargas() {
             cargaPlaca={cubagemCarga.placa}
           />
         )}
+        {/* Import XML to existing Carga Dialog */}
+        {importXmlCarga && (
+          <ImportarXmlCargaDialog
+            open={!!importXmlCarga}
+            onOpenChange={(open) => !open && setImportXmlCarga(null)}
+            cargaId={importXmlCarga.id}
+            cargaPlaca={importXmlCarga.placa}
+            onSuccess={loadCargas}
+          />
+        )}
       </div>
     </MainLayout>
   );
