@@ -170,8 +170,18 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
   for (let i = 0; i < sortedParadas.length; i++) {
     const parada = sortedParadas[i];
 
+    // Calculate row height based on NFs/CTEs
+    const nfsDetail = parada.nfsDetail || [];
+    const ctesDetail = parada.ctesDetail || [];
+    const detailLines = Math.max(nfsDetail.length, 1);
+    const cteLines = ctesDetail.length;
+    const baseRowHeight = 14;
+    const nfBlockHeight = detailLines * 4;
+    const cteBlockHeight = cteLines > 0 ? (cteLines * 4 + 4) : 0;
+    const rowHeight = Math.max(baseRowHeight, 14 + nfBlockHeight + cteBlockHeight);
+
     // Check page break
-    if (y > PAGE_HEIGHT - 30) {
+    if (y > PAGE_HEIGHT - rowHeight - 20) {
       doc.addPage();
       y = MARGIN;
 
@@ -205,7 +215,7 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
     // Zebra striping
     if (i % 2 === 0) {
       doc.setFillColor(249, 250, 251);
-      doc.rect(MARGIN, y, CONTENT_WIDTH, 14, "F");
+      doc.rect(MARGIN, y, CONTENT_WIDTH, rowHeight, "F");
     }
 
     x = MARGIN;
@@ -249,7 +259,43 @@ export async function generateRoteirizacaoPDF(data: RoteirizacaoData): Promise<B
     }
     doc.setTextColor(0, 0, 0);
 
-    y += 14;
+    // NFs detail section
+    if (nfsDetail.length > 0) {
+      let ny = y + 14;
+      doc.setFontSize(5.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235);
+      doc.text("NFs:", MARGIN + colWidths[0] + 2, ny);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+      for (const nf of nfsDetail) {
+        doc.text(
+          `NF ${nf.numero_nf} — ${nf.peso_bruto.toFixed(1)}kg — ${nf.volume_m3.toFixed(3)}m³`,
+          MARGIN + colWidths[0] + 12, ny
+        );
+        ny += 4;
+      }
+    }
+
+    // CTEs detail section
+    if (ctesDetail.length > 0) {
+      let cy = y + 14 + nfBlockHeight;
+      doc.setFontSize(5.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(139, 92, 246); // Purple
+      doc.text("CTEs:", MARGIN + colWidths[0] + 2, cy);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+      for (const cte of ctesDetail) {
+        doc.text(
+          `CT-e ${cte.numero_cte} — ${cte.razao_social_emitente} — R$ ${cte.valor_frete.toFixed(2)}`,
+          MARGIN + colWidths[0] + 14, cy
+        );
+        cy += 4;
+      }
+    }
+
+    y += rowHeight;
   }
 
   // Footer totals
