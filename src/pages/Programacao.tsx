@@ -376,6 +376,7 @@ export default function Programacao() {
           const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
 
           // Entrega sub-header
+          const ctesEntrega = nfsEntrega.map((n) => n.numero_cte).filter(Boolean);
           wsData.push([
             "",
             `Entrega ${entregaIdx}`,
@@ -387,6 +388,7 @@ export default function Programacao() {
             first.dest_uf || "",
             first.dest_cep || "",
             `NFs: ${nfsEntrega.map((n) => n.numero_nf).join(", ")}`,
+            ctesEntrega.length > 0 ? `CTes: ${ctesEntrega.join(", ")}` : "",
             totalCx,
             Number(totalPeso.toFixed(2)),
             Number(totalVol.toFixed(4)),
