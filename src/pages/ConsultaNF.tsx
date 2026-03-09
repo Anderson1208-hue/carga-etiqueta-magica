@@ -70,6 +70,20 @@ const statusColors: Record<string, string> = {
   RECUSADO: "bg-destructive/10 text-destructive",
 };
 
+const agendamentoColors: Record<string, string> = {
+  "AGENDAMENTO": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  "AGUARDANDO AGENDA": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "REENTREGA": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  "DEVOLUCAO": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+};
+
+function getDisplayStatus(nf: NfResult) {
+  if (nf.agendamento) {
+    return { label: nf.agendamento.status, colors: agendamentoColors[nf.agendamento.status] || "bg-muted text-muted-foreground" };
+  }
+  return { label: nf.status_entrega, colors: statusColors[nf.status_entrega] || "" };
+}
+
 export default function ConsultaNF() {
   const { toast } = useToast();
   const [busca, setBusca] = useState("");
