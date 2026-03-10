@@ -948,7 +948,7 @@ export default function Roteirizacao() {
         .from("veiculo_nfs")
         .select(`
           id, nf_id,
-          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, cnpj_destinatario)
+          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
         `)
         .eq("veiculo_id", veiculoId);
 
@@ -1957,47 +1957,126 @@ export default function Roteirizacao() {
                                 </div>
                               ) : veiculoNfs[v.id].length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">Nenhuma NF vinculada</p>
-                              ) : (
-                                <div className="space-y-1">
-                                  <p className="text-xs font-semibold text-muted-foreground mb-2">
-                                    {veiculoNfs[v.id].length} NF(s) vinculada(s)
-                                  </p>
-                                  <div className="grid gap-1">
-                                    {veiculoNfs[v.id].map((vnf: any) => {
-                                      const nf = vnf.notas_fiscais;
+                              ) : (() => {
+                                // Group NFs by CNPJ (entrega)
+                                const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: any[] }>();
+                                veiculoNfs[v.id].forEach((vnf: any) => {
+                                  const nf = vnf.notas_fiscais;
+                                  const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
+                                  if (!entregas.has(cnpj)) {
+                                    const end = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf].filter(Boolean).join(", ");
+                                    entregas.set(cnpj, {
+                                      razaoSocial: nf.dest_razao_social || "Cliente não identificado",
+                                      endereco: end || "Endereço não informado",
+                                      nfs: [],
+                                    });
+                                  }
+                                  entregas.get(cnpj)!.nfs.push(vnf);
+                                });
+
+                                let entregaIdx = 0;
+                                return (
+                                  <div className="space-y-4">
+                                    <p className="text-xs font-semibold text-muted-foreground">
+                                      {veiculoNfs[v.id].length} NF(s) em {entregas.size} entrega(s)
+                                    </p>
+                                    {Array.from(entregas.entries()).map(([cnpj, group]) => {
+                                      entregaIdx++;
+                                      const totalPeso = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.peso_bruto || 0), 0);
+                                      const totalVolume = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.volume_m3 || 0), 0);
+                                      const totalCaixas = group.nfs.reduce((s: number, vnf: any) => {
+                                        const items = vnf.notas_fiscais.itens_nf || [];
+                                        return s + items.reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
+                                      }, 0);
+                                      // Collect all CTEs from NFs in this group
+                                      const allCtes = group.nfs.flatMap((vnf: any) => vnf.ctes || []);
+
                                       return (
-                                        <div key={vnf.id} className="space-y-0.5">
-                                          <div className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-background">
-                                            <div className="flex items-center gap-3">
-                                              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                                              <span className="font-medium">NF {nf.numero_nf}</span>
-                                              <span className="text-muted-foreground truncate max-w-[200px]">{nf.dest_razao_social}</span>
+                                        <div key={cnpj} className="rounded-lg border bg-background overflow-hidden">
+                                          <div className="p-3 bg-accent/30 flex items-center justify-between">
+                                            <div>
+                                              <p className="text-sm font-semibold flex items-center gap-2">
+                                                <Package className="w-3.5 h-3.5 text-primary" />
+                                                Entrega {entregaIdx} — {group.razaoSocial}
+                                              </p>
+                                              <p className="text-xs text-muted-foreground mt-0.5">{group.endereco}</p>
                                             </div>
-                                            <div className="flex gap-3 text-xs text-muted-foreground">
-                                              {nf.dest_bairro && <span>{nf.dest_bairro}</span>}
-                                              <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
-                                              <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
+                                            <div className="flex gap-3 text-xs font-medium text-muted-foreground">
+                                              <span>{group.nfs.length} NFs</span>
+                                              <span>{totalCaixas} cx</span>
+                                              <span>{totalPeso.toFixed(1)} kg</span>
+                                              <span>{totalVolume.toFixed(2)} m³</span>
                                             </div>
                                           </div>
-                                          {vnf.ctes && vnf.ctes.length > 0 && (
-                                            <div className="ml-8 space-y-0.5">
-                                              {vnf.ctes.map((cte: any, idx: number) => (
-                                                <div key={idx} className="flex items-center justify-between text-xs py-1 px-3 rounded bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="font-semibold">CT-e {cte.numero_cte}</span>
-                                                    <span className="text-purple-500 dark:text-purple-400 truncate max-w-[180px]">{cte.razao_social_emitente}</span>
+                                          <div className="p-2 space-y-1">
+                                            {group.nfs.map((vnf: any) => {
+                                              const nf = vnf.notas_fiscais;
+                                              const nfCaixas = (nf.itens_nf || []).reduce((s: number, it: any) => s + calculateBoxes(Number(it.q_com)), 0);
+                                              return (
+                                                <div key={vnf.id} className="space-y-0.5">
+                                                  <div className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-muted/40">
+                                                    <div className="flex items-center gap-3">
+                                                      <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                                      <span className="font-medium">NF {nf.numero_nf}</span>
+                                                    </div>
+                                                    <div className="flex gap-3 text-xs text-muted-foreground">
+                                                      <span>{nfCaixas} cx</span>
+                                                      <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
+                                                      <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
+                                                    </div>
                                                   </div>
-                                                  <span className="font-medium">R$ {Number(cte.valor_frete || 0).toFixed(2)}</span>
+                                                  {vnf.ctes && vnf.ctes.length > 0 && (
+                                                    <div className="ml-8 space-y-0.5">
+                                                      {vnf.ctes.map((cte: any, idx: number) => (
+                                                        <div key={idx} className="flex items-center justify-between text-xs py-1 px-3 rounded bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
+                                                          <div className="flex items-center gap-2">
+                                                            <span className="font-semibold">CT-e {cte.numero_cte}</span>
+                                                            <span className="text-purple-500 dark:text-purple-400 truncate max-w-[180px]">{cte.razao_social_emitente}</span>
+                                                          </div>
+                                                          <span className="font-medium">R$ {Number(cte.valor_frete || 0).toFixed(2)}</span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
                                                 </div>
-                                              ))}
+                                              );
+                                            })}
+                                          </div>
+                                          {allCtes.length > 0 && (
+                                            <div className="px-3 pb-2 pt-1 border-t">
+                                              <p className="text-xs font-medium text-muted-foreground">
+                                                Frete entrega: R$ {allCtes.reduce((s: number, c: any) => s + Number(c.valor_frete || 0), 0).toFixed(2)}
+                                              </p>
                                             </div>
                                           )}
                                         </div>
                                       );
                                     })}
+                                    {/* Grand totals */}
+                                    {(() => {
+                                      const gtPeso = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.peso_bruto || 0), 0);
+                                      const gtVolume = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.volume_m3 || 0), 0);
+                                      const gtCaixas = veiculoNfs[v.id].reduce((s: number, vnf: any) => {
+                                        return s + (vnf.notas_fiscais.itens_nf || []).reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
+                                      }, 0);
+                                      const gtFrete = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + (vnf.ctes || []).reduce((sf: number, c: any) => sf + Number(c.valor_frete || 0), 0), 0);
+                                      return (
+                                        <div className="rounded-lg bg-primary/10 p-3 flex items-center justify-between">
+                                          <span className="text-sm font-bold">TOTAL VEÍCULO</span>
+                                          <div className="flex gap-4 text-sm font-semibold">
+                                            <span>{entregas.size} entregas</span>
+                                            <span>{veiculoNfs[v.id].length} NFs</span>
+                                            <span>{gtCaixas} cx</span>
+                                            <span>{gtPeso.toFixed(1)} kg</span>
+                                            <span>{gtVolume.toFixed(2)} m³</span>
+                                            {gtFrete > 0 && <span>R$ {gtFrete.toFixed(2)}</span>}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           )}
                         </Card>
