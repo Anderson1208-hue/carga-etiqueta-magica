@@ -9,7 +9,7 @@ interface CameraScannerProps {
 
 function ScannerOverlay() {
   return (
-    <div className="absolute inset-0 pointer-events-none">
+    <div className="absolute inset-0 pointer-events-none" translate="no">
       <div className="absolute inset-0">
         <div className="absolute top-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
         <div className="absolute bottom-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
@@ -102,7 +102,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
-      // Set states first so <video> renders, then useEffect will attach the stream
       setUseNative(true);
       setCameraActive(true);
       setLoading(false);
@@ -119,7 +118,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     }
   }, []);
 
-  // Attach stream to video element AFTER it renders, fixing the race condition
+  // Attach stream to video element AFTER it renders
   useEffect(() => {
     if (!cameraActive || !useNative || !streamRef.current) return;
 
@@ -129,7 +128,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     video.srcObject = streamRef.current;
     video.play().catch(() => {});
 
-    // Start scanning loop with center crop for faster/more accurate detection
     const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "ean_8"] });
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -137,7 +135,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     const scan = async () => {
       if (!video || video.readyState < 2) return;
       try {
-        // Crop center square from video for focused detection
         if (canvas && ctx) {
           const vw = video.videoWidth;
           const vh = video.videoHeight;
@@ -153,14 +150,12 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
             return;
           }
         }
-        // Fallback: scan full frame
         const barcodes = await detector.detect(video);
         if (barcodes.length > 0) {
           handleDetection(barcodes[0].rawValue);
         }
       } catch {}
     };
-    // Scan every 250ms for faster response
     const intervalId = window.setInterval(scan, 250);
     animFrameRef.current = intervalId as unknown as number;
 
@@ -175,7 +170,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     setLoading(true);
     setError(null);
     try {
-      // Dynamic import with timeout
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), 8000)
       );
@@ -187,7 +181,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       setUseNative(false);
     } catch (err) {
       console.warn("QR Scanner library failed to load, trying native fallback:", err);
-      // If native is available, fall back to it
       if (hasNativeBarcodeDetector) {
         await startNativeScanner();
       } else {
@@ -218,7 +211,6 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       return;
     }
     setError(null);
-    // Prefer native BarcodeDetector (works offline)
     if (hasNativeBarcodeDetector) {
       await startNativeScanner();
     } else {
@@ -265,9 +257,14 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
   if (!enabled) return null;
 
   const LibraryScanner = ScannerRef.current;
+  const showNative = cameraActive && !error && useNative;
+  const showLibrary = cameraActive && !error && !useNative && scannerLoaded && !!LibraryScanner;
 
+  // CRITICAL: Use a single stable DOM structure with CSS display toggling
+  // instead of conditional rendering to prevent insertBefore errors
+  // caused by Chrome Translate or other browser extensions modifying the DOM.
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" translate="no" suppressHydrationWarning>
       <div className="flex items-center gap-2">
         <Button
           variant={cameraActive ? "destructive" : "default"}
@@ -278,17 +275,17 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
           {loading ? (
             <>
               <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              Abrindo câmera...
+              <span>Abrindo câmera...</span>
             </>
           ) : cameraActive ? (
             <>
               <CameraOff className="w-4 h-4" />
-              Desativar Câmera
+              <span>Desativar Câmera</span>
             </>
           ) : (
             <>
               <Camera className="w-4 h-4" />
-              Ativar Câmera
+              <span>Ativar Câmera</span>
             </>
           )}
         </Button>
@@ -302,43 +299,55 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         </Button>
       </div>
 
-      {error && (
-        <div className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <div>
-            <p>{error}</p>
-            {!navigator.onLine && hasNativeBarcodeDetector && (
-              <p className="mt-1 text-xs opacity-80">Modo offline detectado. Tentando scanner nativo...</p>
-            )}
+      {/* Error - always in DOM, toggled via CSS */}
+      <div
+        className="p-4 rounded-lg bg-destructive/10 text-destructive text-sm flex items-start gap-2"
+        style={{ display: error ? "flex" : "none" }}
+      >
+        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+        <div>
+          <p>{error || ""}</p>
+        </div>
+      </div>
+
+      {/* Scanner container - ALWAYS in DOM, toggled via CSS display */}
+      <div
+        className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto"
+        style={{
+          aspectRatio: "3/4",
+          display: (showNative || showLibrary) ? "block" : "none",
+        }}
+      >
+        {/* Native video - always mounted, shown/hidden via CSS */}
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          playsInline
+          muted
+          autoPlay
+          style={{ display: showNative ? "block" : "none" }}
+        />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
+
+        {/* Library scanner - only mounted when loaded (unavoidable) */}
+        {showLibrary && LibraryScanner && (
+          <div className="absolute inset-0">
+            <LibraryScanner
+              onScan={handleLibraryScan}
+              onError={handleLibraryError}
+              constraints={{ facingMode: "environment" }}
+              scanDelay={250}
+              styles={{
+                container: { width: "100%", height: "100%" },
+                video: { width: "100%", height: "100%", objectFit: "cover" },
+              }}
+            />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Scanner container - Native */}
-      {cameraActive && !error && useNative && (
-        <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto" style={{ aspectRatio: "3/4" }}>
-          <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
-          <canvas ref={canvasRef} className="hidden" />
-          <ScannerOverlay />
-        </div>
-      )}
-
-      {/* Scanner container - Library */}
-      {cameraActive && !error && !useNative && scannerLoaded && LibraryScanner && (
-        <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto" style={{ aspectRatio: "3/4" }}>
-          <LibraryScanner
-            onScan={handleLibraryScan}
-            onError={handleLibraryError}
-            constraints={{ facingMode: "environment" }}
-            scanDelay={250}
-            styles={{
-              container: { width: "100%", height: "100%" },
-              video: { width: "100%", height: "100%", objectFit: "cover" },
-            }}
-          />
-          <ScannerOverlay />
-        </div>
-      )}
+        {/* Overlay - always present inside container */}
+        <ScannerOverlay />
+      </div>
     </div>
   );
 }
