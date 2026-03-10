@@ -7,6 +7,31 @@ interface CameraScannerProps {
   enabled: boolean;
 }
 
+function ScannerOverlay() {
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0">
+        <div className="absolute top-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
+        <div className="absolute bg-black/60" style={{ top: "20%", bottom: "20%", left: 0, width: "10%" }} />
+        <div className="absolute bg-black/60" style={{ top: "20%", bottom: "20%", right: 0, width: "10%" }} />
+      </div>
+      <div className="absolute" style={{ top: "20%", bottom: "20%", left: "10%", right: "10%" }}>
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-primary rounded-tl-lg" />
+        <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-primary rounded-tr-lg" />
+        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-primary rounded-bl-lg" />
+        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-primary rounded-br-lg" />
+        <div className="absolute left-2 right-2 h-0.5 bg-primary/90 animate-pulse top-1/2" />
+      </div>
+      <div className="absolute bottom-3 left-0 right-0 text-center">
+        <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
+          Aponte para o código
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
   const [cameraActive, setCameraActive] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -289,63 +314,29 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         </div>
       )}
 
-      {/* Scanner container */}
-      {cameraActive && !error && (
-        <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto" style={{ aspectRatio: "3/4" }} key={useNative ? "native" : "library"}>
-          {/* Native camera view */}
-          {useNative && (
-            <>
-              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-              <canvas ref={canvasRef} className="hidden" />
-            </>
-          )}
+      {/* Scanner container - Native */}
+      {cameraActive && !error && useNative && (
+        <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto" style={{ aspectRatio: "3/4" }}>
+          <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
+          <canvas ref={canvasRef} className="hidden" />
+          <ScannerOverlay />
+        </div>
+      )}
 
-          {/* Library-based scanner */}
-          {!useNative && scannerLoaded && LibraryScanner && (
-            <LibraryScanner
-              onScan={handleLibraryScan}
-              onError={handleLibraryError}
-              constraints={{ facingMode: "environment" }}
-              scanDelay={250}
-              styles={{
-                container: { width: "100%", height: "100%" },
-                video: { width: "100%", height: "100%", objectFit: "cover" },
-              }}
-            />
-          )}
-
-          {/* Banking-app style overlay with darkened edges and centered square */}
-          <div className="absolute inset-0 pointer-events-none">
-            {/* Dark overlay with transparent center square */}
-            <div className="absolute inset-0">
-              {/* Top dark band */}
-              <div className="absolute top-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
-              {/* Bottom dark band */}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/60" style={{ height: "20%" }} />
-              {/* Left dark band (between top and bottom) */}
-              <div className="absolute bg-black/60" style={{ top: "20%", bottom: "20%", left: 0, width: "10%" }} />
-              {/* Right dark band (between top and bottom) */}
-              <div className="absolute bg-black/60" style={{ top: "20%", bottom: "20%", right: 0, width: "10%" }} />
-            </div>
-
-            {/* Center square frame with corner accents */}
-            <div className="absolute" style={{ top: "20%", bottom: "20%", left: "10%", right: "10%" }}>
-              {/* Corner accents */}
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-[3px] border-l-[3px] border-primary rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-[3px] border-r-[3px] border-primary rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-[3px] border-l-[3px] border-primary rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-[3px] border-r-[3px] border-primary rounded-br-lg" />
-              {/* Scan line animation */}
-              <div className="absolute left-2 right-2 h-0.5 bg-primary/90 animate-pulse top-1/2" />
-            </div>
-
-            {/* Label */}
-            <div className="absolute bottom-3 left-0 right-0 text-center">
-              <span className="bg-black/70 text-white text-xs px-3 py-1.5 rounded-full">
-                Aponte para o código
-              </span>
-            </div>
-          </div>
+      {/* Scanner container - Library */}
+      {cameraActive && !error && !useNative && scannerLoaded && LibraryScanner && (
+        <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto" style={{ aspectRatio: "3/4" }}>
+          <LibraryScanner
+            onScan={handleLibraryScan}
+            onError={handleLibraryError}
+            constraints={{ facingMode: "environment" }}
+            scanDelay={250}
+            styles={{
+              container: { width: "100%", height: "100%" },
+              video: { width: "100%", height: "100%", objectFit: "cover" },
+            }}
+          />
+          <ScannerOverlay />
         </div>
       )}
     </div>
