@@ -268,38 +268,34 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
         </div>
       )}
 
-      {/* Native camera view */}
-      {cameraActive && useNative && !error && (
-        <div className="relative rounded-lg overflow-hidden bg-black aspect-video max-w-md">
-          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-4 border-2 border-primary/50 rounded-lg">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
-            </div>
-            <div className="absolute left-4 right-4 h-0.5 bg-primary/80 animate-pulse top-1/2" />
-          </div>
-          <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-            Scanner nativo (offline)
-          </div>
-        </div>
-      )}
+      {/* Scanner container - single wrapper prevents DOM insertBefore errors */}
+      {cameraActive && !error && (
+        <div className="relative rounded-lg overflow-hidden bg-black aspect-video max-w-md" key={useNative ? "native" : "library"}>
+          {/* Native camera view */}
+          {useNative && (
+            <>
+              <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+              <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                Scanner nativo (offline)
+              </div>
+            </>
+          )}
 
-      {/* Library-based scanner */}
-      {cameraActive && !useNative && scannerLoaded && LibraryScanner && !error && (
-        <div className="relative rounded-lg overflow-hidden bg-black aspect-video max-w-md">
-          <LibraryScanner
-            onScan={handleLibraryScan}
-            onError={handleLibraryError}
-            constraints={{ facingMode: "environment" }}
-            scanDelay={300}
-            styles={{
-              container: { width: "100%", height: "100%" },
-              video: { width: "100%", height: "100%", objectFit: "cover" },
-            }}
-          />
+          {/* Library-based scanner */}
+          {!useNative && scannerLoaded && LibraryScanner && (
+            <LibraryScanner
+              onScan={handleLibraryScan}
+              onError={handleLibraryError}
+              constraints={{ facingMode: "environment" }}
+              scanDelay={300}
+              styles={{
+                container: { width: "100%", height: "100%" },
+                video: { width: "100%", height: "100%", objectFit: "cover" },
+              }}
+            />
+          )}
+
+          {/* Overlay */}
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute inset-4 border-2 border-primary/50 rounded-lg">
               <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
