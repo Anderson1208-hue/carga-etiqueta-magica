@@ -90,38 +90,22 @@ export default function Programacao() {
   async function loadNfsDisponiveis() {
     setLoading(true);
     try {
-      // Fetch cargas and roteirizacoes in parallel
-      const [cargasRes, roteirizacoesRes] = await Promise.all([
-        supabase
-          .from("cargas")
-          .select("id, placa, motorista, data, tipo_carga, status")
-          .neq("status", "entregue"),
-        supabase
-          .from("roteirizacoes")
-          .select("carga_id"),
-      ]);
+      // Fetch cargas abertas (não exclui por roteirização - apenas NFs já vinculadas a veículos serão filtradas)
+      const cargasRes = await supabase
+        .from("cargas")
+        .select("id, placa, motorista, data, tipo_carga, status")
+        .eq("status", "aberta");
 
       if (cargasRes.error) throw cargasRes.error;
-      if (roteirizacoesRes.error) throw roteirizacoesRes.error;
       const cargas = cargasRes.data;
-      const roteirizacoes = roteirizacoesRes.data;
 
       if (!cargas || cargas.length === 0) {
         setNfsDisponiveis([]);
         return;
       }
 
-      // Excluir cargas que já possuem roteirização
-      const cargasComRota = new Set((roteirizacoes || []).map((r) => r.carga_id));
-      const cargasFiltradas = cargas.filter((c) => !cargasComRota.has(c.id) && c.status === "aberta");
-
-      if (cargasFiltradas.length === 0) {
-        setNfsDisponiveis([]);
-        return;
-      }
-
-      const cargaIds = cargasFiltradas.map((c) => c.id);
-      const cargaMap = new Map(cargasFiltradas.map((c) => [c.id, c]));
+      const cargaIds = cargas.map((c) => c.id);
+      const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
       const nfPromises = cargaIds.map((cargaId) =>
         supabase
