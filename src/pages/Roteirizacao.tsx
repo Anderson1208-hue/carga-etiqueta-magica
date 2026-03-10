@@ -1980,6 +1980,29 @@ export default function Roteirizacao() {
                                 variant="outline"
                                 size="sm"
                                 className="h-8 px-2"
+                                disabled={generatingResumoPdfId === v.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!veiculoNfs[v.id]) {
+                                    loadVeiculoNfs(v.id).then(() => {
+                                      setTimeout(() => handleGerarResumoVeiculo(v), 500);
+                                    });
+                                  } else {
+                                    handleGerarResumoVeiculo(v);
+                                  }
+                                }}
+                              >
+                                {generatingResumoPdfId === v.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                                ) : (
+                                  <Download className="w-3.5 h-3.5 mr-1" />
+                                )}
+                                Resumo
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setAlterarRotaVeiculo(v);
