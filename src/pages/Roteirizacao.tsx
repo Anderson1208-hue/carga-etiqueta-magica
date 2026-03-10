@@ -1966,17 +1966,32 @@ export default function Roteirizacao() {
                                     {veiculoNfs[v.id].map((vnf: any) => {
                                       const nf = vnf.notas_fiscais;
                                       return (
-                                        <div key={vnf.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-background">
-                                          <div className="flex items-center gap-3">
-                                            <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                                            <span className="font-medium">NF {nf.numero_nf}</span>
-                                            <span className="text-muted-foreground truncate max-w-[200px]">{nf.dest_razao_social}</span>
+                                        <div key={vnf.id} className="space-y-0.5">
+                                          <div className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-background">
+                                            <div className="flex items-center gap-3">
+                                              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                                              <span className="font-medium">NF {nf.numero_nf}</span>
+                                              <span className="text-muted-foreground truncate max-w-[200px]">{nf.dest_razao_social}</span>
+                                            </div>
+                                            <div className="flex gap-3 text-xs text-muted-foreground">
+                                              {nf.dest_bairro && <span>{nf.dest_bairro}</span>}
+                                              <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
+                                              <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
+                                            </div>
                                           </div>
-                                          <div className="flex gap-3 text-xs text-muted-foreground">
-                                            {nf.dest_bairro && <span>{nf.dest_bairro}</span>}
-                                            <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
-                                            <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
-                                          </div>
+                                          {vnf.ctes && vnf.ctes.length > 0 && (
+                                            <div className="ml-8 space-y-0.5">
+                                              {vnf.ctes.map((cte: any, idx: number) => (
+                                                <div key={idx} className="flex items-center justify-between text-xs py-1 px-3 rounded bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="font-semibold">CT-e {cte.numero_cte}</span>
+                                                    <span className="text-purple-500 dark:text-purple-400 truncate max-w-[180px]">{cte.razao_social_emitente}</span>
+                                                  </div>
+                                                  <span className="font-medium">R$ {Number(cte.valor_frete || 0).toFixed(2)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                       );
                                     })}
