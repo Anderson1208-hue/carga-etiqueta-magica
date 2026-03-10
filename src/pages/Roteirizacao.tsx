@@ -948,7 +948,7 @@ export default function Roteirizacao() {
         .from("veiculo_nfs")
         .select(`
           id, nf_id,
-          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, cnpj_destinatario)
+          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
         `)
         .eq("veiculo_id", veiculoId);
 
