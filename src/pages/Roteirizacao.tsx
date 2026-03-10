@@ -982,6 +982,48 @@ export default function Roteirizacao() {
   }
 
   const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
+  const [generatingResumoPdfId, setGeneratingResumoPdfId] = useState<string | null>(null);
+
+  async function handleGerarResumoVeiculo(veiculo: any) {
+    setGeneratingResumoPdfId(veiculo.id);
+    try {
+      const nfsData = veiculoNfs[veiculo.id];
+      if (!nfsData || nfsData.length === 0) {
+        toast({ title: "Sem dados", description: "Expanda o veículo primeiro para carregar os dados", variant: "destructive" });
+        return;
+      }
+      const nfs = nfsData.map((vnf: any) => {
+        const nf = vnf.notas_fiscais;
+        return {
+          numero_nf: nf.numero_nf,
+          dest_razao_social: nf.dest_razao_social || "",
+          dest_logradouro: nf.dest_logradouro || "",
+          dest_numero: nf.dest_numero || "",
+          dest_bairro: nf.dest_bairro || "",
+          dest_cidade: nf.dest_cidade || "",
+          dest_uf: nf.dest_uf || "",
+          dest_cep: nf.dest_cep || "",
+          cnpj_destinatario: nf.cnpj_destinatario || "",
+          peso_bruto: Number(nf.peso_bruto || 0),
+          volume_m3: Number(nf.volume_m3 || 0),
+          itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
+          ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
+        };
+      });
+      const blob = await generateResumoVeiculoPDF({
+        placa: veiculo.placa,
+        motorista: veiculo.motorista || "",
+        data: veiculo.data,
+        nfs,
+      });
+      downloadBlob(blob, `resumo_entregas_${veiculo.placa}_${veiculo.data}.pdf`);
+    } catch (err) {
+      console.error("Error generating resumo PDF:", err);
+      toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
+    } finally {
+      setGeneratingResumoPdfId(null);
+    }
+  }
 
   async function handleGerarNotaDeCargaVeiculo(veiculo: any) {
     setGeneratingPdfVeiculoId(veiculo.id);
