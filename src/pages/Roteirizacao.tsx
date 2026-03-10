@@ -1988,8 +1988,6 @@ export default function Roteirizacao() {
                                         const items = vnf.notas_fiscais.itens_nf || [];
                                         return s + items.reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
                                       }, 0);
-                                      // Collect all CTEs from NFs in this group
-                                      const allCtes = group.nfs.flatMap((vnf: any) => vnf.ctes || []);
 
                                       return (
                                         <div key={cnpj} className="rounded-lg border bg-background overflow-hidden">
