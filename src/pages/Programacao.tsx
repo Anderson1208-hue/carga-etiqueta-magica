@@ -101,6 +101,11 @@ export default function Programacao() {
           .select("carga_id"),
       ]);
 
+      if (cargasRes.error) throw cargasRes.error;
+      if (roteirizacoesRes.error) throw roteirizacoesRes.error;
+      const cargas = cargasRes.data;
+      const roteirizacoes = roteirizacoesRes.data;
+
       if (!cargas || cargas.length === 0) {
         setNfsDisponiveis([]);
         return;
