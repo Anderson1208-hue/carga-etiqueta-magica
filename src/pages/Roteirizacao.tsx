@@ -951,7 +951,30 @@ export default function Roteirizacao() {
           notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, cnpj_destinatario)
         `)
         .eq("veiculo_id", veiculoId);
-      setVeiculoNfs((prev) => ({ ...prev, [veiculoId]: data || [] }));
+
+      // Fetch CTEs linked to these NFs
+      const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
+      let ctesMap: Record<string, any[]> = {};
+      if (nfIds.length > 0) {
+        const { data: ctesData } = await supabase
+          .from("ctes")
+          .select("nf_id, numero_cte, razao_social_emitente, valor_frete")
+          .in("nf_id", nfIds);
+        if (ctesData) {
+          for (const cte of ctesData) {
+            if (!ctesMap[cte.nf_id!]) ctesMap[cte.nf_id!] = [];
+            ctesMap[cte.nf_id!].push(cte);
+          }
+        }
+      }
+
+      // Attach CTEs to each vnf
+      const enriched = (data || []).map((vnf: any) => ({
+        ...vnf,
+        ctes: ctesMap[vnf.nf_id] || [],
+      }));
+
+      setVeiculoNfs((prev) => ({ ...prev, [veiculoId]: enriched }));
     } catch (err) {
       console.error("Error loading vehicle NFs:", err);
     }
