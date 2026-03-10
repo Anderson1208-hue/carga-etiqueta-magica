@@ -91,7 +91,7 @@ export default function Programacao() {
     setLoading(true);
     try {
       // Fetch cargas and roteirizacoes in parallel
-      const [{ data: cargas }, { data: roteirizacoes }] = await Promise.all([
+      const [cargasRes, roteirizacoesRes] = await Promise.all([
         supabase
           .from("cargas")
           .select("id, placa, motorista, data, tipo_carga, status")
@@ -100,6 +100,11 @@ export default function Programacao() {
           .from("roteirizacoes")
           .select("carga_id"),
       ]);
+
+      if (cargasRes.error) throw cargasRes.error;
+      if (roteirizacoesRes.error) throw roteirizacoesRes.error;
+      const cargas = cargasRes.data;
+      const roteirizacoes = roteirizacoesRes.data;
 
       if (!cargas || cargas.length === 0) {
         setNfsDisponiveis([]);
@@ -217,6 +222,10 @@ export default function Programacao() {
       });
 
       setNfsDisponiveis(available);
+    } catch (error) {
+      console.error("[Programacao] Erro ao carregar NFs:", error);
+      toast({ title: "Erro ao carregar preparação", description: "Tente recarregar a página.", variant: "destructive" });
+      setNfsDisponiveis([]);
     } finally {
       setLoading(false);
     }

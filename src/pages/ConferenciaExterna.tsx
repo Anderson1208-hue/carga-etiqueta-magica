@@ -144,10 +144,12 @@ export default function ConferenciaExterna() {
     setLoadingNfs(true);
     try {
       // Get NFs linked to this vehicle
-      const { data: vnfs } = await supabase
+      const { data: vnfs, error: vnfsError } = await supabase
         .from("veiculo_nfs")
         .select("nf_id, carga_origem_id")
         .eq("veiculo_id", veiculoId);
+
+      if (vnfsError) throw vnfsError;
 
       if (!vnfs || vnfs.length === 0) {
         setNfs([]);
@@ -159,10 +161,12 @@ export default function ConferenciaExterna() {
       const uniqueCargaIds = [...new Set(vnfs.map((v) => v.carga_origem_id))];
 
       // Get NF details
-      const { data: nfsData } = await supabase
+      const { data: nfsData, error: nfsError } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
         .in("id", nfIds);
+
+      if (nfsError) throw nfsError;
 
       // Use RPC to get progress for each carga (avoids 1000 row limit)
       const progressResults = await Promise.all(
@@ -235,8 +239,9 @@ export default function ConferenciaExterna() {
 
       setNfs(filtered);
     } catch (error) {
-      console.error("Erro ao carregar NFs:", error);
-      toast({ title: "Erro ao carregar NFs", variant: "destructive" });
+      console.error("[ConferenciaExterna] Erro ao carregar NFs:", error);
+      toast({ title: "Erro ao carregar NFs", description: "Tente novamente.", variant: "destructive" });
+      setNfs([]);
     } finally {
       setLoadingNfs(false);
     }
@@ -390,43 +395,47 @@ export default function ConferenciaExterna() {
   async function reloadSelectedNfProgress() {
     if (!selectedNf) return;
 
-    const [totalRes, confRes, divRes] = await Promise.all([
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf),
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf)
-        .eq("status", "conferido"),
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf)
-        .eq("status", "divergencia" as any),
-    ]);
+    try {
+      const [totalRes, confRes, divRes] = await Promise.all([
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf),
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf)
+          .eq("status", "conferido"),
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf)
+          .eq("status", "divergencia" as any),
+      ]);
 
-    const divergencias = divRes.count || 0;
-    const total = (totalRes.count || 0) - divergencias;
-    const conferidas = confRes.count || 0;
+      const divergencias = divRes.count || 0;
+      const total = (totalRes.count || 0) - divergencias;
+      const conferidas = confRes.count || 0;
 
-    setSelectedNf((prev) => prev ? { ...prev, totalEtiquetas: total, conferidas } : null);
+      setSelectedNf((prev) => prev ? { ...prev, totalEtiquetas: total, conferidas } : null);
 
-    if (conferidas === total && total > 0) {
-      setTimeout(() => {
-        const completeResult: ScanResult = {
-          type: "success",
-          message: `✅ NF ${selectedNf.numero_nf} - Conferência COMPLETA!`,
-          details: `Todas as ${total} etiquetas conferidas. Baixa liberada.`,
-        };
-        setLastResult(completeResult);
-        addToHistory(completeResult);
-        playSound("success");
-      }, 500);
+      if (conferidas === total && total > 0) {
+        setTimeout(() => {
+          const completeResult: ScanResult = {
+            type: "success",
+            message: `✅ NF ${selectedNf.numero_nf} - Conferência COMPLETA!`,
+            details: `Todas as ${total} etiquetas conferidas. Baixa liberada.`,
+          };
+          setLastResult(completeResult);
+          addToHistory(completeResult);
+          playSound("success");
+        }, 500);
+      }
+    } catch (error) {
+      console.error("[ConferenciaExterna] Erro ao recarregar progresso:", error);
     }
   }
 
