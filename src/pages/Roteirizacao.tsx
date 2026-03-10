@@ -1983,13 +1983,7 @@ export default function Roteirizacao() {
                                 disabled={generatingResumoPdfId === v.id}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (!veiculoNfs[v.id]) {
-                                    loadVeiculoNfs(v.id).then(() => {
-                                      setTimeout(() => handleGerarResumoVeiculo(v), 500);
-                                    });
-                                  } else {
-                                    handleGerarResumoVeiculo(v);
-                                  }
+                                  handleGerarResumoVeiculo(v);
                                 }}
                               >
                                 {generatingResumoPdfId === v.id ? (
