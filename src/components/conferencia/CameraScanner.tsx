@@ -104,19 +104,39 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
     video.srcObject = streamRef.current;
     video.play().catch(() => {});
 
-    // Start scanning loop
+    // Start scanning loop with center crop for faster/more accurate detection
     const detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128", "ean_13", "ean_8"] });
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+
     const scan = async () => {
       if (!video || video.readyState < 2) return;
       try {
+        // Crop center square from video for focused detection
+        if (canvas && ctx) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const size = Math.min(vw, vh) * 0.6;
+          const sx = (vw - size) / 2;
+          const sy = (vh - size) / 2;
+          canvas.width = size;
+          canvas.height = size;
+          ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+          const barcodes = await detector.detect(canvas);
+          if (barcodes.length > 0) {
+            handleDetection(barcodes[0].rawValue);
+            return;
+          }
+        }
+        // Fallback: scan full frame
         const barcodes = await detector.detect(video);
         if (barcodes.length > 0) {
           handleDetection(barcodes[0].rawValue);
         }
       } catch {}
     };
-    // Scan every 400ms to save CPU
-    const intervalId = window.setInterval(scan, 400);
+    // Scan every 250ms for faster response
+    const intervalId = window.setInterval(scan, 250);
     animFrameRef.current = intervalId as unknown as number;
 
     return () => {
