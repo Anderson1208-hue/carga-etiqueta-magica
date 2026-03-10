@@ -222,6 +222,10 @@ export default function Programacao() {
       });
 
       setNfsDisponiveis(available);
+    } catch (error) {
+      console.error("[Programacao] Erro ao carregar NFs:", error);
+      toast({ title: "Erro ao carregar preparação", description: "Tente recarregar a página.", variant: "destructive" });
+      setNfsDisponiveis([]);
     } finally {
       setLoading(false);
     }
