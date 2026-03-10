@@ -144,10 +144,12 @@ export default function ConferenciaExterna() {
     setLoadingNfs(true);
     try {
       // Get NFs linked to this vehicle
-      const { data: vnfs } = await supabase
+      const { data: vnfs, error: vnfsError } = await supabase
         .from("veiculo_nfs")
         .select("nf_id, carga_origem_id")
         .eq("veiculo_id", veiculoId);
+
+      if (vnfsError) throw vnfsError;
 
       if (!vnfs || vnfs.length === 0) {
         setNfs([]);
@@ -159,10 +161,12 @@ export default function ConferenciaExterna() {
       const uniqueCargaIds = [...new Set(vnfs.map((v) => v.carga_origem_id))];
 
       // Get NF details
-      const { data: nfsData } = await supabase
+      const { data: nfsData, error: nfsError } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
         .in("id", nfIds);
+
+      if (nfsError) throw nfsError;
 
       // Use RPC to get progress for each carga (avoids 1000 row limit)
       const progressResults = await Promise.all(
@@ -235,8 +239,9 @@ export default function ConferenciaExterna() {
 
       setNfs(filtered);
     } catch (error) {
-      console.error("Erro ao carregar NFs:", error);
-      toast({ title: "Erro ao carregar NFs", variant: "destructive" });
+      console.error("[ConferenciaExterna] Erro ao carregar NFs:", error);
+      toast({ title: "Erro ao carregar NFs", description: "Tente novamente.", variant: "destructive" });
+      setNfs([]);
     } finally {
       setLoadingNfs(false);
     }
