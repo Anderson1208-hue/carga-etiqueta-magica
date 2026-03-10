@@ -81,13 +81,14 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
       setCameraActive(true);
       setLoading(false);
     } catch (err: any) {
+      console.error("[CameraScanner] startNativeScanner error:", err.name, err.message, err);
       setLoading(false);
       if (err.name === "NotAllowedError") {
         setError("Permissão de câmera negada. Por favor, permita o acesso à câmera.");
       } else if (err.name === "NotFoundError") {
         setError("Nenhuma câmera encontrada no dispositivo.");
       } else {
-        setError("Erro ao acessar a câmera: " + (err.message || ""));
+        setError("Erro ao acessar a câmera: " + (err.name + " - " + err.message || ""));
       }
     }
   }, []);
