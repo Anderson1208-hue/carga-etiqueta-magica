@@ -91,7 +91,7 @@ export default function Programacao() {
     setLoading(true);
     try {
       // Fetch cargas and roteirizacoes in parallel
-      const [{ data: cargas }, { data: roteirizacoes }] = await Promise.all([
+      const [cargasRes, roteirizacoesRes] = await Promise.all([
         supabase
           .from("cargas")
           .select("id, placa, motorista, data, tipo_carga, status")
