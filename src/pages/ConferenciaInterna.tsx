@@ -436,39 +436,43 @@ export default function ConferenciaInterna() {
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
 
-    let all: { id: string; status: string }[] = [];
+    try {
+      let all: { id: string; status: string }[] = [];
 
-    if (offlineMode || !isOnline) {
-      const ets = await getOfflineEtiquetas(selectedCarga.id);
-      all = ets.filter((e) => e.numero_nf === selectedNf).map((e) => ({ id: e.id, status: e.status }));
-    } else {
-      const { data: etiquetasData } = await supabase
-        .from("etiquetas")
-        .select("id, status")
-        .eq("carga_id", selectedCarga.id)
-        .eq("numero_nf", selectedNf);
-      all = etiquetasData || [];
-    }
+      if (offlineMode || !isOnline) {
+        const ets = await getOfflineEtiquetas(selectedCarga.id);
+        all = ets.filter((e) => e.numero_nf === selectedNf).map((e) => ({ id: e.id, status: e.status }));
+      } else {
+        const { data: etiquetasData } = await supabase
+          .from("etiquetas")
+          .select("id, status")
+          .eq("carga_id", selectedCarga.id)
+          .eq("numero_nf", selectedNf);
+        all = etiquetasData || [];
+      }
 
-    const divergencias = all.filter((e) => e.status === "divergencia").length;
-    const total = all.length - divergencias;
-    const conferidas = all.filter(
-      (e) => e.status === "conferido_interno" || e.status === "conferido"
-    ).length;
+      const divergencias = all.filter((e) => e.status === "divergencia").length;
+      const total = all.length - divergencias;
+      const conferidas = all.filter(
+        (e) => e.status === "conferido_interno" || e.status === "conferido"
+      ).length;
 
-    setNfProgress({ numeroNf: selectedNf, total, conferidas });
+      setNfProgress({ numeroNf: selectedNf, total, conferidas });
 
-    if (conferidas === total && total > 0) {
-      setTimeout(() => {
-        const completeResult: ScanResult = {
-          type: "success",
-          message: `✅ NF ${selectedNf} COMPLETA!`,
-          details: `Todas as ${total} etiquetas conferidas internamente.`,
-        };
-        setLastResult(completeResult);
-        addToHistory(completeResult);
-        playSound("success");
-      }, 500);
+      if (conferidas === total && total > 0) {
+        setTimeout(() => {
+          const completeResult: ScanResult = {
+            type: "success",
+            message: `✅ NF ${selectedNf} COMPLETA!`,
+            details: `Todas as ${total} etiquetas conferidas internamente.`,
+          };
+          setLastResult(completeResult);
+          addToHistory(completeResult);
+          playSound("success");
+        }, 500);
+      }
+    } catch (error) {
+      console.error("[ConferenciaInterna] Erro ao recarregar progresso:", error);
     }
   }
 

@@ -390,43 +390,47 @@ export default function ConferenciaExterna() {
   async function reloadSelectedNfProgress() {
     if (!selectedNf) return;
 
-    const [totalRes, confRes, divRes] = await Promise.all([
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf),
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf)
-        .eq("status", "conferido"),
-      supabase
-        .from("etiquetas")
-        .select("id", { count: "exact", head: true })
-        .eq("carga_id", selectedNf.carga_id)
-        .eq("numero_nf", selectedNf.numero_nf)
-        .eq("status", "divergencia" as any),
-    ]);
+    try {
+      const [totalRes, confRes, divRes] = await Promise.all([
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf),
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf)
+          .eq("status", "conferido"),
+        supabase
+          .from("etiquetas")
+          .select("id", { count: "exact", head: true })
+          .eq("carga_id", selectedNf.carga_id)
+          .eq("numero_nf", selectedNf.numero_nf)
+          .eq("status", "divergencia" as any),
+      ]);
 
-    const divergencias = divRes.count || 0;
-    const total = (totalRes.count || 0) - divergencias;
-    const conferidas = confRes.count || 0;
+      const divergencias = divRes.count || 0;
+      const total = (totalRes.count || 0) - divergencias;
+      const conferidas = confRes.count || 0;
 
-    setSelectedNf((prev) => prev ? { ...prev, totalEtiquetas: total, conferidas } : null);
+      setSelectedNf((prev) => prev ? { ...prev, totalEtiquetas: total, conferidas } : null);
 
-    if (conferidas === total && total > 0) {
-      setTimeout(() => {
-        const completeResult: ScanResult = {
-          type: "success",
-          message: `✅ NF ${selectedNf.numero_nf} - Conferência COMPLETA!`,
-          details: `Todas as ${total} etiquetas conferidas. Baixa liberada.`,
-        };
-        setLastResult(completeResult);
-        addToHistory(completeResult);
-        playSound("success");
-      }, 500);
+      if (conferidas === total && total > 0) {
+        setTimeout(() => {
+          const completeResult: ScanResult = {
+            type: "success",
+            message: `✅ NF ${selectedNf.numero_nf} - Conferência COMPLETA!`,
+            details: `Todas as ${total} etiquetas conferidas. Baixa liberada.`,
+          };
+          setLastResult(completeResult);
+          addToHistory(completeResult);
+          playSound("success");
+        }, 500);
+      }
+    } catch (error) {
+      console.error("[ConferenciaExterna] Erro ao recarregar progresso:", error);
     }
   }
 
