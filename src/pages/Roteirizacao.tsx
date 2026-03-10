@@ -2012,43 +2012,27 @@ export default function Roteirizacao() {
                                             {group.nfs.map((vnf: any) => {
                                               const nf = vnf.notas_fiscais;
                                               const nfCaixas = (nf.itens_nf || []).reduce((s: number, it: any) => s + calculateBoxes(Number(it.q_com)), 0);
+                                              const nfCtes = vnf.ctes || [];
                                               return (
-                                                <div key={vnf.id} className="space-y-0.5">
-                                                  <div className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-muted/40">
-                                                    <div className="flex items-center gap-3">
-                                                      <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                                                      <span className="font-medium">NF {nf.numero_nf}</span>
-                                                    </div>
-                                                    <div className="flex gap-3 text-xs text-muted-foreground">
-                                                      <span>{nfCaixas} cx</span>
-                                                      <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
-                                                      <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
-                                                    </div>
+                                                <div key={vnf.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-muted/40">
+                                                  <div className="flex items-center gap-3 min-w-0">
+                                                    <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                                    <span className="font-medium">NF {nf.numero_nf}</span>
+                                                    {nfCtes.length > 0 && (
+                                                      <span className="text-xs text-muted-foreground">
+                                                        CT-e {nfCtes.map((c: any) => c.numero_cte).join(", ")}
+                                                      </span>
+                                                    )}
                                                   </div>
-                                                  {vnf.ctes && vnf.ctes.length > 0 && (
-                                                    <div className="ml-8 space-y-0.5">
-                                                      {vnf.ctes.map((cte: any, idx: number) => (
-                                                        <div key={idx} className="flex items-center justify-between text-xs py-1 px-3 rounded bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300">
-                                                          <div className="flex items-center gap-2">
-                                                            <span className="font-semibold">CT-e {cte.numero_cte}</span>
-                                                            <span className="text-purple-500 dark:text-purple-400 truncate max-w-[180px]">{cte.razao_social_emitente}</span>
-                                                          </div>
-                                                          <span className="font-medium">R$ {Number(cte.valor_frete || 0).toFixed(2)}</span>
-                                                        </div>
-                                                      ))}
-                                                    </div>
-                                                  )}
+                                                  <div className="flex gap-3 text-xs text-muted-foreground shrink-0">
+                                                    <span>{nfCaixas} cx</span>
+                                                    <span>{Number(nf.peso_bruto || 0).toFixed(1)} kg</span>
+                                                    <span>{Number(nf.volume_m3 || 0).toFixed(2)} m³</span>
+                                                  </div>
                                                 </div>
                                               );
                                             })}
                                           </div>
-                                          {allCtes.length > 0 && (
-                                            <div className="px-3 pb-2 pt-1 border-t">
-                                              <p className="text-xs font-medium text-muted-foreground">
-                                                Frete entrega: R$ {allCtes.reduce((s: number, c: any) => s + Number(c.valor_frete || 0), 0).toFixed(2)}
-                                              </p>
-                                            </div>
-                                          )}
                                         </div>
                                       );
                                     })}
@@ -2059,7 +2043,6 @@ export default function Roteirizacao() {
                                       const gtCaixas = veiculoNfs[v.id].reduce((s: number, vnf: any) => {
                                         return s + (vnf.notas_fiscais.itens_nf || []).reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
                                       }, 0);
-                                      const gtFrete = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + (vnf.ctes || []).reduce((sf: number, c: any) => sf + Number(c.valor_frete || 0), 0), 0);
                                       return (
                                         <div className="rounded-lg bg-primary/10 p-3 flex items-center justify-between">
                                           <span className="text-sm font-bold">TOTAL VEÍCULO</span>
@@ -2069,7 +2052,6 @@ export default function Roteirizacao() {
                                             <span>{gtCaixas} cx</span>
                                             <span>{gtPeso.toFixed(1)} kg</span>
                                             <span>{gtVolume.toFixed(2)} m³</span>
-                                            {gtFrete > 0 && <span>R$ {gtFrete.toFixed(2)}</span>}
                                           </div>
                                         </div>
                                       );
