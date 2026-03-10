@@ -15,6 +15,7 @@ export function CameraScanner({ onScan, enabled }: CameraScannerProps) {
   const lastScannedRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number>(0);
   const ScannerRef = useRef<any>(null);
