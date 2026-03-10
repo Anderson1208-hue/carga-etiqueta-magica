@@ -43,6 +43,7 @@ import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
+import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
