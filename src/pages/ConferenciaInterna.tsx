@@ -113,6 +113,9 @@ export default function ConferenciaInterna() {
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+  const [faltamAberto, setFaltamAberto] = useState(false);
+  const [etiquetasFaltantes, setEtiquetasFaltantes] = useState<{id: string; x_prod: string; c_prod: string; seq: number; total: number}[]>([]);
+  const [loadingFaltantes, setLoadingFaltantes] = useState(false);
 
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
