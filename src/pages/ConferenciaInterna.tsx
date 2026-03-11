@@ -486,6 +486,35 @@ export default function ConferenciaInterna() {
     }
   }
 
+  async function loadEtiquetasFaltantes() {
+    if (!selectedCarga || !selectedNf) return;
+    setLoadingFaltantes(true);
+    try {
+      if (offlineMode || !isOnline) {
+        const ets = await getOfflineEtiquetas(selectedCarga.id);
+        const faltantes = ets
+          .filter((e) => e.numero_nf === selectedNf && e.status === "pendente")
+          .map((e) => ({ id: e.id, x_prod: e.x_prod, c_prod: e.c_prod, seq: e.seq, total: e.total }));
+        setEtiquetasFaltantes(faltantes);
+      } else {
+        const { data, error } = await supabase
+          .from("etiquetas")
+          .select("id, x_prod, c_prod, seq, total")
+          .eq("carga_id", selectedCarga.id)
+          .eq("numero_nf", selectedNf)
+          .eq("status", "pendente")
+          .order("c_prod")
+          .order("seq");
+        if (error) throw error;
+        setEtiquetasFaltantes(data || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar faltantes:", error);
+    } finally {
+      setLoadingFaltantes(false);
+    }
+  }
+
   // ---- DIVERGÊNCIA MANAGEMENT (Admin only) ----
   async function loadPendingEtiquetas() {
     if (!selectedCarga || !selectedNf) return;
