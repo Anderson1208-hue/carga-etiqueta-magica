@@ -24,6 +24,11 @@ import {
   type OfflineEtiqueta,
 } from "@/hooks/useOfflineConferencia";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ScanLine,
   CheckCircle2,
   AlertCircle,
@@ -38,6 +43,8 @@ import {
   Upload,
   Wifi,
   WifiOff,
+  ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 
 interface CargaResumo {
@@ -106,6 +113,9 @@ export default function ConferenciaInterna() {
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+  const [faltamAberto, setFaltamAberto] = useState(false);
+  const [etiquetasFaltantes, setEtiquetasFaltantes] = useState<{id: string; x_prod: string; c_prod: string; seq: number; total: number}[]>([]);
+  const [loadingFaltantes, setLoadingFaltantes] = useState(false);
 
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
@@ -474,6 +484,39 @@ export default function ConferenciaInterna() {
     } catch (error) {
       console.error("[ConferenciaInterna] Erro ao recarregar progresso:", error);
     }
+    // Refresh faltantes list if open
+    if (faltamAberto) {
+      loadEtiquetasFaltantes();
+    }
+  }
+
+  async function loadEtiquetasFaltantes() {
+    if (!selectedCarga || !selectedNf) return;
+    setLoadingFaltantes(true);
+    try {
+      if (offlineMode || !isOnline) {
+        const ets = await getOfflineEtiquetas(selectedCarga.id);
+        const faltantes = ets
+          .filter((e) => e.numero_nf === selectedNf && e.status === "pendente")
+          .map((e) => ({ id: e.id, x_prod: e.x_prod, c_prod: e.c_prod, seq: e.seq, total: e.total }));
+        setEtiquetasFaltantes(faltantes);
+      } else {
+        const { data, error } = await supabase
+          .from("etiquetas")
+          .select("id, x_prod, c_prod, seq, total")
+          .eq("carga_id", selectedCarga.id)
+          .eq("numero_nf", selectedNf)
+          .eq("status", "pendente")
+          .order("c_prod")
+          .order("seq");
+        if (error) throw error;
+        setEtiquetasFaltantes(data || []);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar faltantes:", error);
+    } finally {
+      setLoadingFaltantes(false);
+    }
   }
 
   // ---- DIVERGÊNCIA MANAGEMENT (Admin only) ----
@@ -687,6 +730,51 @@ export default function ConferenciaInterna() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* Etiquetas Faltantes */}
+          {nfProgress.conferidas < nfProgress.total && (
+            <Collapsible open={faltamAberto} onOpenChange={(open) => {
+              setFaltamAberto(open);
+              if (open) loadEtiquetasFaltantes();
+            }}>
+              <Card className="border-warning/50">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-warning">
+                        <ClipboardList className="w-4 h-4" />
+                        <span>Faltam conferir ({nfProgress.total - nfProgress.conferidas})</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${faltamAberto ? "rotate-180" : ""}`} />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    {loadingFaltantes ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : etiquetasFaltantes.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-2">Todas conferidas!</p>
+                    ) : (
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        {etiquetasFaltantes.map((et) => (
+                          <div key={et.id} className="flex items-center gap-2 p-2 rounded bg-warning/10 text-sm">
+                            <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="flex-1 truncate font-medium">{et.x_prod}</span>
+                            <Badge variant="outline" className="text-xs shrink-0 border-warning/50 text-warning">
+                              CX {et.seq}/{et.total}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           )}
 
           {/* Divergência Management - Admin Only */}
