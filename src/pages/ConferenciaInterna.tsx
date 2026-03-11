@@ -732,6 +732,51 @@ export default function ConferenciaInterna() {
             </Card>
           )}
 
+          {/* Etiquetas Faltantes */}
+          {nfProgress.conferidas < nfProgress.total && (
+            <Collapsible open={faltamAberto} onOpenChange={(open) => {
+              setFaltamAberto(open);
+              if (open) loadEtiquetasFaltantes();
+            }}>
+              <Card className="border-warning/50">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="pb-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="text-base flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-warning">
+                        <ClipboardList className="w-4 h-4" />
+                        <span>Faltam conferir ({nfProgress.total - nfProgress.conferidas})</span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${faltamAberto ? "rotate-180" : ""}`} />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    {loadingFaltantes ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : etiquetasFaltantes.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-2">Todas conferidas!</p>
+                    ) : (
+                      <div className="space-y-1 max-h-60 overflow-y-auto">
+                        {etiquetasFaltantes.map((et) => (
+                          <div key={et.id} className="flex items-center gap-2 p-2 rounded bg-warning/10 text-sm">
+                            <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="flex-1 truncate font-medium">{et.x_prod}</span>
+                            <Badge variant="outline" className="text-xs shrink-0 border-warning/50 text-warning">
+                              CX {et.seq}/{et.total}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          )}
+
           {/* Divergência Management - Admin Only */}
           {isAdmin && !showDivergencia && (
             <Button
