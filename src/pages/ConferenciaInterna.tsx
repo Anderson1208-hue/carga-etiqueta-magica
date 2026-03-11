@@ -763,7 +763,10 @@ export default function ConferenciaInterna() {
                         {etiquetasFaltantes.map((et) => (
                           <div key={et.id} className="flex items-center gap-2 p-2 rounded bg-warning/10 text-sm">
                             <AlertCircle className="w-3.5 h-3.5 text-warning shrink-0" />
-                            <span className="flex-1 truncate font-medium">{et.x_prod}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{et.x_prod}</div>
+                              <div className="text-xs text-muted-foreground">Cód: {et.c_prod}</div>
+                            </div>
                             <Badge variant="outline" className="text-xs shrink-0 border-warning/50 text-warning">
                               CX {et.seq}/{et.total}
                             </Badge>
