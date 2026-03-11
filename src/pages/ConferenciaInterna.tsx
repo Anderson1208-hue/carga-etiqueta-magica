@@ -484,6 +484,10 @@ export default function ConferenciaInterna() {
     } catch (error) {
       console.error("[ConferenciaInterna] Erro ao recarregar progresso:", error);
     }
+    // Refresh faltantes list if open
+    if (faltamAberto) {
+      loadEtiquetasFaltantes();
+    }
   }
 
   async function loadEtiquetasFaltantes() {
