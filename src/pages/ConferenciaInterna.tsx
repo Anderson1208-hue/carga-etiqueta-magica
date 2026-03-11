@@ -24,6 +24,11 @@ import {
   type OfflineEtiqueta,
 } from "@/hooks/useOfflineConferencia";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   ScanLine,
   CheckCircle2,
   AlertCircle,
@@ -38,6 +43,8 @@ import {
   Upload,
   Wifi,
   WifiOff,
+  ChevronDown,
+  ClipboardList,
 } from "lucide-react";
 
 interface CargaResumo {
