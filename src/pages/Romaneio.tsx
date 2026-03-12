@@ -27,7 +27,8 @@ import {
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet } from "lucide-react";
+import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList } from "lucide-react";
 import * as XLSX from "xlsx";
 import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
