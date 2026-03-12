@@ -78,9 +78,10 @@ interface ScanResult {
 }
 
 export default function ConferenciaInterna() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+  const canDivergencia = isAdmin || !!(profile as any)?.pode_divergencia;
 
   // Offline
   const {
