@@ -30,7 +30,9 @@ export default function Dashboard() {
     cargasFechadas: 0,
     totalNfs: 0,
     etiquetasPendentes: 0,
+    etiquetasConferidasInterno: 0,
     etiquetasConferidas: 0,
+    etiquetasDivergencia: 0,
   });
   const [loading, setLoading] = useState(true);
 
