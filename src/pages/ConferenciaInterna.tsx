@@ -782,7 +782,7 @@ export default function ConferenciaInterna() {
           )}
 
           {/* Divergência Management - Admin Only */}
-          {isAdmin && !showDivergencia && (
+          {canDivergencia && !showDivergencia && (
             <Button
               variant="outline"
               className="w-full border-destructive text-destructive hover:bg-destructive/10"
