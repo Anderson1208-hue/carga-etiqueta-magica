@@ -19,7 +19,9 @@ interface Stats {
   cargasFechadas: number;
   totalNfs: number;
   etiquetasPendentes: number;
+  etiquetasConferidasInterno: number;
   etiquetasConferidas: number;
+  etiquetasDivergencia: number;
 }
 
 export default function Dashboard() {
