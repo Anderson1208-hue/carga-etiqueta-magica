@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN pode_divergencia boolean NOT NULL DEFAULT false;
