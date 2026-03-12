@@ -163,7 +163,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {stats.etiquetasConferidas} de {totalEtiquetas} etiquetas
+                    {totalConferidas} de {totalEtiquetas} etiquetas
                   </span>
                   <span className="font-medium">{progressPercent}%</span>
                 </div>
