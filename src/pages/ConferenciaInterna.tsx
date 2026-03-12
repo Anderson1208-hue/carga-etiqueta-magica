@@ -836,7 +836,10 @@ export default function ConferenciaInterna() {
                         ) : (
                           <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                         )}
-                        <span className="flex-1 truncate">{et.c_prod.replace(/^0+/, "")} — {et.x_prod} — NF {et.numero_nf} — CX {et.seq}/{et.total}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">Cód: {et.c_prod.replace(/^0+/, "")} — {et.x_prod}</div>
+                          <div className="text-xs text-muted-foreground">CX {et.seq}/{et.total}</div>
+                        </div>
                         {isDivergencia && <Badge variant="destructive" className="text-xs">{et.divergencia_motivo}</Badge>}
                       </div>
                     );
