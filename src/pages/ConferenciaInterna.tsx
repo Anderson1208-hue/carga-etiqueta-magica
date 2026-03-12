@@ -78,9 +78,10 @@ interface ScanResult {
 }
 
 export default function ConferenciaInterna() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+  const canDivergencia = isAdmin || !!(profile as any)?.pode_divergencia;
 
   // Offline
   const {
@@ -781,7 +782,7 @@ export default function ConferenciaInterna() {
           )}
 
           {/* Divergência Management - Admin Only */}
-          {isAdmin && !showDivergencia && (
+          {canDivergencia && !showDivergencia && (
             <Button
               variant="outline"
               className="w-full border-destructive text-destructive hover:bg-destructive/10"
@@ -793,7 +794,7 @@ export default function ConferenciaInterna() {
             </Button>
           )}
 
-          {isAdmin && showDivergencia && (
+          {canDivergencia && showDivergencia && (
             <Card className="border-destructive">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
