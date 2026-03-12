@@ -794,7 +794,7 @@ export default function ConferenciaInterna() {
             </Button>
           )}
 
-          {isAdmin && showDivergencia && (
+          {canDivergencia && showDivergencia && (
             <Card className="border-destructive">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
