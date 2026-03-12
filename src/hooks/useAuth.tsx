@@ -8,6 +8,7 @@ interface Profile {
   full_name: string | null;
   role: "admin" | "operador";
   ativo: boolean;
+  pode_divergencia: boolean;
 }
 
 interface AuthContextType {
