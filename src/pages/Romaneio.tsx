@@ -534,7 +534,7 @@ export default function Romaneio() {
               </div>
             </div>
             {/* Summary of NFs by MR */}
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
               {availableMRs.map((mr) => {
                 const nfsInMR = notasFiscais.filter((nf) => nf.macroRegiao === mr.value);
                 const totalBoxes = nfsInMR.reduce((acc, nf) => 
@@ -556,6 +556,34 @@ export default function Romaneio() {
                   </div>
                 );
               })}
+              {selectedMR !== "todas" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (!selectedCarga) return;
+                    const mrNum = parseInt(selectedMR);
+                    const nfsMR = notasFiscais.filter((nf) => nf.macroRegiao === mrNum);
+                    const blob = generateResumoMRPDF({
+                      placa: selectedCarga.placa,
+                      motorista: selectedCarga.motorista,
+                      data: selectedCarga.data,
+                      macroRegiao: mrNum,
+                      nfs: nfsMR.map((nf) => ({
+                        numeroNf: nf.numeroNf,
+                        cnpjDestinatario: nf.cnpjDestinatario,
+                        destBairro: nf.destBairro,
+                        itens: nf.itens,
+                      })),
+                    });
+                    downloadBlob(blob, `resumo_MR${mrNum}_${selectedCarga.placa}.pdf`);
+                    toast({ title: "PDF gerado!", description: `Resumo MR ${mrNum} com ${nfsMR.length} NFs.` });
+                  }}
+                >
+                  <ClipboardList className="w-4 h-4 mr-1" />
+                  Resumo MR PDF
+                </Button>
+              )}
             </div>
           </div>
         )}
