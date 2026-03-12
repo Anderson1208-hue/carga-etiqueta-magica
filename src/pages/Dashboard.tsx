@@ -68,10 +68,11 @@ export default function Dashboard() {
   }
 
   const totalEtiquetas =
-    stats.etiquetasPendentes + stats.etiquetasConferidas;
+    stats.etiquetasPendentes + stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
+  const totalConferidas = stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
   const progressPercent =
     totalEtiquetas > 0
-      ? Math.round((stats.etiquetasConferidas / totalEtiquetas) * 100)
+      ? Math.round((totalConferidas / totalEtiquetas) * 100)
       : 0;
 
   return (
