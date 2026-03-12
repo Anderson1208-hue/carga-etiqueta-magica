@@ -136,14 +136,15 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Etiquetas Conferidas
+                Conferidas (Total)
               </CardTitle>
               <CheckCircle2 className="h-5 w-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.etiquetasConferidas}</div>
+              <div className="text-3xl font-bold">{totalConferidas}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {progressPercent}% do total
+                {stats.etiquetasConferidasInterno} interna · {stats.etiquetasConferidas} externa
+                {stats.etiquetasDivergencia > 0 && ` · ${stats.etiquetasDivergencia} diverg.`}
               </p>
             </CardContent>
           </Card>
