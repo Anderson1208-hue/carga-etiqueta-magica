@@ -19,7 +19,9 @@ interface Stats {
   cargasFechadas: number;
   totalNfs: number;
   etiquetasPendentes: number;
+  etiquetasConferidasInterno: number;
   etiquetasConferidas: number;
+  etiquetasDivergencia: number;
 }
 
 export default function Dashboard() {
@@ -28,7 +30,9 @@ export default function Dashboard() {
     cargasFechadas: 0,
     totalNfs: 0,
     etiquetasPendentes: 0,
+    etiquetasConferidasInterno: 0,
     etiquetasConferidas: 0,
+    etiquetasDivergencia: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -51,10 +55,10 @@ export default function Dashboard() {
         cargasAbertas: cargas.filter((c) => c.status === "aberta").length,
         cargasFechadas: cargas.filter((c) => c.status === "fechada").length,
         totalNfs: nfsRes.count || 0,
-        etiquetasPendentes: etiquetas.filter((e) => e.status === "pendente")
-          .length,
-        etiquetasConferidas: etiquetas.filter((e) => e.status === "conferido")
-          .length,
+        etiquetasPendentes: etiquetas.filter((e) => e.status === "pendente").length,
+        etiquetasConferidasInterno: etiquetas.filter((e) => e.status === "conferido_interno").length,
+        etiquetasConferidas: etiquetas.filter((e) => e.status === "conferido").length,
+        etiquetasDivergencia: etiquetas.filter((e) => e.status === "divergencia").length,
       });
     } catch (error) {
       console.error("Error loading stats:", error);
@@ -64,10 +68,11 @@ export default function Dashboard() {
   }
 
   const totalEtiquetas =
-    stats.etiquetasPendentes + stats.etiquetasConferidas;
+    stats.etiquetasPendentes + stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
+  const totalConferidas = stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
   const progressPercent =
     totalEtiquetas > 0
-      ? Math.round((stats.etiquetasConferidas / totalEtiquetas) * 100)
+      ? Math.round((totalConferidas / totalEtiquetas) * 100)
       : 0;
 
   return (
@@ -131,14 +136,15 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Etiquetas Conferidas
+                Conferidas (Total)
               </CardTitle>
               <CheckCircle2 className="h-5 w-5 text-success" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stats.etiquetasConferidas}</div>
+              <div className="text-3xl font-bold">{totalConferidas}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {progressPercent}% do total
+                {stats.etiquetasConferidasInterno} interna · {stats.etiquetasConferidas} externa
+                {stats.etiquetasDivergencia > 0 && ` · ${stats.etiquetasDivergencia} diverg.`}
               </p>
             </CardContent>
           </Card>
@@ -157,7 +163,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {stats.etiquetasConferidas} de {totalEtiquetas} etiquetas
+                    {totalConferidas} de {totalEtiquetas} etiquetas
                   </span>
                   <span className="font-medium">{progressPercent}%</span>
                 </div>
