@@ -55,10 +55,10 @@ export default function Dashboard() {
         cargasAbertas: cargas.filter((c) => c.status === "aberta").length,
         cargasFechadas: cargas.filter((c) => c.status === "fechada").length,
         totalNfs: nfsRes.count || 0,
-        etiquetasPendentes: etiquetas.filter((e) => e.status === "pendente")
-          .length,
-        etiquetasConferidas: etiquetas.filter((e) => e.status === "conferido")
-          .length,
+        etiquetasPendentes: etiquetas.filter((e) => e.status === "pendente").length,
+        etiquetasConferidasInterno: etiquetas.filter((e) => e.status === "conferido_interno").length,
+        etiquetasConferidas: etiquetas.filter((e) => e.status === "conferido").length,
+        etiquetasDivergencia: etiquetas.filter((e) => e.status === "divergencia").length,
       });
     } catch (error) {
       console.error("Error loading stats:", error);
