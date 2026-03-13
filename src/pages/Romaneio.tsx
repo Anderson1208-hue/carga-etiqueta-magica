@@ -516,6 +516,14 @@ export default function Romaneio() {
                   )}
                   Imprimir Romaneio
                 </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setRomaneioPorNfOpen(true)}
+                  disabled={notasFiscais.length === 0}
+                >
+                  <List className="w-4 h-4 mr-2" />
+                  Romaneio por NF
+                </Button>
               </div>
             )}
           </div>
