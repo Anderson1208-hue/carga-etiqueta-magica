@@ -23,9 +23,12 @@ import {
   Weight,
   Truck,
   FileText,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
+import { getMacroRegiao } from "@/lib/macro-regioes";
 
 interface NfResult {
   id: string;
@@ -91,6 +94,43 @@ export default function ConsultaNF() {
   const [resultados, setResultados] = useState<NfResult[]>([]);
   const [selectedNf, setSelectedNf] = useState<NfResult | null>(null);
   const [searched, setSearched] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  async function handleGerarPdf(nf: NfResult) {
+    if (!nf.carga) return;
+    setGeneratingPdf(true);
+    try {
+      const nfPDF = {
+        numeroNf: nf.numero_nf,
+        razaoSocialEmitente: nf.razao_social_emitente,
+        cnpjEmitente: nf.cnpj_emitente,
+        cnpjDestinatario: nf.cnpj_destinatario || "",
+        destBairro: nf.dest_bairro || "",
+        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        dataEmissao: nf.data_emissao,
+        itens: (nf.itens || []).map((item) => ({
+          cProd: item.c_prod,
+          xProd: item.x_prod,
+          qtdCaixas: calculateBoxes(Number(item.q_com)),
+        })),
+      };
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: nf.carga.data,
+          placa: nf.carga.placa,
+          motorista: nf.carga.motorista,
+        },
+        [nfPDF]
+      );
+      downloadBlob(blob, `nota_carga_NF_${nf.numero_nf}.pdf`);
+      toast({ title: "PDF gerado com sucesso!" });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
 
   async function pesquisar() {
     const termo = busca.trim();
@@ -208,9 +248,24 @@ export default function ConsultaNF() {
                 <FileText className="w-5 h-5" />
                 NF {selectedNf.numero_nf}
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedNf(null)}>
-                Voltar à lista
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleGerarPdf(selectedNf)}
+                  disabled={generatingPdf}
+                >
+                  {generatingPdf ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Gerar PDF
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedNf(null)}>
+                  Voltar à lista
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Status & Carga */}
