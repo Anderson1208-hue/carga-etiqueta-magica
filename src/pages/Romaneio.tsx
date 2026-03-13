@@ -28,7 +28,7 @@ import {
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +41,8 @@ import { Textarea } from "@/components/ui/textarea";
 import * as XLSX from "xlsx";
 import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { format } from "date-fns";
 
@@ -86,7 +88,7 @@ export default function Romaneio() {
   const [romaneioItems, setRomaneioItems] = useState<RomaneioItem[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | null>(null);
+  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | null>(null);
   const [selectedMR, setSelectedMR] = useState<string>("todas");
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
@@ -94,6 +96,9 @@ export default function Romaneio() {
   const [romaneioPorNfOpen, setRomaneioPorNfOpen] = useState(false);
   const [romaneioPorNfInput, setRomaneioPorNfInput] = useState("");
   const [generatingPorNf, setGeneratingPorNf] = useState(false);
+  const [notaCargaPorNfOpen, setNotaCargaPorNfOpen] = useState(false);
+  const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
+  const [nfSearchFilter, setNfSearchFilter] = useState("");
 
   useEffect(() => {
     loadCargas();
@@ -445,6 +450,50 @@ export default function Romaneio() {
     }
   }
 
+  async function handleNotaCargaPorNf() {
+    if (!selectedCarga || selectedNfIds.size === 0) return;
+    setGenerating("nota-por-nf");
+    try {
+      const selectedNfs = notasFiscais.filter((nf) => selectedNfIds.has(nf.id));
+      const nfsPDF = buildNfsPDF(selectedNfs);
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        nfsPDF
+      );
+      downloadBlob(
+        blob,
+        `nota_carga_por_nf_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+      toast({
+        title: "PDF gerado com sucesso!",
+        description: `${selectedNfs.length} NFs incluídas.`,
+      });
+      setNotaCargaPorNfOpen(false);
+      setSelectedNfIds(new Set());
+      setNfSearchFilter("");
+    } catch (error) {
+      console.error("Error generating nota de carga por NF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  const filteredNfsDialog = useMemo(() => {
+    if (!nfSearchFilter.trim()) return notasFiscais;
+    const term = nfSearchFilter.trim().toLowerCase();
+    return notasFiscais.filter(
+      (nf) =>
+        nf.numeroNf.includes(term) ||
+        (nf.cnpjDestinatario || "").includes(term) ||
+        (nf.destBairro || "").toLowerCase().includes(term)
+    );
+  }, [notasFiscais, nfSearchFilter]);
+
   const totalCaixas = romaneioItems.reduce(
     (acc, item) => acc + item.quantidadeTotal,
     0
@@ -529,58 +578,21 @@ export default function Romaneio() {
           </div>
         </div>
 
-        {/* Consultar NF */}
+        {/* Nota de Carga por NF */}
         {selectedCarga && notasFiscais.length > 0 && (
           <div className="wms-card p-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <h3 className="font-semibold">Consultar NF</h3>
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Número da NF..."
-                  value={searchNf}
-                  onChange={(e) => setSearchNf(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchNf.trim()) {
-                      const found = notasFiscais.find(
-                        (nf) => nf.numeroNf === searchNf.trim()
-                      );
-                      if (found) {
-                        setSelectedNfDetail(found);
-                        setNfDialogOpen(true);
-                      } else {
-                        toast({
-                          variant: "destructive",
-                          title: "NF não encontrada",
-                          description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
-                        });
-                      }
-                    }
-                  }}
-                  className="pl-9"
-                />
-              </div>
+              <h3 className="font-semibold">Nota de Carga por NF</h3>
               <Button
-                variant="outline"
-                disabled={!searchNf.trim()}
+                variant="secondary"
                 onClick={() => {
-                  const found = notasFiscais.find(
-                    (nf) => nf.numeroNf === searchNf.trim()
-                  );
-                  if (found) {
-                    setSelectedNfDetail(found);
-                    setNfDialogOpen(true);
-                  } else {
-                    toast({
-                      variant: "destructive",
-                      title: "NF não encontrada",
-                      description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
-                    });
-                  }
+                  setNotaCargaPorNfOpen(true);
+                  setSelectedNfIds(new Set());
+                  setNfSearchFilter("");
                 }}
               >
-                <Search className="w-4 h-4 mr-2" />
-                Consultar
+                <FileText className="w-4 h-4 mr-2" />
+                Selecionar NFs
               </Button>
             </div>
           </div>
@@ -930,6 +942,93 @@ export default function Romaneio() {
                 <Download className="w-4 h-4 mr-2" />
               )}
               Gerar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Nota de Carga por NF */}
+      <Dialog open={notaCargaPorNfOpen} onOpenChange={setNotaCargaPorNfOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nota de Carga por NF</DialogTitle>
+            <DialogDescription>
+              Selecione as NFs para gerar o PDF da Nota de Carga.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por NF, CNPJ ou bairro..."
+                value={nfSearchFilter}
+                onChange={(e) => setNfSearchFilter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{selectedNfIds.size} de {notasFiscais.length} selecionadas</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedNfIds(new Set(filteredNfsDialog.map((nf) => nf.id)))}
+                >
+                  Selecionar todos
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedNfIds(new Set())}
+                >
+                  Limpar
+                </Button>
+              </div>
+            </div>
+            <ScrollArea className="h-[300px] border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredNfsDialog.map((nf) => {
+                  const totalBoxes = nf.itens.reduce((sum, item) => sum + calculateBoxes(item.qCom), 0);
+                  return (
+                    <label
+                      key={nf.id}
+                      className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedNfIds.has(nf.id)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedNfIds);
+                          if (checked) next.add(nf.id);
+                          else next.delete(nf.id);
+                          setSelectedNfIds(next);
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">NF {nf.numeroNf}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {nf.destBairro || "Sem bairro"} • {totalBoxes} cx
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotaCargaPorNfOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleNotaCargaPorNf}
+              disabled={generating === "nota-por-nf" || selectedNfIds.size === 0}
+            >
+              {generating === "nota-por-nf" ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Gerar PDF ({selectedNfIds.size})
             </Button>
           </DialogFooter>
         </DialogContent>
