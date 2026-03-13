@@ -947,6 +947,93 @@ export default function Romaneio() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Nota de Carga por NF */}
+      <Dialog open={notaCargaPorNfOpen} onOpenChange={setNotaCargaPorNfOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nota de Carga por NF</DialogTitle>
+            <DialogDescription>
+              Selecione as NFs para gerar o PDF da Nota de Carga.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por NF, CNPJ ou bairro..."
+                value={nfSearchFilter}
+                onChange={(e) => setNfSearchFilter(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>{selectedNfIds.size} de {notasFiscais.length} selecionadas</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedNfIds(new Set(filteredNfsDialog.map((nf) => nf.id)))}
+                >
+                  Selecionar todos
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedNfIds(new Set())}
+                >
+                  Limpar
+                </Button>
+              </div>
+            </div>
+            <ScrollArea className="h-[300px] border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredNfsDialog.map((nf) => {
+                  const totalBoxes = nf.itens.reduce((sum, item) => sum + calculateBoxes(item.qCom), 0);
+                  return (
+                    <label
+                      key={nf.id}
+                      className="flex items-center gap-3 p-2 rounded-md hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedNfIds.has(nf.id)}
+                        onCheckedChange={(checked) => {
+                          const next = new Set(selectedNfIds);
+                          if (checked) next.add(nf.id);
+                          else next.delete(nf.id);
+                          setSelectedNfIds(next);
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">NF {nf.numeroNf}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {nf.destBairro || "Sem bairro"} • {totalBoxes} cx
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotaCargaPorNfOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleNotaCargaPorNf}
+              disabled={generating === "nota-por-nf" || selectedNfIds.size === 0}
+            >
+              {generating === "nota-por-nf" ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Gerar PDF ({selectedNfIds.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </MainLayout>
   );
 }
