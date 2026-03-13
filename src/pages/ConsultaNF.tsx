@@ -248,9 +248,24 @@ export default function ConsultaNF() {
                 <FileText className="w-5 h-5" />
                 NF {selectedNf.numero_nf}
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedNf(null)}>
-                Voltar à lista
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handleGerarPdf(selectedNf)}
+                  disabled={generatingPdf}
+                >
+                  {generatingPdf ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Gerar PDF
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedNf(null)}>
+                  Voltar à lista
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Status & Carga */}
