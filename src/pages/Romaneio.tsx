@@ -28,7 +28,16 @@ import {
 import { calculateBoxes } from "@/lib/xml-parser";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import * as XLSX from "xlsx";
 import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
@@ -82,6 +91,9 @@ export default function Romaneio() {
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
   const [nfDialogOpen, setNfDialogOpen] = useState(false);
+  const [romaneioPorNfOpen, setRomaneioPorNfOpen] = useState(false);
+  const [romaneioPorNfInput, setRomaneioPorNfInput] = useState("");
+  const [generatingPorNf, setGeneratingPorNf] = useState(false);
 
   useEffect(() => {
     loadCargas();
@@ -350,6 +362,89 @@ export default function Romaneio() {
     }
   }
 
+  async function handleRomaneioPorNf() {
+    if (!selectedCarga || !romaneioPorNfInput.trim()) return;
+    setGeneratingPorNf(true);
+    try {
+      const inputNumbers = romaneioPorNfInput
+        .split(/[,;\s\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const matchedNFs = notasFiscais.filter((nf) =>
+        inputNumbers.includes(nf.numeroNf)
+      );
+
+      if (matchedNFs.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Nenhuma NF encontrada",
+          description: "Nenhum dos números informados corresponde a NFs desta carga.",
+        });
+        setGeneratingPorNf(false);
+        return;
+      }
+
+      const notFound = inputNumbers.filter(
+        (num) => !notasFiscais.some((nf) => nf.numeroNf === num)
+      );
+
+      // Consolidate items from matched NFs
+      const consolidatedMap = new Map<string, RomaneioItem>();
+      matchedNFs.forEach((nf) => {
+        nf.itens.forEach((item) => {
+          const key = item.cProd;
+          const boxes = calculateBoxes(item.qCom);
+          if (consolidatedMap.has(key)) {
+            consolidatedMap.get(key)!.quantidadeTotal += boxes;
+          } else {
+            consolidatedMap.set(key, {
+              cProd: item.cProd,
+              xProd: item.xProd,
+              quantidadeTotal: boxes,
+            });
+          }
+        });
+      });
+
+      const sortedItems = Array.from(consolidatedMap.values()).sort((a, b) =>
+        a.cProd.localeCompare(b.cProd)
+      );
+
+      const blob = await generateRomaneioPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        sortedItems
+      );
+
+      downloadBlob(
+        blob,
+        `romaneio_por_nf_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+
+      let description = `${matchedNFs.length} NFs totalizadas.`;
+      if (notFound.length > 0) {
+        description += ` NFs não encontradas: ${notFound.join(", ")}`;
+      }
+
+      toast({
+        title: "PDF gerado com sucesso!",
+        description,
+      });
+
+      setRomaneioPorNfOpen(false);
+      setRomaneioPorNfInput("");
+    } catch (error) {
+      console.error("Error generating romaneio por NF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGeneratingPorNf(false);
+    }
+  }
+
   const totalCaixas = romaneioItems.reduce(
     (acc, item) => acc + item.quantidadeTotal,
     0
@@ -420,6 +515,14 @@ export default function Romaneio() {
                     <Printer className="w-4 h-4 mr-2" />
                   )}
                   Imprimir Romaneio
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setRomaneioPorNfOpen(true)}
+                  disabled={notasFiscais.length === 0}
+                >
+                  <List className="w-4 h-4 mr-2" />
+                  Romaneio por NF
                 </Button>
               </div>
             )}
@@ -797,6 +900,40 @@ export default function Romaneio() {
           </>
         ) : null}
       </div>
+
+      {/* Dialog Romaneio por NF */}
+      <Dialog open={romaneioPorNfOpen} onOpenChange={setRomaneioPorNfOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Romaneio por NF</DialogTitle>
+            <DialogDescription>
+              Digite os números das NFs (separados por vírgula, espaço ou quebra de linha) para gerar um romaneio totalizado apenas com essas notas.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder={"Ex:\n12345\n12346\n12347"}
+            value={romaneioPorNfInput}
+            onChange={(e) => setRomaneioPorNfInput(e.target.value)}
+            rows={6}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRomaneioPorNfOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRomaneioPorNf}
+              disabled={generatingPorNf || !romaneioPorNfInput.trim()}
+            >
+              {generatingPorNf ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Gerar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </MainLayout>
   );
