@@ -41,6 +41,8 @@ import { Textarea } from "@/components/ui/textarea";
 import * as XLSX from "xlsx";
 import { TipoCargaBadge, isChocolate } from "@/components/TipoCargaBadge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { format } from "date-fns";
 
