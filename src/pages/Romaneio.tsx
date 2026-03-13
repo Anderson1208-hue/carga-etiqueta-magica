@@ -448,6 +448,50 @@ export default function Romaneio() {
     }
   }
 
+  async function handleNotaCargaPorNf() {
+    if (!selectedCarga || selectedNfIds.size === 0) return;
+    setGenerating("nota-por-nf");
+    try {
+      const selectedNfs = notasFiscais.filter((nf) => selectedNfIds.has(nf.id));
+      const nfsPDF = buildNfsPDF(selectedNfs);
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        nfsPDF
+      );
+      downloadBlob(
+        blob,
+        `nota_carga_por_nf_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+      toast({
+        title: "PDF gerado com sucesso!",
+        description: `${selectedNfs.length} NFs incluídas.`,
+      });
+      setNotaCargaPorNfOpen(false);
+      setSelectedNfIds(new Set());
+      setNfSearchFilter("");
+    } catch (error) {
+      console.error("Error generating nota de carga por NF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  const filteredNfsDialog = useMemo(() => {
+    if (!nfSearchFilter.trim()) return notasFiscais;
+    const term = nfSearchFilter.trim().toLowerCase();
+    return notasFiscais.filter(
+      (nf) =>
+        nf.numeroNf.includes(term) ||
+        (nf.cnpjDestinatario || "").includes(term) ||
+        (nf.destBairro || "").toLowerCase().includes(term)
+    );
+  }, [notasFiscais, nfSearchFilter]);
+
   const totalCaixas = romaneioItems.reduce(
     (acc, item) => acc + item.quantidadeTotal,
     0
