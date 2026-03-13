@@ -576,58 +576,21 @@ export default function Romaneio() {
           </div>
         </div>
 
-        {/* Consultar NF */}
+        {/* Nota de Carga por NF */}
         {selectedCarga && notasFiscais.length > 0 && (
           <div className="wms-card p-4">
             <div className="flex items-center gap-4 flex-wrap">
-              <h3 className="font-semibold">Consultar NF</h3>
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Número da NF..."
-                  value={searchNf}
-                  onChange={(e) => setSearchNf(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && searchNf.trim()) {
-                      const found = notasFiscais.find(
-                        (nf) => nf.numeroNf === searchNf.trim()
-                      );
-                      if (found) {
-                        setSelectedNfDetail(found);
-                        setNfDialogOpen(true);
-                      } else {
-                        toast({
-                          variant: "destructive",
-                          title: "NF não encontrada",
-                          description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
-                        });
-                      }
-                    }
-                  }}
-                  className="pl-9"
-                />
-              </div>
+              <h3 className="font-semibold">Nota de Carga por NF</h3>
               <Button
-                variant="outline"
-                disabled={!searchNf.trim()}
+                variant="secondary"
                 onClick={() => {
-                  const found = notasFiscais.find(
-                    (nf) => nf.numeroNf === searchNf.trim()
-                  );
-                  if (found) {
-                    setSelectedNfDetail(found);
-                    setNfDialogOpen(true);
-                  } else {
-                    toast({
-                      variant: "destructive",
-                      title: "NF não encontrada",
-                      description: `Nenhuma NF com número ${searchNf.trim()} nesta carga.`,
-                    });
-                  }
+                  setNotaCargaPorNfOpen(true);
+                  setSelectedNfIds(new Set());
+                  setNfSearchFilter("");
                 }}
               >
-                <Search className="w-4 h-4 mr-2" />
-                Consultar
+                <FileText className="w-4 h-4 mr-2" />
+                Selecionar NFs
               </Button>
             </div>
           </div>
