@@ -91,6 +91,9 @@ export default function Romaneio() {
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
   const [nfDialogOpen, setNfDialogOpen] = useState(false);
+  const [romaneioPorNfOpen, setRomaneioPorNfOpen] = useState(false);
+  const [romaneioPorNfInput, setRomaneioPorNfInput] = useState("");
+  const [generatingPorNf, setGeneratingPorNf] = useState(false);
 
   useEffect(() => {
     loadCargas();
