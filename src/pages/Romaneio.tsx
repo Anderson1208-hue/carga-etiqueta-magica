@@ -362,6 +362,89 @@ export default function Romaneio() {
     }
   }
 
+  async function handleRomaneioPorNf() {
+    if (!selectedCarga || !romaneioPorNfInput.trim()) return;
+    setGeneratingPorNf(true);
+    try {
+      const inputNumbers = romaneioPorNfInput
+        .split(/[,;\s\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const matchedNFs = notasFiscais.filter((nf) =>
+        inputNumbers.includes(nf.numeroNf)
+      );
+
+      if (matchedNFs.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Nenhuma NF encontrada",
+          description: "Nenhum dos números informados corresponde a NFs desta carga.",
+        });
+        setGeneratingPorNf(false);
+        return;
+      }
+
+      const notFound = inputNumbers.filter(
+        (num) => !notasFiscais.some((nf) => nf.numeroNf === num)
+      );
+
+      // Consolidate items from matched NFs
+      const consolidatedMap = new Map<string, RomaneioItem>();
+      matchedNFs.forEach((nf) => {
+        nf.itens.forEach((item) => {
+          const key = item.cProd;
+          const boxes = calculateBoxes(item.qCom);
+          if (consolidatedMap.has(key)) {
+            consolidatedMap.get(key)!.quantidadeTotal += boxes;
+          } else {
+            consolidatedMap.set(key, {
+              cProd: item.cProd,
+              xProd: item.xProd,
+              quantidadeTotal: boxes,
+            });
+          }
+        });
+      });
+
+      const sortedItems = Array.from(consolidatedMap.values()).sort((a, b) =>
+        a.cProd.localeCompare(b.cProd)
+      );
+
+      const blob = await generateRomaneioPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        sortedItems
+      );
+
+      downloadBlob(
+        blob,
+        `romaneio_por_nf_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+
+      let description = `${matchedNFs.length} NFs totalizadas.`;
+      if (notFound.length > 0) {
+        description += ` NFs não encontradas: ${notFound.join(", ")}`;
+      }
+
+      toast({
+        title: "PDF gerado com sucesso!",
+        description,
+      });
+
+      setRomaneioPorNfOpen(false);
+      setRomaneioPorNfInput("");
+    } catch (error) {
+      console.error("Error generating romaneio por NF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGeneratingPorNf(false);
+    }
+  }
+
   const totalCaixas = romaneioItems.reduce(
     (acc, item) => acc + item.quantidadeTotal,
     0
