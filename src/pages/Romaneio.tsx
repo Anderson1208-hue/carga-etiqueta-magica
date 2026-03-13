@@ -901,6 +901,40 @@ export default function Romaneio() {
         ) : null}
       </div>
 
+      {/* Dialog Romaneio por NF */}
+      <Dialog open={romaneioPorNfOpen} onOpenChange={setRomaneioPorNfOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Romaneio por NF</DialogTitle>
+            <DialogDescription>
+              Digite os números das NFs (separados por vírgula, espaço ou quebra de linha) para gerar um romaneio totalizado apenas com essas notas.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder={"Ex:\n12345\n12346\n12347"}
+            value={romaneioPorNfInput}
+            onChange={(e) => setRomaneioPorNfInput(e.target.value)}
+            rows={6}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRomaneioPorNfOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRomaneioPorNf}
+              disabled={generatingPorNf || !romaneioPorNfInput.trim()}
+            >
+              {generatingPorNf ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              Gerar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </MainLayout>
   );
 }
