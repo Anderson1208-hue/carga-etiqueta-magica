@@ -23,9 +23,12 @@ import {
   Weight,
   Truck,
   FileText,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
+import { getMacroRegiao } from "@/lib/macro-regioes";
 
 interface NfResult {
   id: string;
