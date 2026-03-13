@@ -94,6 +94,43 @@ export default function ConsultaNF() {
   const [resultados, setResultados] = useState<NfResult[]>([]);
   const [selectedNf, setSelectedNf] = useState<NfResult | null>(null);
   const [searched, setSearched] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  async function handleGerarPdf(nf: NfResult) {
+    if (!nf.carga) return;
+    setGeneratingPdf(true);
+    try {
+      const nfPDF = {
+        numeroNf: nf.numero_nf,
+        razaoSocialEmitente: nf.razao_social_emitente,
+        cnpjEmitente: nf.cnpj_emitente,
+        cnpjDestinatario: nf.cnpj_destinatario || "",
+        destBairro: nf.dest_bairro || "",
+        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        dataEmissao: nf.data_emissao,
+        itens: (nf.itens || []).map((item) => ({
+          cProd: item.c_prod,
+          xProd: item.x_prod,
+          qtdCaixas: calculateBoxes(Number(item.q_com)),
+        })),
+      };
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: nf.carga.data,
+          placa: nf.carga.placa,
+          motorista: nf.carga.motorista,
+        },
+        [nfPDF]
+      );
+      downloadBlob(blob, `nota_carga_NF_${nf.numero_nf}.pdf`);
+      toast({ title: "PDF gerado com sucesso!" });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }
 
   async function pesquisar() {
     const termo = busca.trim();
