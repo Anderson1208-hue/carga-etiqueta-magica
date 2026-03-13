@@ -86,7 +86,7 @@ export default function Romaneio() {
   const [romaneioItems, setRomaneioItems] = useState<RomaneioItem[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | null>(null);
+  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | null>(null);
   const [selectedMR, setSelectedMR] = useState<string>("todas");
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
@@ -94,6 +94,9 @@ export default function Romaneio() {
   const [romaneioPorNfOpen, setRomaneioPorNfOpen] = useState(false);
   const [romaneioPorNfInput, setRomaneioPorNfInput] = useState("");
   const [generatingPorNf, setGeneratingPorNf] = useState(false);
+  const [notaCargaPorNfOpen, setNotaCargaPorNfOpen] = useState(false);
+  const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
+  const [nfSearchFilter, setNfSearchFilter] = useState("");
 
   useEffect(() => {
     loadCargas();
