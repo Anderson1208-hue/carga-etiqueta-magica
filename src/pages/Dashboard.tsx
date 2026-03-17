@@ -42,23 +42,25 @@ export default function Dashboard() {
 
   async function loadStats() {
     try {
-      const [cargasRes, nfsRes, etiquetasRes] = await Promise.all([
+      const [cargasRes, nfsRes, etPendente, etConfInterno, etConferido, etDivergencia] = await Promise.all([
         supabase.from("cargas").select("status"),
-        supabase.from("notas_fiscais").select("id", { count: "exact" }),
-        supabase.from("etiquetas").select("status"),
+        supabase.from("notas_fiscais").select("id", { count: "exact", head: true }),
+        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
+        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "conferido_interno"),
+        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "conferido"),
+        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "divergencia"),
       ]);
 
       const cargas = cargasRes.data || [];
-      const etiquetas = etiquetasRes.data || [];
 
       setStats({
         cargasAbertas: cargas.filter((c) => c.status === "aberta").length,
         cargasFechadas: cargas.filter((c) => c.status === "fechada").length,
         totalNfs: nfsRes.count || 0,
-        etiquetasPendentes: etiquetas.filter((e) => e.status === "pendente").length,
-        etiquetasConferidasInterno: etiquetas.filter((e) => e.status === "conferido_interno").length,
-        etiquetasConferidas: etiquetas.filter((e) => e.status === "conferido").length,
-        etiquetasDivergencia: etiquetas.filter((e) => e.status === "divergencia").length,
+        etiquetasPendentes: etPendente.count || 0,
+        etiquetasConferidasInterno: etConfInterno.count || 0,
+        etiquetasConferidas: etConferido.count || 0,
+        etiquetasDivergencia: etDivergencia.count || 0,
       });
     } catch (error) {
       console.error("Error loading stats:", error);
