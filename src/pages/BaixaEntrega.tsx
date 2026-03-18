@@ -128,6 +128,21 @@ export default function BaixaEntrega() {
         loadFromOffline(selectedVeiculoId);
       }
       checkOfflineData(selectedVeiculoId);
+      // Find active monitoring route for this vehicle
+      if (isOnline) {
+        supabase
+          .from("monitoramento_rotas")
+          .select("id")
+          .eq("veiculo_id", selectedVeiculoId)
+          .eq("status", "ativa")
+          .limit(1)
+          .maybeSingle()
+          .then(({ data }) => {
+            setMonitoramentoRotaId(data ? (data as any).id : null);
+          });
+      }
+    } else {
+      setMonitoramentoRotaId(null);
     }
   }, [selectedVeiculoId, offlineMode]);
 
