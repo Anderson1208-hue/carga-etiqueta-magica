@@ -92,6 +92,13 @@ export default function BaixaEntrega() {
   const [syncing, setSyncing] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
   const [vehicleHasOffline, setVehicleHasOffline] = useState(false);
+  const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
+
+  // GPS tracker for monitoring
+  useGpsTracker({
+    monitoramentoRotaId,
+    enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
+  });
 
   // Baixa form state
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
