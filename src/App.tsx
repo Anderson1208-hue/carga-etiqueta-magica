@@ -193,6 +193,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/monitoramento-rotas"
+        element={
+          <ProtectedRoute>
+            <MonitoramentoRotas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/consulta-nf"
         element={
           <ProtectedRoute>
