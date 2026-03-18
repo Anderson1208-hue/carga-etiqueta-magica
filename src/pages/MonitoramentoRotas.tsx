@@ -334,6 +334,15 @@ export default function MonitoramentoRotas() {
 
         <MonitoramentoStats {...stats} />
 
+        {/* Mini mapa geral com todos os veículos */}
+        {rotas.filter((r) => r.ultima_lat && r.ultima_lng).length > 0 && (
+          <MapaGeral
+            rotas={rotas.filter((r) => r.ultima_lat && r.ultima_lng)}
+            height="200px"
+            onSelectRota={setSelectedRota}
+          />
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <RotasList
             rotas={rotas}
