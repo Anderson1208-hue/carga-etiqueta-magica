@@ -202,6 +202,109 @@ export default function MonitoramentoRotas() {
     }
   }, []);
 
+  // Load available vehicles to start monitoring
+  const loadVeiculosDisponiveis = useCallback(async () => {
+    setLoadingVeiculos(true);
+    try {
+      const { data: veiculos } = await supabase
+        .from("veiculos")
+        .select("id, placa, motorista, data, status")
+        .in("status", ["pendente", "em_rota"])
+        .order("created_at", { ascending: false });
+
+      const { data: monAtivas } = await supabase
+        .from("monitoramento_rotas")
+        .select("veiculo_id")
+        .eq("status", "ativa");
+
+      const ativosIds = new Set((monAtivas || []).map((m: any) => m.veiculo_id));
+      setVeiculosDisponiveis((veiculos || []).filter((v: any) => !ativosIds.has(v.id)));
+    } finally {
+      setLoadingVeiculos(false);
+    }
+  }, []);
+
+  // Start monitoring for a vehicle
+  async function handleIniciarMonitoramento(veiculo: any) {
+    setIniciandoRota(true);
+    try {
+      const { data: veiculoNfs } = await supabase
+        .from("veiculo_nfs")
+        .select(`
+          nf_id,
+          notas_fiscais (
+            id, numero_nf, cnpj_destinatario, dest_razao_social,
+            dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf, dest_cep,
+            peso_bruto, volume_m3
+          )
+        `)
+        .eq("veiculo_id", veiculo.id);
+
+      const nfs = (veiculoNfs || []).map((vnf: any) => vnf.notas_fiscais).filter(Boolean);
+
+      const groupedByCnpj: Record<string, any[]> = {};
+      nfs.forEach((nf: any) => {
+        const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
+        if (!groupedByCnpj[cnpj]) groupedByCnpj[cnpj] = [];
+        groupedByCnpj[cnpj].push(nf);
+      });
+
+      const { data: rotParadas } = await supabase
+        .from("roteirizacao_paradas")
+        .select("cnpj_destinatario, latitude, longitude, ordem, razao_social, endereco_completo, total_nfs, total_caixas, peso_total_kg, volume_total_m3")
+        .in("cnpj_destinatario", Object.keys(groupedByCnpj))
+        .order("ordem", { ascending: true });
+
+      const { data: monRota, error: rotaErr } = await supabase
+        .from("monitoramento_rotas")
+        .insert({
+          veiculo_id: veiculo.id,
+          motorista: veiculo.motorista,
+          placa: veiculo.placa,
+          data: veiculo.data,
+          total_paradas: Object.keys(groupedByCnpj).length,
+        })
+        .select()
+        .single();
+
+      if (rotaErr) throw rotaErr;
+
+      const paradasMap = new Map((rotParadas || []).map((p: any) => [p.cnpj_destinatario, p]));
+      let ordem = 1;
+      const paradasInsert = Object.entries(groupedByCnpj).map(([cnpj, cnpjNfs]) => {
+        const rotP = paradasMap.get(cnpj);
+        return {
+          monitoramento_rota_id: (monRota as any).id,
+          ordem: rotP?.ordem || ordem++,
+          cnpj_destinatario: cnpj,
+          razao_social: rotP?.razao_social || cnpjNfs[0]?.dest_razao_social,
+          endereco_completo: rotP?.endereco_completo || `${cnpjNfs[0]?.dest_logradouro || ""}, ${cnpjNfs[0]?.dest_numero || ""} - ${cnpjNfs[0]?.dest_bairro || ""}, ${cnpjNfs[0]?.dest_cidade || ""}/${cnpjNfs[0]?.dest_uf || ""}`,
+          latitude: rotP?.latitude || null,
+          longitude: rotP?.longitude || null,
+          raio_geofence_metros: config.raio_padrao_metros,
+          total_nfs: rotP?.total_nfs || cnpjNfs.length,
+          total_caixas: rotP?.total_caixas || 0,
+          peso_total_kg: rotP?.peso_total_kg || cnpjNfs.reduce((s: number, n: any) => s + (Number(n.peso_bruto) || 0), 0),
+          volume_total_m3: rotP?.volume_total_m3 || cnpjNfs.reduce((s: number, n: any) => s + (Number(n.volume_m3) || 0), 0),
+        };
+      });
+
+      paradasInsert.sort((a, b) => a.ordem - b.ordem);
+      paradasInsert.forEach((p, i) => (p.ordem = i + 1));
+
+      await supabase.from("monitoramento_paradas").insert(paradasInsert);
+
+      toast({ title: "Monitoramento iniciado!", description: `${veiculo.placa} - ${paradasInsert.length} paradas` });
+      setShowIniciar(false);
+      loadRotas();
+    } catch (err) {
+      console.error("Erro ao iniciar monitoramento:", err);
+      toast({ title: "Erro ao iniciar monitoramento", variant: "destructive" });
+    } finally {
+      setIniciandoRota(false);
+    }
+  }
+
   useEffect(() => {
     loadRotas();
     loadConfig();
