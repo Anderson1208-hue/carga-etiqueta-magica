@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useGpsTracker } from "@/hooks/useGpsTracker";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
