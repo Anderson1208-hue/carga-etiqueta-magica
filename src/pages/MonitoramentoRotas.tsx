@@ -131,6 +131,10 @@ export default function MonitoramentoRotas() {
   const [justTexto, setJustTexto] = useState("");
   const [savingJust, setSavingJust] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showIniciar, setShowIniciar] = useState(false);
+  const [veiculosDisponiveis, setVeiculosDisponiveis] = useState<any[]>([]);
+  const [loadingVeiculos, setLoadingVeiculos] = useState(false);
+  const [iniciandoRota, setIniciandoRota] = useState(false);
   const [config, setConfig] = useState({
     raio_padrao_metros: 100,
     tempo_minimo_atendimento_min: 5,
