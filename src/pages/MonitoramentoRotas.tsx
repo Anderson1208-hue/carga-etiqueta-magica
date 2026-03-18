@@ -458,6 +458,9 @@ export default function MonitoramentoRotas() {
             <p className="text-muted-foreground">Acompanhamento em tempo real das entregas</p>
           </div>
           <div className="flex gap-2">
+            <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
+              <Truck className="w-4 h-4 mr-1" /> Iniciar Monitoramento
+            </Button>
             <Button variant="outline" size="sm" onClick={() => { loadRotas(); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
               <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
             </Button>
