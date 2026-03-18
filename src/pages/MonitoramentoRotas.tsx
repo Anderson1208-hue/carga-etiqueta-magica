@@ -854,6 +854,46 @@ export default function MonitoramentoRotas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Iniciar Monitoramento Dialog */}
+      <Dialog open={showIniciar} onOpenChange={setShowIniciar}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Iniciar Monitoramento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {loadingVeiculos ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : veiculosDisponiveis.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhum veículo disponível para monitoramento.
+              </p>
+            ) : (
+              veiculosDisponiveis.map((v) => (
+                <div
+                  key={v.id}
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                >
+                  <div>
+                    <p className="font-semibold text-sm">{v.placa}</p>
+                    <p className="text-xs text-muted-foreground">{v.motorista || "Sem motorista"}</p>
+                    <p className="text-xs text-muted-foreground">{v.data}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={iniciandoRota}
+                    onClick={() => handleIniciarMonitoramento(v)}
+                  >
+                    {iniciandoRota ? <Loader2 className="w-4 h-4 animate-spin" /> : "Iniciar"}
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
