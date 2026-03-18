@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useGpsTracker } from "@/hooks/useGpsTracker";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,13 @@ export default function BaixaEntrega() {
   const [syncing, setSyncing] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
   const [vehicleHasOffline, setVehicleHasOffline] = useState(false);
+  const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
+
+  // GPS tracker for monitoring
+  useGpsTracker({
+    monitoramentoRotaId,
+    enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
+  });
 
   // Baixa form state
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
@@ -120,6 +128,21 @@ export default function BaixaEntrega() {
         loadFromOffline(selectedVeiculoId);
       }
       checkOfflineData(selectedVeiculoId);
+      // Find active monitoring route for this vehicle
+      if (isOnline) {
+        supabase
+          .from("monitoramento_rotas")
+          .select("id")
+          .eq("veiculo_id", selectedVeiculoId)
+          .eq("status", "ativa")
+          .limit(1)
+          .maybeSingle()
+          .then(({ data }) => {
+            setMonitoramentoRotaId(data ? (data as any).id : null);
+          });
+      }
+    } else {
+      setMonitoramentoRotaId(null);
     }
   }, [selectedVeiculoId, offlineMode]);
 

@@ -55,6 +55,57 @@ export type Database = {
           },
         ]
       }
+      alertas_monitoramento: {
+        Row: {
+          created_at: string
+          id: string
+          lido: boolean
+          lido_em: string | null
+          lido_por: string | null
+          mensagem: string
+          monitoramento_parada_id: string | null
+          monitoramento_rota_id: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          mensagem: string
+          monitoramento_parada_id?: string | null
+          monitoramento_rota_id: string
+          tipo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          mensagem?: string
+          monitoramento_parada_id?: string | null
+          monitoramento_rota_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alertas_monitoramento_monitoramento_parada_id_fkey"
+            columns: ["monitoramento_parada_id"]
+            isOneToOne: false
+            referencedRelation: "monitoramento_paradas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alertas_monitoramento_monitoramento_rota_id_fkey"
+            columns: ["monitoramento_rota_id"]
+            isOneToOne: false
+            referencedRelation: "monitoramento_rotas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       baixas_entrega: {
         Row: {
           created_at: string
@@ -389,6 +440,184 @@ export type Database = {
           },
         ]
       }
+      monitoramento_config: {
+        Row: {
+          id: string
+          raio_padrao_metros: number
+          tempo_max_sem_atualizacao_min: number
+          tempo_maximo_cliente_min: number
+          tempo_minimo_atendimento_min: number
+          tolerancia_gps_metros: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          raio_padrao_metros?: number
+          tempo_max_sem_atualizacao_min?: number
+          tempo_maximo_cliente_min?: number
+          tempo_minimo_atendimento_min?: number
+          tolerancia_gps_metros?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          raio_padrao_metros?: number
+          tempo_max_sem_atualizacao_min?: number
+          tempo_maximo_cliente_min?: number
+          tempo_minimo_atendimento_min?: number
+          tolerancia_gps_metros?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      monitoramento_paradas: {
+        Row: {
+          cnpj_destinatario: string | null
+          created_at: string
+          endereco_completo: string | null
+          horario_chegada: string | null
+          horario_previsto: string | null
+          horario_saida: string | null
+          id: string
+          is_excecao: boolean
+          justificativa: string | null
+          justificativa_em: string | null
+          justificativa_por: string | null
+          justificativa_tipo: string | null
+          latitude: number | null
+          longitude: number | null
+          monitoramento_rota_id: string
+          ordem: number
+          peso_total_kg: number | null
+          raio_geofence_metros: number
+          razao_social: string | null
+          status: string
+          tempo_permanencia_min: number | null
+          total_caixas: number | null
+          total_nfs: number | null
+          volume_total_m3: number | null
+        }
+        Insert: {
+          cnpj_destinatario?: string | null
+          created_at?: string
+          endereco_completo?: string | null
+          horario_chegada?: string | null
+          horario_previsto?: string | null
+          horario_saida?: string | null
+          id?: string
+          is_excecao?: boolean
+          justificativa?: string | null
+          justificativa_em?: string | null
+          justificativa_por?: string | null
+          justificativa_tipo?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          monitoramento_rota_id: string
+          ordem: number
+          peso_total_kg?: number | null
+          raio_geofence_metros?: number
+          razao_social?: string | null
+          status?: string
+          tempo_permanencia_min?: number | null
+          total_caixas?: number | null
+          total_nfs?: number | null
+          volume_total_m3?: number | null
+        }
+        Update: {
+          cnpj_destinatario?: string | null
+          created_at?: string
+          endereco_completo?: string | null
+          horario_chegada?: string | null
+          horario_previsto?: string | null
+          horario_saida?: string | null
+          id?: string
+          is_excecao?: boolean
+          justificativa?: string | null
+          justificativa_em?: string | null
+          justificativa_por?: string | null
+          justificativa_tipo?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          monitoramento_rota_id?: string
+          ordem?: number
+          peso_total_kg?: number | null
+          raio_geofence_metros?: number
+          razao_social?: string | null
+          status?: string
+          tempo_permanencia_min?: number | null
+          total_caixas?: number | null
+          total_nfs?: number | null
+          volume_total_m3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitoramento_paradas_monitoramento_rota_id_fkey"
+            columns: ["monitoramento_rota_id"]
+            isOneToOne: false
+            referencedRelation: "monitoramento_rotas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitoramento_rotas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: string
+          id: string
+          motorista: string | null
+          paradas_concluidas: number
+          placa: string
+          status: string
+          total_paradas: number
+          ultima_atualizacao: string | null
+          ultima_lat: number | null
+          ultima_lng: number | null
+          veiculo_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          motorista?: string | null
+          paradas_concluidas?: number
+          placa: string
+          status?: string
+          total_paradas?: number
+          ultima_atualizacao?: string | null
+          ultima_lat?: number | null
+          ultima_lng?: number | null
+          veiculo_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          motorista?: string | null
+          paradas_concluidas?: number
+          placa?: string
+          status?: string
+          total_paradas?: number
+          ultima_atualizacao?: string | null
+          ultima_lat?: number | null
+          ultima_lng?: number | null
+          veiculo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitoramento_rotas_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas_fiscais: {
         Row: {
           carga_id: string
@@ -462,6 +691,41 @@ export type Database = {
             columns: ["carga_id"]
             isOneToOne: false
             referencedRelation: "cargas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posicoes_gps: {
+        Row: {
+          accuracy: number | null
+          id: string
+          latitude: number
+          longitude: number
+          monitoramento_rota_id: string
+          registrado_em: string
+        }
+        Insert: {
+          accuracy?: number | null
+          id?: string
+          latitude: number
+          longitude: number
+          monitoramento_rota_id: string
+          registrado_em?: string
+        }
+        Update: {
+          accuracy?: number | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          monitoramento_rota_id?: string
+          registrado_em?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posicoes_gps_monitoramento_rota_id_fkey"
+            columns: ["monitoramento_rota_id"]
+            isOneToOne: false
+            referencedRelation: "monitoramento_rotas"
             referencedColumns: ["id"]
           },
         ]
