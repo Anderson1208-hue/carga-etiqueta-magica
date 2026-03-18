@@ -12,6 +12,7 @@ import type {
   Alerta,
   MonitoramentoConfig,
 } from "@/components/monitoramento/types";
+import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { MonitoramentoStats } from "@/components/monitoramento/MonitoramentoStats";
 import { RotasList } from "@/components/monitoramento/RotasList";
 import { RotaDetailHeader } from "@/components/monitoramento/RotaDetailHeader";
