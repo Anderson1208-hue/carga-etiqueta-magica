@@ -202,6 +202,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/torre-controle"
+        element={
+          <ProtectedRoute>
+            <TorreControle />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/consulta-nf"
         element={
           <ProtectedRoute>

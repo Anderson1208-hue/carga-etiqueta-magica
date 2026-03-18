@@ -43,6 +43,7 @@ const transporteItems = [
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
   { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
+  { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
   { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
