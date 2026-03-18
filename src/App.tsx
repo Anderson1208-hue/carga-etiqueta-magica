@@ -20,6 +20,7 @@ import HistoricoEntregas from "./pages/HistoricoEntregas";
 import Agendamento from "./pages/Agendamento";
 import ConsultaNF from "./pages/ConsultaNF";
 import MonitoramentoRotas from "./pages/MonitoramentoRotas";
+import TorreControle from "./pages/TorreControle";
 import Operadores from "./pages/Operadores";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
@@ -197,6 +198,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MonitoramentoRotas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/torre-controle"
+        element={
+          <ProtectedRoute>
+            <TorreControle />
           </ProtectedRoute>
         }
       />

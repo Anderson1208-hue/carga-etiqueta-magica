@@ -12,6 +12,7 @@ import type {
   Alerta,
   MonitoramentoConfig,
 } from "@/components/monitoramento/types";
+import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { MonitoramentoStats } from "@/components/monitoramento/MonitoramentoStats";
 import { RotasList } from "@/components/monitoramento/RotasList";
 import { RotaDetailHeader } from "@/components/monitoramento/RotaDetailHeader";
@@ -332,6 +333,15 @@ export default function MonitoramentoRotas() {
         </div>
 
         <MonitoramentoStats {...stats} />
+
+        {/* Mini mapa geral com todos os veículos */}
+        {rotas.filter((r) => r.ultima_lat && r.ultima_lng).length > 0 && (
+          <MapaGeral
+            rotas={rotas.filter((r) => r.ultima_lat && r.ultima_lng)}
+            height="200px"
+            onSelectRota={setSelectedRota}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <RotasList
