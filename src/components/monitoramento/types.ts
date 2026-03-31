@@ -52,6 +52,13 @@ export interface MonitoramentoConfig {
   tempo_maximo_cliente_min: number;
   tolerancia_gps_metros: number;
   tempo_max_sem_atualizacao_min: number;
+  intervalo_padrao_segundos: number;
+  intervalo_critico_segundos: number;
+  distance_filter_metros: number;
+  geofence_ativo: boolean;
+  batch_sync_ativo: boolean;
+  batch_max_posicoes: number;
+  raio_aproximacao_metros: number;
 }
 
 export const JUSTIFICATIVA_TIPOS = [

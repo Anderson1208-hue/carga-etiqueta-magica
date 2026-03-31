@@ -19,12 +19,34 @@ interface ConfigDialogProps {
   saving: boolean;
 }
 
-const CONFIG_FIELDS: { key: keyof MonitoramentoConfig; label: string }[] = [
-  { key: "raio_padrao_metros", label: "Raio padrão de geofence (metros)" },
-  { key: "tempo_minimo_atendimento_min", label: "Tempo mínimo para atendimento (minutos)" },
-  { key: "tempo_maximo_cliente_min", label: "Tempo máximo por cliente (minutos)" },
-  { key: "tolerancia_gps_metros", label: "Tolerância de GPS (metros)" },
-  { key: "tempo_max_sem_atualizacao_min", label: "Tempo máximo sem atualização (minutos)" },
+const CONFIG_SECTIONS = [
+  {
+    title: "Geofence & Atendimento",
+    fields: [
+      { key: "raio_padrao_metros" as keyof MonitoramentoConfig, label: "Raio padrão de geofence (metros)", type: "number" as const },
+      { key: "tempo_minimo_atendimento_min" as keyof MonitoramentoConfig, label: "Tempo mínimo para atendimento (min)", type: "number" as const },
+      { key: "tempo_maximo_cliente_min" as keyof MonitoramentoConfig, label: "Tempo máximo por cliente (min)", type: "number" as const },
+      { key: "tolerancia_gps_metros" as keyof MonitoramentoConfig, label: "Tolerância de GPS (metros)", type: "number" as const },
+      { key: "tempo_max_sem_atualizacao_min" as keyof MonitoramentoConfig, label: "Tempo máx. sem atualização (min)", type: "number" as const },
+      { key: "geofence_ativo" as keyof MonitoramentoConfig, label: "Geofence ativo", type: "boolean" as const },
+    ],
+  },
+  {
+    title: "GPS & Intervalo",
+    fields: [
+      { key: "intervalo_padrao_segundos" as keyof MonitoramentoConfig, label: "Intervalo padrão de envio (segundos)", type: "number" as const },
+      { key: "intervalo_critico_segundos" as keyof MonitoramentoConfig, label: "Intervalo modo crítico (segundos)", type: "number" as const },
+      { key: "distance_filter_metros" as keyof MonitoramentoConfig, label: "Filtro de distância mínima (metros)", type: "number" as const },
+      { key: "raio_aproximacao_metros" as keyof MonitoramentoConfig, label: "Raio de aproximação p/ modo crítico (metros)", type: "number" as const },
+    ],
+  },
+  {
+    title: "Sincronização em Lote",
+    fields: [
+      { key: "batch_sync_ativo" as keyof MonitoramentoConfig, label: "Envio em lote ativo", type: "boolean" as const },
+      { key: "batch_max_posicoes" as keyof MonitoramentoConfig, label: "Máx. posições por lote", type: "number" as const },
+    ],
+  },
 ];
 
 export function ConfigDialog({ open, onClose, config, onConfigChange, onSave, saving }: ConfigDialogProps) {
