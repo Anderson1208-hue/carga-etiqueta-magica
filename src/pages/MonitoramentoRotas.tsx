@@ -41,6 +41,13 @@ export default function MonitoramentoRotas() {
     tempo_maximo_cliente_min: 60,
     tolerancia_gps_metros: 30,
     tempo_max_sem_atualizacao_min: 15,
+    intervalo_padrao_segundos: 60,
+    intervalo_critico_segundos: 30,
+    distance_filter_metros: 100,
+    geofence_ativo: true,
+    batch_sync_ativo: true,
+    batch_max_posicoes: 5,
+    raio_aproximacao_metros: 500,
   });
 
   const [showIniciar, setShowIniciar] = useState(false);
