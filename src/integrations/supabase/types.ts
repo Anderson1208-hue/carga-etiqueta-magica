@@ -442,7 +442,14 @@ export type Database = {
       }
       monitoramento_config: {
         Row: {
+          batch_max_posicoes: number
+          batch_sync_ativo: boolean
+          distance_filter_metros: number
+          geofence_ativo: boolean
           id: string
+          intervalo_critico_segundos: number
+          intervalo_padrao_segundos: number
+          raio_aproximacao_metros: number
           raio_padrao_metros: number
           tempo_max_sem_atualizacao_min: number
           tempo_maximo_cliente_min: number
@@ -452,7 +459,14 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          batch_max_posicoes?: number
+          batch_sync_ativo?: boolean
+          distance_filter_metros?: number
+          geofence_ativo?: boolean
           id?: string
+          intervalo_critico_segundos?: number
+          intervalo_padrao_segundos?: number
+          raio_aproximacao_metros?: number
           raio_padrao_metros?: number
           tempo_max_sem_atualizacao_min?: number
           tempo_maximo_cliente_min?: number
@@ -462,7 +476,14 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          batch_max_posicoes?: number
+          batch_sync_ativo?: boolean
+          distance_filter_metros?: number
+          geofence_ativo?: boolean
           id?: string
+          intervalo_critico_segundos?: number
+          intervalo_padrao_segundos?: number
+          raio_aproximacao_metros?: number
           raio_padrao_metros?: number
           tempo_max_sem_atualizacao_min?: number
           tempo_maximo_cliente_min?: number

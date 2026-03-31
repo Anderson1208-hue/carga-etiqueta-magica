@@ -5,7 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Haversine distance in meters
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -16,8 +15,14 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+interface GpsPosition {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  timestamp?: string;
 }
 
 Deno.serve(async (req) => {
@@ -26,9 +31,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { monitoramento_rota_id, latitude, longitude, accuracy } = await req.json();
+    const body = await req.json();
+    const { monitoramento_rota_id, latitude, longitude, accuracy, batch } = body;
 
-    if (!monitoramento_rota_id || latitude == null || longitude == null) {
+    if (!monitoramento_rota_id || (latitude == null && (!batch || batch.length === 0))) {
       return new Response(JSON.stringify({ error: "Dados incompletos" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -40,21 +46,31 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Insert GPS position
-    await supabase.from("posicoes_gps").insert({
-      monitoramento_rota_id,
-      latitude,
-      longitude,
-      accuracy,
-      registrado_em: new Date().toISOString(),
-    });
+    // 1. Insert GPS positions (batch or single)
+    const positions: GpsPosition[] = batch && batch.length > 0
+      ? batch
+      : [{ latitude, longitude, accuracy, timestamp: new Date().toISOString() }];
 
-    // 2. Update route last position
+    const gpsRows = positions.map((p: GpsPosition) => ({
+      monitoramento_rota_id,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      accuracy: p.accuracy,
+      registrado_em: p.timestamp || new Date().toISOString(),
+    }));
+
+    await supabase.from("posicoes_gps").insert(gpsRows);
+
+    // 2. Use last position for route update and geofence checks
+    const lastPos = positions[positions.length - 1];
+    const lat = lastPos.latitude;
+    const lng = lastPos.longitude;
+
     await supabase
       .from("monitoramento_rotas")
       .update({
-        ultima_lat: latitude,
-        ultima_lng: longitude,
+        ultima_lat: lat,
+        ultima_lng: lng,
         ultima_atualizacao: new Date().toISOString(),
       })
       .eq("id", monitoramento_rota_id);
@@ -90,7 +106,7 @@ Deno.serve(async (req) => {
     for (const parada of paradas) {
       if (!parada.latitude || !parada.longitude) continue;
 
-      const dist = haversineDistance(latitude, longitude, Number(parada.latitude), Number(parada.longitude));
+      const dist = haversineDistance(lat, lng, Number(parada.latitude), Number(parada.longitude));
       const raio = (parada.raio_geofence_metros || raio_padrao) + tolerancia_gps;
       const dentroGeofence = dist <= raio;
 
@@ -98,10 +114,7 @@ Deno.serve(async (req) => {
       if (dentroGeofence && parada.status === "programada") {
         await supabase
           .from("monitoramento_paradas")
-          .update({
-            status: "chegou_cliente",
-            horario_chegada: now.toISOString(),
-          })
+          .update({ status: "chegou_cliente", horario_chegada: now.toISOString() })
           .eq("id", parada.id);
 
         // Check if out of sequence
@@ -110,7 +123,6 @@ Deno.serve(async (req) => {
         );
 
         if (anterioresNaoConcluidas.length > 0) {
-          // Mark skipped stops
           for (const ant of anterioresNaoConcluidas) {
             if (ant.status === "programada") {
               await supabase
@@ -128,7 +140,6 @@ Deno.serve(async (req) => {
             }
           }
 
-          // Mark current as out of sequence
           await supabase
             .from("monitoramento_paradas")
             .update({ is_excecao: true, status: "fora_sequencia" })
@@ -144,7 +155,6 @@ Deno.serve(async (req) => {
           events.push(`fora_sequencia_${parada.id}`);
         }
 
-        // Mark as em_rota the next expected stop
         events.push(`chegou_${parada.id}`);
       }
 
@@ -176,7 +186,6 @@ Deno.serve(async (req) => {
         const minutos = (now.getTime() - chegada.getTime()) / 60000;
 
         if (minutos >= tempo_max_cliente) {
-          // Check if alert already exists
           const { data: existingAlert } = await supabase
             .from("alertas_monitoramento")
             .select("id")
@@ -211,7 +220,6 @@ Deno.serve(async (req) => {
         const permanencia = Math.round((now.getTime() - chegada.getTime()) / 60000);
 
         if (permanencia < tempo_min_atendimento) {
-          // Inconsistent visit
           await supabase
             .from("monitoramento_paradas")
             .update({
@@ -230,7 +238,6 @@ Deno.serve(async (req) => {
           });
           events.push(`visita_inconsistente_${parada.id}`);
         } else {
-          // Normal exit
           await supabase
             .from("monitoramento_paradas")
             .update({
