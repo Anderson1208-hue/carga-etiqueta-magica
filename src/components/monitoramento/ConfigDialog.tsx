@@ -57,15 +57,30 @@ export function ConfigDialog({ open, onClose, config, onConfigChange, onSave, sa
         <DialogHeader>
           <DialogTitle>Configurações do Monitoramento</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          {CONFIG_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label className="text-sm font-medium">{label}</label>
-              <Input
-                type="number"
-                value={config[key]}
-                onChange={(e) => onConfigChange({ ...config, [key]: Number(e.target.value) })}
-              />
+        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
+          {CONFIG_SECTIONS.map((section) => (
+            <div key={section.title}>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">{section.title}</h3>
+              <div className="space-y-3">
+                {section.fields.map(({ key, label, type }) => (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <label className="text-sm font-medium flex-1">{label}</label>
+                    {type === "boolean" ? (
+                      <Switch
+                        checked={!!config[key]}
+                        onCheckedChange={(checked) => onConfigChange({ ...config, [key]: checked } as any)}
+                      />
+                    ) : (
+                      <Input
+                        type="number"
+                        className="w-28"
+                        value={config[key] as number}
+                        onChange={(e) => onConfigChange({ ...config, [key]: Number(e.target.value) })}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
