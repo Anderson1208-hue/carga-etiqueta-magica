@@ -112,6 +112,7 @@ export function Sidebar() {
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
+  const torreActive = torreControleItems.some((i) => location.pathname === i.href);
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
@@ -143,6 +144,13 @@ export function Sidebar() {
             items={transporteItems}
             pathname={location.pathname}
             defaultOpen={transporteActive}
+          />
+          <NavGroup
+            label="Torre de Controle"
+            icon={Eye}
+            items={torreControleItems}
+            pathname={location.pathname}
+            defaultOpen={torreActive}
           />
           {isAdmin && (
             <div className="pt-2">
