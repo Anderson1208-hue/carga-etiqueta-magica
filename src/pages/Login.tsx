@@ -15,6 +15,7 @@ export default function Login() {
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
 
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [showForgot, setShowForgot] = useState(false);
@@ -68,6 +69,37 @@ export default function Login() {
     }
 
     setIsLoading(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!forgotEmail) {
+      return;
+    }
+
+    setIsForgotLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message,
+      });
+    } else {
+      toast({
+        title: "E-mail enviado!",
+        description: "Verifique sua caixa de entrada para redefinir a senha.",
+      });
+      setShowForgot(false);
+      setForgotEmail("");
+    }
+
+    setIsForgotLoading(false);
   };
 
   return (
@@ -182,7 +214,7 @@ export default function Login() {
           </Tabs>
 
           {showForgot && (
-            <div className="mt-6 border-t pt-6 space-y-4">
+            <form onSubmit={handleForgotPassword} className="mt-6 border-t pt-6 space-y-4">
               <h3 className="text-sm font-semibold text-foreground">Redefinir senha</h3>
               <p className="text-xs text-muted-foreground">
                 Informe seu e-mail para receber o link de redefinição.
@@ -192,9 +224,11 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
+                required
               />
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setShowForgot(false)}
@@ -202,35 +236,15 @@ export default function Login() {
                   Cancelar
                 </Button>
                 <Button
+                  type="submit"
                   size="sm"
-                  disabled={isLoading || !forgotEmail}
-                  onClick={async () => {
-                    setIsLoading(true);
-                    const { error } = await supabase.auth.resetPasswordForEmail(
-                      forgotEmail,
-                      { redirectTo: `${window.location.origin}/reset-password` }
-                    );
-                    if (error) {
-                      toast({
-                        variant: "destructive",
-                        title: "Erro",
-                        description: error.message,
-                      });
-                    } else {
-                      toast({
-                        title: "E-mail enviado!",
-                        description: "Verifique sua caixa de entrada para redefinir a senha.",
-                      });
-                      setShowForgot(false);
-                    }
-                    setIsLoading(false);
-                  }}
+                  disabled={isForgotLoading || !forgotEmail}
                 >
-                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isForgotLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Enviar link
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </CardContent>
       </Card>
