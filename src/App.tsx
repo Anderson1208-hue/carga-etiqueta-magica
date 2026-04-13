@@ -24,6 +24,7 @@ import TorreControle from "./pages/TorreControle";
 import Operadores from "./pages/Operadores";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -225,6 +226,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
