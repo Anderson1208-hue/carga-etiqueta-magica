@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -179,6 +180,58 @@ export default function Login() {
               </form>
             </TabsContent>
           </Tabs>
+
+          {showForgot && (
+            <div className="mt-6 border-t pt-6 space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Redefinir senha</h3>
+              <p className="text-xs text-muted-foreground">
+                Informe seu e-mail para receber o link de redefinição.
+              </p>
+              <Input
+                type="email"
+                placeholder="seu@email.com"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowForgot(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={isLoading || !forgotEmail}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    const { error } = await supabase.auth.resetPasswordForEmail(
+                      forgotEmail,
+                      { redirectTo: `${window.location.origin}/reset-password` }
+                    );
+                    if (error) {
+                      toast({
+                        variant: "destructive",
+                        title: "Erro",
+                        description: error.message,
+                      });
+                    } else {
+                      toast({
+                        title: "E-mail enviado!",
+                        description: "Verifique sua caixa de entrada para redefinir a senha.",
+                      });
+                      setShowForgot(false);
+                    }
+                    setIsLoading(false);
+                  }}
+                >
+                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Enviar link
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
