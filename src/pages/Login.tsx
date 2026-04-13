@@ -16,6 +16,8 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
   const [signUpData, setSignUpData] = useState({
     email: "",
     password: "",
