@@ -22,6 +22,7 @@ import {
   Users,
   Radio,
   Radar,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -43,10 +44,13 @@ const transporteItems = [
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
   { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
-  { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
-  { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
+];
+
+const torreControleItems = [
+  { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
+  { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
 ];
 
 function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean }) {
@@ -108,6 +112,7 @@ export function Sidebar() {
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
+  const torreActive = torreControleItems.some((i) => location.pathname === i.href);
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
@@ -139,6 +144,13 @@ export function Sidebar() {
             items={transporteItems}
             pathname={location.pathname}
             defaultOpen={transporteActive}
+          />
+          <NavGroup
+            label="Torre de Controle"
+            icon={Eye}
+            items={torreControleItems}
+            pathname={location.pathname}
+            defaultOpen={torreActive}
           />
           {isAdmin && (
             <div className="pt-2">
