@@ -89,9 +89,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setIsLoading(false);
       }
-    }).catch((err) => {
-      console.error("[Auth] Erro ao obter sessão:", err);
-      setIsLoading(false);
     });
 
     return () => {
