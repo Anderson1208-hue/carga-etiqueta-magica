@@ -76,15 +76,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle()
-          .then(({ data: profileData }) => {
-            if (profileData) {
+          .then(({ data: profileData, error: profileError }) => {
+            if (profileError) {
+              console.error("[Auth] Erro ao buscar perfil (getSession):", profileError);
+            } else if (profileData) {
               setProfile(profileData as Profile);
+            } else {
+              console.warn("[Auth] Perfil não encontrado (getSession) para user:", session.user.id);
             }
+            setIsLoading(false);
+          })
+          .catch((err) => {
+            console.error("[Auth] Exceção ao buscar perfil (getSession):", err);
             setIsLoading(false);
           });
       } else {
         setIsLoading(false);
       }
+    }).catch((err) => {
+      console.error("[Auth] Erro ao obter sessão:", err);
+      setIsLoading(false);
     });
 
     return () => {
