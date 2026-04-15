@@ -40,14 +40,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Fetch profile with setTimeout to avoid deadlock
           setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", session.user.id)
-              .maybeSingle();
+            try {
+              const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", session.user.id)
+                .maybeSingle();
 
-            if (profileData) {
-              setProfile(profileData as Profile);
+              if (profileError) {
+                console.error("[Auth] Erro ao buscar perfil (onAuthStateChange):", profileError);
+              } else if (profileData) {
+                setProfile(profileData as Profile);
+              } else {
+                console.warn("[Auth] Perfil não encontrado para user:", session.user.id);
+              }
+            } catch (err) {
+              console.error("[Auth] Exceção ao buscar perfil:", err);
             }
           }, 0);
         } else {
@@ -68,9 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("*")
           .eq("id", session.user.id)
           .maybeSingle()
-          .then(({ data: profileData }) => {
-            if (profileData) {
+          .then(({ data: profileData, error: profileError }) => {
+            if (profileError) {
+              console.error("[Auth] Erro ao buscar perfil (getSession):", profileError);
+            } else if (profileData) {
               setProfile(profileData as Profile);
+            } else {
+              console.warn("[Auth] Perfil não encontrado (getSession) para user:", session.user.id);
             }
             setIsLoading(false);
           });
@@ -85,11 +97,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (err) {
+      console.error("[Auth] Exceção no signIn:", err);
+      return { error: err as Error };
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
