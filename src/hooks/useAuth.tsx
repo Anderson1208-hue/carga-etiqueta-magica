@@ -40,14 +40,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           // Fetch profile with setTimeout to avoid deadlock
           setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", session.user.id)
-              .maybeSingle();
+            try {
+              const { data: profileData, error: profileError } = await supabase
+                .from("profiles")
+                .select("*")
+                .eq("id", session.user.id)
+                .maybeSingle();
 
-            if (profileData) {
-              setProfile(profileData as Profile);
+              if (profileError) {
+                console.error("[Auth] Erro ao buscar perfil (onAuthStateChange):", profileError);
+              } else if (profileData) {
+                setProfile(profileData as Profile);
+              } else {
+                console.warn("[Auth] Perfil não encontrado para user:", session.user.id);
+              }
+            } catch (err) {
+              console.error("[Auth] Exceção ao buscar perfil:", err);
             }
           }, 0);
         } else {
