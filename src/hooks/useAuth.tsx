@@ -85,10 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.warn("[Auth] Perfil não encontrado (getSession) para user:", session.user.id);
             }
             setIsLoading(false);
-          })
-          .catch((err) => {
-            console.error("[Auth] Exceção ao buscar perfil (getSession):", err);
-            setIsLoading(false);
           });
       } else {
         setIsLoading(false);
