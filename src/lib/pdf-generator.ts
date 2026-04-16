@@ -172,7 +172,12 @@ export async function generateNotaDeCargaPDF(
   const pageWidth = A4_WIDTH - MARGIN * 2;
 
   // Sort NFs by MR → bairro → CNPJ → NF number
+  // Se houver ordem de entrega (vinda da roteirização), ela tem prioridade absoluta.
+  // Caso contrário, ordena por MR → bairro → CNPJ → NF.
   const sortedNFs = [...notasFiscais].sort((a, b) => {
+    const oa = a.ordemEntrega ?? Number.POSITIVE_INFINITY;
+    const ob = b.ordemEntrega ?? Number.POSITIVE_INFINITY;
+    if (oa !== ob) return oa - ob;
     const mrA = a.macroRegiao ?? 99;
     const mrB = b.macroRegiao ?? 99;
     if (mrA !== mrB) return mrA - mrB;
