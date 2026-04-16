@@ -369,6 +369,9 @@ export default function Agendamento() {
       });
 
       setBulkDialogOpen(false);
+      // Remove scheduled NFs from list, keep the rest for next batch
+      const scheduledIds = new Set(selectedNfIds);
+      setNfResults(prev => prev.filter(nf => !scheduledIds.has(nf.id)));
       setSelectedNfIds(new Set());
       loadAgendamentos();
     } catch (err) {
