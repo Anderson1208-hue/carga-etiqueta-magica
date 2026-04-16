@@ -194,15 +194,29 @@ function extractVolumeM3(xmlDoc: Document): number {
   const transp = xmlDoc.querySelector("transp");
   const vol = transp?.querySelector("vol");
 
-  // 0) Pandurata: <vol><NUMERO>0,025</NUMERO> (ao lado dos pesos)
-  // Também aceita variações de caixa (numero/Numero) e tags similares.
-  if (vol) {
-    const candidatos = vol.querySelectorAll(
-      "NUMERO, numero, Numero, nVol, qVol, cubagem, CUBAGEM, m3, M3"
-    );
+  // 0) Pandurata: tag <NUMERO> (ou variações) próxima aos pesos.
+  // Procura primeiro dentro de <vol>, depois dentro de <transp>,
+  // e por fim em qualquer lugar do documento. Aceita variações de caixa.
+  const tagNames = [
+    "NUMERO", "numero", "Numero",
+    "nVol", "qVol",
+    "cubagem", "CUBAGEM", "Cubagem",
+    "m3", "M3",
+    "CUB", "cub",
+  ];
+  const selector = tagNames.join(", ");
+
+  const scopes: Element[] = [];
+  if (vol) scopes.push(vol);
+  if (transp) scopes.push(transp);
+  scopes.push(xmlDoc.documentElement);
+
+  for (const scope of scopes) {
+    const candidatos = scope.querySelectorAll(selector);
     for (const node of Array.from(candidatos)) {
       const raw = (node.textContent || "").trim().replace(",", ".");
       const v = parseFloat(raw);
+      // m³ plausível: > 0 e < 1000 (cargas reais ficam bem abaixo disso)
       if (!isNaN(v) && v > 0 && v < 1000) {
         return v;
       }
