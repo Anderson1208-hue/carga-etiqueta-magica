@@ -777,8 +777,11 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es">
                           <FileUp className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem">
+                        <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem (Excel)">
                           <Package className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setM3XmlCarga(carga)} title="Atualizar m³ via XML">
+                          <Box className="w-4 h-4" />
                         </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
@@ -855,6 +858,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setCubagemCarga(null)}
             cargaId={cubagemCarga.id}
             cargaPlaca={cubagemCarga.placa}
+          />
+        )}
+        {/* Atualizar m³ via XML Dialog */}
+        {m3XmlCarga && (
+          <AtualizarM3XmlDialog
+            open={!!m3XmlCarga}
+            onOpenChange={(open) => !open && setM3XmlCarga(null)}
+            cargaId={m3XmlCarga.id}
+            cargaPlaca={m3XmlCarga.placa}
+            onUpdated={loadCargas}
           />
         )}
         {/* Import CT-e Dialog */}
