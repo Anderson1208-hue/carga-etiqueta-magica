@@ -1053,9 +1053,38 @@ export default function Roteirizacao() {
         return;
       }
 
+      // Buscar a ordem de entrega por CNPJ a partir da roteirização das cargas envolvidas
+      const cargaIds = Array.from(new Set(vnfs.map((v: any) => v.carga_origem_id).filter(Boolean)));
+      const ordemPorCnpj = new Map<string, number>();
+      let totalEntregasRota = 0;
+      if (cargaIds.length > 0) {
+        const { data: rots } = await supabase
+          .from("roteirizacoes")
+          .select("id, carga_id, created_at")
+          .in("carga_id", cargaIds)
+          .order("created_at", { ascending: false });
+        const rotIds = (rots || []).map((r: any) => r.id);
+        if (rotIds.length > 0) {
+          const { data: paradas } = await supabase
+            .from("roteirizacao_paradas")
+            .select("cnpj_destinatario, ordem, roteirizacao_id")
+            .in("roteirizacao_id", rotIds)
+            .order("ordem", { ascending: true });
+          // Reordenar de 1..N por CNPJ único na ordem da rota
+          const cnpjsOrdenados: string[] = [];
+          for (const p of paradas || []) {
+            const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
+            if (cnpj && !cnpjsOrdenados.includes(cnpj)) cnpjsOrdenados.push(cnpj);
+          }
+          cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
+          totalEntregasRota = cnpjsOrdenados.length;
+        }
+      }
+
       const notasFiscais = vnfs.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const bairro = nf.dest_bairro || "";
+        const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
         return {
           numeroNf: nf.numero_nf,
           razaoSocialEmitente: nf.razao_social_emitente,
@@ -1064,6 +1093,8 @@ export default function Roteirizacao() {
           destBairro: bairro,
           macroRegiao: getMacroRegiao(bairro),
           dataEmissao: nf.data_emissao,
+          ordemEntrega: ordemPorCnpj.get(cnpjKey),
+          totalEntregas: totalEntregasRota || undefined,
           itens: (nf.itens_nf || []).map((item: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
