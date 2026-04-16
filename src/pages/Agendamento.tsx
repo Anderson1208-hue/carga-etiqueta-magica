@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
@@ -116,18 +117,26 @@ export default function Agendamento() {
   const [search, setSearch] = useState("");
   const [nfResults, setNfResults] = useState<NfResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [selectedNfIds, setSelectedNfIds] = useState<Set<string>>(new Set());
 
   const [agendamentos, setAgendamentos] = useState<AgendamentoRecord[]>([]);
   const [loadingAgendamentos, setLoadingAgendamentos] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("todos");
 
-  // Dialog state
+  // Dialog state (single NF)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedNf, setSelectedNf] = useState<NfResult | null>(null);
   const [agStatus, setAgStatus] = useState<AgendamentoStatus>("AGUARDANDO AGENDA");
   const [agDate, setAgDate] = useState<Date | undefined>(undefined);
   const [agObs, setAgObs] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Bulk dialog state
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<AgendamentoStatus>("AGENDAMENTO");
+  const [bulkDate, setBulkDate] = useState<Date | undefined>(undefined);
+  const [bulkObs, setBulkObs] = useState("");
+  const [savingBulk, setSavingBulk] = useState(false);
 
   // Edit date dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -138,6 +147,11 @@ export default function Agendamento() {
   useEffect(() => {
     loadAgendamentos();
   }, []);
+
+  // Clear selection when results change
+  useEffect(() => {
+    setSelectedNfIds(new Set());
+  }, [nfResults]);
 
   async function loadAgendamentos() {
     setLoadingAgendamentos(true);
@@ -199,7 +213,6 @@ export default function Agendamento() {
         .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
         .limit(50);
 
-      // Search by NF number, chave, destinatário or CNPJ
       query = query.or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`);
 
       const { data, error } = await query;
@@ -229,12 +242,39 @@ export default function Agendamento() {
     }
   }
 
+  function toggleNfSelection(nfId: string) {
+    setSelectedNfIds(prev => {
+      const next = new Set(prev);
+      if (next.has(nfId)) {
+        next.delete(nfId);
+      } else {
+        next.add(nfId);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedNfIds.size === nfResults.length) {
+      setSelectedNfIds(new Set());
+    } else {
+      setSelectedNfIds(new Set(nfResults.map(nf => nf.id)));
+    }
+  }
+
   function openAgendamentoDialog(nf: NfResult) {
     setSelectedNf(nf);
     setAgStatus("AGUARDANDO AGENDA");
     setAgDate(undefined);
     setAgObs("");
     setDialogOpen(true);
+  }
+
+  function openBulkDialog() {
+    setBulkStatus("AGENDAMENTO");
+    setBulkDate(undefined);
+    setBulkObs("");
+    setBulkDialogOpen(true);
   }
 
   async function saveAgendamento() {
@@ -246,7 +286,6 @@ export default function Agendamento() {
       return;
     }
 
-    // Se status é AGUARDANDO AGENDA mas tem data, automaticamente muda para AGENDAMENTO
     const finalStatus = (agStatus === "AGUARDANDO AGENDA" && agDate) ? "AGENDAMENTO" : agStatus;
 
     setSaving(true);
@@ -276,6 +315,46 @@ export default function Agendamento() {
     }
   }
 
+  async function saveBulkAgendamento() {
+    if (!user || selectedNfIds.size === 0) return;
+
+    const needsDate = bulkStatus === "AGENDAMENTO" || bulkStatus === "REENTREGA";
+    if (needsDate && !bulkDate) {
+      toast({ title: "Atenção", description: "Selecione a data do agendamento", variant: "destructive" });
+      return;
+    }
+
+    const finalStatus = (bulkStatus === "AGUARDANDO AGENDA" && bulkDate) ? "AGENDAMENTO" : bulkStatus;
+
+    setSavingBulk(true);
+    try {
+      const inserts = Array.from(selectedNfIds).map(nfId => ({
+        nf_id: nfId,
+        status: finalStatus,
+        data_agendamento: bulkDate ? format(bulkDate, "yyyy-MM-dd") : null,
+        observacao: bulkObs || null,
+        created_by: user.id,
+      }));
+
+      const { error } = await supabase.from("agendamentos").insert(inserts);
+      if (error) throw error;
+
+      toast({
+        title: "Agendamentos salvos!",
+        description: `${inserts.length} NFs agendadas com sucesso.`,
+      });
+
+      setBulkDialogOpen(false);
+      setSelectedNfIds(new Set());
+      loadAgendamentos();
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Erro ao salvar agendamentos em lote", variant: "destructive" });
+    } finally {
+      setSavingBulk(false);
+    }
+  }
+
   function openEditDateDialog(ag: AgendamentoRecord) {
     setEditingAgendamento(ag);
     setEditDate(ag.data_agendamento ? new Date(ag.data_agendamento + "T12:00:00") : undefined);
@@ -289,7 +368,6 @@ export default function Agendamento() {
       const updateData: Record<string, any> = { 
         data_agendamento: editDate ? format(editDate, "yyyy-MM-dd") : null 
       };
-      // Se estava AGUARDANDO AGENDA e recebeu uma data, muda para AGENDAMENTO
       if (editingAgendamento.status === "AGUARDANDO AGENDA" && editDate) {
         updateData.status = "AGENDAMENTO";
       }
@@ -312,6 +390,8 @@ export default function Agendamento() {
   const filteredAgendamentos = filterStatus === "todos"
     ? agendamentos
     : agendamentos.filter(a => a.status === filterStatus);
+
+  const selectedNfs = nfResults.filter(nf => selectedNfIds.has(nf.id));
 
   return (
     <MainLayout>
@@ -346,37 +426,66 @@ export default function Agendamento() {
             </div>
 
             {nfResults.length > 0 && (
-              <div className="mt-4 border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>NF</TableHead>
-                      <TableHead>Destinatário</TableHead>
-                      <TableHead>Cidade/UF</TableHead>
-                      <TableHead>Status Entrega</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead className="w-[120px]">Ação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {nfResults.map(nf => (
-                      <TableRow key={nf.id} className={chocolateRowClass(nf.tipo_carga)}>
-                        <TableCell className="font-mono font-medium">{nf.numero_nf}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
-                        <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
-                        <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
-                        <TableCell><TipoCargaBadge tipoCarga={nf.tipo_carga} /></TableCell>
-                        <TableCell>
-                          <Button size="sm" onClick={() => openAgendamentoDialog(nf)}>
-                            <CalendarIcon className="w-4 h-4 mr-1" />
-                            Agendar
-                          </Button>
-                        </TableCell>
+              <>
+                {/* Bulk action bar */}
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedNfIds.size > 0
+                      ? `${selectedNfIds.size} de ${nfResults.length} NFs selecionadas`
+                      : `${nfResults.length} NFs encontradas — selecione para agendar em lote`}
+                  </p>
+                  {selectedNfIds.size > 0 && (
+                    <Button onClick={openBulkDialog} size="sm">
+                      <CalendarCheck className="w-4 h-4 mr-1" />
+                      Agendar {selectedNfIds.size} NF{selectedNfIds.size > 1 ? "s" : ""}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="mt-2 border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[40px]">
+                          <Checkbox
+                            checked={selectedNfIds.size === nfResults.length && nfResults.length > 0}
+                            onCheckedChange={toggleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead>NF</TableHead>
+                        <TableHead>Destinatário</TableHead>
+                        <TableHead>Cidade/UF</TableHead>
+                        <TableHead>Status Entrega</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="w-[120px]">Ação</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {nfResults.map(nf => (
+                        <TableRow key={nf.id} className={chocolateRowClass(nf.tipo_carga)}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedNfIds.has(nf.id)}
+                              onCheckedChange={() => toggleNfSelection(nf.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-mono font-medium">{nf.numero_nf}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
+                          <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
+                          <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
+                          <TableCell><TipoCargaBadge tipoCarga={nf.tipo_carga} /></TableCell>
+                          <TableCell>
+                            <Button size="sm" onClick={() => openAgendamentoDialog(nf)}>
+                              <CalendarIcon className="w-4 h-4 mr-1" />
+                              Agendar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
 
             {nfResults.length === 0 && search && !searching && (
@@ -460,7 +569,7 @@ export default function Agendamento() {
         </Card>
       </div>
 
-      {/* Dialog */}
+      {/* Single NF Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -545,6 +654,96 @@ export default function Agendamento() {
             <Button onClick={saveAgendamento} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Agendamento Dialog */}
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Agendar {selectedNfIds.size} NFs em Lote</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Summary of selected NFs */}
+            <div className="bg-muted/50 rounded-lg p-3 max-h-[150px] overflow-y-auto">
+              <p className="text-sm font-medium mb-2">NFs selecionadas:</p>
+              <div className="flex flex-wrap gap-1">
+                {selectedNfs.map(nf => (
+                  <Badge key={nf.id} variant="secondary" className="font-mono text-xs">
+                    {nf.numero_nf}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status do Agendamento</Label>
+              <Select value={bulkStatus} onValueChange={v => setBulkStatus(v as AgendamentoStatus)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value}>
+                      <div className="flex items-center gap-2">
+                        {s.icon}
+                        {s.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(bulkStatus === "AGENDAMENTO" || bulkStatus === "REENTREGA") && (
+              <div className="space-y-2">
+                <Label>Data do Agendamento *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !bulkDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {bulkDate ? format(bulkDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={bulkDate}
+                      onSelect={setBulkDate}
+                      disabled={date => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      initialFocus
+                      className="p-3 pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Observação (aplicada a todas)</Label>
+              <Textarea
+                placeholder="Motivo, detalhes adicionais..."
+                value={bulkObs}
+                onChange={e => setBulkObs(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={saveBulkAgendamento} disabled={savingBulk}>
+              {savingBulk && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+              Agendar {selectedNfIds.size} NFs
             </Button>
           </DialogFooter>
         </DialogContent>
