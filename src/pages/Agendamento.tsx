@@ -148,10 +148,10 @@ export default function Agendamento() {
     loadAgendamentos();
   }, []);
 
-  // Clear selection when results change
+  // Clear selection when results change (only on new search)
   useEffect(() => {
     setSelectedNfIds(new Set());
-  }, [nfResults]);
+  }, [nfResults.length]);
 
   async function loadAgendamentos() {
     setLoadingAgendamentos(true);
