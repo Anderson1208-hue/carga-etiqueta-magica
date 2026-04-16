@@ -44,10 +44,11 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
+import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
@@ -93,6 +94,7 @@ export default function Cargas() {
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
   const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
+  const [addXmlCarga, setAddXmlCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
   async function handlePrintNotaCarga(carga: Carga) {
@@ -774,6 +776,9 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
                           {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setAddXmlCarga(carga)} title="Adicionar XML à carga">
+                          <FilePlus2 className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es">
                           <FileUp className="w-4 h-4" />
                         </Button>
@@ -868,6 +873,16 @@ export default function Cargas() {
             cargaId={m3XmlCarga.id}
             cargaPlaca={m3XmlCarga.placa}
             onUpdated={loadCargas}
+          />
+        )}
+        {/* Adicionar XML à Carga Dialog */}
+        {addXmlCarga && (
+          <AdicionarXmlDialog
+            open={!!addXmlCarga}
+            onOpenChange={(open) => !open && setAddXmlCarga(null)}
+            cargaId={addXmlCarga.id}
+            cargaPlaca={addXmlCarga.placa}
+            onAdded={loadCargas}
           />
         )}
         {/* Import CT-e Dialog */}
