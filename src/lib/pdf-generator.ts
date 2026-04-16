@@ -212,6 +212,23 @@ export async function generateNotaDeCargaPDF(
     doc.text(`NF: ${nf.numeroNf}`, MARGIN, y);
     y += 9;
 
+    // Destaque de ordem de entrega (1ª/2ª/...) baseado na rota
+    if (nf.ordemEntrega && nf.ordemEntrega > 0) {
+      const totalStr = nf.totalEntregas && nf.totalEntregas > 0 ? ` DE ${nf.totalEntregas}` : "";
+      const label = `${ordinalPt(nf.ordemEntrega)} ENTREGA${totalStr}`;
+      const boxH = 14;
+      const boxW = pageWidth;
+      doc.setFillColor(255, 230, 0); // amarelo destaque
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.6);
+      doc.rect(MARGIN, y - 2, boxW, boxH, "FD");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text(label, MARGIN + boxW / 2, y + 8, { align: "center" });
+      y += boxH + 4;
+    }
+
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text(`Emitente: ${nf.razaoSocialEmitente}`, MARGIN, y);
