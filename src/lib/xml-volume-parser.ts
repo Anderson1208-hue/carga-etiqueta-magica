@@ -20,13 +20,7 @@ export function parseNFeVolumeXML(xmlString: string): NFeVolumeParsed {
   }
 
   const numeroNf = getFirstTagText(xmlDoc, ["nNF", "nnf"]);
-  const fornecedor = [
-    getFirstTagText(xmlDoc, ["xNome", "xnome"]),
-    getFirstTagText(xmlDoc, ["marca", "xMarca", "xmarca"]),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const fornecedor = extractEmitenteNome(xmlDoc);
 
   return {
     chaveAcesso,
@@ -54,8 +48,8 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   const volNodes = getElementsByLocalName(xmlDoc, ["vol", "volume", "volumes"]);
 
   if (isPandur) {
-    for (const volNode of volNodes) {
-      const nVolNode = getChildByLocalName(volNode, ["nvol"]);
+    const nVolNodes = getElementsByLocalName(xmlDoc, ["nvol"]);
+    for (const nVolNode of nVolNodes) {
       const value = parseVolumeNumber(nVolNode?.textContent);
       if (value > 0) return value;
     }
@@ -79,6 +73,16 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   }
 
   return 0;
+}
+
+function extractEmitenteNome(xmlDoc: Document): string {
+  const emitNode = getElementsByLocalName(xmlDoc, ["emit"])[0];
+  if (!emitNode) return "";
+
+  const razaoSocial = getFirstTagText(emitNode, ["xnome"]);
+  const nomeFantasia = getFirstTagText(emitNode, ["xfant", "xfantasia"]);
+
+  return [razaoSocial, nomeFantasia].filter(Boolean).join(" ").trim();
 }
 
 function getFirstTagText(root: ParentNode, tagNames: string[]): string {
