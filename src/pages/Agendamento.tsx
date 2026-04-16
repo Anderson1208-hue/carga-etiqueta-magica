@@ -208,18 +208,42 @@ export default function Agendamento() {
     setSearching(true);
     try {
       const term = search.trim();
-      let query = supabase
-        .from("notas_fiscais")
-        .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
-        .limit(50);
+      
+      // Check if user typed multiple NF numbers (comma, semicolon, space, or newline separated)
+      const multiTerms = term
+        .split(/[,;\s\n]+/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+      
+      const isMultiSearch = multiTerms.length > 1;
 
-      query = query.or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`);
+      let allData: any[] = [];
 
-      const { data, error } = await query;
-      if (error) throw error;
+      if (isMultiSearch) {
+        // Batch search by multiple NF numbers
+        const batchSize = 50;
+        for (let i = 0; i < multiTerms.length; i += batchSize) {
+          const batch = multiTerms.slice(i, i + batchSize);
+          const { data, error } = await supabase
+            .from("notas_fiscais")
+            .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+            .in("numero_nf", batch);
+          if (error) throw error;
+          if (data) allData.push(...data);
+        }
+      } else {
+        // Single term - search across multiple fields
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+          .or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`)
+          .limit(100);
+        if (error) throw error;
+        if (data) allData = data;
+      }
 
-      if (data && data.length > 0) {
-        const cargaIds = [...new Set(data.map(n => n.carga_id))];
+      if (allData.length > 0) {
+        const cargaIds = [...new Set(allData.map(n => n.carga_id))];
         const { data: cargasData } = await supabase
           .from("cargas")
           .select("id, tipo_carga")
@@ -227,7 +251,7 @@ export default function Agendamento() {
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
 
-        setNfResults(data.map(n => ({
+        setNfResults(allData.map(n => ({
           ...n,
           tipo_carga: cargaMap.get(n.carga_id) || "SECA",
         })));
