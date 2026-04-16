@@ -16,11 +16,17 @@ interface NotaFiscalPDF {
   destBairro?: string;
   macroRegiao?: number;
   dataEmissao: string | null;
+  ordemEntrega?: number;
+  totalEntregas?: number;
   itens: {
     cProd: string;
     xProd: string;
     qtdCaixas: number;
   }[];
+}
+
+function ordinalPt(n: number): string {
+  return `${n}ª`;
 }
 
 interface EtiquetaData {
