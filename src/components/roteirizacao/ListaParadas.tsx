@@ -155,8 +155,12 @@ function SortableRow({
         <TableCell className="text-sm cursor-pointer" onClick={onToggle}>
           {entrega.bairro || "—"}
         </TableCell>
-        <TableCell className="cursor-pointer" onClick={onToggle}>
-          <span className="font-medium">{entrega.razaoSocial}</span>
+        <TableCell className="cursor-pointer max-w-[320px]" onClick={onToggle}>
+          <div className="font-medium truncate" title={entrega.razaoSocial}>{entrega.razaoSocial}</div>
+          <div className="flex items-start gap-1 text-xs text-muted-foreground mt-0.5" title={entrega.enderecoCompleto}>
+            <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+            <span className="truncate">{entrega.enderecoCompleto || "—"}</span>
+          </div>
         </TableCell>
         <TableCell className="font-mono text-xs cursor-pointer" onClick={onToggle}>
           {entrega.cnpjDestinatario}
