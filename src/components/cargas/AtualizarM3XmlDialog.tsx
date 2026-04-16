@@ -78,6 +78,16 @@ export function AtualizarM3XmlDialog({
         const content = await file.text();
         const parsed = parseNFeXML(content);
 
+        // Debug: ajuda a entender por que algumas NFs ficam sem m³
+        console.log("[AtualizarM3] XML:", {
+          arquivo: file.name,
+          numeroNf: parsed.numeroNf,
+          chaveAcesso: parsed.chaveAcesso,
+          emitente: parsed.razaoSocialEmitente,
+          volumeM3: parsed.volumeM3,
+          chaveBate: chavesValidas.has(parsed.chaveAcesso),
+        });
+
         if (!parsed.volumeM3 || parsed.volumeM3 <= 0) {
           r.semM3++;
           continue;
