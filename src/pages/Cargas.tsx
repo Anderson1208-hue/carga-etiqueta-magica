@@ -342,6 +342,7 @@ export default function Cargas() {
           dest_cep: nf.destinatario?.cep || null,
           peso_bruto: nf.pesoBruto || 0,
           peso_liquido: nf.pesoLiquido || 0,
+          volume_m3: nf.volumeM3 || 0,
           itens: nf.itens.map((item) => ({ c_prod: item.cProd, x_prod: item.xProd, u_com: item.uCom, q_com: item.qCom })),
           etiquetas,
         };
