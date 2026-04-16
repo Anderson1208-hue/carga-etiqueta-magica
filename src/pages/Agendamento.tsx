@@ -148,10 +148,10 @@ export default function Agendamento() {
     loadAgendamentos();
   }, []);
 
-  // Clear selection when results change
+  // Clear selection when results change (only on new search)
   useEffect(() => {
     setSelectedNfIds(new Set());
-  }, [nfResults]);
+  }, [nfResults.length]);
 
   async function loadAgendamentos() {
     setLoadingAgendamentos(true);
@@ -208,18 +208,42 @@ export default function Agendamento() {
     setSearching(true);
     try {
       const term = search.trim();
-      let query = supabase
-        .from("notas_fiscais")
-        .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
-        .limit(50);
+      
+      // Check if user typed multiple NF numbers (comma, semicolon, space, or newline separated)
+      const multiTerms = term
+        .split(/[,;\s\n]+/)
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+      
+      const isMultiSearch = multiTerms.length > 1;
 
-      query = query.or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`);
+      let allData: any[] = [];
 
-      const { data, error } = await query;
-      if (error) throw error;
+      if (isMultiSearch) {
+        // Batch search by multiple NF numbers
+        const batchSize = 50;
+        for (let i = 0; i < multiTerms.length; i += batchSize) {
+          const batch = multiTerms.slice(i, i + batchSize);
+          const { data, error } = await supabase
+            .from("notas_fiscais")
+            .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+            .in("numero_nf", batch);
+          if (error) throw error;
+          if (data) allData.push(...data);
+        }
+      } else {
+        // Single term - search across multiple fields
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+          .or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`)
+          .limit(100);
+        if (error) throw error;
+        if (data) allData = data;
+      }
 
-      if (data && data.length > 0) {
-        const cargaIds = [...new Set(data.map(n => n.carga_id))];
+      if (allData.length > 0) {
+        const cargaIds = [...new Set(allData.map(n => n.carga_id))];
         const { data: cargasData } = await supabase
           .from("cargas")
           .select("id, tipo_carga")
@@ -227,7 +251,7 @@ export default function Agendamento() {
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
 
-        setNfResults(data.map(n => ({
+        setNfResults(allData.map(n => ({
           ...n,
           tipo_carga: cargaMap.get(n.carga_id) || "SECA",
         })));
@@ -345,6 +369,9 @@ export default function Agendamento() {
       });
 
       setBulkDialogOpen(false);
+      // Remove scheduled NFs from list, keep the rest for next batch
+      const scheduledIds = new Set(selectedNfIds);
+      setNfResults(prev => prev.filter(nf => !scheduledIds.has(nf.id)));
       setSelectedNfIds(new Set());
       loadAgendamentos();
     } catch (err) {
@@ -412,14 +439,20 @@ export default function Agendamento() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Input
-                placeholder="Número da NF, chave de acesso, destinatário ou CNPJ..."
+              <Textarea
+                placeholder="Digite números de NFs separados por vírgula, espaço ou um por linha. Ou busque por destinatário, CNPJ..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSearch()}
-                className="flex-1"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                className="flex-1 min-h-[60px]"
+                rows={2}
               />
-              <Button onClick={handleSearch} disabled={searching}>
+              <Button onClick={handleSearch} disabled={searching} className="self-end">
                 {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 Buscar
               </Button>
