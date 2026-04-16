@@ -134,8 +134,9 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   const pesoLiquido = parseFloat(pesoLiquidoStr) || 0;
 
   // Extract cubic volume (m³) — not a native NF-e field; clients like Pandurata
-  // commonly put it in <vol><esp> ("CUBAGEM 0,025"), <infCpl> or <infAdProd>.
-  const volumeM3 = extractVolumeM3(xmlDoc);
+  // commonly put it em <vol><esp> ("CUBAGEM 0,025"), <infCpl>, <infAdProd>
+  // ou usam <vol><nVol> com o valor da cubagem (Pandurata).
+  const volumeM3 = extractVolumeM3(xmlDoc, razaoSocialEmitente);
 
   // Extract items (det elements)
   const detElements = xmlDoc.querySelectorAll("det");
@@ -190,7 +191,7 @@ export function parseNFeXML(xmlString: string): NFeParsed {
  *  4) Sum of <infAdProd> per item
  * Returns 0 when nothing is found.
  */
-function extractVolumeM3(xmlDoc: Document): number {
+function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   const getLocalName = (node: Element) =>
     ((node.localName || node.nodeName || "").split(":").pop() || "").toLowerCase();
 
@@ -214,6 +215,19 @@ function extractVolumeM3(xmlDoc: Document): number {
   const scopes = [...volumeBlocks, ...transportBlocks, xmlDoc.documentElement];
   const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
   const seenScopes = new Set<Element>();
+
+  // Pandurata: o XML traz a cubagem em <vol><nVol>. Para esse emitente,
+  // priorizamos esse campo antes de qualquer outra heurística.
+  const isPandurata = /pandurata|pandur/i.test(emitente);
+  if (isPandurata) {
+    for (const volBlock of volumeBlocks) {
+      const nVolNode = Array.from(volBlock.querySelectorAll("*")).find(
+        (el) => getLocalName(el) === "nvol"
+      );
+      const value = parseNumericText(nVolNode?.textContent);
+      if (value > 0) return value;
+    }
+  }
 
   // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
   // ignorando caixa da tag e possíveis namespaces.
