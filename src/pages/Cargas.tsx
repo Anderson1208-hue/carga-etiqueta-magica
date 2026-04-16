@@ -44,8 +44,9 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
+import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -90,6 +91,7 @@ export default function Cargas() {
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
+  const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
@@ -775,8 +777,11 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es">
                           <FileUp className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem">
+                        <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem (Excel)">
                           <Package className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setM3XmlCarga(carga)} title="Atualizar m³ via XML">
+                          <Box className="w-4 h-4" />
                         </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
@@ -853,6 +858,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setCubagemCarga(null)}
             cargaId={cubagemCarga.id}
             cargaPlaca={cubagemCarga.placa}
+          />
+        )}
+        {/* Atualizar m³ via XML Dialog */}
+        {m3XmlCarga && (
+          <AtualizarM3XmlDialog
+            open={!!m3XmlCarga}
+            onOpenChange={(open) => !open && setM3XmlCarga(null)}
+            cargaId={m3XmlCarga.id}
+            cargaPlaca={m3XmlCarga.placa}
+            onUpdated={loadCargas}
           />
         )}
         {/* Import CT-e Dialog */}
