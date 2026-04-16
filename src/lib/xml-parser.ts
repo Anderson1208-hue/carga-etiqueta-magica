@@ -216,9 +216,10 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
   const seenScopes = new Set<Element>();
 
-  // Pandurata: o XML traz a cubagem em <vol><nVol>. Para esse emitente,
-  // priorizamos esse campo antes de qualquer outra heurística.
-  const isPandurata = /pandurata|pandur/i.test(emitente);
+  // Pandurata/PANDUR: alguns XMLs não trazem o nome do emitente com "Pandurata",
+  // mas identificam o fornecedor em tags como <marca>PANDUR</marca>.
+  // Nesses casos, a cubagem vem em <vol><nVol>.
+  const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
   if (isPandurata) {
     for (const volBlock of volumeBlocks) {
       const nVolNode = Array.from(volBlock.querySelectorAll("*")).find(
@@ -267,6 +268,20 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   });
 
   return totalFromItems;
+}
+
+function isPandurataXml(
+  xmlDoc: Document,
+  emitente: string,
+  getElementsByNames: (root: ParentNode, names: string[]) => Element[]
+): boolean {
+  const textos = [emitente];
+
+  getElementsByNames(xmlDoc, ["marca", "xmarca", "xnome"]).forEach((node) => {
+    if (node.textContent) textos.push(node.textContent);
+  });
+
+  return textos.some((texto) => /pandur(?:ata)?/i.test(texto));
 }
 
 /**
