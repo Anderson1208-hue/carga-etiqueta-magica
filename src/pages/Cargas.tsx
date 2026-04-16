@@ -44,8 +44,9 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
+import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -90,6 +91,7 @@ export default function Cargas() {
   const [deleting, setDeleting] = useState(false);
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
+  const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
