@@ -191,61 +191,67 @@ export function parseNFeXML(xmlString: string): NFeParsed {
  * Returns 0 when nothing is found.
  */
 function extractVolumeM3(xmlDoc: Document): number {
-  const transp = xmlDoc.querySelector("transp");
-  const vol = transp?.querySelector("vol");
+  const getLocalName = (node: Element) =>
+    ((node.localName || node.nodeName || "").split(":").pop() || "").toLowerCase();
 
-  // 0) Pandurata: tag <NUMERO> (ou variações) próxima aos pesos.
-  // Procura primeiro dentro de <vol>, depois dentro de <transp>,
-  // e por fim em qualquer lugar do documento. Aceita variações de caixa.
-  const tagNames = [
-    "NUMERO", "numero", "Numero",
-    "nVol", "qVol",
-    "cubagem", "CUBAGEM", "Cubagem",
-    "m3", "M3",
-    "CUB", "cub",
-  ];
-  const selector = tagNames.join(", ");
+  const getElementsByNames = (root: ParentNode, names: string[]) =>
+    Array.from(root.querySelectorAll("*")).filter((el) =>
+      names.includes(getLocalName(el))
+    );
 
-  const scopes: Element[] = [];
-  if (vol) scopes.push(vol);
-  if (transp) scopes.push(transp);
-  scopes.push(xmlDoc.documentElement);
+  const parseNumericText = (text: string | null | undefined): number => {
+    if (!text) return 0;
+    const value = parseFloat(text.trim().replace(",", "."));
+    return !isNaN(value) && value > 0 && value < 1000 ? value : 0;
+  };
 
+  const volumeBlocks = getElementsByNames(xmlDoc, ["vol", "volume", "volumes"]);
+  const transportBlocks = getElementsByNames(xmlDoc, [
+    "transp",
+    "transportador",
+    "transporte",
+  ]);
+  const scopes = [...volumeBlocks, ...transportBlocks, xmlDoc.documentElement];
+  const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
+  const seenScopes = new Set<Element>();
+
+  // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
+  // ignorando caixa da tag e possíveis namespaces.
   for (const scope of scopes) {
-    const candidatos = scope.querySelectorAll(selector);
-    for (const node of Array.from(candidatos)) {
-      const raw = (node.textContent || "").trim().replace(",", ".");
-      const v = parseFloat(raw);
-      // m³ plausível: > 0 e < 1000 (cargas reais ficam bem abaixo disso)
-      if (!isNaN(v) && v > 0 && v < 1000) {
-        return v;
-      }
+    if (seenScopes.has(scope)) continue;
+    seenScopes.add(scope);
+
+    const nodes = [scope, ...Array.from(scope.querySelectorAll("*"))];
+    for (const node of nodes) {
+      if (!m3FieldNames.includes(getLocalName(node))) continue;
+      const value = parseNumericText(node.textContent);
+      if (value > 0) return value;
     }
   }
 
-  // 1) <vol><esp>
-  const esp = vol?.querySelector("esp")?.textContent;
-  const fromEsp = parseM3FromText(esp);
-  if (fromEsp > 0) return fromEsp;
-
-  // 2) Any text inside <vol> (marca, nVol, etc.)
-  if (vol) {
-    const fromVol = parseM3FromText(vol.textContent);
-    if (fromVol > 0) return fromVol;
+  // 1) Texto livre dentro do bloco de transporte/volumes
+  for (const scope of seenScopes) {
+    const fromText = parseM3FromText(scope.textContent);
+    if (fromText > 0) return fromText;
   }
 
-  // 3) <infCpl>
-  const infCpl = xmlDoc.querySelector("infAdic infCpl, infCpl")?.textContent;
-  const fromCpl = parseM3FromText(infCpl);
-  if (fromCpl > 0) return fromCpl;
+  // 2) <infCpl>
+  const infCplNodes = getElementsByNames(xmlDoc, ["infcpl"]);
+  for (const node of infCplNodes) {
+    const fromCpl = parseM3FromText(node.textContent);
+    if (fromCpl > 0) return fromCpl;
+  }
 
-  // 4) Sum from per-item <infAdProd>
-  const detList = xmlDoc.querySelectorAll("det");
+  // 3) Soma de <infAdProd> por item
+  const detList = getElementsByNames(xmlDoc, ["det"]);
   let totalFromItems = 0;
   detList.forEach((det) => {
-    const infAdProd = det.querySelector("infAdProd")?.textContent;
-    totalFromItems += parseM3FromText(infAdProd);
+    const infAdProdNodes = getElementsByNames(det, ["infadprod"]);
+    infAdProdNodes.forEach((node) => {
+      totalFromItems += parseM3FromText(node.textContent);
+    });
   });
+
   return totalFromItems;
 }
 
