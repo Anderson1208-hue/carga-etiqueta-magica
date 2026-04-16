@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { parseNFeXML } from "@/lib/xml-parser";
+import { parseNFeVolumeXML } from "@/lib/xml-volume-parser";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,6 +26,10 @@ interface Resultado {
   naoEncontradas: number;
   erros: number;
   detalhesNaoEncontradas: string[];
+}
+
+function normalizeAccessKey(value: string) {
+  return value.replace(/\D/g, "");
 }
 
 export function AtualizarM3XmlDialog({
@@ -68,7 +72,7 @@ export function AtualizarM3XmlDialog({
     }
 
     const chavesValidas = new Map(
-      (nfsCarga || []).map((n) => [n.chave_acesso, n])
+      (nfsCarga || []).map((n) => [normalizeAccessKey(n.chave_acesso), n])
     );
 
     for (const file of Array.from(files)) {
@@ -76,16 +80,17 @@ export function AtualizarM3XmlDialog({
 
       try {
         const content = await file.text();
-        const parsed = parseNFeXML(content);
+        const parsed = parseNFeVolumeXML(content);
+        const chaveNormalizada = normalizeAccessKey(parsed.chaveAcesso);
 
         // Debug: ajuda a entender por que algumas NFs ficam sem m³
         console.log("[AtualizarM3] XML:", {
           arquivo: file.name,
           numeroNf: parsed.numeroNf,
           chaveAcesso: parsed.chaveAcesso,
-          emitente: parsed.razaoSocialEmitente,
+          emitente: parsed.fornecedor,
           volumeM3: parsed.volumeM3,
-          chaveBate: chavesValidas.has(parsed.chaveAcesso),
+          chaveBate: chavesValidas.has(chaveNormalizada),
         });
 
         if (!parsed.volumeM3 || parsed.volumeM3 <= 0) {
@@ -93,7 +98,7 @@ export function AtualizarM3XmlDialog({
           continue;
         }
 
-        const nfRef = chavesValidas.get(parsed.chaveAcesso);
+        const nfRef = chavesValidas.get(chaveNormalizada);
         if (!nfRef) {
           r.naoEncontradas++;
           if (r.detalhesNaoEncontradas.length < 5) {
