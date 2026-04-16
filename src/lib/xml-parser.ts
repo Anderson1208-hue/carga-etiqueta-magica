@@ -194,6 +194,21 @@ function extractVolumeM3(xmlDoc: Document): number {
   const transp = xmlDoc.querySelector("transp");
   const vol = transp?.querySelector("vol");
 
+  // 0) Pandurata: <vol><NUMERO>0,025</NUMERO> (ao lado dos pesos)
+  // Também aceita variações de caixa (numero/Numero) e tags similares.
+  if (vol) {
+    const candidatos = vol.querySelectorAll(
+      "NUMERO, numero, Numero, nVol, qVol, cubagem, CUBAGEM, m3, M3"
+    );
+    for (const node of Array.from(candidatos)) {
+      const raw = (node.textContent || "").trim().replace(",", ".");
+      const v = parseFloat(raw);
+      if (!isNaN(v) && v > 0 && v < 1000) {
+        return v;
+      }
+    }
+  }
+
   // 1) <vol><esp>
   const esp = vol?.querySelector("esp")?.textContent;
   const fromEsp = parseM3FromText(esp);
