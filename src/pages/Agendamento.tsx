@@ -439,14 +439,20 @@ export default function Agendamento() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Input
-                placeholder="Número da NF, chave de acesso, destinatário ou CNPJ..."
+              <Textarea
+                placeholder="Digite números de NFs separados por vírgula, espaço ou um por linha. Ou busque por destinatário, CNPJ..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSearch()}
-                className="flex-1"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                className="flex-1 min-h-[60px]"
+                rows={2}
               />
-              <Button onClick={handleSearch} disabled={searching}>
+              <Button onClick={handleSearch} disabled={searching} className="self-end">
                 {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                 Buscar
               </Button>
