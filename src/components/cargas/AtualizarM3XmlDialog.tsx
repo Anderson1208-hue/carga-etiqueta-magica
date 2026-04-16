@@ -78,6 +78,14 @@ export function AtualizarM3XmlDialog({
         const content = await file.text();
         const parsed = parseNFeXML(content);
 
+        console.log("[AtualizarM3] XML parseado:", {
+          arquivo: file.name,
+          numeroNf: parsed.numeroNf,
+          chaveAcesso: parsed.chaveAcesso,
+          emitente: parsed.razaoSocialEmitente,
+          volumeM3: parsed.volumeM3,
+        });
+
         if (!parsed.volumeM3 || parsed.volumeM3 <= 0) {
           r.semM3++;
           continue;
