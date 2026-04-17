@@ -112,7 +112,7 @@ export default function ConsultaNF() {
         destCidade: nf.dest_cidade || undefined,
         destUf: nf.dest_uf || undefined,
         destCep: nf.dest_cep || undefined,
-        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         dataEmissao: nf.data_emissao,
         itens: (nf.itens || []).map((item) => ({
           cProd: item.c_prod,

@@ -153,6 +153,7 @@ export default function Etiquetas() {
 
       const mapped: Etiqueta[] = allEtiquetas.map((e: any) => {
         const destBairro = e.notas_fiscais?.dest_bairro || "";
+        const destCidade = e.notas_fiscais?.dest_cidade || "";
         return {
           id: e.id,
           numeroNf: e.numero_nf,
@@ -164,7 +165,7 @@ export default function Etiquetas() {
           status: e.status as "pendente" | "conferido",
           cnpjDestinatario: e.notas_fiscais?.cnpj_destinatario || "",
           destBairro,
-          macroRegiao: getMacroRegiao(destBairro),
+          macroRegiao: getMacroRegiao(destBairro, destCidade),
         };
       });
 

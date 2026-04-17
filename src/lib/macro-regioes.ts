@@ -280,21 +280,67 @@ function normalizeBairro(bairro: string): string {
 }
 
 /**
- * Retorna a macro região (1–11) para um bairro, ou 99 se não mapeado.
+ * Mapa normalizado (sem acentos, uppercase) para lookup O(1).
  */
-export function getMacroRegiao(bairro: string | null | undefined): number {
-  if (!bairro) return 99;
-
-  const normalizado = normalizeBairro(bairro);
-
-  // Tenta match direto no mapa (comparando normalizado)
+const NORMALIZED_MAP: Record<string, number> = (() => {
+  const map: Record<string, number> = {};
   for (const [key, value] of Object.entries(BAIRRO_MACRO_REGIAO)) {
-    if (normalizeBairro(key) === normalizado) {
-      return value;
+    map[normalizeBairro(key)] = value;
+  }
+  return map;
+})();
+
+/**
+ * Tenta resolver um termo (bairro ou cidade) no mapa.
+ * Aceita o termo inteiro OU partes separadas por '/' (ex: "DUQUE DE CAXIAS / SAO BENTO").
+ */
+function resolveTerm(termo: string): number | null {
+  const normalizado = normalizeBairro(termo);
+  if (NORMALIZED_MAP[normalizado] !== undefined) {
+    return NORMALIZED_MAP[normalizado];
+  }
+  // Tenta partes separadas por '/'
+  if (normalizado.includes("/")) {
+    const partes = normalizado.split("/").map((p) => p.trim()).filter(Boolean);
+    for (const parte of partes) {
+      if (NORMALIZED_MAP[parte] !== undefined) {
+        return NORMALIZED_MAP[parte];
+      }
     }
   }
+  return null;
+}
 
-  return 99;
+/**
+ * Retorna a macro região para uma NF.
+ * - Se a cidade for "RIO DE JANEIRO" (ou não informada), usa o bairro.
+ * - Para outras cidades, usa o nome da cidade/município.
+ * - Aceita valores com '/' (tenta o todo e cada parte).
+ * Retorna 99 se não mapeado.
+ */
+export function getMacroRegiao(
+  bairro: string | null | undefined,
+  cidade?: string | null | undefined,
+): number {
+  const cidadeNorm = cidade ? normalizeBairro(cidade) : "";
+  const isRio = !cidadeNorm || cidadeNorm === "RIO DE JANEIRO";
+
+  // Para cidades fora do Rio, prioriza a cidade
+  if (!isRio) {
+    const porCidade = resolveTerm(cidade!);
+    if (porCidade !== null) return porCidade;
+    // Fallback: tenta o bairro mesmo assim
+    if (bairro) {
+      const porBairro = resolveTerm(bairro);
+      if (porBairro !== null) return porBairro;
+    }
+    return 99;
+  }
+
+  // Rio de Janeiro: usa o bairro
+  if (!bairro) return 99;
+  const porBairro = resolveTerm(bairro);
+  return porBairro !== null ? porBairro : 99;
 }
 
 /**
