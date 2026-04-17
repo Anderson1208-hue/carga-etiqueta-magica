@@ -158,6 +158,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "SÃO JOÃO DE MERITI": 14,
   "SEROPEDICA": 14,
   "SEROPÉDICA": 14,
+  "PAVUNA": 14,
+  "PARQUE COLUMBIA": 14,
 
   // Macro Região 15
   "JAPERI": 15,
