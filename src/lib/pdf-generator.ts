@@ -13,7 +13,13 @@ interface NotaFiscalPDF {
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
+  destRazaoSocial?: string;
+  destLogradouro?: string;
+  destNumero?: string;
   destBairro?: string;
+  destCidade?: string;
+  destUf?: string;
+  destCep?: string;
   macroRegiao?: number;
   dataEmissao: string | null;
   ordemEntrega?: number;
@@ -23,6 +29,17 @@ interface NotaFiscalPDF {
     xProd: string;
     qtdCaixas: number;
   }[];
+}
+
+function buildEnderecoCompleto(nf: NotaFiscalPDF): string {
+  const partes: string[] = [];
+  const ruaNum = [nf.destLogradouro, nf.destNumero].filter(Boolean).join(", ");
+  if (ruaNum) partes.push(ruaNum);
+  if (nf.destBairro) partes.push(nf.destBairro);
+  const cidadeUf = [nf.destCidade, nf.destUf].filter(Boolean).join("/");
+  if (cidadeUf) partes.push(cidadeUf);
+  if (nf.destCep) partes.push(`CEP ${nf.destCep}`);
+  return partes.join(" - ");
 }
 
 function ordinalPt(n: number): string {
