@@ -1173,7 +1173,7 @@ export default function Roteirizacao() {
         const { data } = await supabase
           .from("veiculo_nfs")
           .select(`
-            id, nf_id,
+            id, nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
           `)
           .eq("veiculo_id", veiculo.id);
