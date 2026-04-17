@@ -31,34 +31,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let lastUserId: string | null = null;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (session?.user) {
-          // Fetch profile with setTimeout to avoid deadlock
-          setTimeout(async () => {
-            try {
-              const { data: profileData, error: profileError } = await supabase
-                .from("profiles")
-                .select("*")
-                .eq("id", session.user.id)
-                .maybeSingle();
+        const newUserId = session?.user?.id ?? null;
 
-              if (profileError) {
-                console.error("[Auth] Erro ao buscar perfil (onAuthStateChange):", profileError);
-              } else if (profileData) {
-                setProfile(profileData as Profile);
-              } else {
-                console.warn("[Auth] Perfil não encontrado para user:", session.user.id);
+        // Ignora TOKEN_REFRESHED e USER_UPDATED para evitar refetch + re-render do spinner
+        // que causam o "white screen + restart" quando o token é renovado ou a aba volta ao foco.
+        if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+          return;
+        }
+
+        if (session?.user) {
+          // Só refaz o fetch se o usuário mudou (login real, não refresh)
+          if (newUserId !== lastUserId) {
+            lastUserId = newUserId;
+            setTimeout(async () => {
+              try {
+                const { data: profileData, error: profileError } = await supabase
+                  .from("profiles")
+                  .select("*")
+                  .eq("id", session.user.id)
+                  .maybeSingle();
+
+                if (profileError) {
+                  console.error("[Auth] Erro ao buscar perfil (onAuthStateChange):", profileError);
+                } else if (profileData) {
+                  setProfile(profileData as Profile);
+                } else {
+                  console.warn("[Auth] Perfil não encontrado para user:", session.user.id);
+                }
+              } catch (err) {
+                console.error("[Auth] Exceção ao buscar perfil:", err);
               }
-            } catch (err) {
-              console.error("[Auth] Exceção ao buscar perfil:", err);
-            }
-          }, 0);
+            }, 0);
+          }
         } else {
+          lastUserId = null;
           setProfile(null);
         }
         setIsLoading(false);
@@ -71,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        lastUserId = session.user.id;
         supabase
           .from("profiles")
           .select("*")
