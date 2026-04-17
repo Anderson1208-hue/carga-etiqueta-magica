@@ -58,6 +58,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "ENGENHO DE DENTRO": 4,
   "RIO COMPRIDO": 4,
   "CACHAMBI": 4,
+  "BENFICA": 4,
+  "VASCO DA GAMA": 4,
 
   // Macro Região 5
   "PORTUGUESA": 5,
@@ -73,6 +75,9 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "VILA DA PENHA": 5,
   "MANGUINHOS": 5,
   "DEL CASTILHO": 5,
+  "OLARIA": 5,
+  "COELHO NETO": 5,
+  "PENHA CIRCULAR": 5,
 
   // Macro Região 6
   "MADUREIRA": 6,
