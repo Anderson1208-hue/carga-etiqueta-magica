@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
+import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
 import { Settings2 } from "lucide-react";
 
 interface Carga {
