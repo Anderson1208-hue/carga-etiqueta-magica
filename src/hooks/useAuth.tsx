@@ -85,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        lastUserId = session.user.id;
         supabase
           .from("profiles")
           .select("*")
