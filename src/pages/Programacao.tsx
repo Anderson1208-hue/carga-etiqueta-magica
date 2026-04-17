@@ -202,7 +202,7 @@ export default function Programacao() {
             peso_bruto: Number(nf.peso_bruto) || 0,
             volume_m3: Number(nf.volume_m3) || 0,
             totalCaixas,
-            macroRegiao: getMacroRegiao(nf.dest_bairro),
+            macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
             carga_id: nf.carga_id,
             carga_placa: carga?.placa || "",
             carga_motorista: carga?.motorista || "",

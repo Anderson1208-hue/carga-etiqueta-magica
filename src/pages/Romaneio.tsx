@@ -226,7 +226,7 @@ export default function Romaneio() {
         destUf: nf.dest_uf || undefined,
         destCep: nf.dest_cep || undefined,
         dataEmissao: nf.data_emissao,
-        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
