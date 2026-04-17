@@ -1019,36 +1019,15 @@ export default function Roteirizacao() {
         }
       }
 
-      // Buscar ordem de entrega (CNPJ → ordem) baseada na roteirização das cargas
+      // Buscar ordem de entrega (CNPJ → ordem) baseada na roteirização das cargas.
+      // Em veículos multi-carga, prioriza a rota consolidada que cobre mais CNPJs do veículo.
       const cargaIds = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
-      const ordemPorCnpj = new Map<string, number>();
-      if (cargaIds.length > 0) {
-        const { data: rots } = await supabase
-          .from("roteirizacoes")
-          .select("id, carga_id, created_at")
-          .in("carga_id", cargaIds)
-          .order("created_at", { ascending: false });
-        const latestRotIdPorCarga = new Map<string, string>();
-        for (const r of rots || []) {
-          if (!latestRotIdPorCarga.has(r.carga_id)) {
-            latestRotIdPorCarga.set(r.carga_id, r.id);
-          }
-        }
-        const rotIds = Array.from(latestRotIdPorCarga.values());
-        if (rotIds.length > 0) {
-          const { data: paradas } = await supabase
-            .from("roteirizacao_paradas")
-            .select("cnpj_destinatario, ordem")
-            .in("roteirizacao_id", rotIds)
-            .order("ordem", { ascending: true });
-          const cnpjsOrdenados: string[] = [];
-          for (const p of paradas || []) {
-            const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
-            if (cnpj && !cnpjsOrdenados.includes(cnpj)) cnpjsOrdenados.push(cnpj);
-          }
-          cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
-        }
-      }
+      const cnpjsDoVeiculo = new Set(
+        (data || [])
+          .map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""))
+          .filter(Boolean)
+      );
+      const ordemPorCnpj = await buildOrdemPorCnpj(cargaIds, cnpjsDoVeiculo);
 
       // Anexa CTEs e ordem de entrega a cada vnf
       const enriched = (data || []).map((vnf: any) => {
