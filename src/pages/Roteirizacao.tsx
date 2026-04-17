@@ -44,6 +44,7 @@ import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
+import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
@@ -1109,6 +1110,56 @@ export default function Roteirizacao() {
 
   const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
   const [generatingResumoPdfId, setGeneratingResumoPdfId] = useState<string | null>(null);
+  const [generatingResumoDiaDate, setGeneratingResumoDiaDate] = useState<string | null>(null);
+
+  async function handleGerarResumoDia(dateStr: string, veics: any[]) {
+    setGeneratingResumoDiaDate(dateStr);
+    try {
+      const veiculosData: VeiculoDiaData[] = [];
+      for (const veiculo of veics) {
+        const { data } = await supabase
+          .from("veiculo_nfs")
+          .select(`
+            nf_id,
+            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
+          `)
+          .eq("veiculo_id", veiculo.id);
+        const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
+        let ctesMap: Record<string, any[]> = {};
+        if (nfIds.length > 0) {
+          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds);
+          if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
+        }
+        const nfs = (data || []).map((vnf: any) => {
+          const nf = vnf.notas_fiscais;
+          return {
+            numero_nf: nf.numero_nf, dest_razao_social: nf.dest_razao_social || "",
+            dest_logradouro: nf.dest_logradouro || "", dest_numero: nf.dest_numero || "",
+            dest_bairro: nf.dest_bairro || "", dest_cidade: nf.dest_cidade || "",
+            dest_uf: nf.dest_uf || "", dest_cep: nf.dest_cep || "",
+            cnpj_destinatario: nf.cnpj_destinatario || "",
+            peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
+            itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
+            ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
+          };
+        });
+        veiculosData.push({
+          placa: veiculo.placa,
+          motorista: veiculo.motorista || "",
+          data: veiculo.data,
+          nfs,
+        });
+      }
+      const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
+      downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
+      toast({ title: "Resumo do dia gerado", description: `${veics.length} veículo(s)` });
+    } catch (err) {
+      console.error("Error generating resumo dia PDF:", err);
+      toast({ title: "Erro", description: "Erro ao gerar resumo do dia", variant: "destructive" });
+    } finally {
+      setGeneratingResumoDiaDate(null);
+    }
+  }
 
   async function handleGerarResumoVeiculo(veiculo: any) {
     setGeneratingResumoPdfId(veiculo.id);
@@ -2083,6 +2134,20 @@ export default function Roteirizacao() {
                         {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}
                       </span>
                       <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 ml-auto"
+                        disabled={generatingResumoDiaDate === dateStr}
+                        onClick={() => handleGerarResumoDia(dateStr, veics)}
+                      >
+                        {generatingResumoDiaDate === dateStr ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <FileText className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        Resumo do Dia
+                      </Button>
                     </div>
                     <div className="space-y-2">
                       {veics.map((v: any) => (
