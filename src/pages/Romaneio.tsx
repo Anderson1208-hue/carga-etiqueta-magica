@@ -66,7 +66,13 @@ interface NotaFiscalData {
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
+  destRazaoSocial?: string;
+  destLogradouro?: string;
+  destNumero?: string;
   destBairro: string;
+  destCidade?: string;
+  destUf?: string;
+  destCep?: string;
   dataEmissao: string | null;
   macroRegiao: number;
   itens: {
