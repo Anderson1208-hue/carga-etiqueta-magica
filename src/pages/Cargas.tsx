@@ -783,12 +783,6 @@ export default function Cargas() {
                               Fechada
                             </span>
                           </SelectItem>
-                          <SelectItem value="expedida">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-success" />
-                              Expedida
-                            </span>
-                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
