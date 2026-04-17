@@ -1123,7 +1123,7 @@ export default function Roteirizacao() {
         const { data } = await supabase
           .from("veiculo_nfs")
           .select(`
-            nf_id,
+            nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
           `)
           .eq("veiculo_id", veiculo.id);
@@ -1133,8 +1133,21 @@ export default function Roteirizacao() {
           const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds);
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
         }
+        // Ordem de entrega por CNPJ (rota consolidada prioritária)
+        const cargaIdsDia = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
+        const cnpjsVeiculoDia = new Set(
+          (data || [])
+            .map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""))
+            .filter(Boolean)
+        );
+        const ordemPorCnpjDia = cargaIdsDia.length > 0
+          ? await buildOrdemPorCnpj(cargaIdsDia as string[], cnpjsVeiculoDia)
+          : new Map<string, number>();
+        const totalRotaDia = new Set(ordemPorCnpjDia.keys()).size;
+
         const nfs = (data || []).map((vnf: any) => {
           const nf = vnf.notas_fiscais;
+          const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
           return {
             numero_nf: nf.numero_nf, dest_razao_social: nf.dest_razao_social || "",
             dest_logradouro: nf.dest_logradouro || "", dest_numero: nf.dest_numero || "",
@@ -1144,6 +1157,7 @@ export default function Roteirizacao() {
             peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
             itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
+            ordem_entrega: ordemPorCnpjDia.get(cnpjKey),
           };
         });
         veiculosData.push({
@@ -1151,6 +1165,7 @@ export default function Roteirizacao() {
           motorista: veiculo.motorista || "",
           data: veiculo.data,
           nfs,
+          totalEntregasRota: totalRotaDia || undefined,
         });
       }
       const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
@@ -1173,7 +1188,7 @@ export default function Roteirizacao() {
         const { data } = await supabase
           .from("veiculo_nfs")
           .select(`
-            id, nf_id,
+            id, nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
           `)
           .eq("veiculo_id", veiculo.id);
@@ -1189,8 +1204,24 @@ export default function Roteirizacao() {
         toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
         return;
       }
+
+      // Buscar ordem de entrega por CNPJ priorizando rota consolidada (multi-carga)
+      const cargaIdsResumo = Array.from(
+        new Set(nfsData.map((v: any) => v.carga_origem_id).filter(Boolean))
+      );
+      const cnpjsDoVeiculoResumo = new Set(
+        nfsData
+          .map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""))
+          .filter(Boolean)
+      );
+      const ordemPorCnpjResumo = cargaIdsResumo.length > 0
+        ? await buildOrdemPorCnpj(cargaIdsResumo as string[], cnpjsDoVeiculoResumo)
+        : new Map<string, number>();
+      const totalEntregasResumo = new Set(ordemPorCnpjResumo.keys()).size;
+
       const nfs = nfsData.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
+        const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
         return {
           numero_nf: nf.numero_nf, dest_razao_social: nf.dest_razao_social || "",
           dest_logradouro: nf.dest_logradouro || "", dest_numero: nf.dest_numero || "",
@@ -1200,9 +1231,16 @@ export default function Roteirizacao() {
           peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
           itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
+          ordem_entrega: ordemPorCnpjResumo.get(cnpjKey),
         };
       });
-      const blob = await generateResumoVeiculoPDF({ placa: veiculo.placa, motorista: veiculo.motorista || "", data: veiculo.data, nfs });
+      const blob = await generateResumoVeiculoPDF({
+        placa: veiculo.placa,
+        motorista: veiculo.motorista || "",
+        data: veiculo.data,
+        nfs,
+        totalEntregasRota: totalEntregasResumo || undefined,
+      });
       downloadBlob(blob, `resumo_entregas_${veiculo.placa}_${veiculo.data}.pdf`);
     } catch (err) {
       console.error("Error generating resumo PDF:", err);

@@ -6,6 +6,7 @@ interface VeiculoResumoData {
   placa: string;
   motorista: string;
   data: string;
+  totalEntregasRota?: number;
   nfs: {
     numero_nf: string;
     dest_razao_social: string;
@@ -20,6 +21,7 @@ interface VeiculoResumoData {
     volume_m3: number;
     itens_nf: { q_com: number }[];
     ctes: { numero_cte: string }[];
+    ordem_entrega?: number;
   }[];
 }
 
@@ -45,22 +47,33 @@ export async function generateResumoVeiculoPDF(data: VeiculoResumoData): Promise
   );
   y = 27;
 
-  // Group by CNPJ
-  const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: VeiculoResumoData["nfs"] }>();
+  // Group by CNPJ, capturando ordem de entrega da rota
+  const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: VeiculoResumoData["nfs"]; ordem: number | undefined }>();
   data.nfs.forEach((nf) => {
     const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
     if (!entregas.has(cnpj)) {
       const end = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf].filter(Boolean).join(", ");
-      entregas.set(cnpj, { razaoSocial: nf.dest_razao_social || "—", endereco: end || "—", nfs: [] });
+      entregas.set(cnpj, { razaoSocial: nf.dest_razao_social || "—", endereco: end || "—", nfs: [], ordem: nf.ordem_entrega });
     }
-    entregas.get(cnpj)!.nfs.push(nf);
+    const grp = entregas.get(cnpj)!;
+    grp.nfs.push(nf);
+    if (grp.ordem === undefined && nf.ordem_entrega !== undefined) grp.ordem = nf.ordem_entrega;
   });
 
-  let gtNfs = 0, gtCx = 0, gtPeso = 0, gtVol = 0;
-  let idx = 0;
+  // Ordena entregas pela ordem da rota (sem ordem vai pro fim)
+  const entregasOrdenadas = Array.from(entregas.entries()).sort((a, b) => {
+    const oa = a[1].ordem ?? Number.POSITIVE_INFINITY;
+    const ob = b[1].ordem ?? Number.POSITIVE_INFINITY;
+    return oa - ob;
+  });
 
-  for (const [, group] of entregas) {
-    idx++;
+  const totalRota = data.totalEntregasRota || entregas.size;
+  let gtNfs = 0, gtCx = 0, gtPeso = 0, gtVol = 0;
+  let fallbackIdx = 0;
+
+  for (const [, group] of entregasOrdenadas) {
+    fallbackIdx++;
+    const ordemNum = group.ordem ?? fallbackIdx;
     const totalNfs = group.nfs.length;
     const totalCx = group.nfs.reduce((s, nf) => s + nf.itens_nf.reduce((si, it) => si + calculateBoxes(Number(it.q_com)), 0), 0);
     const totalPeso = group.nfs.reduce((s, nf) => s + Number(nf.peso_bruto || 0), 0);
@@ -77,7 +90,7 @@ export async function generateResumoVeiculoPDF(data: VeiculoResumoData): Promise
     doc.setTextColor(30, 30, 30);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text(`Entrega ${idx} — ${truncate(group.razaoSocial, 40)}`, M + 2, y + 4.5);
+    doc.text(`Entrega ${ordemNum} de ${totalRota} — ${truncate(group.razaoSocial, 36)}`, M + 2, y + 4.5);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(6.5);
     const summary = `${totalNfs} NFs | ${totalCx} cx | ${totalPeso.toFixed(1)} kg | ${totalVol.toFixed(2)} m³`;
