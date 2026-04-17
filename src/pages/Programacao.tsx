@@ -935,12 +935,19 @@ export default function Programacao() {
                               const totalVolumeEntrega = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
                               const isExpanded = expandedEntregas.has(entregaKey);
                               const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
+                              const hasAgendamento = nfsEntrega.some((n) => n.tem_agendamento);
+                              const proxAgendamento = nfsEntrega
+                                .filter((n) => n.tem_agendamento && n.data_agendamento)
+                                .map((n) => n.data_agendamento as string)
+                                .sort()[0];
 
                               return (
-                                <div key={entregaKey} className="border rounded-md">
+                                <div key={entregaKey} className={`border rounded-md ${hasAgendamento ? "border-green-500 border-2" : ""}`}>
                                   <div
                                     className={`flex items-center gap-2 p-2 rounded-t-md cursor-pointer transition-colors ${
-                                      allEntregaSel
+                                      hasAgendamento
+                                        ? "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50"
+                                        : allEntregaSel
                                         ? "bg-primary/5"
                                         : someEntregaSel
                                         ? "bg-accent/30"
@@ -969,6 +976,11 @@ export default function Programacao() {
                                         <Badge variant="outline" className="text-xs shrink-0">
                                           {nfsEntrega.length} NF{nfsEntrega.length > 1 ? "s" : ""}
                                         </Badge>
+                                        {hasAgendamento && (
+                                          <Badge className="text-xs shrink-0 bg-green-600 hover:bg-green-700 text-white border-transparent">
+                                            ⭐ PRIORIDADE — AGENDADA{proxAgendamento ? ` ${format(new Date(proxAgendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                          </Badge>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                         <MapPin className="w-3 h-3 shrink-0" />
