@@ -261,12 +261,37 @@ export async function generateNotaDeCargaPDF(
     if (nf.dataEmissao) {
       doc.text(`Data Emissão: ${formatDate(nf.dataEmissao)}`, MARGIN + 100, y);
     }
-    y += 5;
-    // Show bairro/MR info
-    if (nf.destBairro) {
+    y += 6;
+
+    // Destinatário (razão social)
+    if (nf.destRazaoSocial) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Destinatário:", MARGIN, y);
+      doc.setFont("helvetica", "normal");
+      const destLines = doc.splitTextToSize(nf.destRazaoSocial, pageWidth - 28);
+      doc.text(destLines, MARGIN + 28, y);
+      y += 5 * destLines.length + 1;
+    }
+
+    // Endereço completo
+    const endereco = buildEnderecoCompleto(nf);
+    if (endereco) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Endereço:", MARGIN, y);
+      doc.setFont("helvetica", "normal");
+      const endLines = doc.splitTextToSize(endereco, pageWidth - 22);
+      doc.text(endLines, MARGIN + 22, y);
+      y += 5 * endLines.length;
+    } else if (nf.destBairro) {
       doc.setFontSize(10);
       doc.setFont("helvetica", "italic");
       doc.text(`Bairro: ${nf.destBairro} — MR ${mr}`, MARGIN, y + 2);
+      y += 6;
+    }
+    if (endereco && nf.destBairro) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "italic");
+      doc.text(`MR ${mr}`, MARGIN, y + 2);
       y += 6;
     }
     y += 3;
