@@ -92,6 +92,33 @@ export function parseCTeXML(xmlString: string): CTeParsed {
   const valorStr = vTPrest?.textContent || vRec?.textContent || "0";
   const valorFrete = parseFloat(valorStr) || 0;
 
+  // Extract cubic volume (m3) — tries multiple known CT-e tags
+  let volumeM3 = 0;
+
+  // 1) <infQ> with cUnid=00 (M3) and tpMed indicating cubagem/volume
+  const infQNodes = Array.from(xmlDoc.querySelectorAll("infQ"));
+  for (const node of infQNodes) {
+    const cUnid = node.querySelector("cUnid")?.textContent?.trim() || "";
+    const tpMed = (node.querySelector("tpMed")?.textContent || "").toUpperCase();
+    const qCarga = parseFloat(node.querySelector("qCarga")?.textContent || "0") || 0;
+    if (qCarga <= 0) continue;
+    // cUnid 00 = M3; tpMed often "CUBAGEM" / "M3" / "VOLUME"
+    if (cUnid === "00" || /CUB|M3|M\u00b3|VOLUME/.test(tpMed)) {
+      volumeM3 = qCarga;
+      break;
+    }
+  }
+
+  // 2) Fallback: any tag literally named volume / vol / cubagem / m3
+  if (volumeM3 <= 0) {
+    const candidates = ["cubagem", "Cubagem", "CUBAGEM", "volume", "Volume", "vol", "m3", "M3"];
+    for (const tag of candidates) {
+      const el = xmlDoc.getElementsByTagName(tag)[0];
+      const v = parseFloat(el?.textContent || "0") || 0;
+      if (v > 0) { volumeM3 = v; break; }
+    }
+  }
+
   return {
     chaveCte,
     numeroCte,
@@ -99,5 +126,6 @@ export function parseCTeXML(xmlString: string): CTeParsed {
     razaoSocialEmitente,
     chaveNfReferenciada,
     valorFrete,
+    volumeM3,
   };
 }
