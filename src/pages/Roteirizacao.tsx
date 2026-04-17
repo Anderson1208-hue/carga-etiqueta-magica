@@ -874,6 +874,15 @@ export default function Roteirizacao() {
           .in("id", cargaIdsExpedidas);
       }
 
+      // Atualizar status_entrega das NFs para "NF EM ROTA"
+      const nfIdsExpedidas = Array.from(new Set(allNfIds.map((i) => i.nfId)));
+      if (nfIdsExpedidas.length > 0) {
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "NF EM ROTA" })
+          .in("id", nfIdsExpedidas);
+      }
+
       setVeiculoCriado({
         id: veiculo.id,
         placa: emplacPlaca.trim().toUpperCase(),
