@@ -999,7 +999,7 @@ export type Database = {
         | "conferido_interno"
         | "conferido"
         | "divergencia"
-      load_status: "aberta" | "fechada" | "em_rota" | "entregue"
+      load_status: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1134,7 +1134,7 @@ export const Constants = {
         "conferido",
         "divergencia",
       ],
-      load_status: ["aberta", "fechada", "em_rota", "entregue"],
+      load_status: ["aberta", "fechada", "em_rota", "entregue", "expedida"],
     },
   },
 } as const

@@ -61,7 +61,7 @@ interface Carga {
   placa: string;
   motorista: string;
   observacao: string | null;
-  status: "aberta" | "fechada" | "em_rota" | "entregue";
+  status: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida";
   operador_responsavel: string | null;
   tipo_carga?: string;
   created_at: string;
@@ -419,7 +419,7 @@ export default function Cargas() {
     return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
-  async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada" | "em_rota" | "entregue") {
+  async function handleStatusChange(cargaId: string, newStatus: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida") {
     try {
       const { error } = await supabase
         .from("cargas")
@@ -756,11 +756,11 @@ export default function Cargas() {
                     <TableCell>
                       <Select
                         value={carga.status}
-                        onValueChange={(value: "aberta" | "fechada" | "em_rota" | "entregue") =>
+                        onValueChange={(value: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida") =>
                           handleStatusChange(carga.id, value)
                         }
                       >
-                        <SelectTrigger className="w-28">
+                        <SelectTrigger className="w-32">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -774,6 +774,12 @@ export default function Cargas() {
                             <span className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-muted-foreground" />
                               Fechada
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="expedida">
+                            <span className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-success" />
+                              Expedida
                             </span>
                           </SelectItem>
                         </SelectContent>
