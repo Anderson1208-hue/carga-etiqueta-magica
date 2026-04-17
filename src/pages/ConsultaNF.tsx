@@ -158,7 +158,7 @@ export default function ConsultaNF() {
           created_at, carga_id,
           cargas(placa, motorista, data, status, tipo_carga),
           itens_nf(c_prod, x_prod, q_com, u_com),
-          agendamentos(status, data_agendamento)
+          agendamentos(status, data_agendamento, created_at)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
