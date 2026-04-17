@@ -1043,11 +1043,14 @@ export default function Roteirizacao() {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
 
-    // Aplica melhor rota primeiro; depois preenche CNPJs ainda sem ordem
+    // Aplica melhor rota primeiro; depois preenche CNPJs ainda sem ordem.
+    // IMPORTANTE: considera apenas CNPJs do veículo atual, para que a
+    // numeração seja 1..N do veículo (e não 1..N da rota consolidada inteira).
     const cnpjsOrdenados: string[] = [];
     for (const r of rotsRanked) {
       const ordenadas = [...r.paradas].sort((a, b) => a.ordem - b.ordem);
       for (const p of ordenadas) {
+        if (!cnpjsDoVeiculo.has(p.cnpj)) continue;
         if (!cnpjsOrdenados.includes(p.cnpj)) cnpjsOrdenados.push(p.cnpj);
       }
     }
