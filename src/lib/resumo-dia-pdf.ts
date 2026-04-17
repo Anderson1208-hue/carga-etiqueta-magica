@@ -6,6 +6,7 @@ export interface VeiculoDiaData {
   placa: string;
   motorista: string;
   data: string;
+  totalEntregasRota?: number;
   nfs: {
     numero_nf: string;
     dest_razao_social: string;
@@ -20,6 +21,7 @@ export interface VeiculoDiaData {
     volume_m3: number;
     itens_nf: { q_com: number }[];
     ctes: { numero_cte: string }[];
+    ordem_entrega?: number;
   }[];
 }
 
@@ -58,22 +60,33 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
   // ===== Totais gerais =====
   let gNfs = 0, gCx = 0, gPeso = 0, gVol = 0, gEntregas = 0;
   const veiculosCalc = data.veiculos.map((v) => {
-    const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: VeiculoDiaData["nfs"] }>();
+    const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: VeiculoDiaData["nfs"]; ordem: number | undefined }>();
     v.nfs.forEach((nf) => {
       const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
       if (!entregas.has(cnpj)) {
         const end = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf]
           .filter(Boolean).join(", ");
-        entregas.set(cnpj, { razaoSocial: nf.dest_razao_social || "—", endereco: end || "—", nfs: [] });
+        entregas.set(cnpj, { razaoSocial: nf.dest_razao_social || "—", endereco: end || "—", nfs: [], ordem: nf.ordem_entrega });
       }
-      entregas.get(cnpj)!.nfs.push(nf);
+      const grp = entregas.get(cnpj)!;
+      grp.nfs.push(nf);
+      if (grp.ordem === undefined && nf.ordem_entrega !== undefined) grp.ordem = nf.ordem_entrega;
     });
+    // Ordena entregas pela ordem da rota
+    const entregasOrdenadas = new Map(
+      Array.from(entregas.entries()).sort((a, b) => {
+        const oa = a[1].ordem ?? Number.POSITIVE_INFINITY;
+        const ob = b[1].ordem ?? Number.POSITIVE_INFINITY;
+        return oa - ob;
+      })
+    );
     const totNfs = v.nfs.length;
     const totCx = v.nfs.reduce((s, nf) => s + nf.itens_nf.reduce((si, it) => si + calculateBoxes(Number(it.q_com)), 0), 0);
     const totPeso = v.nfs.reduce((s, nf) => s + Number(nf.peso_bruto || 0), 0);
     const totVol = v.nfs.reduce((s, nf) => s + Number(nf.volume_m3 || 0), 0);
     gNfs += totNfs; gCx += totCx; gPeso += totPeso; gVol += totVol; gEntregas += entregas.size;
-    return { v, entregas, totNfs, totCx, totPeso, totVol };
+    const totalRota = v.totalEntregasRota || entregas.size;
+    return { v, entregas: entregasOrdenadas, totNfs, totCx, totPeso, totVol, totalRota };
   });
 
   doc.setFillColor(240, 245, 255);
