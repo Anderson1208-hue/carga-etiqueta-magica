@@ -998,7 +998,7 @@ export default function Roteirizacao() {
       const { data } = await supabase
         .from("veiculo_nfs")
         .select(`
-          id, nf_id,
+          id, nf_id, carga_origem_id,
           notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
         `)
         .eq("veiculo_id", veiculoId);
@@ -1019,11 +1019,46 @@ export default function Roteirizacao() {
         }
       }
 
-      // Attach CTEs to each vnf
-      const enriched = (data || []).map((vnf: any) => ({
-        ...vnf,
-        ctes: ctesMap[vnf.nf_id] || [],
-      }));
+      // Buscar ordem de entrega (CNPJ → ordem) baseada na roteirização das cargas
+      const cargaIds = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
+      const ordemPorCnpj = new Map<string, number>();
+      if (cargaIds.length > 0) {
+        const { data: rots } = await supabase
+          .from("roteirizacoes")
+          .select("id, carga_id, created_at")
+          .in("carga_id", cargaIds)
+          .order("created_at", { ascending: false });
+        const latestRotIdPorCarga = new Map<string, string>();
+        for (const r of rots || []) {
+          if (!latestRotIdPorCarga.has(r.carga_id)) {
+            latestRotIdPorCarga.set(r.carga_id, r.id);
+          }
+        }
+        const rotIds = Array.from(latestRotIdPorCarga.values());
+        if (rotIds.length > 0) {
+          const { data: paradas } = await supabase
+            .from("roteirizacao_paradas")
+            .select("cnpj_destinatario, ordem")
+            .in("roteirizacao_id", rotIds)
+            .order("ordem", { ascending: true });
+          const cnpjsOrdenados: string[] = [];
+          for (const p of paradas || []) {
+            const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
+            if (cnpj && !cnpjsOrdenados.includes(cnpj)) cnpjsOrdenados.push(cnpj);
+          }
+          cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
+        }
+      }
+
+      // Anexa CTEs e ordem de entrega a cada vnf
+      const enriched = (data || []).map((vnf: any) => {
+        const cnpjKey = (vnf.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
+        return {
+          ...vnf,
+          ctes: ctesMap[vnf.nf_id] || [],
+          ordemEntrega: ordemPorCnpj.get(cnpjKey),
+        };
+      });
 
       setVeiculoNfs((prev) => ({ ...prev, [veiculoId]: enriched }));
     } catch (err) {
@@ -2130,8 +2165,8 @@ export default function Roteirizacao() {
                               ) : veiculoNfs[v.id].length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">Nenhuma NF vinculada</p>
                               ) : (() => {
-                                // Group NFs by CNPJ (entrega)
-                                const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: any[] }>();
+                                // Group NFs by CNPJ (entrega) e captura ordem de entrega da rota
+                                const entregas = new Map<string, { razaoSocial: string; endereco: string; nfs: any[]; ordem: number | undefined }>();
                                 veiculoNfs[v.id].forEach((vnf: any) => {
                                   const nf = vnf.notas_fiscais;
                                   const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
@@ -2141,19 +2176,27 @@ export default function Roteirizacao() {
                                       razaoSocial: nf.dest_razao_social || "Cliente não identificado",
                                       endereco: end || "Endereço não informado",
                                       nfs: [],
+                                      ordem: vnf.ordemEntrega,
                                     });
                                   }
                                   entregas.get(cnpj)!.nfs.push(vnf);
                                 });
 
-                                let entregaIdx = 0;
+                                // Ordena pela ordem real da rota (sem ordem vai para o final)
+                                const entregasOrdenadas = Array.from(entregas.entries()).sort((a, b) => {
+                                  const oa = a[1].ordem ?? Number.POSITIVE_INFINITY;
+                                  const ob = b[1].ordem ?? Number.POSITIVE_INFINITY;
+                                  return oa - ob;
+                                });
+                                const totalEntregas = entregasOrdenadas.length;
+
                                 return (
                                   <div className="space-y-4">
                                     <p className="text-xs font-semibold text-muted-foreground">
                                       {veiculoNfs[v.id].length} NF(s) em {entregas.size} entrega(s)
                                     </p>
-                                    {Array.from(entregas.entries()).map(([cnpj, group]) => {
-                                      entregaIdx++;
+                                    {entregasOrdenadas.map(([cnpj, group], idx) => {
+                                      const ordemEntrega = group.ordem ?? (idx + 1);
                                       const totalPeso = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.peso_bruto || 0), 0);
                                       const totalVolume = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.volume_m3 || 0), 0);
                                       const totalCaixas = group.nfs.reduce((s: number, vnf: any) => {
@@ -2164,14 +2207,19 @@ export default function Roteirizacao() {
                                       return (
                                         <div key={cnpj} className="rounded-lg border bg-background overflow-hidden">
                                           <div className="p-3 bg-accent/30 flex items-center justify-between">
-                                            <div>
-                                              <p className="text-sm font-semibold flex items-center gap-2">
-                                                <Package className="w-3.5 h-3.5 text-primary" />
-                                                Entrega {entregaIdx} — {group.razaoSocial}
-                                              </p>
-                                              <p className="text-xs text-muted-foreground mt-0.5">{group.endereco}</p>
+                                            <div className="flex items-center gap-3 min-w-0">
+                                              <Badge variant="default" className="shrink-0 text-sm font-bold px-3 py-1">
+                                                {ordemEntrega}ª ENTREGA
+                                              </Badge>
+                                              <div className="min-w-0">
+                                                <p className="text-sm font-semibold flex items-center gap-2">
+                                                  <Package className="w-3.5 h-3.5 text-primary" />
+                                                  {group.razaoSocial}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground mt-0.5">{group.endereco}</p>
+                                              </div>
                                             </div>
-                                            <div className="flex gap-3 text-xs font-medium text-muted-foreground">
+                                            <div className="flex gap-3 text-xs font-medium text-muted-foreground shrink-0">
                                               <span>{group.nfs.length} NFs</span>
                                               <span>{totalCaixas} cx</span>
                                               <span>{totalPeso.toFixed(1)} kg</span>
@@ -2186,6 +2234,9 @@ export default function Roteirizacao() {
                                               return (
                                                 <div key={vnf.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-muted/40">
                                                   <div className="flex items-center gap-3 min-w-0">
+                                                    <Badge variant="outline" className="shrink-0 text-[10px] font-semibold">
+                                                      {ordemEntrega}ª de {totalEntregas}
+                                                    </Badge>
                                                     <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                                                     <span className="font-medium">NF {nf.numero_nf}</span>
                                                     {nfCtes.length > 0 && (
