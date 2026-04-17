@@ -187,7 +187,29 @@ export function ImportarCteDialog({
           throw error;
         }
       } else {
-        toast({ title: "CT-es importados!", description: `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` });
+        // Sobrescrever volume_m3 da NF para fornecedores Pandurata e Docile
+        const FORNECEDORES_VOLUME_CTE = ["PANDURATA", "DOCILE"];
+        let volumesAtualizados = 0;
+        for (const file of successFiles) {
+          const cte = file.data!;
+          const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
+          if (!nfMatch || !cte.volumeM3 || cte.volumeM3 <= 0) continue;
+          const razao = (nfMatch.razao_social_emitente || "").toUpperCase();
+          const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
+          if (!isAlvo) continue;
+          const { error: updErr } = await supabase
+            .from("notas_fiscais")
+            .update({ volume_m3: cte.volumeM3 })
+            .eq("id", nfMatch.id);
+          if (!updErr) volumesAtualizados++;
+        }
+
+        toast({
+          title: "CT-es importados!",
+          description:
+            `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` +
+            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado via CT-e (Pandurata/Docile).` : ""),
+        });
         handleClose(false);
         onSuccess();
       }
