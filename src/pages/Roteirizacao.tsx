@@ -1118,38 +1118,15 @@ export default function Roteirizacao() {
         return;
       }
 
-      // Buscar a ordem de entrega por CNPJ a partir da roteirização das cargas envolvidas
+      // Buscar a ordem de entrega por CNPJ priorizando a rota consolidada (multi-carga)
       const cargaIds = Array.from(new Set(vnfs.map((v: any) => v.carga_origem_id).filter(Boolean)));
-      const ordemPorCnpj = new Map<string, number>();
-      let totalEntregasRota = 0;
-      if (cargaIds.length > 0) {
-        const { data: rots } = await supabase
-          .from("roteirizacoes")
-          .select("id, carga_id, created_at")
-          .in("carga_id", cargaIds)
-          .order("created_at", { ascending: false });
-        const latestRotIdPorCarga = new Map<string, string>();
-        for (const r of rots || []) {
-          if (!latestRotIdPorCarga.has(r.carga_id)) {
-            latestRotIdPorCarga.set(r.carga_id, r.id);
-          }
-        }
-        const rotIds = Array.from(latestRotIdPorCarga.values());
-        if (rotIds.length > 0) {
-          const { data: paradas } = await supabase
-            .from("roteirizacao_paradas")
-            .select("cnpj_destinatario, ordem, roteirizacao_id")
-            .in("roteirizacao_id", rotIds)
-            .order("ordem", { ascending: true });
-          const cnpjsOrdenados: string[] = [];
-          for (const p of paradas || []) {
-            const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
-            if (cnpj && !cnpjsOrdenados.includes(cnpj)) cnpjsOrdenados.push(cnpj);
-          }
-          cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
-          totalEntregasRota = cnpjsOrdenados.length;
-        }
-      }
+      const cnpjsDoVeiculo = new Set(
+        vnfs
+          .map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""))
+          .filter(Boolean)
+      );
+      const ordemPorCnpj = await buildOrdemPorCnpj(cargaIds, cnpjsDoVeiculo);
+      const totalEntregasRota = new Set(ordemPorCnpj.keys()).size;
 
       const notasFiscais = vnfs.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
