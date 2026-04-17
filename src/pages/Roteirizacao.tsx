@@ -1189,8 +1189,24 @@ export default function Roteirizacao() {
         toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
         return;
       }
+
+      // Buscar ordem de entrega por CNPJ priorizando rota consolidada (multi-carga)
+      const cargaIdsResumo = Array.from(
+        new Set(nfsData.map((v: any) => v.carga_origem_id).filter(Boolean))
+      );
+      const cnpjsDoVeiculoResumo = new Set(
+        nfsData
+          .map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""))
+          .filter(Boolean)
+      );
+      const ordemPorCnpjResumo = cargaIdsResumo.length > 0
+        ? await buildOrdemPorCnpj(cargaIdsResumo as string[], cnpjsDoVeiculoResumo)
+        : new Map<string, number>();
+      const totalEntregasResumo = new Set(ordemPorCnpjResumo.keys()).size;
+
       const nfs = nfsData.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
+        const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
         return {
           numero_nf: nf.numero_nf, dest_razao_social: nf.dest_razao_social || "",
           dest_logradouro: nf.dest_logradouro || "", dest_numero: nf.dest_numero || "",
@@ -1200,9 +1216,16 @@ export default function Roteirizacao() {
           peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
           itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
+          ordem_entrega: ordemPorCnpjResumo.get(cnpjKey),
         };
       });
-      const blob = await generateResumoVeiculoPDF({ placa: veiculo.placa, motorista: veiculo.motorista || "", data: veiculo.data, nfs });
+      const blob = await generateResumoVeiculoPDF({
+        placa: veiculo.placa,
+        motorista: veiculo.motorista || "",
+        data: veiculo.data,
+        nfs,
+        totalEntregasRota: totalEntregasResumo || undefined,
+      });
       downloadBlob(blob, `resumo_entregas_${veiculo.placa}_${veiculo.data}.pdf`);
     } catch (err) {
       console.error("Error generating resumo PDF:", err);
