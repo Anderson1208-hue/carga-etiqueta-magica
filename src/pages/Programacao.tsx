@@ -126,7 +126,7 @@ export default function Programacao() {
       const [nfResults, { data: assigned }, { data: agendamentos }, { data: ctes }] = await Promise.all([
         Promise.all(nfPromises),
         supabase.from("veiculo_nfs").select("nf_id"),
-        supabase.from("agendamentos").select("nf_id, data_agendamento, status"),
+        supabase.from("agendamentos").select("nf_id, data_agendamento, status, created_at").order("created_at", { ascending: false }),
         supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
@@ -147,10 +147,12 @@ export default function Programacao() {
         if (cte.nf_id) cteMap.set(cte.nf_id, cte.numero_cte);
       });
 
-      // Build map of NF agendamentos - only the latest per NF
+      // Build map of NF agendamentos - only the latest per NF (lista vem ordenada desc por created_at)
       const agendamentoMap = new Map<string, { data_agendamento: string | null; status: string }>();
       (agendamentos || []).forEach((ag) => {
-        agendamentoMap.set(ag.nf_id, { data_agendamento: ag.data_agendamento, status: ag.status });
+        if (!agendamentoMap.has(ag.nf_id)) {
+          agendamentoMap.set(ag.nf_id, { data_agendamento: ag.data_agendamento, status: ag.status });
+        }
       });
 
       // Liberar NFs agendadas na véspera. Considera próximo dia útil:
