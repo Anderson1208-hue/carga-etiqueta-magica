@@ -59,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
+import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
 import { Settings2 } from "lucide-react";
 
 interface Carga {
@@ -142,6 +143,7 @@ export default function Roteirizacao() {
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
+  const [reroteirizarVeiculo, setReroteirizarVeiculo] = useState<any | null>(null);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
@@ -2103,6 +2105,18 @@ export default function Roteirizacao() {
                                 <Settings2 className="w-3.5 h-3.5 mr-1" />
                                 Alterar Rota
                               </Button>
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setReroteirizarVeiculo(v);
+                                }}
+                              >
+                                <Route className="w-3.5 h-3.5 mr-1" />
+                                Reroteirizar
+                              </Button>
                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
                             </div>
                           </button>
@@ -2232,6 +2246,17 @@ export default function Roteirizacao() {
           onOpenChange={(open) => { if (!open) setAlterarRotaVeiculo(null); }}
           veiculo={alterarRotaVeiculo}
           onUpdated={() => {
+            loadVeiculos();
+            setVeiculoNfs({});
+            setExpandedVeiculoId(null);
+          }}
+        />
+
+        <ReroteirizarVeiculoDialog
+          open={!!reroteirizarVeiculo}
+          onOpenChange={(open) => { if (!open) setReroteirizarVeiculo(null); }}
+          veiculo={reroteirizarVeiculo}
+          onCompleted={() => {
             loadVeiculos();
             setVeiculoNfs({});
             setExpandedVeiculoId(null);
