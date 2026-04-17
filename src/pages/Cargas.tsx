@@ -468,13 +468,21 @@ export default function Cargas() {
       } else {
         const { error } = await supabase
           .from("carga_operadores")
-          .insert({ carga_id: cargaId, operador_id: operadorId });
-        if (error) throw error;
+          .upsert(
+            { carga_id: cargaId, operador_id: operadorId },
+            { onConflict: "carga_id,operador_id", ignoreDuplicates: true }
+          );
+        if (error && (error as any).code !== "23505") throw error;
 
         setCargas((prev) =>
           prev.map((c) =>
             c.id === cargaId
-              ? { ...c, operadores_atribuidos: [...currentOps, operadorId] }
+              ? {
+                  ...c,
+                  operadores_atribuidos: c.operadores_atribuidos?.includes(operadorId)
+                    ? c.operadores_atribuidos
+                    : [...(c.operadores_atribuidos || []), operadorId],
+                }
               : c
           )
         );
