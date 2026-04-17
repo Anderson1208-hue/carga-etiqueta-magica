@@ -153,8 +153,18 @@ export default function Programacao() {
         agendamentoMap.set(ag.nf_id, { data_agendamento: ag.data_agendamento, status: ag.status });
       });
 
-      // Liberar NFs agendadas na véspera (amanhã ou antes)
-      const tomorrow = format(new Date(Date.now() + 86400000), "yyyy-MM-dd");
+      // Liberar NFs agendadas na véspera. Considera próximo dia útil:
+      // - Sex libera Sáb, Dom e Seg (próximo dia útil = Seg)
+      // - Demais dias liberam o dia seguinte
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const proximoDiaUtil = new Date(hoje);
+      proximoDiaUtil.setDate(proximoDiaUtil.getDate() + 1);
+      // Se cair em sábado (6) ou domingo (0), avança até segunda
+      while (proximoDiaUtil.getDay() === 0 || proximoDiaUtil.getDay() === 6) {
+        proximoDiaUtil.setDate(proximoDiaUtil.getDate() + 1);
+      }
+      const limiteLiberacao = format(proximoDiaUtil, "yyyy-MM-dd");
 
       const available: NfDisponivel[] = nfs
         .filter((nf) => {
@@ -164,7 +174,7 @@ export default function Programacao() {
             // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
             if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'DEVOLUCAO') return false;
             // AGENDAMENTO ou REENTREGA: libera na véspera (data <= amanhã)
-            if ((ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA') && ag.data_agendamento && ag.data_agendamento > tomorrow) return false;
+            if ((ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA') && ag.data_agendamento && ag.data_agendamento > limiteLiberacao) return false;
           }
           return true;
         })
