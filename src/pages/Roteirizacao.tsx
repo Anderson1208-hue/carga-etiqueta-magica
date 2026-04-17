@@ -998,7 +998,7 @@ export default function Roteirizacao() {
       const { data } = await supabase
         .from("veiculo_nfs")
         .select(`
-          id, nf_id,
+          id, nf_id, carga_origem_id,
           notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
         `)
         .eq("veiculo_id", veiculoId);
@@ -1019,11 +1019,46 @@ export default function Roteirizacao() {
         }
       }
 
-      // Attach CTEs to each vnf
-      const enriched = (data || []).map((vnf: any) => ({
-        ...vnf,
-        ctes: ctesMap[vnf.nf_id] || [],
-      }));
+      // Buscar ordem de entrega (CNPJ → ordem) baseada na roteirização das cargas
+      const cargaIds = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
+      const ordemPorCnpj = new Map<string, number>();
+      if (cargaIds.length > 0) {
+        const { data: rots } = await supabase
+          .from("roteirizacoes")
+          .select("id, carga_id, created_at")
+          .in("carga_id", cargaIds)
+          .order("created_at", { ascending: false });
+        const latestRotIdPorCarga = new Map<string, string>();
+        for (const r of rots || []) {
+          if (!latestRotIdPorCarga.has(r.carga_id)) {
+            latestRotIdPorCarga.set(r.carga_id, r.id);
+          }
+        }
+        const rotIds = Array.from(latestRotIdPorCarga.values());
+        if (rotIds.length > 0) {
+          const { data: paradas } = await supabase
+            .from("roteirizacao_paradas")
+            .select("cnpj_destinatario, ordem")
+            .in("roteirizacao_id", rotIds)
+            .order("ordem", { ascending: true });
+          const cnpjsOrdenados: string[] = [];
+          for (const p of paradas || []) {
+            const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
+            if (cnpj && !cnpjsOrdenados.includes(cnpj)) cnpjsOrdenados.push(cnpj);
+          }
+          cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
+        }
+      }
+
+      // Anexa CTEs e ordem de entrega a cada vnf
+      const enriched = (data || []).map((vnf: any) => {
+        const cnpjKey = (vnf.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
+        return {
+          ...vnf,
+          ctes: ctesMap[vnf.nf_id] || [],
+          ordemEntrega: ordemPorCnpj.get(cnpjKey),
+        };
+      });
 
       setVeiculoNfs((prev) => ({ ...prev, [veiculoId]: enriched }));
     } catch (err) {
