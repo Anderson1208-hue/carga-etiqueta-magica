@@ -7,6 +7,7 @@ export interface CTeParsed {
   razaoSocialEmitente: string;
   chaveNfReferenciada: string;
   valorFrete: number;
+  volumeM3: number;
 }
 
 export function parseCTeXML(xmlString: string): CTeParsed {
