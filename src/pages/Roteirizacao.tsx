@@ -1063,7 +1063,15 @@ export default function Roteirizacao() {
           .select("id, carga_id, created_at")
           .in("carga_id", cargaIds)
           .order("created_at", { ascending: false });
-        const rotIds = (rots || []).map((r: any) => r.id);
+        // Manter apenas a roteirização MAIS RECENTE de cada carga
+        // (evita misturar paradas de roteirizações antigas com novas)
+        const latestRotIdPorCarga = new Map<string, string>();
+        for (const r of rots || []) {
+          if (!latestRotIdPorCarga.has(r.carga_id)) {
+            latestRotIdPorCarga.set(r.carga_id, r.id);
+          }
+        }
+        const rotIds = Array.from(latestRotIdPorCarga.values());
         if (rotIds.length > 0) {
           const { data: paradas } = await supabase
             .from("roteirizacao_paradas")
@@ -1071,6 +1079,7 @@ export default function Roteirizacao() {
             .in("roteirizacao_id", rotIds)
             .order("ordem", { ascending: true });
           // Reordenar de 1..N por CNPJ único na ordem da rota
+          // (uma "entrega" = um CNPJ; todas as NFs do mesmo CNPJ herdam a mesma ordem)
           const cnpjsOrdenados: string[] = [];
           for (const p of paradas || []) {
             const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
