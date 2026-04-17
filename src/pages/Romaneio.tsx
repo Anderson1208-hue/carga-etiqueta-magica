@@ -66,7 +66,13 @@ interface NotaFiscalData {
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
+  destRazaoSocial?: string;
+  destLogradouro?: string;
+  destNumero?: string;
   destBairro: string;
+  destCidade?: string;
+  destUf?: string;
+  destCep?: string;
   dataEmissao: string | null;
   macroRegiao: number;
   itens: {
@@ -160,7 +166,13 @@ export default function Romaneio() {
           razao_social_emitente,
           cnpj_emitente,
           cnpj_destinatario,
+          dest_razao_social,
+          dest_logradouro,
+          dest_numero,
           dest_bairro,
+          dest_cidade,
+          dest_uf,
+          dest_cep,
           data_emissao,
           itens_nf(
             c_prod,
@@ -206,7 +218,13 @@ export default function Romaneio() {
         razaoSocialEmitente: nf.razao_social_emitente,
         cnpjEmitente: nf.cnpj_emitente,
         cnpjDestinatario: nf.cnpj_destinatario || "",
+        destRazaoSocial: nf.dest_razao_social || undefined,
+        destLogradouro: nf.dest_logradouro || undefined,
+        destNumero: nf.dest_numero || undefined,
         destBairro: nf.dest_bairro || "",
+        destCidade: nf.dest_cidade || undefined,
+        destUf: nf.dest_uf || undefined,
+        destCep: nf.dest_cep || undefined,
         dataEmissao: nf.data_emissao,
         macroRegiao: getMacroRegiao(nf.dest_bairro),
         itens: (nf.itens_nf || []).map((item: any) => ({
@@ -278,7 +296,13 @@ export default function Romaneio() {
       razaoSocialEmitente: nf.razaoSocialEmitente,
       cnpjEmitente: nf.cnpjEmitente,
       cnpjDestinatario: nf.cnpjDestinatario,
+      destRazaoSocial: nf.destRazaoSocial,
+      destLogradouro: nf.destLogradouro,
+      destNumero: nf.destNumero,
       destBairro: nf.destBairro,
+      destCidade: nf.destCidade,
+      destUf: nf.destUf,
+      destCep: nf.destCep,
       macroRegiao: nf.macroRegiao,
       dataEmissao: nf.dataEmissao,
       itens: nf.itens.map((item) => ({

@@ -104,7 +104,8 @@ export default function Cargas() {
         .from("notas_fiscais")
         .select(`
           id, numero_nf, razao_social_emitente, cnpj_emitente,
-          cnpj_destinatario, dest_bairro, data_emissao,
+          cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero,
+          dest_bairro, dest_cidade, dest_uf, dest_cep, data_emissao,
           itens_nf(c_prod, x_prod, q_com)
         `)
         .eq("carga_id", carga.id)
@@ -120,7 +121,13 @@ export default function Cargas() {
         razaoSocialEmitente: nf.razao_social_emitente,
         cnpjEmitente: nf.cnpj_emitente,
         cnpjDestinatario: nf.cnpj_destinatario || "",
+        destRazaoSocial: nf.dest_razao_social || undefined,
+        destLogradouro: nf.dest_logradouro || undefined,
+        destNumero: nf.dest_numero || undefined,
         destBairro: nf.dest_bairro || undefined,
+        destCidade: nf.dest_cidade || undefined,
+        destUf: nf.dest_uf || undefined,
+        destCep: nf.dest_cep || undefined,
         macroRegiao: getMacroRegiao(nf.dest_bairro),
         dataEmissao: nf.data_emissao,
         itens: (nf.itens_nf || []).map((item: any) => ({

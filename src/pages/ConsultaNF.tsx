@@ -105,7 +105,13 @@ export default function ConsultaNF() {
         razaoSocialEmitente: nf.razao_social_emitente,
         cnpjEmitente: nf.cnpj_emitente,
         cnpjDestinatario: nf.cnpj_destinatario || "",
+        destRazaoSocial: nf.dest_razao_social || undefined,
+        destLogradouro: nf.dest_logradouro || undefined,
+        destNumero: nf.dest_numero || undefined,
         destBairro: nf.dest_bairro || "",
+        destCidade: nf.dest_cidade || undefined,
+        destUf: nf.dest_uf || undefined,
+        destCep: nf.dest_cep || undefined,
         macroRegiao: getMacroRegiao(nf.dest_bairro),
         dataEmissao: nf.data_emissao,
         itens: (nf.itens || []).map((item) => ({
