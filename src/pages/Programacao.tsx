@@ -64,6 +64,8 @@ interface NfDisponivel {
   carga_data: string;
   carga_tipo_carga: string;
   numero_cte: string;
+  tem_agendamento: boolean;
+  data_agendamento: string | null;
 }
 
 export default function Programacao() {
@@ -207,6 +209,8 @@ export default function Programacao() {
             carga_data: carga?.data || "",
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
+            tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
+            data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
           };
         });
 
@@ -931,12 +935,19 @@ export default function Programacao() {
                               const totalVolumeEntrega = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
                               const isExpanded = expandedEntregas.has(entregaKey);
                               const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
+                              const hasAgendamento = nfsEntrega.some((n) => n.tem_agendamento);
+                              const proxAgendamento = nfsEntrega
+                                .filter((n) => n.tem_agendamento && n.data_agendamento)
+                                .map((n) => n.data_agendamento as string)
+                                .sort()[0];
 
                               return (
-                                <div key={entregaKey} className="border rounded-md">
+                                <div key={entregaKey} className={`border rounded-md ${hasAgendamento ? "border-green-500 border-2" : ""}`}>
                                   <div
                                     className={`flex items-center gap-2 p-2 rounded-t-md cursor-pointer transition-colors ${
-                                      allEntregaSel
+                                      hasAgendamento
+                                        ? "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50"
+                                        : allEntregaSel
                                         ? "bg-primary/5"
                                         : someEntregaSel
                                         ? "bg-accent/30"
@@ -965,6 +976,11 @@ export default function Programacao() {
                                         <Badge variant="outline" className="text-xs shrink-0">
                                           {nfsEntrega.length} NF{nfsEntrega.length > 1 ? "s" : ""}
                                         </Badge>
+                                        {hasAgendamento && (
+                                          <Badge className="text-xs shrink-0 bg-green-600 hover:bg-green-700 text-white border-transparent">
+                                            ⭐ PRIORIDADE — AGENDADA{proxAgendamento ? ` ${format(new Date(proxAgendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                          </Badge>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                         <MapPin className="w-3 h-3 shrink-0" />
@@ -1005,7 +1021,9 @@ export default function Programacao() {
                                         <div
                                           key={nf.id}
                                           className={`flex items-center gap-3 p-1.5 rounded text-sm cursor-pointer transition-colors ${
-                                            selectedNfIds.has(nf.id)
+                                            nf.tem_agendamento
+                                              ? "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-l-4 border-green-500"
+                                              : selectedNfIds.has(nf.id)
                                               ? "bg-primary/5"
                                               : "hover:bg-muted/30"
                                           }`}
@@ -1019,6 +1037,11 @@ export default function Programacao() {
                                             NF {nf.numero_nf}
                                           </span>
                                           <TipoCargaBadge tipoCarga={nf.carga_tipo_carga} />
+                                          {nf.tem_agendamento && (
+                                            <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
+                                              AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                            </Badge>
+                                          )}
                                           <span className="text-xs text-muted-foreground">
                                             {nf.totalCaixas} cx
                                           </span>
