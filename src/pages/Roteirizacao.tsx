@@ -1060,7 +1060,8 @@ export default function Roteirizacao() {
           nf_id, carga_origem_id,
           notas_fiscais!inner(
             numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
-            dest_bairro, dest_razao_social, data_emissao, peso_bruto, volume_m3,
+            dest_razao_social, dest_logradouro, dest_numero, dest_bairro,
+            dest_cidade, dest_uf, dest_cep, data_emissao, peso_bruto, volume_m3,
             itens_nf(c_prod, x_prod, q_com)
           )
         `)
@@ -1081,8 +1082,6 @@ export default function Roteirizacao() {
           .select("id, carga_id, created_at")
           .in("carga_id", cargaIds)
           .order("created_at", { ascending: false });
-        // Manter apenas a roteirização MAIS RECENTE de cada carga
-        // (evita misturar paradas de roteirizações antigas com novas)
         const latestRotIdPorCarga = new Map<string, string>();
         for (const r of rots || []) {
           if (!latestRotIdPorCarga.has(r.carga_id)) {
@@ -1096,8 +1095,6 @@ export default function Roteirizacao() {
             .select("cnpj_destinatario, ordem, roteirizacao_id")
             .in("roteirizacao_id", rotIds)
             .order("ordem", { ascending: true });
-          // Reordenar de 1..N por CNPJ único na ordem da rota
-          // (uma "entrega" = um CNPJ; todas as NFs do mesmo CNPJ herdam a mesma ordem)
           const cnpjsOrdenados: string[] = [];
           for (const p of paradas || []) {
             const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
@@ -1117,7 +1114,13 @@ export default function Roteirizacao() {
           razaoSocialEmitente: nf.razao_social_emitente,
           cnpjEmitente: nf.cnpj_emitente,
           cnpjDestinatario: nf.cnpj_destinatario || "",
+          destRazaoSocial: nf.dest_razao_social || undefined,
+          destLogradouro: nf.dest_logradouro || undefined,
+          destNumero: nf.dest_numero || undefined,
           destBairro: bairro,
+          destCidade: nf.dest_cidade || undefined,
+          destUf: nf.dest_uf || undefined,
+          destCep: nf.dest_cep || undefined,
           macroRegiao: getMacroRegiao(bairro),
           dataEmissao: nf.data_emissao,
           ordemEntrega: ordemPorCnpj.get(cnpjKey),
