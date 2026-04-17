@@ -865,6 +865,15 @@ export default function Roteirizacao() {
       const { error: linkError } = await supabase.from("veiculo_nfs").insert(links);
       if (linkError) throw linkError;
 
+      // Marcar todas as cargas envolvidas como "expedida"
+      const cargaIdsExpedidas = Array.from(new Set(allNfIds.map((i) => i.cargaId)));
+      if (cargaIdsExpedidas.length > 0) {
+        await supabase
+          .from("cargas")
+          .update({ status: "expedida" as any })
+          .in("id", cargaIdsExpedidas);
+      }
+
       setVeiculoCriado({
         id: veiculo.id,
         placa: emplacPlaca.trim().toUpperCase(),
