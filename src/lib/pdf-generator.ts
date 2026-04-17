@@ -296,7 +296,20 @@ export async function generateNotaDeCargaPDF(
       x = MARGIN;
       doc.text(truncateText(formatCProdDisplay(item.cProd), 25), x + 3, y);
       x += colWidths[0];
-      doc.text(truncateText(item.xProd, 65), x + 3, y);
+      // Limita a descrição à largura real da coluna (com folga de 2mm para não invadir a Qtd)
+      const descMaxWidth = colWidths[1] - 5;
+      let descText = item.xProd || "";
+      while (descText.length > 0 && doc.getTextWidth(descText) > descMaxWidth) {
+        descText = descText.slice(0, -1);
+      }
+      if (descText.length < (item.xProd || "").length) {
+        // troca os 3 últimos chars por "..." mantendo dentro da largura
+        while (descText.length > 3 && doc.getTextWidth(descText.slice(0, -3) + "...") > descMaxWidth) {
+          descText = descText.slice(0, -1);
+        }
+        descText = descText.slice(0, -3) + "...";
+      }
+      doc.text(descText, x + 3, y);
       x += colWidths[1];
       doc.text(item.qtdCaixas.toString(), x + colWidths[2] - 5, y, {
         align: "right",
