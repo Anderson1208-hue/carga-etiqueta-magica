@@ -417,18 +417,34 @@ export default function Roteirizacao() {
     } catch { return null; }
   }
 
-  async function geocodeViaNominatim(query: string): Promise<{ lat: number; lng: number } | null> {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`,
-        { headers: { "User-Agent": "WMS-Recebimento/1.0" } }
-      );
-      const data = await response.json();
-      if (data.length > 0) {
-        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  async function geocodeViaNominatim(query: string, retries = 2): Promise<{ lat: number; lng: number } | null> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=br`,
+          { headers: { "Accept": "application/json" } }
+        );
+        if (!response.ok) {
+          if ((response.status === 429 || response.status === 503) && attempt < retries) {
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            continue;
+          }
+          return null;
+        }
+        const data = await response.json();
+        if (data.length > 0) {
+          return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+        }
+        return null;
+      } catch {
+        if (attempt < retries) {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        return null;
       }
-      return null;
-    } catch { return null; }
+    }
+    return null;
   }
 
   async function geocodeAddresses() {
@@ -450,20 +466,34 @@ export default function Roteirizacao() {
         await new Promise((r) => setTimeout(r, 300));
       }
 
-      // Tentativa 2: Bairro + Cidade + UF via Nominatim
+      const cidade = entrega.cidade || "Rio de Janeiro";
+      const uf = entrega.uf || "RJ";
+
+      // Tentativa 2: Logradouro + Bairro + Cidade (mais específico)
+      if (!coords && entrega.logradouro && entrega.bairro) {
+        coords = await geocodeViaNominatim(`${entrega.logradouro}, ${entrega.bairro}, ${cidade}, ${uf}`);
+        await new Promise((r) => setTimeout(r, 1100));
+      }
+
+      // Tentativa 3: Bairro + Cidade + UF via Nominatim
       if (!coords && entrega.bairro) {
-        const cidade = entrega.cidade || "Rio de Janeiro";
-        const uf = entrega.uf || "RJ";
         coords = await geocodeViaNominatim(`${entrega.bairro}, ${cidade}, ${uf}`);
         await new Promise((r) => setTimeout(r, 1100));
       }
 
-      // Tentativa 3: Logradouro + Cidade via Nominatim
+      // Tentativa 4: Logradouro + Cidade via Nominatim
       if (!coords && entrega.logradouro) {
-        const cidade = entrega.cidade || "Rio de Janeiro";
-        const uf = entrega.uf || "RJ";
         coords = await geocodeViaNominatim(`${entrega.logradouro}, ${cidade}, ${uf}`);
         await new Promise((r) => setTimeout(r, 1100));
+      }
+
+      // Tentativa 5 (último recurso): Cidade + UF para ao menos posicionar no mapa
+      if (!coords && entrega.cidade) {
+        coords = await geocodeViaNominatim(`${cidade}, ${uf}`);
+        await new Promise((r) => setTimeout(r, 1100));
+        if (coords) {
+          console.warn(`Geocoding aproximado (cidade) para ${entrega.razaoSocial}: ${entrega.enderecoCompleto}`);
+        }
       }
 
       if (coords) {
@@ -471,7 +501,7 @@ export default function Roteirizacao() {
         successCount++;
       } else {
         failedAddresses.push(entrega.razaoSocial);
-        console.warn(`Geocoding falhou para: ${entrega.enderecoCompleto}`);
+        console.warn(`Geocoding falhou TOTALMENTE para ${entrega.razaoSocial} | CEP=${entrega.cep} | ${entrega.enderecoCompleto}`);
       }
     }
 
