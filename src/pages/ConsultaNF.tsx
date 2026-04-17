@@ -166,9 +166,13 @@ export default function ConsultaNF() {
       if (error) throw error;
 
       const results: NfResult[] = (nfs || []).map((nf: any) => {
-        // Get latest agendamento if exists
-        const agendamentos = nf.agendamentos || [];
-        const latestAgendamento = agendamentos.length > 0 ? agendamentos[agendamentos.length - 1] : null;
+        // Get latest agendamento (ordenar por created_at DESC para pegar o mais recente)
+        const agendamentos = [...(nf.agendamentos || [])].sort((a: any, b: any) => {
+          const da = new Date(a.created_at || 0).getTime();
+          const db = new Date(b.created_at || 0).getTime();
+          return db - da;
+        });
+        const latestAgendamento = agendamentos.length > 0 ? agendamentos[0] : null;
         
         return {
           ...nf,
