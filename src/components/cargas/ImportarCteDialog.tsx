@@ -42,19 +42,19 @@ export function ImportarCteDialog({
   const [isDragActive, setIsDragActive] = useState(false);
 
   // Fetch NFs for this carga to match chave_acesso
-  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
+  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
 
   async function loadNfs() {
     if (nfsLoaded) return;
     const { data } = await supabase
       .from("notas_fiscais")
-      .select("id, chave_acesso, numero_nf")
+      .select("id, chave_acesso, numero_nf, razao_social_emitente")
       .eq("carga_id", cargaId);
 
-    const map = new Map<string, { id: string; numero_nf: string }>();
+    const map = new Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>();
     (data || []).forEach((nf) => {
-      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf });
+      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf, razao_social_emitente: nf.razao_social_emitente || "" });
     });
     setNfsMap(map);
     setNfsLoaded(true);
@@ -187,7 +187,29 @@ export function ImportarCteDialog({
           throw error;
         }
       } else {
-        toast({ title: "CT-es importados!", description: `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` });
+        // Sobrescrever volume_m3 da NF para fornecedores Pandurata e Docile
+        const FORNECEDORES_VOLUME_CTE = ["PANDURATA", "DOCILE"];
+        let volumesAtualizados = 0;
+        for (const file of successFiles) {
+          const cte = file.data!;
+          const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
+          if (!nfMatch || !cte.volumeM3 || cte.volumeM3 <= 0) continue;
+          const razao = (nfMatch.razao_social_emitente || "").toUpperCase();
+          const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
+          if (!isAlvo) continue;
+          const { error: updErr } = await supabase
+            .from("notas_fiscais")
+            .update({ volume_m3: cte.volumeM3 })
+            .eq("id", nfMatch.id);
+          if (!updErr) volumesAtualizados++;
+        }
+
+        toast({
+          title: "CT-es importados!",
+          description:
+            `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` +
+            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado via CT-e (Pandurata/Docile).` : ""),
+        });
         handleClose(false);
         onSuccess();
       }
