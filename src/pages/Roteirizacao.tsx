@@ -992,6 +992,68 @@ export default function Roteirizacao() {
     }
   }
 
+  /**
+   * Constrói o mapa CNPJ → ordem de entrega para um veículo.
+   * Em veículos multi-carga, prioriza a roteirização que cobre o MAIOR número
+   * de CNPJs do veículo (rota consolidada). Faz fallback combinando rotas
+   * individuais para CNPJs ainda não cobertos.
+   */
+  async function buildOrdemPorCnpj(
+    cargaIds: string[],
+    cnpjsDoVeiculo: Set<string>
+  ): Promise<Map<string, number>> {
+    const ordemPorCnpj = new Map<string, number>();
+    if (cargaIds.length === 0) return ordemPorCnpj;
+
+    const { data: rots } = await supabase
+      .from("roteirizacoes")
+      .select("id, carga_id, created_at")
+      .in("carga_id", cargaIds)
+      .order("created_at", { ascending: false });
+    if (!rots || rots.length === 0) return ordemPorCnpj;
+
+    const rotIds = rots.map((r: any) => r.id);
+    const { data: paradas } = await supabase
+      .from("roteirizacao_paradas")
+      .select("cnpj_destinatario, ordem, roteirizacao_id")
+      .in("roteirizacao_id", rotIds)
+      .order("ordem", { ascending: true });
+    if (!paradas || paradas.length === 0) return ordemPorCnpj;
+
+    // Agrupa paradas por roteirização
+    const paradasPorRot = new Map<string, { cnpj: string; ordem: number }[]>();
+    for (const p of paradas) {
+      const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
+      if (!cnpj) continue;
+      const arr = paradasPorRot.get(p.roteirizacao_id) || [];
+      arr.push({ cnpj, ordem: p.ordem });
+      paradasPorRot.set(p.roteirizacao_id, arr);
+    }
+
+    // Pontuação: nº de CNPJs do veículo cobertos por cada roteirização
+    const rotsRanked = rots
+      .map((r: any) => {
+        const ps = paradasPorRot.get(r.id) || [];
+        const coverage = ps.filter((p) => cnpjsDoVeiculo.has(p.cnpj)).length;
+        return { id: r.id, created_at: r.created_at, coverage, paradas: ps };
+      })
+      .sort((a, b) => {
+        if (b.coverage !== a.coverage) return b.coverage - a.coverage;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+    // Aplica melhor rota primeiro; depois preenche CNPJs ainda sem ordem
+    const cnpjsOrdenados: string[] = [];
+    for (const r of rotsRanked) {
+      const ordenadas = [...r.paradas].sort((a, b) => a.ordem - b.ordem);
+      for (const p of ordenadas) {
+        if (!cnpjsOrdenados.includes(p.cnpj)) cnpjsOrdenados.push(p.cnpj);
+      }
+    }
+    cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
+    return ordemPorCnpj;
+  }
+
   async function loadVeiculoNfs(veiculoId: string) {
     if (veiculoNfs[veiculoId]) return;
     try {
