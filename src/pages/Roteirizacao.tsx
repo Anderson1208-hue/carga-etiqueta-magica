@@ -2033,30 +2033,52 @@ export default function Roteirizacao() {
             </div>
 
             {/* Actions */}
+            {modoManual && !roteirizacao && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                <strong>Modo Manual ativo:</strong> arraste as paradas abaixo para definir a ordem desejada e clique em <em>Confirmar Ordem Manual</em>. A geocodificação acontece em background para calcular km/tempo.
+              </div>
+            )}
             <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={geocodeAddresses}
-                disabled={geocoding || loading}
-                variant="outline"
-              >
-                {geocoding ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <MapPin className="w-4 h-4 mr-2" />
-                )}
-                Geocodificar Endereços
-              </Button>
-              <Button
-                onClick={calculateRoute}
-                disabled={calculating || entregas.filter((e) => e.latitude).length === 0}
-              >
-                {calculating ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Route className="w-4 h-4 mr-2" />
-                )}
-                Calcular Rota Otimizada
-              </Button>
+              {!modoManual && (
+                <>
+                  <Button
+                    onClick={geocodeAddresses}
+                    disabled={geocoding || loading}
+                    variant="outline"
+                  >
+                    {geocoding ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <MapPin className="w-4 h-4 mr-2" />
+                    )}
+                    Geocodificar Endereços
+                  </Button>
+                  <Button
+                    onClick={calculateRoute}
+                    disabled={calculating || entregas.filter((e) => e.latitude).length === 0}
+                  >
+                    {calculating ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Route className="w-4 h-4 mr-2" />
+                    )}
+                    Calcular Rota Otimizada
+                  </Button>
+                </>
+              )}
+              {modoManual && (
+                <Button
+                  onClick={calculateRouteManual}
+                  disabled={calculating || geocoding || entregas.length === 0}
+                >
+                  {calculating || geocoding ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
+                  {geocoding ? "Calculando km/tempo..." : "Confirmar Ordem Manual"}
+                </Button>
+              )}
               <Button onClick={exportCSV} variant="secondary" disabled={entregas.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
                 Exportar Rota CSV
