@@ -64,6 +64,19 @@ interface NfResult {
     status: string;
     data_agendamento: string | null;
   } | null;
+  ctes?: {
+    numero_cte: string;
+    chave_cte: string;
+    razao_social_emitente: string | null;
+    cnpj_emitente: string | null;
+    valor_frete: number | null;
+  }[];
+  veiculo?: {
+    placa: string;
+    motorista: string | null;
+    data: string;
+    status: string;
+  } | null;
 }
 
 const statusColors: Record<string, string> = {
