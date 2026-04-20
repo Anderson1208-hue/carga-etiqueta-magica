@@ -68,6 +68,8 @@ interface NfResult {
   tipo_carga: string;
   agendamento_status?: string | null;
   agendamento_data?: string | null;
+  numero_cte?: string | null;
+  cte_emitente?: string | null;
 }
 
 interface AgendamentoRecord {
@@ -81,6 +83,8 @@ interface AgendamentoRecord {
   dest_razao_social?: string | null;
   dest_cidade?: string | null;
   tipo_carga?: string;
+  numero_cte?: string | null;
+  cte_emitente?: string | null;
 }
 
 const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.ReactNode; color: string; requiresDate: boolean }[] = [
@@ -175,22 +179,35 @@ export default function Agendamento() {
           .in("id", nfIds);
 
         const cargaIds = [...new Set((nfsData || []).map(n => n.carga_id))];
-        const { data: cargasData } = await supabase
-          .from("cargas")
-          .select("id, tipo_carga")
-          .in("id", cargaIds);
+        const [{ data: cargasData }, { data: ctesData }] = await Promise.all([
+          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
+          supabase
+            .from("ctes")
+            .select("nf_id, numero_cte, razao_social_emitente, created_at")
+            .in("nf_id", nfIds)
+            .order("created_at", { ascending: false }),
+        ]);
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
         const nfMap = new Map((nfsData || []).map(n => [n.id, n]));
+        const cteMap = new Map<string, { numero_cte: string; razao_social_emitente: string | null }>();
+        (ctesData || []).forEach(c => {
+          if (c.nf_id && !cteMap.has(c.nf_id)) {
+            cteMap.set(c.nf_id, { numero_cte: c.numero_cte, razao_social_emitente: c.razao_social_emitente });
+          }
+        });
 
         const enriched: AgendamentoRecord[] = data.map(a => {
           const nf = nfMap.get(a.nf_id);
+          const cte = cteMap.get(a.nf_id);
           return {
             ...a,
             numero_nf: nf?.numero_nf,
             dest_razao_social: nf?.dest_razao_social,
             dest_cidade: nf?.dest_cidade,
             tipo_carga: nf ? cargaMap.get(nf.carga_id) || "SECA" : "SECA",
+            numero_cte: cte?.numero_cte ?? null,
+            cte_emitente: cte?.razao_social_emitente ?? null,
           };
         });
 
@@ -248,11 +265,16 @@ export default function Agendamento() {
       if (allData.length > 0) {
         const cargaIds = [...new Set(allData.map(n => n.carga_id))];
         const nfIdsAll = allData.map(n => n.id);
-        const [{ data: cargasData }, { data: agData }] = await Promise.all([
+        const [{ data: cargasData }, { data: agData }, { data: ctesData }] = await Promise.all([
           supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
           supabase
             .from("agendamentos")
             .select("nf_id, status, data_agendamento, created_at")
+            .in("nf_id", nfIdsAll)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("ctes")
+            .select("nf_id, numero_cte, razao_social_emitente, created_at")
             .in("nf_id", nfIdsAll)
             .order("created_at", { ascending: false }),
         ]);
@@ -265,12 +287,20 @@ export default function Agendamento() {
             agMap.set(a.nf_id, { status: a.status, data_agendamento: a.data_agendamento });
           }
         });
+        const cteMap = new Map<string, { numero_cte: string; razao_social_emitente: string | null }>();
+        (ctesData || []).forEach(c => {
+          if (c.nf_id && !cteMap.has(c.nf_id)) {
+            cteMap.set(c.nf_id, { numero_cte: c.numero_cte, razao_social_emitente: c.razao_social_emitente });
+          }
+        });
 
         setNfResults(allData.map(n => ({
           ...n,
           tipo_carga: cargaMap.get(n.carga_id) || "SECA",
           agendamento_status: agMap.get(n.id)?.status ?? null,
           agendamento_data: agMap.get(n.id)?.data_agendamento ?? null,
+          numero_cte: cteMap.get(n.id)?.numero_cte ?? null,
+          cte_emitente: cteMap.get(n.id)?.razao_social_emitente ?? null,
         })));
       } else {
         setNfResults([]);
@@ -505,6 +535,8 @@ export default function Agendamento() {
                         <TableHead>NF</TableHead>
                         <TableHead>Destinatário</TableHead>
                         <TableHead>Cidade/UF</TableHead>
+                        <TableHead>CT-e</TableHead>
+                        <TableHead>Emitente CT-e</TableHead>
                         <TableHead>Status Entrega</TableHead>
                         <TableHead>Status Agenda</TableHead>
                         <TableHead>Data Agenda</TableHead>
@@ -524,6 +556,8 @@ export default function Agendamento() {
                           <TableCell className="font-mono font-medium">{nf.numero_nf}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
                           <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
+                          <TableCell className="font-mono text-sm">{nf.numero_cte || <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="max-w-[180px] truncate text-sm">{nf.cte_emitente || <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
                           <TableCell>{nf.agendamento_status ? statusBadge(nf.agendamento_status) : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-sm">
@@ -587,6 +621,8 @@ export default function Agendamento() {
                     <TableRow>
                       <TableHead>NF</TableHead>
                       <TableHead>Destinatário</TableHead>
+                      <TableHead>CT-e</TableHead>
+                      <TableHead>Emitente CT-e</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Agenda</TableHead>
                       <TableHead>Observação</TableHead>
@@ -600,6 +636,8 @@ export default function Agendamento() {
                       <TableRow key={ag.id} className={chocolateRowClass(ag.tipo_carga)}>
                         <TableCell className="font-mono font-medium">{ag.numero_nf || "—"}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{ag.dest_razao_social || "—"}</TableCell>
+                        <TableCell className="font-mono text-sm">{ag.numero_cte || <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-sm">{ag.cte_emitente || <span className="text-muted-foreground">—</span>}</TableCell>
                         <TableCell>{statusBadge(ag.status)}</TableCell>
                         <TableCell>
                           {ag.data_agendamento
