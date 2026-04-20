@@ -123,7 +123,7 @@ export default function AuditoriaLog() {
       });
 
       if (error) throw error;
-      const result = data as { total: number; rows: AuditRow[] };
+      const result = data as unknown as { total: number; rows: AuditRow[] };
       setRows(result.rows ?? []);
       setTotal(result.total ?? 0);
     } catch (e) {
