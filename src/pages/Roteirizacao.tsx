@@ -1990,8 +1990,26 @@ export default function Roteirizacao() {
                       <Input
                         type="date"
                         value={emplacData}
-                        onChange={(e) => setEmplacData(e.target.value)}
+                        onChange={(e) => {
+                          setEmplacData(e.target.value);
+                          setSairHoje(e.target.value === format(new Date(), "yyyy-MM-dd"));
+                        }}
                       />
+                      <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer select-none">
+                        <Checkbox
+                          checked={sairHoje}
+                          onCheckedChange={(v) => {
+                            const checked = v === true;
+                            setSairHoje(checked);
+                            setEmplacData(
+                              checked
+                                ? format(new Date(), "yyyy-MM-dd")
+                                : format(proximoDiaUtilApos(new Date()), "yyyy-MM-dd")
+                            );
+                          }}
+                        />
+                        <span>Sair hoje ({format(new Date(), "dd/MM/yyyy")})</span>
+                      </label>
                     </div>
                     <div className="flex items-end">
                       <Button
