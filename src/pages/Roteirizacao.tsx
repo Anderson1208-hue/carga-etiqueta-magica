@@ -821,6 +821,130 @@ export default function Roteirizacao() {
     }
   }
 
+  /**
+   * Modo manual: respeita a ordem atual das entregas (drag-and-drop).
+   * Geocodifica em background e calcula km/tempo via Haversine entre paradas consecutivas.
+   */
+  async function calculateRouteManual() {
+    setCalculating(true);
+    try {
+      if (entregas.length === 0) {
+        toast({ title: "Erro", description: "Nenhuma entrega para roteirizar", variant: "destructive" });
+        return;
+      }
+
+      const cdLatNum = parseFloat(cdLat);
+      const cdLngNum = parseFloat(cdLng);
+      if (isNaN(cdLatNum) || isNaN(cdLngNum)) {
+        toast({ title: "Erro", description: "Coordenadas do CD inválidas", variant: "destructive" });
+        return;
+      }
+
+      // Geocodifica em background as paradas que ainda não têm coordenadas
+      setGeocoding(true);
+      const updated = [...entregas];
+      for (let i = 0; i < updated.length; i++) {
+        const e = updated[i];
+        if (e.latitude && e.longitude) continue;
+        if (e.enderecoCompleto === "Endereço não informado") continue;
+
+        let coords: { lat: number; lng: number } | null = null;
+        if (e.cep && e.cep !== "SEM_CEP") {
+          coords = await geocodeViaCep(e.cep);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        const cidade = e.cidade || "Rio de Janeiro";
+        const uf = e.uf || "RJ";
+        if (!coords && e.logradouro && e.bairro) {
+          coords = await geocodeViaNominatim(`${e.logradouro}, ${e.bairro}, ${cidade}, ${uf}`);
+          await new Promise((r) => setTimeout(r, 1100));
+        }
+        if (!coords && e.bairro) {
+          coords = await geocodeViaNominatim(`${e.bairro}, ${cidade}, ${uf}`);
+          await new Promise((r) => setTimeout(r, 1100));
+        }
+        if (coords) {
+          updated[i] = { ...e, latitude: coords.lat, longitude: coords.lng };
+        }
+      }
+      setGeocoding(false);
+
+      // Mantém a ordem manual + numera sequencialmente
+      const orderedEntregas: Entrega[] = updated.map((e, i) => ({ ...e, ordem: i + 1 }));
+
+      // Distância via Haversine entre paradas consecutivas
+      let distanciaTotal = 0;
+      let prevLat = cdLatNum;
+      let prevLng = cdLngNum;
+      for (const e of orderedEntregas) {
+        if (e.latitude && e.longitude) {
+          distanciaTotal += haversineDistance(prevLat, prevLng, e.latitude, e.longitude);
+          prevLat = e.latitude;
+          prevLng = e.longitude;
+        }
+      }
+      // Estimativa: 25 km/h média urbana + 10min por parada
+      const tempoMin = Math.round((distanciaTotal / 25) * 60 + orderedEntregas.length * 10);
+
+      const pesoTotal = orderedEntregas.reduce((s, e) => s + e.pesoTotalKg, 0);
+      const volumeTotal = orderedEntregas.reduce((s, e) => s + e.volumeTotalM3, 0);
+
+      const { data: rotData, error: rotError } = await supabase
+        .from("roteirizacoes")
+        .insert({
+          carga_id: selectedCargaIds[0],
+          created_by: user?.id,
+          ponto_inicial_lat: cdLatNum,
+          ponto_inicial_lng: cdLngNum,
+          ponto_inicial_nome: cdNome,
+          distancia_total_km: distanciaTotal,
+          tempo_estimado_min: tempoMin,
+          peso_total_kg: pesoTotal,
+          volume_total_m3: volumeTotal,
+          status: "concluida",
+        })
+        .select()
+        .single();
+      if (rotError) throw rotError;
+
+      const paradasInsert = orderedEntregas.map((e, index) => ({
+        roteirizacao_id: rotData.id,
+        cnpj_destinatario: e.cnpjDestinatario,
+        razao_social: e.razaoSocial,
+        endereco_completo: e.enderecoCompleto,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        ordem: e.ordem || index + 1,
+        total_nfs: e.totalNfs,
+        total_caixas: e.totalCaixas,
+        peso_total_kg: e.pesoTotalKg,
+        volume_total_m3: e.volumeTotalM3,
+      }));
+      await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
+      setRoteirizacao({
+        id: rotData.id,
+        distanciaTotalKm: distanciaTotal,
+        tempoEstimadoMin: tempoMin,
+        pesoTotalKg: pesoTotal,
+        volumeTotalM3: volumeTotal,
+        paradas: orderedEntregas,
+      });
+      setEntregas(orderedEntregas);
+
+      toast({
+        title: "Rota manual confirmada!",
+        description: `${orderedEntregas.length} paradas - ${distanciaTotal.toFixed(1)} km - ~${tempoMin} min (estimado)`,
+      });
+    } catch (error) {
+      console.error("Manual route error:", error);
+      setGeocoding(false);
+      toast({ title: "Erro ao confirmar rota manual", description: String(error), variant: "destructive" });
+    } finally {
+      setCalculating(false);
+    }
+  }
+
   function handleReorder(reordered: Entrega[]) {
     setEntregas(reordered);
     if (roteirizacao) {
