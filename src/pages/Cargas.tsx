@@ -163,27 +163,86 @@ export default function Cargas() {
   async function loadCargas() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // 1) Buscar cargas SEM JOIN (evita explosão de linhas e limite de 1000)
+      const { data: cargasData, error } = await supabase
         .from("cargas")
-        .select(`
-          *,
-          notas_fiscais(
-            id,
-            itens_nf(id)
-          )
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      const cargasWithCounts = (data || []).map((carga) => ({
+      const cargasList = cargasData || [];
+      if (cargasList.length === 0) {
+        setCargas([]);
+        return;
+      }
+
+      const cargaIds = cargasList.map((c: any) => c.id);
+
+      // 2) Buscar todas NFs (id + carga_id) das cargas listadas — em lotes de 200 ids
+      const nfsAll: { id: string; carga_id: string }[] = [];
+      const CHUNK = 200;
+      for (let i = 0; i < cargaIds.length; i += CHUNK) {
+        const slice = cargaIds.slice(i, i + CHUNK);
+        // Paginar resultado para evitar limite de 1000
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data: nfsPage, error: nfsErr } = await supabase
+            .from("notas_fiscais")
+            .select("id, carga_id")
+            .in("carga_id", slice)
+            .order("id", { ascending: true })
+            .range(from, from + PAGE - 1);
+          if (nfsErr) throw nfsErr;
+          const rows = nfsPage || [];
+          nfsAll.push(...rows);
+          if (rows.length < PAGE) break;
+          from += PAGE;
+        }
+      }
+
+      // 3) Buscar contagem de itens por nf — paginado também
+      const nfIds = nfsAll.map((n) => n.id);
+      const itensByNf = new Map<string, number>();
+      for (let i = 0; i < nfIds.length; i += CHUNK) {
+        const slice = nfIds.slice(i, i + CHUNK);
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data: itensPage, error: itErr } = await supabase
+            .from("itens_nf")
+            .select("nf_id")
+            .in("nf_id", slice)
+            .order("nf_id", { ascending: true })
+            .range(from, from + PAGE - 1);
+          if (itErr) throw itErr;
+          const rows = itensPage || [];
+          rows.forEach((r: any) => {
+            itensByNf.set(r.nf_id, (itensByNf.get(r.nf_id) || 0) + 1);
+          });
+          if (rows.length < PAGE) break;
+          from += PAGE;
+        }
+      }
+
+      // 4) Agregar por carga
+      const nfsCountByCarga = new Map<string, number>();
+      const itensCountByCarga = new Map<string, number>();
+      nfsAll.forEach((nf) => {
+        nfsCountByCarga.set(nf.carga_id, (nfsCountByCarga.get(nf.carga_id) || 0) + 1);
+        const itensQty = itensByNf.get(nf.id) || 0;
+        itensCountByCarga.set(
+          nf.carga_id,
+          (itensCountByCarga.get(nf.carga_id) || 0) + itensQty
+        );
+      });
+
+      const cargasWithCounts = cargasList.map((carga: any) => ({
         ...carga,
         _count: {
-          nfs: carga.notas_fiscais?.length || 0,
-          itens: carga.notas_fiscais?.reduce(
-            (acc: number, nf: any) => acc + (nf.itens_nf?.length || 0),
-            0
-          ) || 0,
+          nfs: nfsCountByCarga.get(carga.id) || 0,
+          itens: itensCountByCarga.get(carga.id) || 0,
         },
       }));
 
