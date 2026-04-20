@@ -53,7 +53,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "REENTREGA" | "DEVOLUCAO";
+type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "REENTREGA" | "DEVOLUCAO";
 
 interface NfResult {
   id: string;
@@ -84,6 +84,7 @@ interface AgendamentoRecord {
 const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.ReactNode; color: string; requiresDate: boolean }[] = [
   { value: "AGENDAMENTO", label: "Agendamento", icon: <CalendarCheck className="w-4 h-4" />, color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", requiresDate: true },
   { value: "AGUARDANDO AGENDA", label: "Aguardando Agenda", icon: <Clock className="w-4 h-4" />, color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", requiresDate: false },
+  { value: "AGUARDANDO REAGENDA", label: "Aguardando Reagenda", icon: <Clock className="w-4 h-4" />, color: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100", requiresDate: false },
   { value: "REENTREGA", label: "Reentrega", icon: <RotateCcw className="w-4 h-4" />, color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", requiresDate: true },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];
