@@ -569,8 +569,8 @@ export function ReroteirizarVeiculoDialog({
             Reroteirizar Veículo {veiculo?.placa}
           </DialogTitle>
           <DialogDescription>
-            Geocodifica e reordena automaticamente as paradas a partir do CD. Você pode arrastar
-            para ajustar a ordem manualmente antes de salvar.
+            Preserva a ordem manual definida anteriormente. Novos CNPJs são acrescentados ao
+            final por proximidade. Você pode arrastar para ajustar antes de salvar.
           </DialogDescription>
         </DialogHeader>
 
