@@ -31,6 +31,7 @@ import {
   ClipboardList,
   Route,
   Download,
+  List,
 } from "lucide-react";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
@@ -785,30 +786,59 @@ export default function Programacao() {
                 </p>
               </div>
             </div>
-            <Button
-              size="lg"
-              className="w-full md:w-auto"
-              onClick={() => {
-                const nfIds = [...selectedNfIds];
-                const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
-                navigate("/roteirizacao", { 
-                  state: { 
-                    nfIds, 
-                    cargaIds,
-                    totais: {
-                      nfs: selTotalNfs,
-                      caixas: selTotalCaixas,
-                      peso: selTotalPeso,
-                      volume: selTotalVolume,
-                      entregas: selTotalEntregas,
-                    }
-                  } 
-                });
-              }}
-            >
-              <Route className="w-4 h-4 mr-2" />
-              Enviar para Roteirização ({selTotalNfs} NFs)
-            </Button>
+            <div className="flex flex-col md:flex-row gap-2">
+              <Button
+                size="lg"
+                className="w-full md:w-auto"
+                onClick={() => {
+                  const nfIds = [...selectedNfIds];
+                  const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
+                  navigate("/roteirizacao", { 
+                    state: { 
+                      nfIds, 
+                      cargaIds,
+                      totais: {
+                        nfs: selTotalNfs,
+                        caixas: selTotalCaixas,
+                        peso: selTotalPeso,
+                        volume: selTotalVolume,
+                        entregas: selTotalEntregas,
+                      }
+                    } 
+                  });
+                }}
+              >
+                <Route className="w-4 h-4 mr-2" />
+                Enviar para Roteirização ({selTotalNfs} NFs)
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full md:w-auto"
+                title="Pula a geocodificação automática — você define a ordem das paradas manualmente (drag-and-drop). O sistema calcula km/tempo em background respeitando sua ordem."
+                onClick={() => {
+                  const nfIds = [...selectedNfIds];
+                  const cargaIds = [...new Set(selectedNfs.map((nf) => nf.carga_id))];
+                  navigate("/roteirizacao", { 
+                    state: { 
+                      nfIds, 
+                      cargaIds,
+                      modoManual: true,
+                      totais: {
+                        nfs: selTotalNfs,
+                        caixas: selTotalCaixas,
+                        peso: selTotalPeso,
+                        volume: selTotalVolume,
+                        entregas: selTotalEntregas,
+                      }
+                    } 
+                  });
+                }}
+              >
+                <List className="w-4 h-4 mr-2" />
+                Roteirizar Manualmente
+              </Button>
+            </div>
           </div>
         )}
 

@@ -25,6 +25,7 @@ type: reference
 - [Integração Prep/Rot](mem://arquitetura/integracao-preparacao-roteirizacao) — Passing NF payload via location.state.
 - [Múltiplas Cargas Rota](mem://arquitetura/banco-de-dados/roteirizacao/multi-carga-vinculo) — Routes use primary carga_id as reference.
 - [Clustering Geográfico](mem://logica/roteirizacao/clustering-geografico) — Haversine clustering (6km urban / 17km interior).
+- [Roteirização Manual](mem://funcionalidades/roteirizacao/modo-manual) — Botão alternativo na Preparação: drag-and-drop + Haversine, sem OSRM.
 - [Geocodificação RJ](mem://logica/geocodificacao-fallback-estratetiga) — Fallback chain: BrasilAPI CEP -> Bairro -> Logradouro.
 - [Coordenadas do CD](mem://arquitetura/banco-de-dados/coordenadas-cd-central) — Fixed coordinates (-22.8783, -43.3367).
 - [Conferência 2 Etapas](mem://arquitetura/fluxo-conferencia-duas-etapas) — Workflow for Galpão (Interna) vs Motorista (Externa).

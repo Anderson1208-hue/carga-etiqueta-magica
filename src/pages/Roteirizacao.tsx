@@ -122,6 +122,7 @@ export default function Roteirizacao() {
   // When coming from Preparação with specific NF IDs
   const [modoNfIds, setModoNfIds] = useState(false);
   const [nfIdsSelecionados, setNfIdsSelecionados] = useState<string[]>([]);
+  const [modoManual, setModoManual] = useState(false);
   const [totaisPreparacao, setTotaisPreparacao] = useState<{
     nfs: number; caixas: number; peso: number; volume: number; entregas: number;
   } | null>(null);
@@ -166,7 +167,7 @@ export default function Roteirizacao() {
   // Auto-select cargas or NFs when coming from Preparação
   useEffect(() => {
     if (stateConsumedRef.current) return;
-    const state = location.state as { cargaIds?: string[]; nfIds?: string[]; totais?: { nfs: number; caixas: number; peso: number; volume: number; entregas: number } } | null;
+    const state = location.state as { cargaIds?: string[]; nfIds?: string[]; modoManual?: boolean; totais?: { nfs: number; caixas: number; peso: number; volume: number; entregas: number } } | null;
     if (!state) return;
     
     // New mode: specific NF IDs from Preparação
@@ -174,6 +175,7 @@ export default function Roteirizacao() {
       stateConsumedRef.current = true;
       setModoNfIds(true);
       setNfIdsSelecionados(state.nfIds);
+      if (state.modoManual) setModoManual(true);
       if (state.totais) setTotaisPreparacao(state.totais);
       if (state.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
         const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
@@ -190,6 +192,7 @@ export default function Roteirizacao() {
       if (valid.length > 0) {
         setSelectedCargaIds(valid);
       }
+      if (state.modoManual) setModoManual(true);
       stateConsumedRef.current = true;
       navigate(location.pathname, { replace: true, state: null });
     }
@@ -813,6 +816,130 @@ export default function Roteirizacao() {
         description: "Tente novamente ou verifique os endereços",
         variant: "destructive",
       });
+    } finally {
+      setCalculating(false);
+    }
+  }
+
+  /**
+   * Modo manual: respeita a ordem atual das entregas (drag-and-drop).
+   * Geocodifica em background e calcula km/tempo via Haversine entre paradas consecutivas.
+   */
+  async function calculateRouteManual() {
+    setCalculating(true);
+    try {
+      if (entregas.length === 0) {
+        toast({ title: "Erro", description: "Nenhuma entrega para roteirizar", variant: "destructive" });
+        return;
+      }
+
+      const cdLatNum = parseFloat(cdLat);
+      const cdLngNum = parseFloat(cdLng);
+      if (isNaN(cdLatNum) || isNaN(cdLngNum)) {
+        toast({ title: "Erro", description: "Coordenadas do CD inválidas", variant: "destructive" });
+        return;
+      }
+
+      // Geocodifica em background as paradas que ainda não têm coordenadas
+      setGeocoding(true);
+      const updated = [...entregas];
+      for (let i = 0; i < updated.length; i++) {
+        const e = updated[i];
+        if (e.latitude && e.longitude) continue;
+        if (e.enderecoCompleto === "Endereço não informado") continue;
+
+        let coords: { lat: number; lng: number } | null = null;
+        if (e.cep && e.cep !== "SEM_CEP") {
+          coords = await geocodeViaCep(e.cep);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        const cidade = e.cidade || "Rio de Janeiro";
+        const uf = e.uf || "RJ";
+        if (!coords && e.logradouro && e.bairro) {
+          coords = await geocodeViaNominatim(`${e.logradouro}, ${e.bairro}, ${cidade}, ${uf}`);
+          await new Promise((r) => setTimeout(r, 1100));
+        }
+        if (!coords && e.bairro) {
+          coords = await geocodeViaNominatim(`${e.bairro}, ${cidade}, ${uf}`);
+          await new Promise((r) => setTimeout(r, 1100));
+        }
+        if (coords) {
+          updated[i] = { ...e, latitude: coords.lat, longitude: coords.lng };
+        }
+      }
+      setGeocoding(false);
+
+      // Mantém a ordem manual + numera sequencialmente
+      const orderedEntregas: Entrega[] = updated.map((e, i) => ({ ...e, ordem: i + 1 }));
+
+      // Distância via Haversine entre paradas consecutivas
+      let distanciaTotal = 0;
+      let prevLat = cdLatNum;
+      let prevLng = cdLngNum;
+      for (const e of orderedEntregas) {
+        if (e.latitude && e.longitude) {
+          distanciaTotal += haversineDistance(prevLat, prevLng, e.latitude, e.longitude);
+          prevLat = e.latitude;
+          prevLng = e.longitude;
+        }
+      }
+      // Estimativa: 25 km/h média urbana + 10min por parada
+      const tempoMin = Math.round((distanciaTotal / 25) * 60 + orderedEntregas.length * 10);
+
+      const pesoTotal = orderedEntregas.reduce((s, e) => s + e.pesoTotalKg, 0);
+      const volumeTotal = orderedEntregas.reduce((s, e) => s + e.volumeTotalM3, 0);
+
+      const { data: rotData, error: rotError } = await supabase
+        .from("roteirizacoes")
+        .insert({
+          carga_id: selectedCargaIds[0],
+          created_by: user?.id,
+          ponto_inicial_lat: cdLatNum,
+          ponto_inicial_lng: cdLngNum,
+          ponto_inicial_nome: cdNome,
+          distancia_total_km: distanciaTotal,
+          tempo_estimado_min: tempoMin,
+          peso_total_kg: pesoTotal,
+          volume_total_m3: volumeTotal,
+          status: "concluida",
+        })
+        .select()
+        .single();
+      if (rotError) throw rotError;
+
+      const paradasInsert = orderedEntregas.map((e, index) => ({
+        roteirizacao_id: rotData.id,
+        cnpj_destinatario: e.cnpjDestinatario,
+        razao_social: e.razaoSocial,
+        endereco_completo: e.enderecoCompleto,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        ordem: e.ordem || index + 1,
+        total_nfs: e.totalNfs,
+        total_caixas: e.totalCaixas,
+        peso_total_kg: e.pesoTotalKg,
+        volume_total_m3: e.volumeTotalM3,
+      }));
+      await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
+      setRoteirizacao({
+        id: rotData.id,
+        distanciaTotalKm: distanciaTotal,
+        tempoEstimadoMin: tempoMin,
+        pesoTotalKg: pesoTotal,
+        volumeTotalM3: volumeTotal,
+        paradas: orderedEntregas,
+      });
+      setEntregas(orderedEntregas);
+
+      toast({
+        title: "Rota manual confirmada!",
+        description: `${orderedEntregas.length} paradas - ${distanciaTotal.toFixed(1)} km - ~${tempoMin} min (estimado)`,
+      });
+    } catch (error) {
+      console.error("Manual route error:", error);
+      setGeocoding(false);
+      toast({ title: "Erro ao confirmar rota manual", description: String(error), variant: "destructive" });
     } finally {
       setCalculating(false);
     }
@@ -1906,30 +2033,52 @@ export default function Roteirizacao() {
             </div>
 
             {/* Actions */}
+            {modoManual && !roteirizacao && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+                <strong>Modo Manual ativo:</strong> arraste as paradas abaixo para definir a ordem desejada e clique em <em>Confirmar Ordem Manual</em>. A geocodificação acontece em background para calcular km/tempo.
+              </div>
+            )}
             <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={geocodeAddresses}
-                disabled={geocoding || loading}
-                variant="outline"
-              >
-                {geocoding ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <MapPin className="w-4 h-4 mr-2" />
-                )}
-                Geocodificar Endereços
-              </Button>
-              <Button
-                onClick={calculateRoute}
-                disabled={calculating || entregas.filter((e) => e.latitude).length === 0}
-              >
-                {calculating ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Route className="w-4 h-4 mr-2" />
-                )}
-                Calcular Rota Otimizada
-              </Button>
+              {!modoManual && (
+                <>
+                  <Button
+                    onClick={geocodeAddresses}
+                    disabled={geocoding || loading}
+                    variant="outline"
+                  >
+                    {geocoding ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <MapPin className="w-4 h-4 mr-2" />
+                    )}
+                    Geocodificar Endereços
+                  </Button>
+                  <Button
+                    onClick={calculateRoute}
+                    disabled={calculating || entregas.filter((e) => e.latitude).length === 0}
+                  >
+                    {calculating ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Route className="w-4 h-4 mr-2" />
+                    )}
+                    Calcular Rota Otimizada
+                  </Button>
+                </>
+              )}
+              {modoManual && (
+                <Button
+                  onClick={calculateRouteManual}
+                  disabled={calculating || geocoding || entregas.length === 0}
+                >
+                  {calculating || geocoding ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  )}
+                  {geocoding ? "Calculando km/tempo..." : "Confirmar Ordem Manual"}
+                </Button>
+              )}
               <Button onClick={exportCSV} variant="secondary" disabled={entregas.length === 0}>
                 <Download className="w-4 h-4 mr-2" />
                 Exportar Rota CSV
@@ -2172,7 +2321,7 @@ export default function Roteirizacao() {
               <CardContent>
                 <ListaParadas
                   entregas={filteredEntregas}
-                  onReorder={roteirizacao ? handleReorder : undefined}
+                  onReorder={(roteirizacao || modoManual) ? handleReorder : undefined}
                 />
               </CardContent>
             </Card>
