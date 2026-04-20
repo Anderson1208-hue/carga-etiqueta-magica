@@ -538,7 +538,18 @@ export default function ConsultaNF() {
                           <TableCell className="text-sm">
                             {nf.dest_cidade}/{nf.dest_uf}
                           </TableCell>
-                          <TableCell className="text-sm">{nf.carga?.placa}</TableCell>
+                          <TableCell className="text-sm">
+                            {nf.veiculo ? (
+                              <div className="flex flex-col">
+                                <span className="font-mono font-semibold text-primary">{nf.veiculo.placa}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {format(new Date(nf.veiculo.data + "T00:00:00"), "dd/MM/yyyy")} · expedida
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">{nf.carga?.placa}</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
