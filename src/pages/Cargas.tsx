@@ -44,13 +44,11 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -69,20 +67,12 @@ interface Carga {
     nfs: number;
     itens: number;
   };
-  operadores_atribuidos?: string[];
-}
-
-interface Operador {
-  id: string;
-  full_name: string | null;
-  email: string;
 }
 
 export default function Cargas() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const [cargas, setCargas] = useState<Carga[]>([]);
-  const [operadores, setOperadores] = useState<Operador[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTipoCarga, setDialogTipoCarga] = useState<"SECA" | "CHOCOLATE">("SECA");
@@ -169,17 +159,6 @@ export default function Cargas() {
     loadCargas();
   }, []);
 
-  useEffect(() => {
-    if (isAdmin) loadOperadores();
-  }, [isAdmin]);
-
-  async function loadOperadores() {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .order("full_name");
-    setOperadores(data || []);
-  }
 
   async function loadCargas() {
     setLoading(true);
@@ -197,24 +176,8 @@ export default function Cargas() {
 
       if (error) throw error;
 
-      const cargaIds = (data || []).map((c) => c.id);
-      let operadoresMap = new Map<string, string[]>();
-      if (cargaIds.length > 0) {
-        const { data: assignments } = await supabase
-          .from("carga_operadores")
-          .select("carga_id, operador_id")
-          .in("carga_id", cargaIds);
-        
-        (assignments || []).forEach((a) => {
-          const list = operadoresMap.get(a.carga_id) || [];
-          list.push(a.operador_id);
-          operadoresMap.set(a.carga_id, list);
-        });
-      }
-
       const cargasWithCounts = (data || []).map((carga) => ({
         ...carga,
-        operadores_atribuidos: operadoresMap.get(carga.id) || [],
         _count: {
           nfs: carga.notas_fiscais?.length || 0,
           itens: carga.notas_fiscais?.reduce(
@@ -449,58 +412,6 @@ export default function Cargas() {
     }
   }
 
-  async function handleToggleOperador(cargaId: string, operadorId: string) {
-    const carga = cargas.find((c) => c.id === cargaId);
-    const currentOps = carga?.operadores_atribuidos || [];
-    const isAssigned = currentOps.includes(operadorId);
-
-    try {
-      if (isAssigned) {
-        const { error } = await supabase
-          .from("carga_operadores")
-          .delete()
-          .eq("carga_id", cargaId)
-          .eq("operador_id", operadorId);
-        if (error) throw error;
-
-        setCargas((prev) =>
-          prev.map((c) =>
-            c.id === cargaId
-              ? { ...c, operadores_atribuidos: currentOps.filter((id) => id !== operadorId) }
-              : c
-          )
-        );
-        const op = operadores.find((o) => o.id === operadorId);
-        toast({ title: "Operador removido", description: `${op?.full_name || op?.email} removido da carga.` });
-      } else {
-        const { error } = await supabase
-          .from("carga_operadores")
-          .upsert(
-            { carga_id: cargaId, operador_id: operadorId },
-            { onConflict: "carga_id,operador_id", ignoreDuplicates: true }
-          );
-        if (error && (error as any).code !== "23505") throw error;
-
-        setCargas((prev) =>
-          prev.map((c) =>
-            c.id === cargaId
-              ? {
-                  ...c,
-                  operadores_atribuidos: c.operadores_atribuidos?.includes(operadorId)
-                    ? c.operadores_atribuidos
-                    : [...(c.operadores_atribuidos || []), operadorId],
-                }
-              : c
-          )
-        );
-        const op = operadores.find((o) => o.id === operadorId);
-        toast({ title: "Operador atribuído", description: `${op?.full_name || op?.email} atribuído à carga.` });
-      }
-    } catch (error) {
-      console.error("Error toggling operador:", error);
-      toast({ variant: "destructive", title: "Erro ao atribuir operador" });
-    }
-  }
 
   function handleDeleteClick(carga: Carga) {
     setCargaToDelete(carga);
@@ -687,7 +598,6 @@ export default function Cargas() {
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-center">NFs</TableHead>
                 <TableHead className="text-center">Itens</TableHead>
-                {isAdmin && <TableHead>Operador</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -695,13 +605,13 @@ export default function Cargas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filteredCargas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Truck className="w-10 h-10 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
@@ -726,40 +636,6 @@ export default function Cargas() {
                     </TableCell>
                     <TableCell className="text-center">{carga._count?.nfs || 0}</TableCell>
                     <TableCell className="text-center">{carga._count?.itens || 0}</TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="w-40 justify-start text-xs">
-                              <UserCheck className="w-3 h-3 mr-1 shrink-0" />
-                              {(carga.operadores_atribuidos || []).length > 0
-                                ? `${(carga.operadores_atribuidos || []).length} operador(es)`
-                                : <span className="text-muted-foreground">Sem operador</span>
-                              }
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-56 p-2" align="start">
-                            <div className="space-y-1 max-h-48 overflow-auto">
-                              {operadores.map((op) => {
-                                const isChecked = (carga.operadores_atribuidos || []).includes(op.id);
-                                return (
-                                  <label
-                                    key={op.id}
-                                    className="flex items-center gap-2 p-1.5 rounded hover:bg-muted cursor-pointer text-sm"
-                                  >
-                                    <Checkbox
-                                      checked={isChecked}
-                                      onCheckedChange={() => handleToggleOperador(carga.id, op.id)}
-                                    />
-                                    <span className="truncate">{op.full_name || op.email}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      </TableCell>
-                    )}
                     <TableCell>
                       <Select
                         value={carga.status}
