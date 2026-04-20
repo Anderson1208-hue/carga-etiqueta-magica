@@ -346,13 +346,47 @@ export function ReroteirizarVeiculoDialog({
 
       let list = Array.from(entregaMap.values());
 
-      // 3. Try to reuse existing coords from any roteirizacao_paradas with same CNPJ
+      // 3. Try to reuse existing coords AND ordem from roteirizacao_paradas of THIS veiculo's primary carga
+      // Preserves manual ordering set by the operator (modo manual / drag-and-drop).
       const cnpjs = list.map((e) => e.cnpjDestinatario).filter((c) => !c.startsWith("SEM_CNPJ"));
-      if (cnpjs.length > 0) {
+      const ordemPrevia = new Map<string, number>();
+
+      if (primary) {
+        // Buscar paradas da roteirização atual desta carga (mantém ordem manual)
+        const { data: rotAtual } = await supabase
+          .from("roteirizacoes")
+          .select("id")
+          .eq("carga_id", primary)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (rotAtual?.id) {
+          const { data: paradasAtuais } = await supabase
+            .from("roteirizacao_paradas")
+            .select("cnpj_destinatario, ordem, latitude, longitude")
+            .eq("roteirizacao_id", rotAtual.id);
+
+          (paradasAtuais || []).forEach((p: any) => {
+            ordemPrevia.set(p.cnpj_destinatario, p.ordem);
+            if (p.latitude && p.longitude) {
+              // hidrata coords desta carga primeiro
+              const idx = list.findIndex((e) => e.cnpjDestinatario === p.cnpj_destinatario);
+              if (idx >= 0 && !list[idx].latitude) {
+                list[idx] = { ...list[idx], latitude: Number(p.latitude), longitude: Number(p.longitude) };
+              }
+            }
+          });
+        }
+      }
+
+      // Fallback: completar coords faltantes a partir de QUALQUER roteirização anterior com mesmo CNPJ
+      const semCoords = list.filter((e) => !e.latitude || !e.longitude).map((e) => e.cnpjDestinatario);
+      if (semCoords.length > 0) {
         const { data: existing } = await supabase
           .from("roteirizacao_paradas")
           .select("cnpj_destinatario, latitude, longitude")
-          .in("cnpj_destinatario", cnpjs)
+          .in("cnpj_destinatario", semCoords)
           .not("latitude", "is", null);
         const cache = new Map<string, { lat: number; lng: number }>();
         (existing || []).forEach((p: any) => {
@@ -361,6 +395,7 @@ export function ReroteirizarVeiculoDialog({
           }
         });
         list = list.map((e) => {
+          if (e.latitude && e.longitude) return e;
           const c = cache.get(e.cnpjDestinatario);
           return c ? { ...e, latitude: c.lat, longitude: c.lng } : e;
         });
@@ -405,8 +440,27 @@ export function ReroteirizarVeiculoDialog({
         }
       }
 
-      // 5. Cluster + sort from CD
-      const sorted = clusterAndSort(list, CD_LAT, CD_LNG).map((e, i) => ({ ...e, ordem: i + 1 }));
+      // 5. Preservar ordem manual prévia quando existir; só usa cluster+sort para CNPJs novos
+      let sorted: Entrega[];
+      const comOrdemPrevia = list.filter((e) => ordemPrevia.has(e.cnpjDestinatario));
+      const semOrdemPrevia = list.filter((e) => !ordemPrevia.has(e.cnpjDestinatario));
+
+      if (comOrdemPrevia.length > 0) {
+        comOrdemPrevia.sort(
+          (a, b) => (ordemPrevia.get(a.cnpjDestinatario) ?? 0) - (ordemPrevia.get(b.cnpjDestinatario) ?? 0)
+        );
+        const novosOrdenados =
+          semOrdemPrevia.length > 0
+            ? clusterAndSort(
+                semOrdemPrevia,
+                comOrdemPrevia[comOrdemPrevia.length - 1].latitude ?? CD_LAT,
+                comOrdemPrevia[comOrdemPrevia.length - 1].longitude ?? CD_LNG
+              )
+            : [];
+        sorted = [...comOrdemPrevia, ...novosOrdenados].map((e, i) => ({ ...e, ordem: i + 1 }));
+      } else {
+        sorted = clusterAndSort(list, CD_LAT, CD_LNG).map((e, i) => ({ ...e, ordem: i + 1 }));
+      }
 
       setEntregas(sorted);
       setStats({ geocoded: geoCount, failed });
@@ -515,8 +569,8 @@ export function ReroteirizarVeiculoDialog({
             Reroteirizar Veículo {veiculo?.placa}
           </DialogTitle>
           <DialogDescription>
-            Geocodifica e reordena automaticamente as paradas a partir do CD. Você pode arrastar
-            para ajustar a ordem manualmente antes de salvar.
+            Preserva a ordem manual definida anteriormente. Novos CNPJs são acrescentados ao
+            final por proximidade. Você pode arrastar para ajustar antes de salvar.
           </DialogDescription>
         </DialogHeader>
 
