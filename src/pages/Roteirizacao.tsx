@@ -122,6 +122,7 @@ export default function Roteirizacao() {
   // When coming from Preparação with specific NF IDs
   const [modoNfIds, setModoNfIds] = useState(false);
   const [nfIdsSelecionados, setNfIdsSelecionados] = useState<string[]>([]);
+  const [modoManual, setModoManual] = useState(false);
   const [totaisPreparacao, setTotaisPreparacao] = useState<{
     nfs: number; caixas: number; peso: number; volume: number; entregas: number;
   } | null>(null);
