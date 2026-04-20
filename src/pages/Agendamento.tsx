@@ -535,6 +535,8 @@ export default function Agendamento() {
                         <TableHead>NF</TableHead>
                         <TableHead>Destinatário</TableHead>
                         <TableHead>Cidade/UF</TableHead>
+                        <TableHead>CT-e</TableHead>
+                        <TableHead>Emitente CT-e</TableHead>
                         <TableHead>Status Entrega</TableHead>
                         <TableHead>Status Agenda</TableHead>
                         <TableHead>Data Agenda</TableHead>
@@ -554,6 +556,8 @@ export default function Agendamento() {
                           <TableCell className="font-mono font-medium">{nf.numero_nf}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
                           <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
+                          <TableCell className="font-mono text-sm">{nf.numero_cte || <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="max-w-[180px] truncate text-sm">{nf.cte_emitente || <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
                           <TableCell>{nf.agendamento_status ? statusBadge(nf.agendamento_status) : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-sm">
