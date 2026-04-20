@@ -44,6 +44,7 @@ import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
+import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
 import {
@@ -1456,6 +1457,10 @@ export default function Roteirizacao() {
       const ordemPorCnpj = await buildOrdemPorCnpj(cargaIds, cnpjsDoVeiculo);
       const totalEntregasRota = new Set(ordemPorCnpj.keys()).size;
 
+      const enderecMap = await fetchEnderecamentosByNfIds(
+        vnfs.map((v: any) => v.notas_fiscais?.id).filter(Boolean)
+      );
+
       const notasFiscais = vnfs.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const bairro = nf.dest_bairro || "";
@@ -1476,6 +1481,7 @@ export default function Roteirizacao() {
           dataEmissao: nf.data_emissao,
           ordemEntrega: ordemPorCnpj.get(cnpjKey),
           totalEntregas: totalEntregasRota || undefined,
+          enderecamentos: enderecMap.get(nf.id) || [],
           itens: (nf.itens_nf || []).map((item: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
