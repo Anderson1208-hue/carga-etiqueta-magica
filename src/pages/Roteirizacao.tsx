@@ -985,7 +985,18 @@ export default function Roteirizacao() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setVeiculos(data || []);
+
+      // Filtra veículos que não têm mais NFs vinculadas (rotas esvaziadas)
+      const ids = (data || []).map((v) => v.id);
+      let comNfs = new Set<string>(ids);
+      if (ids.length > 0) {
+        const { data: vnfs } = await supabase
+          .from("veiculo_nfs")
+          .select("veiculo_id")
+          .in("veiculo_id", ids);
+        comNfs = new Set((vnfs || []).map((r: any) => r.veiculo_id));
+      }
+      setVeiculos((data || []).filter((v) => comNfs.has(v.id)));
     } catch (err) {
       console.error("Error loading veiculos:", err);
     } finally {
