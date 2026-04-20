@@ -39,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { format } from "date-fns";
+import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
@@ -128,7 +129,8 @@ export default function Roteirizacao() {
   // Emplacamento
   const [emplacPlaca, setEmplacPlaca] = useState("");
   const [emplacMotorista, setEmplacMotorista] = useState("");
-  const [emplacData, setEmplacData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [emplacData, setEmplacData] = useState(format(proximoDiaUtilApos(new Date()), "yyyy-MM-dd"));
+  const [sairHoje, setSairHoje] = useState(false);
   const [savingEmplac, setSavingEmplac] = useState(false);
   const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null; motorista?: string } | null>(null);
   const [motoristaDespacho, setMotoristaDespacho] = useState("");
@@ -1988,8 +1990,26 @@ export default function Roteirizacao() {
                       <Input
                         type="date"
                         value={emplacData}
-                        onChange={(e) => setEmplacData(e.target.value)}
+                        onChange={(e) => {
+                          setEmplacData(e.target.value);
+                          setSairHoje(e.target.value === format(new Date(), "yyyy-MM-dd"));
+                        }}
                       />
+                      <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer select-none">
+                        <Checkbox
+                          checked={sairHoje}
+                          onCheckedChange={(v) => {
+                            const checked = v === true;
+                            setSairHoje(checked);
+                            setEmplacData(
+                              checked
+                                ? format(new Date(), "yyyy-MM-dd")
+                                : format(proximoDiaUtilApos(new Date()), "yyyy-MM-dd")
+                            );
+                          }}
+                        />
+                        <span>Sair hoje ({format(new Date(), "dd/MM/yyyy")})</span>
+                      </label>
                     </div>
                     <div className="flex items-end">
                       <Button
