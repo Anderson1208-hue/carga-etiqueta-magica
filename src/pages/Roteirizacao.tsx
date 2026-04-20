@@ -2321,7 +2321,7 @@ export default function Roteirizacao() {
               <CardContent>
                 <ListaParadas
                   entregas={filteredEntregas}
-                  onReorder={roteirizacao ? handleReorder : undefined}
+                  onReorder={(roteirizacao || modoManual) ? handleReorder : undefined}
                 />
               </CardContent>
             </Card>
