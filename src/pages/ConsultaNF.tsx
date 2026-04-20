@@ -172,7 +172,9 @@ export default function ConsultaNF() {
           created_at, carga_id,
           cargas(placa, motorista, data, status, tipo_carga),
           itens_nf(c_prod, x_prod, q_com, u_com),
-          agendamentos(status, data_agendamento, created_at)
+          agendamentos(status, data_agendamento, created_at),
+          ctes(numero_cte, chave_cte, razao_social_emitente, cnpj_emitente, valor_frete),
+          veiculo_nfs(veiculos(placa, motorista, data, status))
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
@@ -180,14 +182,15 @@ export default function ConsultaNF() {
       if (error) throw error;
 
       const results: NfResult[] = (nfs || []).map((nf: any) => {
-        // Get latest agendamento (ordenar por created_at DESC para pegar o mais recente)
         const agendamentos = [...(nf.agendamentos || [])].sort((a: any, b: any) => {
           const da = new Date(a.created_at || 0).getTime();
           const db = new Date(b.created_at || 0).getTime();
           return db - da;
         });
         const latestAgendamento = agendamentos.length > 0 ? agendamentos[0] : null;
-        
+        const veiculoLink = (nf.veiculo_nfs || [])[0];
+        const veiculo = veiculoLink?.veiculos || null;
+
         return {
           ...nf,
           carga: nf.cargas,
@@ -197,6 +200,8 @@ export default function ConsultaNF() {
             0
           ),
           agendamento: latestAgendamento,
+          ctes: nf.ctes || [],
+          veiculo,
         };
       });
 
