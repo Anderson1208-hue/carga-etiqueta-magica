@@ -89,11 +89,15 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   // Format CNPJ emitente
   const cnpjEmitenteFormatted = formatCNPJ(cnpjEmitente);
 
-  // Extract recipient data (destinatário)
+  // Extract recipient data (destinatário) — pode ser CNPJ (PJ) ou CPF (PF)
   const dest = xmlDoc.querySelector("dest");
   const destCNPJ = dest?.querySelector("CNPJ");
+  const destCPF = dest?.querySelector("CPF");
   const cnpjDestinatario = destCNPJ?.textContent || "";
-  const cnpjDestinatarioFormatted = formatCNPJ(cnpjDestinatario);
+  const cpfDestinatario = destCPF?.textContent || "";
+  const cnpjDestinatarioFormatted = cnpjDestinatario
+    ? formatCNPJ(cnpjDestinatario)
+    : formatCPF(cpfDestinatario);
 
   // Extract recipient address (endereço do destinatário)
   let destinatario: DestinatarioEndereco | undefined;
@@ -315,6 +319,15 @@ function formatCNPJ(cnpj: string): string {
   return cleaned.replace(
     /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
     "$1.$2.$3/$4-$5"
+  );
+}
+
+function formatCPF(cpf: string): string {
+  const cleaned = cpf.replace(/\D/g, "");
+  if (cleaned.length !== 11) return cpf;
+  return cleaned.replace(
+    /^(\d{3})(\d{3})(\d{3})(\d{2})$/,
+    "$1.$2.$3-$4"
   );
 }
 
