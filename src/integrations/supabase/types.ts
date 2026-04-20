@@ -106,6 +106,294 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_04: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_05: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_06: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_07: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_08: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_09: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      audit_log_2026_10: {
+        Row: {
+          action: string
+          changes: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changes?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       baixas_entrega: {
         Row: {
           created_at: string
@@ -985,12 +1273,26 @@ export type Database = {
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      ensure_audit_log_partition: { Args: never; Returns: undefined }
       get_conferencia_progress: { Args: { p_carga_id: string }; Returns: Json }
       has_profile: { Args: never; Returns: boolean }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       is_active_operator: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_carga_operator: { Args: { p_carga_id: string }; Returns: boolean }
+      listar_audit_log: {
+        Args: {
+          p_action?: string
+          p_data_fim?: string
+          p_data_inicio?: string
+          p_entity_id?: string
+          p_entity_type?: string
+          p_limit?: number
+          p_offset?: number
+          p_user_id?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "operador"

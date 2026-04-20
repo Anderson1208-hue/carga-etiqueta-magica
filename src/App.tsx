@@ -22,6 +22,7 @@ import ConsultaNF from "./pages/ConsultaNF";
 import MonitoramentoRotas from "./pages/MonitoramentoRotas";
 import TorreControle from "./pages/TorreControle";
 import Operadores from "./pages/Operadores";
+import AuditoriaLog from "./pages/AuditoriaLog";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
@@ -223,6 +224,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Operadores />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/auditoria"
+        element={
+          <ProtectedRoute>
+            <AuditoriaLog />
           </ProtectedRoute>
         }
       />
