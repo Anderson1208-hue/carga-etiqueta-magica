@@ -179,22 +179,35 @@ export default function Agendamento() {
           .in("id", nfIds);
 
         const cargaIds = [...new Set((nfsData || []).map(n => n.carga_id))];
-        const { data: cargasData } = await supabase
-          .from("cargas")
-          .select("id, tipo_carga")
-          .in("id", cargaIds);
+        const [{ data: cargasData }, { data: ctesData }] = await Promise.all([
+          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
+          supabase
+            .from("ctes")
+            .select("nf_id, numero_cte, razao_social_emitente, created_at")
+            .in("nf_id", nfIds)
+            .order("created_at", { ascending: false }),
+        ]);
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
         const nfMap = new Map((nfsData || []).map(n => [n.id, n]));
+        const cteMap = new Map<string, { numero_cte: string; razao_social_emitente: string | null }>();
+        (ctesData || []).forEach(c => {
+          if (c.nf_id && !cteMap.has(c.nf_id)) {
+            cteMap.set(c.nf_id, { numero_cte: c.numero_cte, razao_social_emitente: c.razao_social_emitente });
+          }
+        });
 
         const enriched: AgendamentoRecord[] = data.map(a => {
           const nf = nfMap.get(a.nf_id);
+          const cte = cteMap.get(a.nf_id);
           return {
             ...a,
             numero_nf: nf?.numero_nf,
             dest_razao_social: nf?.dest_razao_social,
             dest_cidade: nf?.dest_cidade,
             tipo_carga: nf ? cargaMap.get(nf.carga_id) || "SECA" : "SECA",
+            numero_cte: cte?.numero_cte ?? null,
+            cte_emitente: cte?.razao_social_emitente ?? null,
           };
         });
 
