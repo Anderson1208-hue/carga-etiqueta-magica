@@ -900,15 +900,6 @@ export default function Roteirizacao() {
       const { error: linkError } = await supabase.from("veiculo_nfs").insert(links);
       if (linkError) throw linkError;
 
-      // Marcar todas as cargas envolvidas como "expedida"
-      const cargaIdsExpedidas = Array.from(new Set(allNfIds.map((i) => i.cargaId)));
-      if (cargaIdsExpedidas.length > 0) {
-        await supabase
-          .from("cargas")
-          .update({ status: "expedida" as any })
-          .in("id", cargaIdsExpedidas);
-      }
-
       // Atualizar status_entrega das NFs para "NF EM ROTA"
       const nfIdsExpedidas = Array.from(new Set(allNfIds.map((i) => i.nfId)));
       if (nfIdsExpedidas.length > 0) {
@@ -916,6 +907,49 @@ export default function Roteirizacao() {
           .from("notas_fiscais")
           .update({ status_entrega: "NF EM ROTA" })
           .in("id", nfIdsExpedidas);
+      }
+
+      // Só marca a carga como expedida quando não restar NF pendente de emplacamento.
+      const cargaIdsAfetadas = Array.from(new Set(allNfIds.map((i) => i.cargaId)));
+      if (cargaIdsAfetadas.length > 0) {
+        const [{ data: nfsDasCargas, error: nfsCargasError }, { data: vnfsDasCargas, error: vnfsCargasError }] = await Promise.all([
+          supabase
+            .from("notas_fiscais")
+            .select("id, carga_id, status_entrega")
+            .in("carga_id", cargaIdsAfetadas),
+          supabase
+            .from("veiculo_nfs")
+            .select("nf_id, carga_origem_id")
+            .in("carga_origem_id", cargaIdsAfetadas),
+        ]);
+
+        if (nfsCargasError) throw nfsCargasError;
+        if (vnfsCargasError) throw vnfsCargasError;
+
+        const nfsEmplacadas = new Set((vnfsDasCargas || []).map((item) => item.nf_id));
+        const statusPorCarga = new Map<string, "aberta" | "expedida">();
+
+        cargaIdsAfetadas.forEach((cargaId) => {
+          const aindaTemNfDisponivel = (nfsDasCargas || []).some((nf) => {
+            if (nf.carga_id !== cargaId) return false;
+            if (nf.status_entrega === "ENTREGUE" || nf.status_entrega === "RECUSADO") return false;
+            return !nfsEmplacadas.has(nf.id);
+          });
+
+          statusPorCarga.set(cargaId, aindaTemNfDisponivel ? "aberta" : "expedida");
+        });
+
+        const cargasAbertas = cargaIdsAfetadas.filter((cargaId) => statusPorCarga.get(cargaId) === "aberta");
+        const cargasExpedidas = cargaIdsAfetadas.filter((cargaId) => statusPorCarga.get(cargaId) === "expedida");
+
+        await Promise.all([
+          cargasAbertas.length > 0
+            ? supabase.from("cargas").update({ status: "aberta" as any }).in("id", cargasAbertas)
+            : Promise.resolve(),
+          cargasExpedidas.length > 0
+            ? supabase.from("cargas").update({ status: "expedida" as any }).in("id", cargasExpedidas)
+            : Promise.resolve(),
+        ]);
       }
 
       setVeiculoCriado({
