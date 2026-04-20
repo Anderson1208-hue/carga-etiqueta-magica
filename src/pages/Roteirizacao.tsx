@@ -167,7 +167,7 @@ export default function Roteirizacao() {
   // Auto-select cargas or NFs when coming from Preparação
   useEffect(() => {
     if (stateConsumedRef.current) return;
-    const state = location.state as { cargaIds?: string[]; nfIds?: string[]; totais?: { nfs: number; caixas: number; peso: number; volume: number; entregas: number } } | null;
+    const state = location.state as { cargaIds?: string[]; nfIds?: string[]; modoManual?: boolean; totais?: { nfs: number; caixas: number; peso: number; volume: number; entregas: number } } | null;
     if (!state) return;
     
     // New mode: specific NF IDs from Preparação
@@ -175,6 +175,7 @@ export default function Roteirizacao() {
       stateConsumedRef.current = true;
       setModoNfIds(true);
       setNfIdsSelecionados(state.nfIds);
+      if (state.modoManual) setModoManual(true);
       if (state.totais) setTotaisPreparacao(state.totais);
       if (state.cargaIds && state.cargaIds.length > 0 && cargas.length > 0) {
         const valid = state.cargaIds.filter((id) => cargas.some((c) => c.id === id));
@@ -191,6 +192,7 @@ export default function Roteirizacao() {
       if (valid.length > 0) {
         setSelectedCargaIds(valid);
       }
+      if (state.modoManual) setModoManual(true);
       stateConsumedRef.current = true;
       navigate(location.pathname, { replace: true, state: null });
     }
