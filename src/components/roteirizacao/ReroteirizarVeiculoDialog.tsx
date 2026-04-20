@@ -440,8 +440,27 @@ export function ReroteirizarVeiculoDialog({
         }
       }
 
-      // 5. Cluster + sort from CD
-      const sorted = clusterAndSort(list, CD_LAT, CD_LNG).map((e, i) => ({ ...e, ordem: i + 1 }));
+      // 5. Preservar ordem manual prévia quando existir; só usa cluster+sort para CNPJs novos
+      let sorted: Entrega[];
+      const comOrdemPrevia = list.filter((e) => ordemPrevia.has(e.cnpjDestinatario));
+      const semOrdemPrevia = list.filter((e) => !ordemPrevia.has(e.cnpjDestinatario));
+
+      if (comOrdemPrevia.length > 0) {
+        comOrdemPrevia.sort(
+          (a, b) => (ordemPrevia.get(a.cnpjDestinatario) ?? 0) - (ordemPrevia.get(b.cnpjDestinatario) ?? 0)
+        );
+        const novosOrdenados =
+          semOrdemPrevia.length > 0
+            ? clusterAndSort(
+                semOrdemPrevia,
+                comOrdemPrevia[comOrdemPrevia.length - 1].latitude ?? CD_LAT,
+                comOrdemPrevia[comOrdemPrevia.length - 1].longitude ?? CD_LNG
+              )
+            : [];
+        sorted = [...comOrdemPrevia, ...novosOrdenados].map((e, i) => ({ ...e, ordem: i + 1 }));
+      } else {
+        sorted = clusterAndSort(list, CD_LAT, CD_LNG).map((e, i) => ({ ...e, ordem: i + 1 }));
+      }
 
       setEntregas(sorted);
       setStats({ geocoded: geoCount, failed });
