@@ -322,6 +322,15 @@ function formatCNPJ(cnpj: string): string {
   );
 }
 
+function formatCPF(cpf: string): string {
+  const cleaned = cpf.replace(/\D/g, "");
+  if (cleaned.length !== 11) return cpf;
+  return cleaned.replace(
+    /^(\d{3})(\d{3})(\d{3})(\d{2})$/,
+    "$1.$2.$3-$4"
+  );
+}
+
 export function calculateBoxes(qCom: number): number {
   return Math.ceil(qCom);
 }
