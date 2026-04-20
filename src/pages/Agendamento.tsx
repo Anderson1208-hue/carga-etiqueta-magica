@@ -265,11 +265,16 @@ export default function Agendamento() {
       if (allData.length > 0) {
         const cargaIds = [...new Set(allData.map(n => n.carga_id))];
         const nfIdsAll = allData.map(n => n.id);
-        const [{ data: cargasData }, { data: agData }] = await Promise.all([
+        const [{ data: cargasData }, { data: agData }, { data: ctesData }] = await Promise.all([
           supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
           supabase
             .from("agendamentos")
             .select("nf_id, status, data_agendamento, created_at")
+            .in("nf_id", nfIdsAll)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("ctes")
+            .select("nf_id, numero_cte, razao_social_emitente, created_at")
             .in("nf_id", nfIdsAll)
             .order("created_at", { ascending: false }),
         ]);
@@ -282,12 +287,20 @@ export default function Agendamento() {
             agMap.set(a.nf_id, { status: a.status, data_agendamento: a.data_agendamento });
           }
         });
+        const cteMap = new Map<string, { numero_cte: string; razao_social_emitente: string | null }>();
+        (ctesData || []).forEach(c => {
+          if (c.nf_id && !cteMap.has(c.nf_id)) {
+            cteMap.set(c.nf_id, { numero_cte: c.numero_cte, razao_social_emitente: c.razao_social_emitente });
+          }
+        });
 
         setNfResults(allData.map(n => ({
           ...n,
           tipo_carga: cargaMap.get(n.carga_id) || "SECA",
           agendamento_status: agMap.get(n.id)?.status ?? null,
           agendamento_data: agMap.get(n.id)?.data_agendamento ?? null,
+          numero_cte: cteMap.get(n.id)?.numero_cte ?? null,
+          cte_emitente: cteMap.get(n.id)?.razao_social_emitente ?? null,
         })));
       } else {
         setNfResults([]);
