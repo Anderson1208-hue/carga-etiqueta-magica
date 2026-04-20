@@ -321,7 +321,7 @@ export default function Romaneio() {
 
     setGenerating("nota");
     try {
-      const nfsPDF = buildNfsPDF(filteredNFs);
+      const nfsPDF = await buildNfsPDF(filteredNFs);
       const blob = await generateNotaDeCargaPDF(
         {
           data: selectedCarga.data,
@@ -375,7 +375,7 @@ export default function Romaneio() {
     if (!selectedCarga || filteredNFs.length === 0) return;
     setGenerating("print-nota");
     try {
-      const nfsPDF = buildNfsPDF(filteredNFs);
+      const nfsPDF = await buildNfsPDF(filteredNFs);
       const blob = await generateNotaDeCargaPDF(
         {
           data: selectedCarga.data,
@@ -482,7 +482,7 @@ export default function Romaneio() {
     setGenerating("nota-por-nf");
     try {
       const selectedNfs = notasFiscais.filter((nf) => selectedNfIds.has(nf.id));
-      const nfsPDF = buildNfsPDF(selectedNfs);
+      const nfsPDF = await buildNfsPDF(selectedNfs);
       const blob = await generateNotaDeCargaPDF(
         {
           data: selectedCarga.data,
