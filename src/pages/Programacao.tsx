@@ -172,7 +172,7 @@ export default function Programacao() {
           const ag = agendamentoMap.get(nf.id);
           if (ag) {
             // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
-            if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'DEVOLUCAO') return false;
+            if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'AGUARDANDO REAGENDA' || ag.status === 'DEVOLUCAO') return false;
             // AGENDAMENTO ou REENTREGA: libera na véspera (data <= amanhã)
             if ((ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA') && ag.data_agendamento && ag.data_agendamento > limiteLiberacao) return false;
           }
