@@ -1,6 +1,6 @@
 ---
 name: Roteirização Modo Manual
-description: Botão alternativo na Preparação que pula geocodificação automática — operador define ordem das paradas via drag-and-drop e sistema calcula km/tempo via Haversine em background.
+description: Modo manual da Preparação preserva ordem definida pelo operador (drag-and-drop) ao salvar e também ao reroteirizar o veículo posteriormente.
 type: feature
 ---
 A Preparação possui dois botões de envio para a Roteirização:
@@ -8,11 +8,19 @@ A Preparação possui dois botões de envio para a Roteirização:
 2. **"Roteirizar Manualmente"** — envia `modoManual: true` no `location.state`.
 
 No modo manual:
-- A lista de paradas é editável via drag-and-drop (`@dnd-kit`) desde o início (sem precisar calcular rota antes).
-- Botão único "Confirmar Ordem Manual" substitui Geocodificar/Calcular Rota Otimizada.
-- A função `calculateRouteManual()` em `src/pages/Roteirizacao.tsx`:
-  - Geocodifica em background (CEP → Logradouro+Bairro → Bairro) silenciosamente.
-  - Calcula `distancia_total_km` via Haversine entre paradas consecutivas (CD → P1 → P2 → ...).
+- Lista de paradas editável via drag-and-drop (`@dnd-kit`) desde o início.
+- Botão único "Confirmar Ordem Manual".
+- `calculateRouteManual()` em `src/pages/Roteirizacao.tsx`:
+  - Geocodifica em background (CEP → Logradouro+Bairro → Bairro).
+  - Calcula `distancia_total_km` via Haversine entre paradas consecutivas.
   - Estima `tempo_estimado_min` como `(distancia/25)*60 + 10min*paradas`.
-  - **NÃO** chama OSRM nem reordena — respeita 100% a ordem definida pelo operador.
-- Salva normalmente em `roteirizacoes` + `roteirizacao_paradas` com `status: "concluida"`.
+  - **NÃO** chama OSRM nem reordena.
+- Salva em `roteirizacoes` + `roteirizacao_paradas` com `status: "concluida"`.
+
+## Reroteirização preserva ordem manual
+`src/components/roteirizacao/ReroteirizarVeiculoDialog.tsx` busca primeiro a roteirização atual da carga primária do veículo e monta um `Map<cnpj, ordem>` (`ordemPrevia`).
+- CNPJs com ordem prévia → mantidos exatamente na ordem que estavam.
+- CNPJs novos (NFs adicionadas depois) → posicionados ao final via `clusterAndSort` a partir da última parada conhecida.
+- Só faz cluster automático completo quando NÃO existe roteirização prévia.
+
+Isso garante que reroteirizar não destrói a ordem manual definida pelo operador.
