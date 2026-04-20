@@ -927,6 +927,36 @@ export type Database = {
           },
         ]
       }
+      nf_enderecamento: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          nf_id: string
+          posicao: string
+          principal: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nf_id: string
+          posicao: string
+          principal?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nf_id?: string
+          posicao?: string
+          principal?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notas_fiscais: {
         Row: {
           carga_id: string

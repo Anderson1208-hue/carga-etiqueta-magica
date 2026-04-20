@@ -24,6 +24,7 @@ interface NotaFiscalPDF {
   dataEmissao: string | null;
   ordemEntrega?: number;
   totalEntregas?: number;
+  enderecamentos?: string[];
   itens: {
     cProd: string;
     xProd: string;
@@ -295,6 +296,33 @@ export async function generateNotaDeCargaPDF(
       y += 6;
     }
     y += 3;
+
+    // Bloco destacado: MR (sempre) + Endereçamento no CD (posições)
+    {
+      const mrText = `MR ${mr} — ${getMacroRegiaoLabel(mr)}`;
+      const posicoes = (nf.enderecamentos || []).filter((p) => p && p.trim().length > 0);
+      const posLabel = posicoes.length > 0 ? `Endereçamento CD: ${posicoes.join("  •  ")}` : "Endereçamento CD: — (não cadastrado)";
+
+      doc.setFontSize(11);
+      const posLines = doc.splitTextToSize(posLabel, pageWidth - 6);
+      const boxH = 8 + 5 * posLines.length;
+
+      doc.setFillColor(232, 244, 255); // azul claro
+      doc.setDrawColor(60, 120, 200);
+      doc.setLineWidth(0.4);
+      doc.rect(MARGIN, y - 2, pageWidth, boxH, "FD");
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(mrText, MARGIN + 3, y + 3);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text(posLines, MARGIN + 3, y + 8);
+
+      y += boxH + 4;
+    }
 
     doc.setLineWidth(0.5);
     doc.line(MARGIN, y, A4_WIDTH - MARGIN, y);

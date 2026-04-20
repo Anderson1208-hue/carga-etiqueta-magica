@@ -37,6 +37,7 @@ const topNav = [
 const depositoItems = [
   { name: "Romaneio", href: "/romaneio", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
+  { name: "Endereçamento", href: "/enderecamento", icon: MapPin },
   { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
 ];
 

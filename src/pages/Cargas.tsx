@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
+import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao } from "@/lib/macro-regioes";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,6 +107,7 @@ export default function Cargas() {
         return;
       }
 
+      const enderecMap = await fetchEnderecamentosByNfIds(nfsData.map((n: any) => n.id));
       const notasFiscaisPDF = nfsData.map((nf) => ({
         numeroNf: nf.numero_nf,
         razaoSocialEmitente: nf.razao_social_emitente,
@@ -120,6 +122,7 @@ export default function Cargas() {
         destCep: nf.dest_cep || undefined,
         macroRegiao: getMacroRegiao(nf.dest_bairro),
         dataEmissao: nf.data_emissao,
+        enderecamentos: enderecMap.get(nf.id) || [],
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,

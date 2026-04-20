@@ -18,6 +18,7 @@ import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
 import HistoricoEntregas from "./pages/HistoricoEntregas";
 import Agendamento from "./pages/Agendamento";
+import Enderecamento from "./pages/Enderecamento";
 import ConsultaNF from "./pages/ConsultaNF";
 import MonitoramentoRotas from "./pages/MonitoramentoRotas";
 import TorreControle from "./pages/TorreControle";
@@ -192,6 +193,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Agendamento />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/enderecamento"
+        element={
+          <ProtectedRoute>
+            <Enderecamento />
           </ProtectedRoute>
         }
       />

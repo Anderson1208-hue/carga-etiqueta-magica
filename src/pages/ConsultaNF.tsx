@@ -28,6 +28,7 @@ import {
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
+import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao } from "@/lib/macro-regioes";
 
 interface NfResult {
@@ -114,6 +115,7 @@ export default function ConsultaNF() {
     if (!nf.carga) return;
     setGeneratingPdf(true);
     try {
+      const enderecMap = await fetchEnderecamentosByNfIds([nf.id]);
       const nfPDF = {
         numeroNf: nf.numero_nf,
         razaoSocialEmitente: nf.razao_social_emitente,
@@ -128,6 +130,7 @@ export default function ConsultaNF() {
         destCep: nf.dest_cep || undefined,
         macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         dataEmissao: nf.data_emissao,
+        enderecamentos: enderecMap.get(nf.id) || [],
         itens: (nf.itens || []).map((item) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
