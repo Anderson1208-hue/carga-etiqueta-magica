@@ -129,7 +129,8 @@ export default function Roteirizacao() {
   // Emplacamento
   const [emplacPlaca, setEmplacPlaca] = useState("");
   const [emplacMotorista, setEmplacMotorista] = useState("");
-  const [emplacData, setEmplacData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [emplacData, setEmplacData] = useState(format(proximoDiaUtilApos(new Date()), "yyyy-MM-dd"));
+  const [sairHoje, setSairHoje] = useState(false);
   const [savingEmplac, setSavingEmplac] = useState(false);
   const [veiculoCriado, setVeiculoCriado] = useState<{ id: string; placa: string; accessCode: string | null; motorista?: string } | null>(null);
   const [motoristaDespacho, setMotoristaDespacho] = useState("");
