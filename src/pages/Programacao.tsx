@@ -157,17 +157,12 @@ export default function Programacao() {
         }
       });
 
-      // Liberar NFs agendadas na véspera. Considera próximo dia útil:
-      // - Sex libera Sáb, Dom e Seg (próximo dia útil = Seg)
-      // - Demais dias liberam o dia seguinte
+      // Liberar NFs agendadas na véspera considerando dias úteis (exclui sáb,
+      // dom e feriados nacionais/estaduais RJ). Ex.: se amanhã é feriado,
+      // libera hoje as NFs agendadas para o próximo dia útil.
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
-      const proximoDiaUtil = new Date(hoje);
-      proximoDiaUtil.setDate(proximoDiaUtil.getDate() + 1);
-      // Se cair em sábado (6) ou domingo (0), avança até segunda
-      while (proximoDiaUtil.getDay() === 0 || proximoDiaUtil.getDay() === 6) {
-        proximoDiaUtil.setDate(proximoDiaUtil.getDate() + 1);
-      }
+      const proximoDiaUtil = proximoDiaUtilApos(hoje);
       const limiteLiberacao = format(proximoDiaUtil, "yyyy-MM-dd");
 
       const available: NfDisponivel[] = nfs
