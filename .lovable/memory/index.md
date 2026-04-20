@@ -49,6 +49,7 @@ type: reference
 - [Ordenação Etiquetas](mem://funcionalidades/pdf/etiquetas-ordenacao-operacional) — Hierarchical grouping for label printing.
 - [Layout Zebra](mem://funcionalidades/pdf/etiquetas-configuracao-impressao-zebra-final) — PDF parameters for Zebra ZD220 labels.
 - [Nota de Carga](mem://funcionalidades/pdf/nota-de-carga) — PDF generation and groupings.
+- [Endereçamento NF no CD](mem://funcionalidades/operacao/enderecamento-nf-cd) — Múltiplas posições por NF; aparecem com a MR no header do PDF Nota de Carga.
 - [Romaneio Totalizado](mem://funcionalidades/pdf/romaneio-totalizado) — Landscape PDF formatting requirements.
 - [Validação Importação](mem://seguranca/validacao-importacao) — Rules for Chaves, CNPJ, Placas.
 - [Busca Lote e Sync](mem://arquitetura/banco-de-dados/estrategia-de-busca-em-lote) — Deterministic pagination, RPC for massive aggregations.
