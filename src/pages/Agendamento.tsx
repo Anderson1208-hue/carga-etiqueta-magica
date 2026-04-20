@@ -68,6 +68,8 @@ interface NfResult {
   tipo_carga: string;
   agendamento_status?: string | null;
   agendamento_data?: string | null;
+  numero_cte?: string | null;
+  cte_emitente?: string | null;
 }
 
 interface AgendamentoRecord {
@@ -81,6 +83,8 @@ interface AgendamentoRecord {
   dest_razao_social?: string | null;
   dest_cidade?: string | null;
   tipo_carga?: string;
+  numero_cte?: string | null;
+  cte_emitente?: string | null;
 }
 
 const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.ReactNode; color: string; requiresDate: boolean }[] = [
