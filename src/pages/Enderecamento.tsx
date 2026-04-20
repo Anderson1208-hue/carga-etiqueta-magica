@@ -223,7 +223,7 @@ export default function Enderecamento() {
               <CardTitle className="text-sm text-muted-foreground">Com endereço</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{totalComEnd}</div>
+              <div className="text-2xl font-bold text-primary">{totalComEnd}</div>
             </CardContent>
           </Card>
           <Card>
@@ -231,7 +231,7 @@ export default function Enderecamento() {
               <CardTitle className="text-sm text-muted-foreground">Sem endereço</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{totalSemEnd}</div>
+              <div className="text-2xl font-bold text-destructive">{totalSemEnd}</div>
             </CardContent>
           </Card>
         </div>

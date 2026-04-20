@@ -26,6 +26,7 @@ import {
   printBlob,
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
 import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare } from "lucide-react";
@@ -290,7 +291,8 @@ export default function Romaneio() {
     }
   }
 
-  function buildNfsPDF(nfs: NotaFiscalData[]) {
+  async function buildNfsPDF(nfs: NotaFiscalData[]) {
+    const enderecMap = await fetchEnderecamentosByNfIds(nfs.map((n) => n.id));
     return nfs.map((nf) => ({
       numeroNf: nf.numeroNf,
       razaoSocialEmitente: nf.razaoSocialEmitente,
@@ -305,6 +307,7 @@ export default function Romaneio() {
       destCep: nf.destCep,
       macroRegiao: nf.macroRegiao,
       dataEmissao: nf.dataEmissao,
+      enderecamentos: enderecMap.get(nf.id) || [],
       itens: nf.itens.map((item) => ({
         cProd: item.cProd,
         xProd: item.xProd,
