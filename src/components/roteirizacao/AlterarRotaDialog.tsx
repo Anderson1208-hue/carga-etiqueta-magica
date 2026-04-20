@@ -181,6 +181,26 @@ export function AlterarRotaDialog({
         if (delErr) throw delErr;
       }
 
+      // 2.1 Se todas as NFs foram removidas e nenhuma será adicionada,
+      // remove o veículo da programação.
+      const totalRestante =
+        nfsVinculadas.length - nfsToRemove.size + nfsToAdd.size;
+      if (totalRestante <= 0) {
+        const { error: delVeicErr } = await supabase
+          .from("veiculos")
+          .delete()
+          .eq("id", veiculo.id);
+        if (delVeicErr) throw delVeicErr;
+
+        toast({
+          title: "Veículo removido",
+          description: `Veículo ${placa.toUpperCase()} foi removido da programação (sem NFs vinculadas).`,
+        });
+        onUpdated();
+        onOpenChange(false);
+        return;
+      }
+
       // 3. Add selected NFs
       if (nfsToAdd.size > 0) {
         const nfsToInsert = Array.from(nfsToAdd).map((nfId) => {
