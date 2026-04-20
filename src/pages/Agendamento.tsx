@@ -621,6 +621,8 @@ export default function Agendamento() {
                     <TableRow>
                       <TableHead>NF</TableHead>
                       <TableHead>Destinatário</TableHead>
+                      <TableHead>CT-e</TableHead>
+                      <TableHead>Emitente CT-e</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Agenda</TableHead>
                       <TableHead>Observação</TableHead>
@@ -634,6 +636,8 @@ export default function Agendamento() {
                       <TableRow key={ag.id} className={chocolateRowClass(ag.tipo_carga)}>
                         <TableCell className="font-mono font-medium">{ag.numero_nf || "—"}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{ag.dest_razao_social || "—"}</TableCell>
+                        <TableCell className="font-mono text-sm">{ag.numero_cte || <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="max-w-[180px] truncate text-sm">{ag.cte_emitente || <span className="text-muted-foreground">—</span>}</TableCell>
                         <TableCell>{statusBadge(ag.status)}</TableCell>
                         <TableCell>
                           {ag.data_agendamento
