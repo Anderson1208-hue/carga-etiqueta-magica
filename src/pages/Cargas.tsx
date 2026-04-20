@@ -44,13 +44,11 @@ import {
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, UserCheck, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
