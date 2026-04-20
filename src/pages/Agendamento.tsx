@@ -66,6 +66,8 @@ interface NfResult {
   status_entrega: string;
   carga_id: string;
   tipo_carga: string;
+  agendamento_status?: string | null;
+  agendamento_data?: string | null;
 }
 
 interface AgendamentoRecord {
@@ -245,16 +247,30 @@ export default function Agendamento() {
 
       if (allData.length > 0) {
         const cargaIds = [...new Set(allData.map(n => n.carga_id))];
-        const { data: cargasData } = await supabase
-          .from("cargas")
-          .select("id, tipo_carga")
-          .in("id", cargaIds);
+        const nfIdsAll = allData.map(n => n.id);
+        const [{ data: cargasData }, { data: agData }] = await Promise.all([
+          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
+          supabase
+            .from("agendamentos")
+            .select("nf_id, status, data_agendamento, created_at")
+            .in("nf_id", nfIdsAll)
+            .order("created_at", { ascending: false }),
+        ]);
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
+        // pega o agendamento mais recente por nf_id (já vem ordenado desc)
+        const agMap = new Map<string, { status: string; data_agendamento: string | null }>();
+        (agData || []).forEach(a => {
+          if (!agMap.has(a.nf_id)) {
+            agMap.set(a.nf_id, { status: a.status, data_agendamento: a.data_agendamento });
+          }
+        });
 
         setNfResults(allData.map(n => ({
           ...n,
           tipo_carga: cargaMap.get(n.carga_id) || "SECA",
+          agendamento_status: agMap.get(n.id)?.status ?? null,
+          agendamento_data: agMap.get(n.id)?.data_agendamento ?? null,
         })));
       } else {
         setNfResults([]);
@@ -490,6 +506,8 @@ export default function Agendamento() {
                         <TableHead>Destinatário</TableHead>
                         <TableHead>Cidade/UF</TableHead>
                         <TableHead>Status Entrega</TableHead>
+                        <TableHead>Status Agenda</TableHead>
+                        <TableHead>Data Agenda</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead className="w-[120px]">Ação</TableHead>
                       </TableRow>
@@ -507,6 +525,12 @@ export default function Agendamento() {
                           <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
                           <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
                           <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
+                          <TableCell>{nf.agendamento_status ? statusBadge(nf.agendamento_status) : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">
+                            {nf.agendamento_data
+                              ? format(new Date(nf.agendamento_data + "T12:00:00"), "dd/MM/yyyy")
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell><TipoCargaBadge tipoCarga={nf.tipo_carga} /></TableCell>
                           <TableCell>
                             <Button size="sm" onClick={() => openAgendamentoDialog(nf)}>
