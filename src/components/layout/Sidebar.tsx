@@ -23,6 +23,7 @@ import {
   Radio,
   Radar,
   Eye,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -153,10 +154,14 @@ export function Sidebar() {
             defaultOpen={torreActive}
           />
           {isAdmin && (
-            <div className="pt-2">
+            <div className="pt-2 space-y-0.5">
               <NavItem
                 item={{ name: "Operadores", href: "/operadores", icon: Users }}
                 isActive={location.pathname === "/operadores"}
+              />
+              <NavItem
+                item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
+                isActive={location.pathname === "/auditoria"}
               />
             </div>
           )}
