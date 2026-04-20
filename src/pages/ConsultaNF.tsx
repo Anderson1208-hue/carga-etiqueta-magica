@@ -340,6 +340,62 @@ export default function ConsultaNF() {
                 </div>
               </div>
 
+              {/* Veículo Expedido */}
+              {selectedNf.veiculo && (
+                <div className="border-t pt-4 bg-primary/5 -mx-6 px-6 py-4">
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    <Truck className="w-4 h-4" /> Veículo de Expedição
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Placa</p>
+                      <p className="font-mono font-bold text-base">{selectedNf.veiculo.placa}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Motorista</p>
+                      <p className="font-medium">{selectedNf.veiculo.motorista || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Data Expedição</p>
+                      <p className="font-medium">
+                        {format(new Date(selectedNf.veiculo.data + "T00:00:00"), "dd/MM/yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CT-e vinculados */}
+              {selectedNf.ctes && selectedNf.ctes.length > 0 && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> CT-e Vinculado{selectedNf.ctes.length > 1 ? "s" : ""}
+                  </p>
+                  <div className="space-y-2">
+                    {selectedNf.ctes.map((cte, idx) => (
+                      <div key={idx} className="rounded border p-3 bg-muted/30">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <p className="text-sm font-medium">CT-e nº {cte.numero_cte}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {cte.razao_social_emitente || "—"} {cte.cnpj_emitente ? `· ${cte.cnpj_emitente}` : ""}
+                            </p>
+                          </div>
+                          {cte.valor_frete != null && Number(cte.valor_frete) > 0 && (
+                            <Badge variant="outline">
+                              R$ {Number(cte.valor_frete).toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-mono text-muted-foreground mt-1 break-all">
+                          {cte.chave_cte}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Emitente */}
               <div className="border-t pt-4">
                 <p className="text-sm font-semibold mb-2">Emitente</p>
