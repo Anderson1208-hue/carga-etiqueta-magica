@@ -64,6 +64,19 @@ interface NfResult {
     status: string;
     data_agendamento: string | null;
   } | null;
+  ctes?: {
+    numero_cte: string;
+    chave_cte: string;
+    razao_social_emitente: string | null;
+    cnpj_emitente: string | null;
+    valor_frete: number | null;
+  }[];
+  veiculo?: {
+    placa: string;
+    motorista: string | null;
+    data: string;
+    status: string;
+  } | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -159,7 +172,9 @@ export default function ConsultaNF() {
           created_at, carga_id,
           cargas(placa, motorista, data, status, tipo_carga),
           itens_nf(c_prod, x_prod, q_com, u_com),
-          agendamentos(status, data_agendamento, created_at)
+          agendamentos(status, data_agendamento, created_at),
+          ctes(numero_cte, chave_cte, razao_social_emitente, cnpj_emitente, valor_frete),
+          veiculo_nfs(veiculos(placa, motorista, data, status))
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
@@ -167,14 +182,15 @@ export default function ConsultaNF() {
       if (error) throw error;
 
       const results: NfResult[] = (nfs || []).map((nf: any) => {
-        // Get latest agendamento (ordenar por created_at DESC para pegar o mais recente)
         const agendamentos = [...(nf.agendamentos || [])].sort((a: any, b: any) => {
           const da = new Date(a.created_at || 0).getTime();
           const db = new Date(b.created_at || 0).getTime();
           return db - da;
         });
         const latestAgendamento = agendamentos.length > 0 ? agendamentos[0] : null;
-        
+        const veiculoLink = (nf.veiculo_nfs || [])[0];
+        const veiculo = veiculoLink?.veiculos || null;
+
         return {
           ...nf,
           carga: nf.cargas,
@@ -184,6 +200,8 @@ export default function ConsultaNF() {
             0
           ),
           agendamento: latestAgendamento,
+          ctes: nf.ctes || [],
+          veiculo,
         };
       });
 
@@ -321,6 +339,62 @@ export default function ConsultaNF() {
                   </p>
                 </div>
               </div>
+
+              {/* Veículo Expedido */}
+              {selectedNf.veiculo && (
+                <div className="border-t pt-4 bg-primary/5 -mx-6 px-6 py-4">
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    <Truck className="w-4 h-4" /> Veículo de Expedição
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Placa</p>
+                      <p className="font-mono font-bold text-base">{selectedNf.veiculo.placa}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Motorista</p>
+                      <p className="font-medium">{selectedNf.veiculo.motorista || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Data Expedição</p>
+                      <p className="font-medium">
+                        {format(new Date(selectedNf.veiculo.data + "T00:00:00"), "dd/MM/yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CT-e vinculados */}
+              {selectedNf.ctes && selectedNf.ctes.length > 0 && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> CT-e Vinculado{selectedNf.ctes.length > 1 ? "s" : ""}
+                  </p>
+                  <div className="space-y-2">
+                    {selectedNf.ctes.map((cte, idx) => (
+                      <div key={idx} className="rounded border p-3 bg-muted/30">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div>
+                            <p className="text-sm font-medium">CT-e nº {cte.numero_cte}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {cte.razao_social_emitente || "—"} {cte.cnpj_emitente ? `· ${cte.cnpj_emitente}` : ""}
+                            </p>
+                          </div>
+                          {cte.valor_frete != null && Number(cte.valor_frete) > 0 && (
+                            <Badge variant="outline">
+                              R$ {Number(cte.valor_frete).toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-mono text-muted-foreground mt-1 break-all">
+                          {cte.chave_cte}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Emitente */}
               <div className="border-t pt-4">
@@ -464,7 +538,18 @@ export default function ConsultaNF() {
                           <TableCell className="text-sm">
                             {nf.dest_cidade}/{nf.dest_uf}
                           </TableCell>
-                          <TableCell className="text-sm">{nf.carga?.placa}</TableCell>
+                          <TableCell className="text-sm">
+                            {nf.veiculo ? (
+                              <div className="flex flex-col">
+                                <span className="font-mono font-semibold text-primary">{nf.veiculo.placa}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {format(new Date(nf.veiculo.data + "T00:00:00"), "dd/MM/yyyy")} · expedida
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">{nf.carga?.placa}</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
