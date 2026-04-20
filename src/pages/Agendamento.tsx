@@ -66,6 +66,8 @@ interface NfResult {
   status_entrega: string;
   carga_id: string;
   tipo_carga: string;
+  agendamento_status?: string | null;
+  agendamento_data?: string | null;
 }
 
 interface AgendamentoRecord {
