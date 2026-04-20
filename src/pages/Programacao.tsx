@@ -41,6 +41,7 @@ import {
 import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/TipoCargaBadge";
 import * as XLSX from "xlsx";
 import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
+import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 
 interface NfDisponivel {
   id: string;
