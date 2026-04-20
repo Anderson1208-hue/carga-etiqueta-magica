@@ -88,6 +88,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "MARECHAL HERMES": 6,
   "HONORIO GURGEL": 6,
   "HONÓRIO GURGEL": 6,
+  "TURIACU": 6,
+  "TURIAÇU": 6,
 
   // Macro Região 7
   "PECHINCHA": 7,
