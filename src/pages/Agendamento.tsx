@@ -506,6 +506,8 @@ export default function Agendamento() {
                         <TableHead>Destinatário</TableHead>
                         <TableHead>Cidade/UF</TableHead>
                         <TableHead>Status Entrega</TableHead>
+                        <TableHead>Status Agenda</TableHead>
+                        <TableHead>Data Agenda</TableHead>
                         <TableHead>Tipo</TableHead>
                         <TableHead className="w-[120px]">Ação</TableHead>
                       </TableRow>
@@ -523,6 +525,12 @@ export default function Agendamento() {
                           <TableCell className="max-w-[200px] truncate">{nf.dest_razao_social || "—"}</TableCell>
                           <TableCell>{nf.dest_cidade ? `${nf.dest_cidade}/${nf.dest_uf}` : "—"}</TableCell>
                           <TableCell>{statusEntregaBadge(nf.status_entrega)}</TableCell>
+                          <TableCell>{nf.agendamento_status ? statusBadge(nf.agendamento_status) : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-sm">
+                            {nf.agendamento_data
+                              ? format(new Date(nf.agendamento_data + "T12:00:00"), "dd/MM/yyyy")
+                              : <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell><TipoCargaBadge tipoCarga={nf.tipo_carga} /></TableCell>
                           <TableCell>
                             <Button size="sm" onClick={() => openAgendamentoDialog(nf)}>
