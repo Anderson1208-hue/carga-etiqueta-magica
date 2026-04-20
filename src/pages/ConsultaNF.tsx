@@ -76,6 +76,7 @@ const statusColors: Record<string, string> = {
 const agendamentoColors: Record<string, string> = {
   "AGENDAMENTO": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   "AGUARDANDO AGENDA": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "AGUARDANDO REAGENDA": "bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100",
   "REENTREGA": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   "DEVOLUCAO": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
