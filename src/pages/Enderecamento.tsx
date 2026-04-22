@@ -42,6 +42,9 @@ export default function Enderecamento() {
   const [novaPos, setNovaPos] = useState<Record<string, string>>({});
   const [savingNf, setSavingNf] = useState<string | null>(null);
   const [filtroSemEnd, setFiltroSemEnd] = useState(false);
+  const [loteNfs, setLoteNfs] = useState("");
+  const [lotePosicao, setLotePosicao] = useState("");
+  const [salvandoLote, setSalvandoLote] = useState(false);
 
   useEffect(() => {
     void carregar();
