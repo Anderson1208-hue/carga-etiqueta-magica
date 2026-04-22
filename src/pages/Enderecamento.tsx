@@ -170,6 +170,87 @@ export default function Enderecamento() {
     }
   }
 
+  async function aplicarLote() {
+    const posicao = lotePosicao.trim();
+    if (!posicao) {
+      toast({ variant: "destructive", title: "Informe a posição" });
+      return;
+    }
+    // Extrai números de NF: aceita quebras de linha, vírgula, ponto-e-vírgula, tab e espaço
+    const numeros = Array.from(
+      new Set(
+        loteNfs
+          .split(/[\s,;]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    );
+    if (numeros.length === 0) {
+      toast({ variant: "destructive", title: "Cole ao menos uma NF" });
+      return;
+    }
+
+    setSalvandoLote(true);
+    try {
+      // Mapeia número -> ids (pode haver múltiplas NFs com mesmo número de emitentes diferentes; pegamos todas as ativas)
+      const matchedIds: string[] = [];
+      const naoEncontradas: string[] = [];
+      const numerosNorm = numeros.map((n) => n.replace(/^0+/, "") || n);
+      for (let i = 0; i < numeros.length; i++) {
+        const alvo = numerosNorm[i];
+        const found = nfs.filter(
+          (n) => (n.numero_nf.replace(/^0+/, "") || n.numero_nf) === alvo
+        );
+        if (found.length === 0) naoEncontradas.push(numeros[i]);
+        else found.forEach((f) => matchedIds.push(f.id));
+      }
+
+      if (matchedIds.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Nenhuma NF encontrada",
+          description: "Verifique se as NFs estão ativas no CD/em rota.",
+        });
+        return;
+      }
+
+      // Insere uma posição por NF; ignora as que já têm a mesma posição (unique constraint)
+      const rows = matchedIds.map((id) => ({ nf_id: id, posicao }));
+      const { error } = await supabase
+        .from("nf_enderecamento")
+        .upsert(rows, { onConflict: "nf_id,posicao", ignoreDuplicates: true });
+      if (error) throw error;
+
+      // Atualiza estado local
+      setNfs((prev) =>
+        prev.map((n) =>
+          matchedIds.includes(n.id) && !n.posicoes.includes(posicao)
+            ? { ...n, posicoes: [...n.posicoes, posicao] }
+            : n
+        )
+      );
+
+      toast({
+        title: `Posição "${posicao}" aplicada`,
+        description:
+          `${matchedIds.length} NF(s) atualizadas` +
+          (naoEncontradas.length
+            ? ` • ${naoEncontradas.length} não encontradas: ${naoEncontradas.slice(0, 5).join(", ")}${naoEncontradas.length > 5 ? "..." : ""}`
+            : ""),
+      });
+      setLoteNfs("");
+      setLotePosicao("");
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao aplicar em lote",
+        description: err.message,
+      });
+    } finally {
+      setSalvandoLote(false);
+    }
+  }
+
   async function removerPosicao(nfId: string, posicao: string) {
     setSavingNf(nfId);
     try {
