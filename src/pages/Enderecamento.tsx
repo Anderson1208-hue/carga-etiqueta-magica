@@ -248,7 +248,8 @@ export default function Enderecamento() {
       toast({
         title: `Posição "${posicao}" aplicada`,
         description:
-          `${matchedIds.length} NF(s) atualizadas` +
+          `${inseridas} NF(s) atualizadas` +
+          (jaTinham.length ? ` • ${jaTinham.length} já tinham essa posição` : "") +
           (naoEncontradas.length
             ? ` • ${naoEncontradas.length} não encontradas: ${naoEncontradas.slice(0, 5).join(", ")}${naoEncontradas.length > 5 ? "..." : ""}`
             : ""),
