@@ -321,6 +321,56 @@ export default function Enderecamento() {
           </Card>
         </div>
 
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Plus className="w-4 h-4 text-primary" />
+              Atribuir mesma posição a várias NFs
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Cole os números das NFs (uma por linha, ou separadas por vírgula/espaço) e informe a posição. Útil para posições que comportam várias cargas.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_240px_auto] gap-3">
+              <Textarea
+                placeholder={"Ex:\n123456\n123457\n123458"}
+                value={loteNfs}
+                onChange={(e) => setLoteNfs(e.target.value)}
+                className="min-h-[100px] font-mono text-sm"
+                disabled={salvandoLote}
+              />
+              <div className="flex flex-col gap-2">
+                <Input
+                  placeholder="Posição (ex: A-01-02)"
+                  value={lotePosicao}
+                  onChange={(e) => setLotePosicao(e.target.value)}
+                  className="font-mono"
+                  disabled={salvandoLote}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {(() => {
+                    const n = loteNfs.split(/[\s,;]+/).filter(Boolean).length;
+                    return n > 0 ? `${n} NF(s) coladas` : "Nenhuma NF colada";
+                  })()}
+                </div>
+              </div>
+              <Button
+                onClick={aplicarLote}
+                disabled={salvandoLote || !lotePosicao.trim() || !loteNfs.trim()}
+                className="md:self-start"
+              >
+                {salvandoLote ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Aplicar a todas
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="pt-6 space-y-4">
             <div className="flex flex-col sm:flex-row gap-3">
