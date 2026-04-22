@@ -535,16 +535,19 @@ export type Database = {
         Row: {
           cnpj: string
           created_at: string
+          emitente: string | null
           id: string
         }
         Insert: {
           cnpj: string
           created_at?: string
+          emitente?: string | null
           id?: string
         }
         Update: {
           cnpj?: string
           created_at?: string
+          emitente?: string | null
           id?: string
         }
         Relationships: []
