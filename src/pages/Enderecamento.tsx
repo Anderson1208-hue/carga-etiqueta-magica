@@ -214,12 +214,27 @@ export default function Enderecamento() {
         return;
       }
 
-      // Insere uma posição por NF; ignora as que já têm a mesma posição (unique constraint)
-      const rows = matchedIds.map((id) => ({ nf_id: id, posicao }));
-      const { error } = await supabase
-        .from("nf_enderecamento")
-        .upsert(rows, { onConflict: "nf_id,posicao", ignoreDuplicates: true });
-      if (error) throw error;
+      // Verifica quais NFs já têm a posição para evitar violar a unique (lower(btrim(posicao)))
+      const posNorm = posicao.trim().toLowerCase();
+      const idsToInsert: string[] = [];
+      const jaTinham: string[] = [];
+      for (const id of matchedIds) {
+        const nf = nfs.find((n) => n.id === id);
+        const has = nf?.posicoes.some((p) => p.trim().toLowerCase() === posNorm);
+        if (has) jaTinham.push(id);
+        else if (!idsToInsert.includes(id)) idsToInsert.push(id);
+      }
+
+      let inseridas = 0;
+      if (idsToInsert.length > 0) {
+        const rows = idsToInsert.map((id) => ({ nf_id: id, posicao }));
+        const { error, data } = await supabase
+          .from("nf_enderecamento")
+          .insert(rows)
+          .select("nf_id");
+        if (error) throw error;
+        inseridas = data?.length || 0;
+      }
 
       // Atualiza estado local
       setNfs((prev) =>
@@ -233,7 +248,8 @@ export default function Enderecamento() {
       toast({
         title: `Posição "${posicao}" aplicada`,
         description:
-          `${matchedIds.length} NF(s) atualizadas` +
+          `${inseridas} NF(s) atualizadas` +
+          (jaTinham.length ? ` • ${jaTinham.length} já tinham essa posição` : "") +
           (naoEncontradas.length
             ? ` • ${naoEncontradas.length} não encontradas: ${naoEncontradas.slice(0, 5).join(", ")}${naoEncontradas.length > 5 ? "..." : ""}`
             : ""),
