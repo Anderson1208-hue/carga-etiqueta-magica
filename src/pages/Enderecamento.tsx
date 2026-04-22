@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -41,6 +42,9 @@ export default function Enderecamento() {
   const [novaPos, setNovaPos] = useState<Record<string, string>>({});
   const [savingNf, setSavingNf] = useState<string | null>(null);
   const [filtroSemEnd, setFiltroSemEnd] = useState(false);
+  const [loteNfs, setLoteNfs] = useState("");
+  const [lotePosicao, setLotePosicao] = useState("");
+  const [salvandoLote, setSalvandoLote] = useState(false);
 
   useEffect(() => {
     void carregar();
@@ -166,6 +170,87 @@ export default function Enderecamento() {
     }
   }
 
+  async function aplicarLote() {
+    const posicao = lotePosicao.trim();
+    if (!posicao) {
+      toast({ variant: "destructive", title: "Informe a posição" });
+      return;
+    }
+    // Extrai números de NF: aceita quebras de linha, vírgula, ponto-e-vírgula, tab e espaço
+    const numeros = Array.from(
+      new Set(
+        loteNfs
+          .split(/[\s,;]+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    );
+    if (numeros.length === 0) {
+      toast({ variant: "destructive", title: "Cole ao menos uma NF" });
+      return;
+    }
+
+    setSalvandoLote(true);
+    try {
+      // Mapeia número -> ids (pode haver múltiplas NFs com mesmo número de emitentes diferentes; pegamos todas as ativas)
+      const matchedIds: string[] = [];
+      const naoEncontradas: string[] = [];
+      const numerosNorm = numeros.map((n) => n.replace(/^0+/, "") || n);
+      for (let i = 0; i < numeros.length; i++) {
+        const alvo = numerosNorm[i];
+        const found = nfs.filter(
+          (n) => (n.numero_nf.replace(/^0+/, "") || n.numero_nf) === alvo
+        );
+        if (found.length === 0) naoEncontradas.push(numeros[i]);
+        else found.forEach((f) => matchedIds.push(f.id));
+      }
+
+      if (matchedIds.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Nenhuma NF encontrada",
+          description: "Verifique se as NFs estão ativas no CD/em rota.",
+        });
+        return;
+      }
+
+      // Insere uma posição por NF; ignora as que já têm a mesma posição (unique constraint)
+      const rows = matchedIds.map((id) => ({ nf_id: id, posicao }));
+      const { error } = await supabase
+        .from("nf_enderecamento")
+        .upsert(rows, { onConflict: "nf_id,posicao", ignoreDuplicates: true });
+      if (error) throw error;
+
+      // Atualiza estado local
+      setNfs((prev) =>
+        prev.map((n) =>
+          matchedIds.includes(n.id) && !n.posicoes.includes(posicao)
+            ? { ...n, posicoes: [...n.posicoes, posicao] }
+            : n
+        )
+      );
+
+      toast({
+        title: `Posição "${posicao}" aplicada`,
+        description:
+          `${matchedIds.length} NF(s) atualizadas` +
+          (naoEncontradas.length
+            ? ` • ${naoEncontradas.length} não encontradas: ${naoEncontradas.slice(0, 5).join(", ")}${naoEncontradas.length > 5 ? "..." : ""}`
+            : ""),
+      });
+      setLoteNfs("");
+      setLotePosicao("");
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao aplicar em lote",
+        description: err.message,
+      });
+    } finally {
+      setSalvandoLote(false);
+    }
+  }
+
   async function removerPosicao(nfId: string, posicao: string) {
     setSavingNf(nfId);
     try {
@@ -235,6 +320,56 @@ export default function Enderecamento() {
             </CardContent>
           </Card>
         </div>
+
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Plus className="w-4 h-4 text-primary" />
+              Atribuir mesma posição a várias NFs
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Cole os números das NFs (uma por linha, ou separadas por vírgula/espaço) e informe a posição. Útil para posições que comportam várias cargas.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_240px_auto] gap-3">
+              <Textarea
+                placeholder={"Ex:\n123456\n123457\n123458"}
+                value={loteNfs}
+                onChange={(e) => setLoteNfs(e.target.value)}
+                className="min-h-[100px] font-mono text-sm"
+                disabled={salvandoLote}
+              />
+              <div className="flex flex-col gap-2">
+                <Input
+                  placeholder="Posição (ex: A-01-02)"
+                  value={lotePosicao}
+                  onChange={(e) => setLotePosicao(e.target.value)}
+                  className="font-mono"
+                  disabled={salvandoLote}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {(() => {
+                    const n = loteNfs.split(/[\s,;]+/).filter(Boolean).length;
+                    return n > 0 ? `${n} NF(s) coladas` : "Nenhuma NF colada";
+                  })()}
+                </div>
+              </div>
+              <Button
+                onClick={aplicarLote}
+                disabled={salvandoLote || !lotePosicao.trim() || !loteNfs.trim()}
+                className="md:self-start"
+              >
+                {salvandoLote ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                Aplicar a todas
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="pt-6 space-y-4">
