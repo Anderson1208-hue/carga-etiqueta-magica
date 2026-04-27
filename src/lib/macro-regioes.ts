@@ -60,6 +60,7 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "CACHAMBI": 4,
   "BENFICA": 4,
   "VASCO DA GAMA": 4,
+  "PILARES": 4,
 
   // Macro Região 5
   "PORTUGUESA": 5,
@@ -78,6 +79,9 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "OLARIA": 5,
   "COELHO NETO": 5,
   "PENHA CIRCULAR": 5,
+  "CORDOVIL": 5,
+  "ENGENHO DA RAINHA": 5,
+  "VICENTE DE CARVALHO": 5,
 
   // Macro Região 6
   "MADUREIRA": 6,
@@ -90,12 +94,17 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "HONÓRIO GURGEL": 6,
   "TURIACU": 6,
   "TURIAÇU": 6,
+  "ROCHA MIRANDA": 6,
 
   // Macro Região 7
   "PECHINCHA": 7,
   "FREGUESIA": 7,
   "FREGUESIA (JACAREPAGUA)": 7,
   "FREGUESIA (JACAREPAGUÁ)": 7,
+  "FREGUESIA JACAREPAGUA": 7,
+  "FREGUESIA JACAREPAGUÁ": 7,
+  "FREGUESIA DE JACAREPAGUA": 7,
+  "FREGUESIA DE JACAREPAGUÁ": 7,
   "ANIL": 7,
 
   // Macro Região 8
@@ -117,6 +126,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "CAMPO GRANDE": 11,
   "REALENGO": 11,
   "BANGU": 11,
+  "CENTRO BANGU": 11,
+  "GUADALUPE": 11,
   "PADRE MIGUEL": 11,
   "SANTA CRUZ": 11,
   "KOSMOS": 11,
