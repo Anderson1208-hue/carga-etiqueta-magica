@@ -1394,7 +1394,7 @@ export default function Roteirizacao() {
         .select(`
           nf_id, carga_origem_id,
           notas_fiscais!inner(
-            numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
+            id, numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
             dest_razao_social, dest_logradouro, dest_numero, dest_bairro,
             dest_cidade, dest_uf, dest_cep, data_emissao, peso_bruto, volume_m3,
             itens_nf(c_prod, x_prod, q_com)
@@ -1421,6 +1421,21 @@ export default function Roteirizacao() {
         vnfs.map((v: any) => v.notas_fiscais?.id).filter(Boolean)
       );
 
+      // Buscar NFs que estão marcadas como REENTREGA (agendamentos)
+      const nfIdsVeic = vnfs.map((v: any) => v.nf_id).filter(Boolean);
+      const reentregaMap = new Map<string, string>();
+      if (nfIdsVeic.length > 0) {
+        const { data: agds } = await supabase
+          .from("agendamentos")
+          .select("nf_id, status, observacao")
+          .in("nf_id", nfIdsVeic)
+          .eq("status", "REENTREGA");
+        (agds || []).forEach((a: any) => {
+          reentregaMap.set(a.nf_id, a.observacao || "");
+        });
+      }
+
+
       const notasFiscais = vnfs.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const bairro = nf.dest_bairro || "";
@@ -1442,6 +1457,8 @@ export default function Roteirizacao() {
           ordemEntrega: ordemPorCnpj.get(cnpjKey),
           totalEntregas: totalEntregasRota || undefined,
           enderecamentos: enderecMap.get(nf.id) || [],
+          reentrega: reentregaMap.has(vnf.nf_id),
+          reentregaObservacao: reentregaMap.get(vnf.nf_id) || undefined,
           itens: (nf.itens_nf || []).map((item: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
