@@ -1421,6 +1421,21 @@ export default function Roteirizacao() {
         vnfs.map((v: any) => v.notas_fiscais?.id).filter(Boolean)
       );
 
+      // Buscar NFs que estão marcadas como REENTREGA (agendamentos)
+      const nfIdsVeic = vnfs.map((v: any) => v.nf_id).filter(Boolean);
+      const reentregaMap = new Map<string, string>();
+      if (nfIdsVeic.length > 0) {
+        const { data: agds } = await supabase
+          .from("agendamentos")
+          .select("nf_id, status, observacao")
+          .in("nf_id", nfIdsVeic)
+          .eq("status", "REENTREGA");
+        (agds || []).forEach((a: any) => {
+          reentregaMap.set(a.nf_id, a.observacao || "");
+        });
+      }
+
+
       const notasFiscais = vnfs.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const bairro = nf.dest_bairro || "";
