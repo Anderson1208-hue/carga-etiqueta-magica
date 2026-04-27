@@ -78,6 +78,9 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "OLARIA": 5,
   "COELHO NETO": 5,
   "PENHA CIRCULAR": 5,
+  "CORDOVIL": 5,
+  "ENGENHO DA RAINHA": 5,
+  "VICENTE DE CARVALHO": 5,
 
   // Macro Região 6
   "MADUREIRA": 6,
