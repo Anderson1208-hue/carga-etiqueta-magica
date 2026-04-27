@@ -430,6 +430,13 @@ export default function BaixaEntrega() {
 
     setSubmitting(true);
     try {
+      // Reentrega exige conexão (precisa atualizar vínculos no servidor)
+      if ((!isOnline || offlineMode) && ocorrencia === "reentrega") {
+        toast({ title: "Sem conexão", description: "A ocorrência Reentrega requer conexão com a internet", variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+
       // If offline or offlineMode, save locally
       if (!isOnline || offlineMode) {
         await saveBaixaOffline({
