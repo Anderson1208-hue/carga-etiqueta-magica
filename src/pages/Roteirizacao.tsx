@@ -1394,7 +1394,7 @@ export default function Roteirizacao() {
         .select(`
           nf_id, carga_origem_id,
           notas_fiscais!inner(
-            numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
+            id, numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
             dest_razao_social, dest_logradouro, dest_numero, dest_bairro,
             dest_cidade, dest_uf, dest_cep, data_emissao, peso_bruto, volume_m3,
             itens_nf(c_prod, x_prod, q_com)
