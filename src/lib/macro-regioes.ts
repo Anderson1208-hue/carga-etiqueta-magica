@@ -94,6 +94,7 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "HONÓRIO GURGEL": 6,
   "TURIACU": 6,
   "TURIAÇU": 6,
+  "TURICU": 6,
   "ROCHA MIRANDA": 6,
 
   // Macro Região 7
