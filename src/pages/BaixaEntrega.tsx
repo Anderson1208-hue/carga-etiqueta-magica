@@ -488,6 +488,42 @@ export default function BaixaEntrega() {
 
       if (insertError) throw insertError;
 
+      // Se for "Reentrega": NF volta para a Preparação
+      if (ocorrencia === "reentrega") {
+        // 1) Garante status_entrega = CARGA NO DEPOSITO (não pode ser ENTREGUE/RECUSADO)
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "CARGA NO DEPOSITO" })
+          .eq("id", selectedNfId);
+
+        // 2) Remove vínculo veiculo_nfs (libera para nova programação)
+        await supabase
+          .from("veiculo_nfs")
+          .delete()
+          .eq("nf_id", selectedNfId);
+
+        // 3) Cria/atualiza agendamento REENTREGA com data = próximo dia útil
+        const proxima = proximoDiaUtilApos(new Date());
+        const dataAg = `${proxima.getFullYear()}-${String(proxima.getMonth() + 1).padStart(2, "0")}-${String(proxima.getDate()).padStart(2, "0")}`;
+
+        const { data: existingAg } = await supabase
+          .from("agendamentos")
+          .select("id")
+          .eq("nf_id", selectedNfId)
+          .maybeSingle();
+
+        if (existingAg?.id) {
+          await supabase
+            .from("agendamentos")
+            .update({ status: "REENTREGA", data_agendamento: dataAg })
+            .eq("id", existingAg.id);
+        } else {
+          await supabase
+            .from("agendamentos")
+            .insert({ nf_id: selectedNfId, status: "REENTREGA", data_agendamento: dataAg, created_by: user?.id || null });
+        }
+      }
+
       toast({
         title: "Baixa registrada!",
         description: `NF ${nfs.find((n) => n.nf_id === selectedNfId)?.numero_nf} - ${OCORRENCIAS.find((o) => o.value === ocorrencia)?.label}`,
