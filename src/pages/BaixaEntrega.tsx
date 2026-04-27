@@ -34,7 +34,9 @@ import {
   Upload,
   WifiOff,
   Wifi,
+  RotateCcw,
 } from "lucide-react";
+import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 
 interface Veiculo {
   id: string;
@@ -58,13 +60,14 @@ interface NfEntrega {
   baixa_status: string | null;
 }
 
-type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "outros";
+type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "reentrega" | "outros";
 
 const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "entregue", label: "Entregue", icon: <CheckCircle2 className="w-5 h-5" />, color: "text-green-600" },
   { value: "recusado", label: "Recusado", icon: <XCircle className="w-5 h-5" />, color: "text-red-600" },
   { value: "endereco_nao_encontrado", label: "Endereço não encontrado", icon: <MapPin className="w-5 h-5" />, color: "text-orange-600" },
   { value: "ausente", label: "Destinatário ausente", icon: <AlertTriangle className="w-5 h-5" />, color: "text-yellow-600" },
+  { value: "reentrega", label: "Reentrega", icon: <RotateCcw className="w-5 h-5" />, color: "text-blue-600" },
   { value: "outros", label: "Outros", icon: <AlertTriangle className="w-5 h-5" />, color: "text-muted-foreground" },
 ];
 
