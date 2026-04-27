@@ -25,6 +25,8 @@ interface NotaFiscalPDF {
   ordemEntrega?: number;
   totalEntregas?: number;
   enderecamentos?: string[];
+  reentrega?: boolean;
+  reentregaObservacao?: string;
   itens: {
     cProd: string;
     xProd: string;
