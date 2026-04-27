@@ -1457,6 +1457,8 @@ export default function Roteirizacao() {
           ordemEntrega: ordemPorCnpj.get(cnpjKey),
           totalEntregas: totalEntregasRota || undefined,
           enderecamentos: enderecMap.get(nf.id) || [],
+          reentrega: reentregaMap.has(vnf.nf_id),
+          reentregaObservacao: reentregaMap.get(vnf.nf_id) || undefined,
           itens: (nf.itens_nf || []).map((item: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
