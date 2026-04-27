@@ -34,7 +34,9 @@ import {
   Upload,
   WifiOff,
   Wifi,
+  RotateCcw,
 } from "lucide-react";
+import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 
 interface Veiculo {
   id: string;
@@ -58,13 +60,14 @@ interface NfEntrega {
   baixa_status: string | null;
 }
 
-type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "outros";
+type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "reentrega" | "outros";
 
 const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "entregue", label: "Entregue", icon: <CheckCircle2 className="w-5 h-5" />, color: "text-green-600" },
   { value: "recusado", label: "Recusado", icon: <XCircle className="w-5 h-5" />, color: "text-red-600" },
   { value: "endereco_nao_encontrado", label: "Endereço não encontrado", icon: <MapPin className="w-5 h-5" />, color: "text-orange-600" },
   { value: "ausente", label: "Destinatário ausente", icon: <AlertTriangle className="w-5 h-5" />, color: "text-yellow-600" },
+  { value: "reentrega", label: "Reentrega", icon: <RotateCcw className="w-5 h-5" />, color: "text-blue-600" },
   { value: "outros", label: "Outros", icon: <AlertTriangle className="w-5 h-5" />, color: "text-muted-foreground" },
 ];
 
@@ -427,6 +430,13 @@ export default function BaixaEntrega() {
 
     setSubmitting(true);
     try {
+      // Reentrega exige conexão (precisa atualizar vínculos no servidor)
+      if ((!isOnline || offlineMode) && ocorrencia === "reentrega") {
+        toast({ title: "Sem conexão", description: "A ocorrência Reentrega requer conexão com a internet", variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+
       // If offline or offlineMode, save locally
       if (!isOnline || offlineMode) {
         await saveBaixaOffline({
@@ -484,6 +494,42 @@ export default function BaixaEntrega() {
         });
 
       if (insertError) throw insertError;
+
+      // Se for "Reentrega": NF volta para a Preparação
+      if (ocorrencia === "reentrega") {
+        // 1) Garante status_entrega = CARGA NO DEPOSITO (não pode ser ENTREGUE/RECUSADO)
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "CARGA NO DEPOSITO" })
+          .eq("id", selectedNfId);
+
+        // 2) Remove vínculo veiculo_nfs (libera para nova programação)
+        await supabase
+          .from("veiculo_nfs")
+          .delete()
+          .eq("nf_id", selectedNfId);
+
+        // 3) Cria/atualiza agendamento REENTREGA com data = próximo dia útil
+        const proxima = proximoDiaUtilApos(new Date());
+        const dataAg = `${proxima.getFullYear()}-${String(proxima.getMonth() + 1).padStart(2, "0")}-${String(proxima.getDate()).padStart(2, "0")}`;
+
+        const { data: existingAg } = await supabase
+          .from("agendamentos")
+          .select("id")
+          .eq("nf_id", selectedNfId)
+          .maybeSingle();
+
+        if (existingAg?.id) {
+          await supabase
+            .from("agendamentos")
+            .update({ status: "REENTREGA", data_agendamento: dataAg })
+            .eq("id", existingAg.id);
+        } else {
+          await supabase
+            .from("agendamentos")
+            .insert({ nf_id: selectedNfId, status: "REENTREGA", data_agendamento: dataAg, created_by: user?.id || null });
+        }
+      }
 
       toast({
         title: "Baixa registrada!",
