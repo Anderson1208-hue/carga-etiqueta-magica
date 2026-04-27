@@ -60,6 +60,7 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "CACHAMBI": 4,
   "BENFICA": 4,
   "VASCO DA GAMA": 4,
+  "PILARES": 4,
 
   // Macro Região 5
   "PORTUGUESA": 5,
@@ -125,6 +126,8 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
   "CAMPO GRANDE": 11,
   "REALENGO": 11,
   "BANGU": 11,
+  "CENTRO BANGU": 11,
+  "GUADALUPE": 11,
   "PADRE MIGUEL": 11,
   "SANTA CRUZ": 11,
   "KOSMOS": 11,
