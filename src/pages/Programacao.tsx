@@ -127,9 +127,28 @@ export default function Programacao() {
           .limit(2000)
       );
 
-      const [nfResults, { data: assigned }, { data: agendamentos }, { data: ctes }] = await Promise.all([
+      // Buscar TODOS os vínculos veiculo_nfs paginando (limite default Supabase é 1000)
+      const fetchAllAssigned = async () => {
+        const all: { nf_id: string }[] = [];
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("veiculo_nfs")
+            .select("nf_id")
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          all.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+
+      const [nfResults, assigned, { data: agendamentos }, { data: ctes }] = await Promise.all([
         Promise.all(nfPromises),
-        supabase.from("veiculo_nfs").select("nf_id"),
+        fetchAllAssigned(),
         supabase.from("agendamentos").select("nf_id, data_agendamento, status, created_at").order("created_at", { ascending: false }),
         supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
