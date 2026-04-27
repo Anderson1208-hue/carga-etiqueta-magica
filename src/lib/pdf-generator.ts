@@ -237,6 +237,34 @@ export async function generateNotaDeCargaPDF(
     doc.text(`NF: ${nf.numeroNf}`, MARGIN, y);
     y += 9;
 
+    // Destaque REENTREGA (banner vermelho)
+    if (nf.reentrega) {
+      const obs = (nf.reentregaObservacao || "").trim();
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      const obsLines = obs ? doc.splitTextToSize(`Obs.: ${obs}`, pageWidth - 6) : [];
+      const boxH = 12 + (obsLines.length > 0 ? 5 * obsLines.length + 2 : 0);
+
+      doc.setFillColor(220, 38, 38);
+      doc.setDrawColor(127, 29, 29);
+      doc.setLineWidth(0.6);
+      doc.rect(MARGIN, y - 2, pageWidth, boxH, "FD");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("REENTREGA", MARGIN + pageWidth / 2, y + 6, { align: "center" });
+
+      if (obsLines.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(obsLines, MARGIN + 3, y + 13);
+      }
+      doc.setTextColor(0, 0, 0);
+      y += boxH + 4;
+    }
+
+
     // Destaque de ordem de entrega (1ª/2ª/...) baseado na rota
     if (nf.ordemEntrega && nf.ordemEntrega > 0) {
       const totalStr = nf.totalEntregas && nf.totalEntregas > 0 ? ` DE ${nf.totalEntregas}` : "";
