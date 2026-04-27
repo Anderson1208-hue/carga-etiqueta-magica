@@ -699,30 +699,42 @@ export default function Cargas() {
                     <TableCell className="text-center">{carga._count?.nfs || 0}</TableCell>
                     <TableCell className="text-center">{carga._count?.itens || 0}</TableCell>
                     <TableCell>
-                      <Select
-                        value={carga.status}
-                        onValueChange={(value: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida") =>
-                          handleStatusChange(carga.id, value)
-                        }
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="aberta">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-primary" />
-                              Aberta
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="fechada">
-                            <span className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-muted-foreground" />
-                              Fechada
-                            </span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {carga.status === "aberta" || carga.status === "fechada" ? (
+                        <Select
+                          value={carga.status}
+                          onValueChange={(value: "aberta" | "fechada") =>
+                            handleStatusChange(carga.id, value)
+                          }
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="aberta">
+                              <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-primary" />
+                                Aberta
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="fechada">
+                              <span className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+                                Fechada
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant="secondary" className="capitalize">
+                          {carga.status === "em_rota"
+                            ? "Em Rota"
+                            : carga.status === "entregue"
+                            ? "Entregue"
+                            : carga.status === "expedida"
+                            ? "Expedida"
+                            : carga.status}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
