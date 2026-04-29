@@ -19,6 +19,7 @@ interface MinutaParsed {
   cnpjEmitente: string;
   razaoSocialEmitente: string;
   valorFrete: number;
+  dataEmissao: string; // ISO date "YYYY-MM-DD" ou ""
 }
 
 const SYSTEM_PROMPT = `Você é um extrator de dados de Minutas de Transporte brasileiras em PDF.
@@ -37,6 +38,7 @@ Extraia EXATAMENTE os campos solicitados, sem inventar dados:
 - "cnpj_emitente": CNPJ da transportadora emitente da minuta (14 dígitos, sem máscara).
 - "razao_social_emitente": razão social da transportadora emitente.
 - "valor_frete": valor do frete em decimal com ponto (ex: "R$ 75,14" → 75.14). 0 se ausente.
+- "data_emissao": data de emissão da minuta no formato ISO "YYYY-MM-DD" (ex: "29/04/2026" → "2026-04-29"). Vazio se ausente.
 
 NUNCA invente uma chave de 44 dígitos. Se não houver no documento, retorne string vazia.
 Responda APENAS através da função fornecida.`;
@@ -102,6 +104,7 @@ Deno.serve(async (req) => {
                   cnpj_emitente: { type: "string" },
                   razao_social_emitente: { type: "string" },
                   valor_frete: { type: "number" },
+                  data_emissao: { type: "string", description: "Data emissão YYYY-MM-DD ou vazio" },
                 },
                 required: [
                   "numero_minuta",
@@ -111,6 +114,7 @@ Deno.serve(async (req) => {
                   "cnpj_emitente",
                   "razao_social_emitente",
                   "valor_frete",
+                  "data_emissao",
                 ],
                 additionalProperties: false,
               },
@@ -158,6 +162,12 @@ Deno.serve(async (req) => {
     const chaveCteRaw = String(args.chave_cte || "").replace(/\D/g, "");
     const chaveNfRaw = String(args.chave_nf_referenciada || "").replace(/\D/g, "");
 
+    // Normaliza data: aceita YYYY-MM-DD ou DD/MM/YYYY
+    let dataEmissao = String(args.data_emissao || "").trim();
+    const brMatch = dataEmissao.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) dataEmissao = `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataEmissao)) dataEmissao = "";
+
     const result: MinutaParsed = {
       numeroMinuta,
       // Aceita chave somente se tiver exatamente 44 dígitos
@@ -167,6 +177,7 @@ Deno.serve(async (req) => {
       cnpjEmitente: String(args.cnpj_emitente || "").replace(/\D/g, ""),
       razaoSocialEmitente: String(args.razao_social_emitente || "").trim(),
       valorFrete: Number(args.valor_frete) || 0,
+      dataEmissao,
     };
 
     // Validações: minuta precisa ter ao menos número da minuta e número da NF
