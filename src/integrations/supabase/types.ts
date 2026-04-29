@@ -559,10 +559,14 @@ export type Database = {
           chave_nf_referenciada: string | null
           cnpj_emitente: string | null
           created_at: string
+          data_emissao: string | null
           id: string
+          identificador_interno: string | null
           nf_id: string | null
           numero_cte: string
+          numero_nf_referenciada: string | null
           razao_social_emitente: string | null
+          tipo_documento: string
           valor_frete: number | null
         }
         Insert: {
@@ -571,10 +575,14 @@ export type Database = {
           chave_nf_referenciada?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_emissao?: string | null
           id?: string
+          identificador_interno?: string | null
           nf_id?: string | null
           numero_cte: string
+          numero_nf_referenciada?: string | null
           razao_social_emitente?: string | null
+          tipo_documento?: string
           valor_frete?: number | null
         }
         Update: {
@@ -583,10 +591,14 @@ export type Database = {
           chave_nf_referenciada?: string | null
           cnpj_emitente?: string | null
           created_at?: string
+          data_emissao?: string | null
           id?: string
+          identificador_interno?: string | null
           nf_id?: string | null
           numero_cte?: string
+          numero_nf_referenciada?: string | null
           razao_social_emitente?: string | null
+          tipo_documento?: string
           valor_frete?: number | null
         }
         Relationships: [
