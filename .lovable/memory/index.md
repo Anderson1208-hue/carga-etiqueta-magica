@@ -18,6 +18,7 @@ type: reference
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.
 - [XML Parser](mem://funcionalidades/xml-parser) — Weights extracted from <transp><vol> (header level).
 - [Importação de CT-e](mem://funcionalidades/operacao/importacao-cte) — Parse and link CT-e to Carga and NF.
+- [Documentos Transporte CTE+Minuta](mem://funcionalidades/operacao/documentos-transporte-cte-minuta) — Tabela ctes genérica: tipo_documento (CTE/MINUTA), MIN-{cnpj}-{num} para minuta sem chave, vínculo NF por chave→número.
 - [Importação de Cubagem](mem://funcionalidades/operacao/importacao-cubagem-excel) — Excel m3 import via regex.
 - [Ordenação Numérica](mem://logica/ordenacao-numerica-real) — Natural sorting logic.
 - [Filtros de Disponibilidade](mem://logica/preparacao/filtros-disponibilidade) — NF visibility rules in Preparação.
