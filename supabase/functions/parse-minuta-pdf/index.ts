@@ -1,5 +1,7 @@
-// Parse de PDF de Minuta (CT-e) via Lovable AI Gateway (Gemini)
-// Extrai: numero_cte, chave_cte, chave_nf_referenciada, cnpj_emitente, razao_social_emitente, valor_frete
+// Parse de PDF de Minuta de Transporte via Lovable AI Gateway (Gemini)
+// Extrai dados de minutas de coleta/expedição (não confundir com CT-e completo).
+// Campos extraídos: numero_minuta, numero_nf_referenciada, cnpj_emitente,
+// razao_social_emitente, valor_frete. Chaves de 44 dígitos são opcionais.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,25 +12,34 @@ const corsHeaders = {
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 interface MinutaParsed {
-  numeroCte: string;
-  chaveCte: string;
-  chaveNfReferenciada: string;
+  numeroMinuta: string;
+  chaveCte: string; // opcional, vazio se não houver
+  numeroNfReferenciada: string;
+  chaveNfReferenciada: string; // opcional, vazio se não houver
   cnpjEmitente: string;
   razaoSocialEmitente: string;
   valorFrete: number;
 }
 
-const SYSTEM_PROMPT = `Você é um extrator de dados de Minutas/CT-e brasileiros em PDF.
-Extraia EXATAMENTE os campos pedidos, sem inventar dados.
-Regras:
-- "chave_cte": chave de acesso do CT-e (44 dígitos numéricos). Remova espaços e pontos.
-- "chave_nf_referenciada": chave da NF-e referenciada/transportada (44 dígitos). Se houver múltiplas, retorne a primeira.
-- "numero_cte": número do CT-e (apenas dígitos, sem zeros à esquerda).
-- "cnpj_emitente": CNPJ da transportadora emitente do CT-e (14 dígitos, sem máscara).
-- "razao_social_emitente": razão social da transportadora.
-- "valor_frete": valor total da prestação do serviço (vTPrest), número decimal com ponto (ex: 123.45).
-Se algum campo não for encontrado, retorne string vazia ou 0.
-Responda APENAS com a função fornecida.`;
+const SYSTEM_PROMPT = `Você é um extrator de dados de Minutas de Transporte brasileiras em PDF.
+Estas minutas (também chamadas de "minuta de coleta", "minuta de expedição" ou "via UNI")
+NÃO são CT-e completos — geralmente trazem apenas números, sem chaves de 44 dígitos.
+
+Extraia EXATAMENTE os campos solicitados, sem inventar dados:
+
+- "numero_minuta": número da minuta/UNI (ex: "000003187" → retorne "3187", apenas dígitos sem zeros à esquerda).
+- "chave_cte": chave de acesso do CT-e SE existir explicitamente no documento (44 dígitos numéricos).
+   Se NÃO existir uma sequência de 44 dígitos rotulada como chave/CT-e, retorne string vazia "".
+- "numero_nf_referenciada": número da Nota Fiscal transportada/referenciada
+   (ex: "0000107164" → retorne "107164", apenas dígitos sem zeros à esquerda).
+   Se houver múltiplas NFs, retorne a primeira.
+- "chave_nf_referenciada": chave de acesso da NF-e SE existir (44 dígitos). Caso contrário, "".
+- "cnpj_emitente": CNPJ da transportadora emitente da minuta (14 dígitos, sem máscara).
+- "razao_social_emitente": razão social da transportadora emitente.
+- "valor_frete": valor do frete em decimal com ponto (ex: "R$ 75,14" → 75.14). 0 se ausente.
+
+NUNCA invente uma chave de 44 dígitos. Se não houver no documento, retorne string vazia.
+Responda APENAS através da função fornecida.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -66,7 +77,7 @@ Deno.serve(async (req) => {
             content: [
               {
                 type: "text",
-                text: `Extraia os dados desta minuta/CT-e (arquivo: ${fileName || "minuta.pdf"}).`,
+                text: `Extraia os dados desta minuta de transporte (arquivo: ${fileName || "minuta.pdf"}).`,
               },
               {
                 type: "image_url",
@@ -80,20 +91,22 @@ Deno.serve(async (req) => {
             type: "function",
             function: {
               name: "registrar_minuta",
-              description: "Registra os dados extraídos da minuta/CT-e",
+              description: "Registra os dados extraídos da minuta de transporte",
               parameters: {
                 type: "object",
                 properties: {
-                  numero_cte: { type: "string" },
-                  chave_cte: { type: "string" },
-                  chave_nf_referenciada: { type: "string" },
+                  numero_minuta: { type: "string", description: "Número da minuta/UNI sem zeros à esquerda" },
+                  chave_cte: { type: "string", description: "Chave CT-e 44 dígitos OU string vazia" },
+                  numero_nf_referenciada: { type: "string", description: "Número da NF sem zeros à esquerda" },
+                  chave_nf_referenciada: { type: "string", description: "Chave NF-e 44 dígitos OU string vazia" },
                   cnpj_emitente: { type: "string" },
                   razao_social_emitente: { type: "string" },
                   valor_frete: { type: "number" },
                 },
                 required: [
-                  "numero_cte",
+                  "numero_minuta",
                   "chave_cte",
+                  "numero_nf_referenciada",
                   "chave_nf_referenciada",
                   "cnpj_emitente",
                   "razao_social_emitente",
@@ -139,20 +152,27 @@ Deno.serve(async (req) => {
     }
 
     const args = JSON.parse(toolCall.function.arguments);
+
+    const numeroMinuta = String(args.numero_minuta || "").replace(/\D/g, "").replace(/^0+/, "");
+    const numeroNf = String(args.numero_nf_referenciada || "").replace(/\D/g, "").replace(/^0+/, "");
+    const chaveCteRaw = String(args.chave_cte || "").replace(/\D/g, "");
+    const chaveNfRaw = String(args.chave_nf_referenciada || "").replace(/\D/g, "");
+
     const result: MinutaParsed = {
-      numeroCte: String(args.numero_cte || "").replace(/\D/g, "").replace(/^0+/, "") || "",
-      chaveCte: String(args.chave_cte || "").replace(/\D/g, ""),
-      chaveNfReferenciada: String(args.chave_nf_referenciada || "").replace(/\D/g, ""),
+      numeroMinuta,
+      // Aceita chave somente se tiver exatamente 44 dígitos
+      chaveCte: chaveCteRaw.length === 44 ? chaveCteRaw : "",
+      numeroNfReferenciada: numeroNf,
+      chaveNfReferenciada: chaveNfRaw.length === 44 ? chaveNfRaw : "",
       cnpjEmitente: String(args.cnpj_emitente || "").replace(/\D/g, ""),
       razaoSocialEmitente: String(args.razao_social_emitente || "").trim(),
       valorFrete: Number(args.valor_frete) || 0,
     };
 
-    // Validações
+    // Validações: minuta precisa ter ao menos número da minuta e número da NF
     const errors: string[] = [];
-    if (result.chaveCte.length !== 44) errors.push("chave_cte inválida (precisa 44 dígitos)");
-    if (result.chaveNfReferenciada.length !== 44) errors.push("chave_nf_referenciada inválida");
-    if (!result.numeroCte) errors.push("numero_cte vazio");
+    if (!result.numeroMinuta) errors.push("número da minuta não encontrado");
+    if (!result.numeroNfReferenciada) errors.push("número da NF referenciada não encontrado");
 
     return new Response(JSON.stringify({ data: result, warnings: errors }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

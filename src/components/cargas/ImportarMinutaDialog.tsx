@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dialog";
 
 interface MinutaParsed {
-  numeroCte: string;
+  numeroMinuta: string;
   chaveCte: string;
+  numeroNfReferenciada: string;
   chaveNfReferenciada: string;
   cnpjEmitente: string;
   razaoSocialEmitente: string;
@@ -26,6 +27,7 @@ interface ParsedMinutaFile {
   status: "success" | "error" | "warning";
   error?: string;
   nfNumero?: string;
+  nfId?: string;
 }
 
 interface ImportarMinutaDialogProps {
@@ -41,11 +43,24 @@ async function fileToBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const res = reader.result as string;
-      resolve(res.split(",")[1]); // strip data:...;base64,
+      resolve(res.split(",")[1]);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+// Normaliza um número (NF ou minuta) removendo zeros à esquerda e não-dígitos
+function normalizaNumero(s: string | undefined | null): string {
+  return String(s || "").replace(/\D/g, "").replace(/^0+/, "");
+}
+
+// Gera um identificador único para a minuta quando não há chave de CT-e real (44 dígitos).
+// Formato: MIN-{cnpj}-{numero} (cabe em chave_cte text + UNIQUE).
+function buildMinutaId(parsed: MinutaParsed): string {
+  if (parsed.chaveCte && parsed.chaveCte.length === 44) return parsed.chaveCte;
+  const cnpj = parsed.cnpjEmitente || "SEMCNPJ";
+  return `MIN-${cnpj}-${parsed.numeroMinuta}`;
 }
 
 export function ImportarMinutaDialog({
@@ -60,7 +75,10 @@ export function ImportarMinutaDialog({
   const [saving, setSaving] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
+  // Mapeia número de NF normalizado -> {id, numero_nf}
+  const [nfsByNumero, setNfsByNumero] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
+  // Mapeia chave de acesso -> {id, numero_nf} (fallback)
+  const [nfsByChave, setNfsByChave] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
 
   async function loadNfs() {
@@ -69,11 +87,15 @@ export function ImportarMinutaDialog({
       .from("notas_fiscais")
       .select("id, chave_acesso, numero_nf")
       .eq("carga_id", cargaId);
-    const map = new Map<string, { id: string; numero_nf: string }>();
+    const byNumero = new Map<string, { id: string; numero_nf: string }>();
+    const byChave = new Map<string, { id: string; numero_nf: string }>();
     (data || []).forEach((nf) => {
-      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf });
+      byChave.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf });
+      const numNorm = normalizaNumero(nf.numero_nf);
+      if (numNorm) byNumero.set(numNorm, { id: nf.id, numero_nf: nf.numero_nf });
     });
-    setNfsMap(map);
+    setNfsByNumero(byNumero);
+    setNfsByChave(byChave);
     setNfsLoaded(true);
   }
 
@@ -105,12 +127,6 @@ export function ImportarMinutaDialog({
           const parsed: MinutaParsed = resp.data;
           const warnings: string[] = resp.warnings || [];
 
-          // Duplicate check
-          if (parsedFiles.some((pf) => pf.data?.chaveCte === parsed.chaveCte) && parsed.chaveCte) {
-            newFiles.push({ fileName: file.name, data: parsed, status: "error", error: "Minuta já adicionada (chave duplicada)" });
-            continue;
-          }
-
           if (warnings.length > 0) {
             newFiles.push({
               fileName: file.name,
@@ -121,13 +137,27 @@ export function ImportarMinutaDialog({
             continue;
           }
 
-          const nfMatch = nfsMap.get(parsed.chaveNfReferenciada);
+          // Duplicate check no buffer atual (mesma minuta no mesmo upload)
+          const minutaId = buildMinutaId(parsed);
+          if (parsedFiles.some((pf) => pf.data && buildMinutaId(pf.data) === minutaId)) {
+            newFiles.push({ fileName: file.name, data: parsed, status: "error", error: "Minuta já adicionada na lista" });
+            continue;
+          }
+
+          // Casa NF: primeiro tenta por chave (se houver), depois por número
+          let nfMatch = parsed.chaveNfReferenciada
+            ? nfsByChave.get(parsed.chaveNfReferenciada)
+            : undefined;
+          if (!nfMatch) {
+            nfMatch = nfsByNumero.get(normalizaNumero(parsed.numeroNfReferenciada));
+          }
+
           if (!nfMatch) {
             newFiles.push({
               fileName: file.name,
               data: parsed,
               status: "error",
-              error: `NF referenciada não encontrada nesta carga (chave: ...${parsed.chaveNfReferenciada.slice(-8)})`,
+              error: `NF ${parsed.numeroNfReferenciada} não encontrada nesta carga`,
             });
             continue;
           }
@@ -137,6 +167,7 @@ export function ImportarMinutaDialog({
             data: parsed,
             status: "success",
             nfNumero: nfMatch.numero_nf,
+            nfId: nfMatch.id,
           });
         } catch (error) {
           newFiles.push({
@@ -151,7 +182,7 @@ export function ImportarMinutaDialog({
       setParsedFiles((prev) => [...prev, ...newFiles]);
       setIsProcessing(false);
     },
-    [parsedFiles, nfsMap]
+    [parsedFiles, nfsByNumero, nfsByChave]
   );
 
   function handleRemoveFile(index: number) {
@@ -162,7 +193,8 @@ export function ImportarMinutaDialog({
     if (!openState) {
       setParsedFiles([]);
       setNfsLoaded(false);
-      setNfsMap(new Map());
+      setNfsByNumero(new Map());
+      setNfsByChave(new Map());
     }
     onOpenChange(openState);
   }
@@ -195,13 +227,12 @@ export function ImportarMinutaDialog({
     try {
       const inserts = successFiles.map((file) => {
         const m = file.data!;
-        const nfMatch = nfsMap.get(m.chaveNfReferenciada);
         return {
           carga_id: cargaId,
-          nf_id: nfMatch?.id || null,
-          chave_cte: m.chaveCte,
-          numero_cte: m.numeroCte,
-          chave_nf_referenciada: m.chaveNfReferenciada,
+          nf_id: file.nfId || null,
+          chave_cte: buildMinutaId(m),
+          numero_cte: m.numeroMinuta,
+          chave_nf_referenciada: m.chaveNfReferenciada || null,
           cnpj_emitente: m.cnpjEmitente,
           razao_social_emitente: m.razaoSocialEmitente,
           valor_frete: m.valorFrete,
@@ -244,7 +275,7 @@ export function ImportarMinutaDialog({
 
         <div className="space-y-4">
           <div className="bg-muted/50 border rounded-lg p-3 text-xs text-muted-foreground">
-            Os dados de cada minuta serão extraídos automaticamente do PDF (número, chave, CNPJ emitente, valor do frete e chave da NF referenciada). Cada minuta é vinculada à NF correspondente nesta carga.
+            Os dados de cada minuta são extraídos automaticamente do PDF (número da minuta, transportadora, valor do frete e NF referenciada). A minuta é vinculada à NF correspondente nesta carga pelo <strong>número da NF</strong>.
           </div>
 
           <div
@@ -317,7 +348,7 @@ export function ImportarMinutaDialog({
                       </div>
                       {file.status === "success" ? (
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Minuta {file.data?.numeroCte} → NF {file.nfNumero} • {file.data?.razaoSocialEmitente} • R$ {file.data?.valorFrete.toFixed(2)}
+                          Minuta {file.data?.numeroMinuta} → NF {file.nfNumero} • {file.data?.razaoSocialEmitente} • R$ {file.data?.valorFrete.toFixed(2)}
                         </p>
                       ) : (
                         <p className="text-xs text-destructive mt-0.5">{file.error}</p>
