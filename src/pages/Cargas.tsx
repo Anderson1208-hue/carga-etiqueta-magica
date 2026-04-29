@@ -46,10 +46,11 @@ import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { Badge } from "@/components/ui/badge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2 } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
+import { ImportarMinutaDialog } from "@/components/cargas/ImportarMinutaDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -86,6 +87,7 @@ export default function Cargas() {
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
   const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
+  const [minutaCarga, setMinutaCarga] = useState<Carga | null>(null);
   const [addXmlCarga, setAddXmlCarga] = useState<Carga | null>(null);
   const [filtroTipoCarga, setFiltroTipoCarga] = useState<string>("todos");
 
@@ -745,8 +747,11 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => setAddXmlCarga(carga)} title="Adicionar XML à carga">
                           <FilePlus2 className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es">
+                        <Button variant="ghost" size="sm" onClick={() => setCteCarga(carga)} title="Importar CT-es (XML)">
                           <FileUp className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setMinutaCarga(carga)} title="Importar Minutas (PDF)">
+                          <FileSignature className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setCubagemCarga(carga)} title="Importar Cubagem (Excel)">
                           <Package className="w-4 h-4" />
@@ -858,6 +863,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setCteCarga(null)}
             cargaId={cteCarga.id}
             cargaPlaca={cteCarga.placa}
+            onSuccess={loadCargas}
+          />
+        )}
+        {/* Import Minuta (PDF) Dialog */}
+        {minutaCarga && (
+          <ImportarMinutaDialog
+            open={!!minutaCarga}
+            onOpenChange={(open) => !open && setMinutaCarga(null)}
+            cargaId={minutaCarga.id}
+            cargaPlaca={minutaCarga.placa}
             onSuccess={loadCargas}
           />
         )}
