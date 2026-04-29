@@ -420,6 +420,16 @@ export default function Agendamento() {
       const { error } = await supabase.from("agendamentos").insert(inserts);
       if (error) throw error;
 
+      // REENTREGA em lote: libera todas as NFs dos veículos antigos.
+      if (finalStatus === "REENTREGA") {
+        const ids = Array.from(selectedNfIds);
+        await supabase.from("veiculo_nfs").delete().in("nf_id", ids);
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "CARGA NO DEPOSITO" })
+          .in("id", ids);
+      }
+
       toast({
         title: "Agendamentos salvos!",
         description: `${inserts.length} NFs agendadas com sucesso.`,
