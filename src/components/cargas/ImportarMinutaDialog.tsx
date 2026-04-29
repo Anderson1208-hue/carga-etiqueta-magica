@@ -19,6 +19,7 @@ interface MinutaParsed {
   cnpjEmitente: string;
   razaoSocialEmitente: string;
   valorFrete: number;
+  dataEmissao: string;
 }
 
 interface ParsedMinutaFile {
@@ -227,15 +228,22 @@ export function ImportarMinutaDialog({
     try {
       const inserts = successFiles.map((file) => {
         const m = file.data!;
+        const isMinuta = !m.chaveCte || m.chaveCte.length !== 44;
+        const identificadorInterno = isMinuta ? `MIN-${m.cnpjEmitente || "SEMCNPJ"}-${m.numeroMinuta}` : null;
         return {
           carga_id: cargaId,
           nf_id: file.nfId || null,
+          // chave_cte é UNIQUE NOT NULL: usa identificador interno quando minuta sem chave
           chave_cte: buildMinutaId(m),
           numero_cte: m.numeroMinuta,
           chave_nf_referenciada: m.chaveNfReferenciada || null,
+          numero_nf_referenciada: m.numeroNfReferenciada || null,
           cnpj_emitente: m.cnpjEmitente,
           razao_social_emitente: m.razaoSocialEmitente,
           valor_frete: m.valorFrete,
+          tipo_documento: isMinuta ? "MINUTA" : "CTE",
+          identificador_interno: identificadorInterno,
+          data_emissao: m.dataEmissao || null,
         };
       });
 

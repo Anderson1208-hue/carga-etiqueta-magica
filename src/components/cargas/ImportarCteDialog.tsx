@@ -166,15 +166,22 @@ export function ImportarCteDialog({
       const inserts = successFiles.map((file) => {
         const cte = file.data!;
         const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
+        // Extrai número da NF da chave (posições 26-34 = nNF)
+        const numeroNfRef = cte.chaveNfReferenciada?.length === 44
+          ? cte.chaveNfReferenciada.substring(25, 34).replace(/^0+/, "")
+          : null;
         return {
           carga_id: cargaId,
           nf_id: nfMatch?.id || null,
           chave_cte: cte.chaveCte,
           numero_cte: cte.numeroCte,
           chave_nf_referenciada: cte.chaveNfReferenciada,
+          numero_nf_referenciada: numeroNfRef,
           cnpj_emitente: cte.cnpjEmitente,
           razao_social_emitente: cte.razaoSocialEmitente,
           valor_frete: cte.valorFrete,
+          tipo_documento: "CTE",
+          identificador_interno: null,
         };
       });
 
