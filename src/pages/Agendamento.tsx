@@ -371,14 +371,16 @@ export default function Agendamento() {
 
       if (error) throw error;
 
-      // REENTREGA: libera a NF do veículo antigo e devolve para o depósito
+      // REENTREGA ou novo AGENDAMENTO de NF que já saiu para rota:
+      // libera a NF do veículo antigo e devolve para o depósito,
       // para reaparecer na Programação na véspera da nova data agendada.
-      if (finalStatus === "REENTREGA") {
+      if (finalStatus === "REENTREGA" || finalStatus === "AGENDAMENTO") {
         await supabase.from("veiculo_nfs").delete().eq("nf_id", selectedNf.id);
         await supabase
           .from("notas_fiscais")
           .update({ status_entrega: "CARGA NO DEPOSITO" })
-          .eq("id", selectedNf.id);
+          .eq("id", selectedNf.id)
+          .eq("status_entrega", "NF EM ROTA");
       }
 
       toast({
@@ -420,14 +422,15 @@ export default function Agendamento() {
       const { error } = await supabase.from("agendamentos").insert(inserts);
       if (error) throw error;
 
-      // REENTREGA em lote: libera todas as NFs dos veículos antigos.
-      if (finalStatus === "REENTREGA") {
+      // REENTREGA/AGENDAMENTO em lote: libera NFs que estavam em rota.
+      if (finalStatus === "REENTREGA" || finalStatus === "AGENDAMENTO") {
         const ids = Array.from(selectedNfIds);
         await supabase.from("veiculo_nfs").delete().in("nf_id", ids);
         await supabase
           .from("notas_fiscais")
           .update({ status_entrega: "CARGA NO DEPOSITO" })
-          .in("id", ids);
+          .in("id", ids)
+          .eq("status_entrega", "NF EM ROTA");
       }
 
       toast({

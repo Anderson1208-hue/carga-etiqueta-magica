@@ -1,0 +1,2 @@
+DELETE FROM veiculo_nfs WHERE nf_id IN ('63040b35-d912-4960-9b3f-18fb5d422a6c','e6222653-1f01-4dc6-b700-52d8a606347a');
+UPDATE notas_fiscais SET status_entrega = 'CARGA NO DEPOSITO' WHERE id IN ('63040b35-d912-4960-9b3f-18fb5d422a6c','e6222653-1f01-4dc6-b700-52d8a606347a');
