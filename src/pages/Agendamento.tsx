@@ -371,14 +371,16 @@ export default function Agendamento() {
 
       if (error) throw error;
 
-      // REENTREGA: libera a NF do veículo antigo e devolve para o depósito
+      // REENTREGA ou novo AGENDAMENTO de NF que já saiu para rota:
+      // libera a NF do veículo antigo e devolve para o depósito,
       // para reaparecer na Programação na véspera da nova data agendada.
-      if (finalStatus === "REENTREGA") {
+      if (finalStatus === "REENTREGA" || finalStatus === "AGENDAMENTO") {
         await supabase.from("veiculo_nfs").delete().eq("nf_id", selectedNf.id);
         await supabase
           .from("notas_fiscais")
           .update({ status_entrega: "CARGA NO DEPOSITO" })
-          .eq("id", selectedNf.id);
+          .eq("id", selectedNf.id)
+          .eq("status_entrega", "NF EM ROTA");
       }
 
       toast({
