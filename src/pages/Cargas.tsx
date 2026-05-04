@@ -331,11 +331,27 @@ export default function Cargas() {
       return;
     }
 
-    const invalidCnpjs = successFiles.filter(
-      (f) => !validateCNPJ(f.data.cnpjEmitente) || !validateCNPJ(f.data.cnpjDestinatario || "")
-    );
+    const invalidCnpjs = successFiles
+      .map((f) => {
+        const emiOk = validateCNPJ(f.data.cnpjEmitente);
+        const destOk = validateCNPJ(f.data.cnpjDestinatario || "");
+        if (emiOk && destOk) return null;
+        const partes: string[] = [];
+        if (!emiOk)
+          partes.push(`emitente "${f.data.cnpjEmitente || "vazio"}"`);
+        if (!destOk)
+          partes.push(`destinatário "${f.data.cnpjDestinatario || "vazio"}"`);
+        return `NF ${f.data.numeroNf} (${f.data.razaoSocialEmitente || f.fileName}) → ${partes.join(" e ")}`;
+      })
+      .filter((x): x is string => x !== null);
+
     if (invalidCnpjs.length > 0) {
-      toast({ variant: "destructive", title: "CNPJ inválido", description: `${invalidCnpjs.length} XML(s) com CNPJ inválido (deve ter 14 dígitos).` });
+      console.error("[Cargas] CNPJs inválidos:", invalidCnpjs);
+      toast({
+        variant: "destructive",
+        title: `CNPJ inválido em ${invalidCnpjs.length} NF(s)`,
+        description: invalidCnpjs.slice(0, 3).join(" | ") + (invalidCnpjs.length > 3 ? ` | +${invalidCnpjs.length - 3}` : ""),
+      });
       return;
     }
 
