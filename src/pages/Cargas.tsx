@@ -289,6 +289,13 @@ export default function Cargas() {
     return cleanCnpj.length === 14;
   }
 
+  // Destinatário pode ser PJ (CNPJ - 14 dígitos) ou PF (CPF - 11 dígitos)
+  function validateCnpjOuCpf(doc: string): boolean {
+    if (!doc) return true;
+    const clean = doc.replace(/\D/g, "");
+    return clean.length === 14 || clean.length === 11;
+  }
+
   function sanitizeText(text: string, maxLength: number): string {
     return text.trim().slice(0, maxLength);
   }
@@ -334,7 +341,7 @@ export default function Cargas() {
     const invalidCnpjs = successFiles
       .map((f) => {
         const emiOk = validateCNPJ(f.data.cnpjEmitente);
-        const destOk = validateCNPJ(f.data.cnpjDestinatario || "");
+        const destOk = validateCnpjOuCpf(f.data.cnpjDestinatario || "");
         if (emiOk && destOk) return null;
         const partes: string[] = [];
         if (!emiOk)
