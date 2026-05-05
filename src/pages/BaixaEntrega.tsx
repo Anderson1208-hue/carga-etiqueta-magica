@@ -190,24 +190,31 @@ export default function BaixaEntrega() {
 
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
-        .select("nf_id, status")
+        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path")
         .eq("veiculo_id", veiculoId);
 
-      const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b.status]));
+      const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b]));
 
-      const result: NfEntrega[] = (nfsData || []).map((nf) => ({
-        id: nf.id,
-        nf_id: nf.id,
-        numero_nf: nf.numero_nf,
-        dest_razao_social: nf.dest_razao_social || "Não informado",
-        dest_logradouro: nf.dest_logradouro || "",
-        dest_numero: nf.dest_numero || "",
-        dest_bairro: nf.dest_bairro || "",
-        dest_cidade: nf.dest_cidade || "",
-        dest_uf: nf.dest_uf || "",
-        cnpj_destinatario: nf.cnpj_destinatario || "",
-        baixa_status: baixasMap.get(nf.id) || null,
-      }));
+      const result: NfEntrega[] = (nfsData || []).map((nf) => {
+        const baixa = baixasMap.get(nf.id);
+        return {
+          id: nf.id,
+          nf_id: nf.id,
+          numero_nf: nf.numero_nf,
+          dest_razao_social: nf.dest_razao_social || "Não informado",
+          dest_logradouro: nf.dest_logradouro || "",
+          dest_numero: nf.dest_numero || "",
+          dest_bairro: nf.dest_bairro || "",
+          dest_cidade: nf.dest_cidade || "",
+          dest_uf: nf.dest_uf || "",
+          cnpj_destinatario: nf.cnpj_destinatario || "",
+          baixa_status: baixa?.status || null,
+          baixa_ocorrencia: baixa?.ocorrencia || null,
+          baixa_recebedor: baixa?.recebedor_nome || null,
+          baixa_registrado_em: baixa?.registrado_em || null,
+          baixa_foto_path: baixa?.foto_path || null,
+        };
+      });
 
       result.sort((a, b) => {
         if (a.baixa_status && !b.baixa_status) return 1;
