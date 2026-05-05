@@ -83,6 +83,7 @@ interface NfResult {
     ocorrencia: string | null;
     recebedor_nome: string | null;
     registrado_em: string | null;
+    foto_path: string | null;
   } | null;
 }
 
