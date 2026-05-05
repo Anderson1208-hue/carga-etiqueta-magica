@@ -489,56 +489,59 @@ export default function Agendamento() {
   }
 
   const [generatingResumo, setGeneratingResumo] = useState(false);
+  const [generatingExcel, setGeneratingExcel] = useState(false);
+
+  async function buildResumoItems(): Promise<AgendamentoResumoItem[] | null> {
+    const base = filterStatus === "todos" ? agendamentos : agendamentos.filter(a => a.status === filterStatus);
+    if (base.length === 0) {
+      toast({ title: "Sem dados", description: "Não há agendamentos para gerar resumo." });
+      return null;
+    }
+    const nfIds = base.map(a => a.nf_id);
+    const nfMap = new Map<string, any>();
+    const itensMap = new Map<string, number>();
+    const batch = 200;
+    for (let i = 0; i < nfIds.length; i += batch) {
+      const slice = nfIds.slice(i, i + batch);
+      const [{ data: nfsData }, { data: itensData }] = await Promise.all([
+        supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_bairro, dest_cidade, dest_uf, peso_bruto, volume_m3")
+          .in("id", slice),
+        supabase
+          .from("itens_nf")
+          .select("nf_id, q_com")
+          .in("nf_id", slice),
+      ]);
+      (nfsData || []).forEach(n => nfMap.set(n.id, n));
+      (itensData || []).forEach(it => {
+        const cx = calculateBoxes(Number(it.q_com));
+        itensMap.set(it.nf_id, (itensMap.get(it.nf_id) || 0) + cx);
+      });
+    }
+    return base.map(a => {
+      const nf = nfMap.get(a.nf_id);
+      return {
+        data_agendamento: a.data_agendamento,
+        status: a.status,
+        numero_nf: a.numero_nf || nf?.numero_nf || "—",
+        cnpj_destinatario: nf?.cnpj_destinatario ?? null,
+        dest_razao_social: nf?.dest_razao_social ?? a.dest_razao_social ?? null,
+        dest_bairro: nf?.dest_bairro ?? null,
+        dest_cidade: nf?.dest_cidade ?? a.dest_cidade ?? null,
+        dest_uf: nf?.dest_uf ?? null,
+        peso_bruto: Number(nf?.peso_bruto || 0),
+        volume_m3: Number(nf?.volume_m3 || 0),
+        caixas: itensMap.get(a.nf_id) || 0,
+      };
+    });
+  }
 
   async function gerarResumoPDF() {
     setGeneratingResumo(true);
     try {
-      const base = filterStatus === "todos" ? agendamentos : agendamentos.filter(a => a.status === filterStatus);
-      if (base.length === 0) {
-        toast({ title: "Sem dados", description: "Não há agendamentos para gerar resumo." });
-        return;
-      }
-      const nfIds = base.map(a => a.nf_id);
-      // Buscar dados das NFs
-      const nfMap = new Map<string, any>();
-      const itensMap = new Map<string, number>(); // nf_id -> total caixas
-      const batch = 200;
-      for (let i = 0; i < nfIds.length; i += batch) {
-        const slice = nfIds.slice(i, i + batch);
-        const [{ data: nfsData }, { data: itensData }] = await Promise.all([
-          supabase
-            .from("notas_fiscais")
-            .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_bairro, dest_cidade, dest_uf, peso_bruto, volume_m3")
-            .in("id", slice),
-          supabase
-            .from("itens_nf")
-            .select("nf_id, q_com")
-            .in("nf_id", slice),
-        ]);
-        (nfsData || []).forEach(n => nfMap.set(n.id, n));
-        (itensData || []).forEach(it => {
-          const cx = calculateBoxes(Number(it.q_com));
-          itensMap.set(it.nf_id, (itensMap.get(it.nf_id) || 0) + cx);
-        });
-      }
-
-      const items: AgendamentoResumoItem[] = base.map(a => {
-        const nf = nfMap.get(a.nf_id);
-        return {
-          data_agendamento: a.data_agendamento,
-          status: a.status,
-          numero_nf: a.numero_nf || nf?.numero_nf || "—",
-          cnpj_destinatario: nf?.cnpj_destinatario ?? null,
-          dest_razao_social: nf?.dest_razao_social ?? a.dest_razao_social ?? null,
-          dest_bairro: nf?.dest_bairro ?? null,
-          dest_cidade: nf?.dest_cidade ?? a.dest_cidade ?? null,
-          dest_uf: nf?.dest_uf ?? null,
-          peso_bruto: Number(nf?.peso_bruto || 0),
-          volume_m3: Number(nf?.volume_m3 || 0),
-          caixas: itensMap.get(a.nf_id) || 0,
-        };
-      });
-
+      const items = await buildResumoItems();
+      if (!items) return;
       const blob = await generateAgendamentosResumoPDF(items);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -552,6 +555,27 @@ export default function Agendamento() {
       toast({ title: "Erro", description: "Erro ao gerar resumo PDF", variant: "destructive" });
     } finally {
       setGeneratingResumo(false);
+    }
+  }
+
+  async function gerarResumoExcel() {
+    setGeneratingExcel(true);
+    try {
+      const items = await buildResumoItems();
+      if (!items) return;
+      const blob = generateAgendamentosResumoExcel(items);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resumo-agendamentos-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel gerado!", description: `${items.length} agendamentos no resumo.` });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Erro ao gerar resumo Excel", variant: "destructive" });
+    } finally {
+      setGeneratingExcel(false);
     }
   }
 
