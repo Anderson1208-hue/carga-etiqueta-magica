@@ -146,6 +146,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         veiculo: {
+          id: veiculo.id,
           placa: veiculo.placa,
           motorista: veiculo.motorista,
           status: veiculo.status,
