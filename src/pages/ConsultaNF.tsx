@@ -78,6 +78,12 @@ interface NfResult {
     data: string;
     status: string;
   } | null;
+  baixa?: {
+    status: string;
+    ocorrencia: string | null;
+    recebedor_nome: string | null;
+    registrado_em: string | null;
+  } | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -177,7 +183,8 @@ export default function ConsultaNF() {
           itens_nf(c_prod, x_prod, q_com, u_com),
           agendamentos(status, data_agendamento, created_at),
           ctes(numero_cte, chave_cte, razao_social_emitente, cnpj_emitente, valor_frete),
-          veiculo_nfs(veiculos(placa, motorista, data, status))
+          veiculo_nfs(veiculos(placa, motorista, data, status)),
+          baixas_entrega(status, ocorrencia, recebedor_nome, registrado_em)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
@@ -193,6 +200,12 @@ export default function ConsultaNF() {
         const latestAgendamento = agendamentos.length > 0 ? agendamentos[0] : null;
         const veiculoLink = (nf.veiculo_nfs || [])[0];
         const veiculo = veiculoLink?.veiculos || null;
+        const baixas = [...(nf.baixas_entrega || [])].sort((a: any, b: any) => {
+          const da = new Date(a.registrado_em || 0).getTime();
+          const db = new Date(b.registrado_em || 0).getTime();
+          return db - da;
+        });
+        const latestBaixa = baixas.length > 0 ? baixas[0] : null;
 
         return {
           ...nf,
@@ -205,6 +218,7 @@ export default function ConsultaNF() {
           agendamento: latestAgendamento,
           ctes: nf.ctes || [],
           veiculo,
+          baixa: latestBaixa,
         };
       });
 
