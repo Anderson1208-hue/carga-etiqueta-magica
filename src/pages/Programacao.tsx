@@ -111,26 +111,44 @@ export default function Programacao() {
       const cargaIds = cargas.map((c) => c.id);
       const cargaMap = new Map(cargas.map((c) => [c.id, c]));
 
-      const nfPromises = cargaIds.map((cargaId) =>
-        supabase
-          .from("notas_fiscais")
-          .select(`
-            id, numero_nf, chave_acesso, cnpj_destinatario,
-            dest_razao_social, dest_bairro, dest_cep,
-            dest_logradouro, dest_numero, dest_cidade, dest_uf,
-            peso_bruto, volume_m3, carga_id, status_entrega,
-            itens_nf(q_com)
-          `)
-          .eq("carga_id", cargaId)
-          .neq("status_entrega", "ENTREGUE")
-          .neq("status_entrega", "RECUSADO")
-          .limit(2000)
-      );
+      const pageSize = 1000;
+      const nfSelect = `
+        id, numero_nf, chave_acesso, cnpj_destinatario,
+        dest_razao_social, dest_bairro, dest_cep,
+        dest_logradouro, dest_numero, dest_cidade, dest_uf,
+        peso_bruto, volume_m3, carga_id, status_entrega,
+        itens_nf(q_com)
+      `;
+
+      const fetchNfsForCarga = async (cargaId: string) => {
+        const all: any[] = [];
+        let from = 0;
+
+        while (true) {
+          const { data, error } = await supabase
+            .from("notas_fiscais")
+            .select(nfSelect)
+            .eq("carga_id", cargaId)
+            .neq("status_entrega", "ENTREGUE")
+            .neq("status_entrega", "RECUSADO")
+            .order("numero_nf", { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          all.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+
+        return all;
+      };
+
+      const nfPromises = cargaIds.map((cargaId) => fetchNfsForCarga(cargaId));
 
       // Buscar TODOS os vínculos veiculo_nfs paginando (limite default Supabase é 1000)
       const fetchAllAssigned = async () => {
         const all: { nf_id: string }[] = [];
-        const pageSize = 1000;
         let from = 0;
         while (true) {
           const { data, error } = await supabase
@@ -153,7 +171,7 @@ export default function Programacao() {
         supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
-      const nfs = nfResults.flatMap((r) => r.data || []);
+      const nfs = nfResults.flat();
 
       if (nfs.length === 0) {
         setNfsDisponiveis([]);
