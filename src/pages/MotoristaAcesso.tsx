@@ -128,6 +128,7 @@ export default function MotoristaAcesso() {
     setOcorrencia("");
     setRecebedorNome("");
     setObservacao("");
+    clearFoto();
   }
 
   function selectNf(nf: NfMotorista) {
