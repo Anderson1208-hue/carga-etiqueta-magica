@@ -426,6 +426,27 @@ export default function BaixaEntrega() {
       resetForm();
       setSelectedNfId(nfId);
       captureGPS();
+      // Carrega foto da baixa sob demanda (lazy)
+      const nf = nfs.find((n) => n.nf_id === nfId);
+      if (nf?.baixa_foto_path && !fotoUrls[nf.baixa_foto_path]) {
+        loadFotoUrl(nf.baixa_foto_path);
+      }
+    }
+  }
+
+  async function loadFotoUrl(path: string) {
+    setLoadingFoto(path);
+    try {
+      const { data } = await supabase.storage
+        .from("comprovantes")
+        .createSignedUrl(path, 3600);
+      if (data?.signedUrl) {
+        setFotoUrls((prev) => ({ ...prev, [path]: data.signedUrl }));
+      }
+    } catch (e) {
+      console.error("Erro ao carregar foto:", e);
+    } finally {
+      setLoadingFoto(null);
     }
   }
 
