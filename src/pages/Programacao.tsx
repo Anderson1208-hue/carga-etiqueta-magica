@@ -171,7 +171,7 @@ export default function Programacao() {
         supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
-      const nfs = nfResults.flatMap((r) => r.data || []);
+      const nfs = nfResults.flat();
 
       if (nfs.length === 0) {
         setNfsDisponiveis([]);
