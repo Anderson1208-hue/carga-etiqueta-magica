@@ -2,9 +2,12 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation } from "lucide-react";
 
 interface NfMotorista {
   id: string;
@@ -26,18 +29,38 @@ interface NfMotorista {
 }
 
 interface VeiculoInfo {
+  id: string;
   placa: string;
   motorista: string;
   status: string;
   data: string;
 }
 
+type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "reentrega" | "outros";
+
+const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: "entregue", label: "Entregue", icon: <CheckCircle2 className="w-5 h-5" />, color: "text-success" },
+  { value: "recusado", label: "Recusado", icon: <XCircle className="w-5 h-5" />, color: "text-destructive" },
+  { value: "endereco_nao_encontrado", label: "Endereço não encontrado", icon: <MapPin className="w-5 h-5" />, color: "text-warning" },
+  { value: "ausente", label: "Destinatário ausente", icon: <AlertTriangle className="w-5 h-5" />, color: "text-pending" },
+  { value: "reentrega", label: "Reentrega", icon: <RotateCcw className="w-5 h-5" />, color: "text-primary" },
+  { value: "outros", label: "Outros", icon: <AlertTriangle className="w-5 h-5" />, color: "text-muted-foreground" },
+];
+
 export default function MotoristaAcesso() {
+  const { toast } = useToast();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [veiculo, setVeiculo] = useState<VeiculoInfo | null>(null);
   const [nfs, setNfs] = useState<NfMotorista[]>([]);
+  const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
+  const [ocorrencia, setOcorrencia] = useState<OcorrenciaTipo | "">("");
+  const [recebedorNome, setRecebedorNome] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,11 +84,95 @@ export default function MotoristaAcesso() {
       } else {
         setVeiculo(data.veiculo);
         setNfs(data.nfs || []);
+        resetBaixaForm();
+        captureGPS();
       }
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function resetBaixaForm() {
+    setSelectedNfId(null);
+    setOcorrencia("");
+    setRecebedorNome("");
+    setObservacao("");
+  }
+
+  function selectNf(nf: NfMotorista) {
+    if (nf.entrega) return;
+
+    if (selectedNfId === nf.id) {
+      resetBaixaForm();
+      return;
+    }
+
+    resetBaixaForm();
+    setSelectedNfId(nf.id);
+    captureGPS();
+  }
+
+  function captureGPS() {
+    if (!navigator.geolocation) return;
+
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsLoading(false);
+      },
+      () => setGpsLoading(false),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function reloadMotoristaData() {
+    const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+      body: { code: code.trim().toUpperCase() },
+    });
+
+    if (!fnError && !data?.error) {
+      setVeiculo(data.veiculo);
+      setNfs(data.nfs || []);
+    }
+  }
+
+  async function submitBaixa() {
+    if (!selectedNfId || !ocorrencia) {
+      toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+        body: {
+          code: code.trim().toUpperCase(),
+          action: "registrar-baixa",
+          nf_id: selectedNfId,
+          ocorrencia,
+          recebedor_nome: recebedorNome || null,
+          observacao: observacao || null,
+          latitude: gpsCoords?.lat ?? null,
+          longitude: gpsCoords?.lng ?? null,
+        },
+      });
+
+      if (fnError || data?.error) throw new Error(data?.error || "Erro ao registrar baixa");
+
+      toast({ title: "Baixa registrada!", description: "A NF foi atualizada com sucesso." });
+      resetBaixaForm();
+      await reloadMotoristaData();
+    } catch (err) {
+      toast({
+        title: "Erro",
+        description: err instanceof Error ? err.message : "Erro ao registrar baixa",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -215,33 +322,108 @@ export default function MotoristaAcesso() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {nfs.map((nf) => (
-              <Card key={nf.id} className="p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="font-mono font-semibold text-sm">
-                    NF {nf.numero_nf}
-                  </span>
-                  {getStatusBadge(nf)}
-                </div>
-                <p className="text-sm font-medium mb-1">
-                  {nf.dest_razao_social || "Destinatário não informado"}
-                </p>
-                <p className="text-xs text-muted-foreground flex items-start gap-1">
-                  <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                  {formatEndereco(nf)}
-                </p>
-                {nf.entrega?.recebedor_nome && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Recebedor: {nf.entrega.recebedor_nome}
+            {nfs.map((nf) => {
+              const isSelected = selectedNfId === nf.id;
+
+              return (
+                <Card
+                  key={nf.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`p-3 transition-all active:scale-[0.99] ${nf.entrega ? "opacity-70" : "cursor-pointer"} ${isSelected ? "ring-2 ring-primary" : ""}`}
+                  onClick={() => selectNf(nf)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") selectNf(nf);
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="font-mono font-semibold text-sm">
+                      NF {nf.numero_nf}
+                    </span>
+                    {getStatusBadge(nf)}
+                  </div>
+                  <p className="text-sm font-medium mb-1">
+                    {nf.dest_razao_social || "Destinatário não informado"}
                   </p>
-                )}
-                {nf.entrega?.ocorrencia && (
-                  <p className="text-xs text-destructive mt-1">
-                    Ocorrência: {nf.entrega.ocorrencia}
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                    {formatEndereco(nf)}
                   </p>
-                )}
-              </Card>
-            ))}
+                  {nf.entrega?.recebedor_nome && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recebedor: {nf.entrega.recebedor_nome}
+                    </p>
+                  )}
+                  {nf.entrega?.ocorrencia && (
+                    <p className="text-xs text-destructive mt-1">
+                      Ocorrência: {nf.entrega.ocorrencia}
+                    </p>
+                  )}
+
+                  {isSelected && !nf.entrega && (
+                    <div className="mt-3 pt-3 border-t space-y-4" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">Ocorrência *</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {OCORRENCIAS.map((oc) => (
+                            <Button
+                              key={oc.value}
+                              type="button"
+                              variant={ocorrencia === oc.value ? "default" : "outline"}
+                              size="sm"
+                              className="justify-start text-xs h-auto py-2"
+                              onClick={() => setOcorrencia(oc.value)}
+                            >
+                              <span className={ocorrencia === oc.value ? "" : oc.color}>{oc.icon}</span>
+                              <span className="ml-1">{oc.label}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {ocorrencia === "entregue" && (
+                        <div>
+                          <Label className="text-sm">Nome do recebedor</Label>
+                          <Input
+                            value={recebedorNome}
+                            onChange={(e) => setRecebedorNome(e.target.value)}
+                            placeholder="Nome de quem recebeu"
+                            className="mt-1"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <Label className="text-sm">Observação</Label>
+                        <Textarea
+                          value={observacao}
+                          onChange={(e) => setObservacao(e.target.value)}
+                          placeholder="Detalhe a ocorrência..."
+                          rows={2}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Navigation className="w-3 h-3" />
+                        {gpsLoading ? (
+                          <span>Obtendo localização...</span>
+                        ) : gpsCoords ? (
+                          <span>GPS: {gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</span>
+                        ) : (
+                          <span className="text-destructive">GPS indisponível</span>
+                        )}
+                      </div>
+
+                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia} className="w-full" size="lg">
+                        {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                        Registrar Baixa
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
