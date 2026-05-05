@@ -723,6 +723,15 @@ export default function Agendamento() {
                 {generatingResumo ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileDown className="w-4 h-4 mr-1" />}
                 Resumo PDF
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={gerarResumoExcel}
+                disabled={generatingExcel || loadingAgendamentos}
+              >
+                {generatingExcel ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileDown className="w-4 h-4 mr-1" />}
+                Resumo Excel
+              </Button>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue />
