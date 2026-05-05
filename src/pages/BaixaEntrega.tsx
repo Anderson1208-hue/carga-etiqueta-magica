@@ -58,6 +58,10 @@ interface NfEntrega {
   dest_uf: string;
   cnpj_destinatario: string;
   baixa_status: string | null;
+  baixa_ocorrencia?: string | null;
+  baixa_recebedor?: string | null;
+  baixa_registrado_em?: string | null;
+  baixa_foto_path?: string | null;
 }
 
 type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "reentrega" | "outros";
@@ -112,6 +116,8 @@ export default function BaixaEntrega() {
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
+  const [loadingFoto, setLoadingFoto] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -186,24 +192,31 @@ export default function BaixaEntrega() {
 
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
-        .select("nf_id, status")
+        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path")
         .eq("veiculo_id", veiculoId);
 
-      const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b.status]));
+      const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b]));
 
-      const result: NfEntrega[] = (nfsData || []).map((nf) => ({
-        id: nf.id,
-        nf_id: nf.id,
-        numero_nf: nf.numero_nf,
-        dest_razao_social: nf.dest_razao_social || "Não informado",
-        dest_logradouro: nf.dest_logradouro || "",
-        dest_numero: nf.dest_numero || "",
-        dest_bairro: nf.dest_bairro || "",
-        dest_cidade: nf.dest_cidade || "",
-        dest_uf: nf.dest_uf || "",
-        cnpj_destinatario: nf.cnpj_destinatario || "",
-        baixa_status: baixasMap.get(nf.id) || null,
-      }));
+      const result: NfEntrega[] = (nfsData || []).map((nf) => {
+        const baixa = baixasMap.get(nf.id);
+        return {
+          id: nf.id,
+          nf_id: nf.id,
+          numero_nf: nf.numero_nf,
+          dest_razao_social: nf.dest_razao_social || "Não informado",
+          dest_logradouro: nf.dest_logradouro || "",
+          dest_numero: nf.dest_numero || "",
+          dest_bairro: nf.dest_bairro || "",
+          dest_cidade: nf.dest_cidade || "",
+          dest_uf: nf.dest_uf || "",
+          cnpj_destinatario: nf.cnpj_destinatario || "",
+          baixa_status: baixa?.status || null,
+          baixa_ocorrencia: baixa?.ocorrencia || null,
+          baixa_recebedor: baixa?.recebedor_nome || null,
+          baixa_registrado_em: baixa?.registrado_em || null,
+          baixa_foto_path: baixa?.foto_path || null,
+        };
+      });
 
       result.sort((a, b) => {
         if (a.baixa_status && !b.baixa_status) return 1;
@@ -413,6 +426,27 @@ export default function BaixaEntrega() {
       resetForm();
       setSelectedNfId(nfId);
       captureGPS();
+      // Carrega foto da baixa sob demanda (lazy)
+      const nf = nfs.find((n) => n.nf_id === nfId);
+      if (nf?.baixa_foto_path && !fotoUrls[nf.baixa_foto_path]) {
+        loadFotoUrl(nf.baixa_foto_path);
+      }
+    }
+  }
+
+  async function loadFotoUrl(path: string) {
+    setLoadingFoto(path);
+    try {
+      const { data } = await supabase.storage
+        .from("comprovantes")
+        .createSignedUrl(path, 3600);
+      if (data?.signedUrl) {
+        setFotoUrls((prev) => ({ ...prev, [path]: data.signedUrl }));
+      }
+    } catch (e) {
+      console.error("Erro ao carregar foto:", e);
+    } finally {
+      setLoadingFoto(null);
     }
   }
 
@@ -697,7 +731,7 @@ export default function BaixaEntrega() {
                       role="button"
                       tabIndex={0}
                       className={`transition-all cursor-pointer active:scale-[0.99] ${
-                        isDone ? "opacity-60" : ""
+                        isDone && !isSelected ? "opacity-70" : ""
                       } ${isSelected ? "ring-2 ring-primary" : ""}`}
                       onClick={() => selectNf(nf.nf_id)}
                     >
@@ -722,6 +756,73 @@ export default function BaixaEntrega() {
                             .filter(Boolean)
                             .join(", ")}
                         </p>
+
+                        {/* Visualização da baixa registrada */}
+                        {isSelected && isDone && (
+                          <div
+                            className="mt-3 pt-3 border-t space-y-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-muted-foreground">Ocorrência</p>
+                                <p className="font-medium">
+                                  {OCORRENCIAS.find((o) => o.value === nf.baixa_ocorrencia)?.label || nf.baixa_ocorrencia || "—"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Data/Hora</p>
+                                <p className="font-medium">
+                                  {nf.baixa_registrado_em
+                                    ? new Date(nf.baixa_registrado_em).toLocaleString("pt-BR")
+                                    : "—"}
+                                </p>
+                              </div>
+                              {nf.baixa_recebedor && (
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Recebedor</p>
+                                  <p className="font-medium">{nf.baixa_recebedor}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {nf.baixa_foto_path ? (
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">Comprovante</Label>
+                                {loadingFoto === nf.baixa_foto_path ? (
+                                  <div className="flex justify-center py-6 border rounded-lg">
+                                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                                  </div>
+                                ) : fotoUrls[nf.baixa_foto_path] ? (
+                                  <a
+                                    href={fotoUrls[nf.baixa_foto_path]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <img
+                                      src={fotoUrls[nf.baixa_foto_path]}
+                                      alt="Canhoto"
+                                      className="w-full max-h-64 object-contain rounded-lg border bg-muted"
+                                      loading="lazy"
+                                    />
+                                  </a>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => nf.baixa_foto_path && loadFotoUrl(nf.baixa_foto_path)}
+                                  >
+                                    <ImageIcon className="w-4 h-4 mr-1" />
+                                    Ver foto
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs italic text-muted-foreground">Sem foto registrada</p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Expanded form when selected */}
                         {isSelected && !isDone && (
