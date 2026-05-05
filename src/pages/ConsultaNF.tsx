@@ -117,6 +117,24 @@ export default function ConsultaNF() {
   const [selectedNf, setSelectedNf] = useState<NfResult | null>(null);
   const [searched, setSearched] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [canhotoUrl, setCanhotoUrl] = useState<string | null>(null);
+  const [loadingCanhoto, setLoadingCanhoto] = useState(false);
+
+  async function carregarCanhoto(path: string) {
+    setLoadingCanhoto(true);
+    setCanhotoUrl(null);
+    try {
+      const { data, error } = await supabase.storage
+        .from("comprovantes")
+        .createSignedUrl(path, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) setCanhotoUrl(data.signedUrl);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Erro ao carregar canhoto", description: err.message });
+    } finally {
+      setLoadingCanhoto(false);
+    }
+  }
 
   async function handleGerarPdf(nf: NfResult) {
     if (!nf.carga) return;
@@ -169,6 +187,7 @@ export default function ConsultaNF() {
     setLoading(true);
     setSearched(true);
     setSelectedNf(null);
+    setCanhotoUrl(null);
 
     try {
       // Search by numero_nf (partial match)
