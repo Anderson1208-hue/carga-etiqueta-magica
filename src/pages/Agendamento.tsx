@@ -47,11 +47,14 @@ import {
   CalendarCheck,
   Loader2,
   FileText,
+  FileDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
+import { generateAgendamentosResumoPDF, type AgendamentoResumoItem } from "@/lib/agendamentos-resumo-pdf";
+import { calculateBoxes } from "@/lib/xml-parser";
 
 type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "REENTREGA" | "DEVOLUCAO";
 
@@ -484,6 +487,73 @@ export default function Agendamento() {
     }
   }
 
+  const [generatingResumo, setGeneratingResumo] = useState(false);
+
+  async function gerarResumoPDF() {
+    setGeneratingResumo(true);
+    try {
+      const base = filterStatus === "todos" ? agendamentos : agendamentos.filter(a => a.status === filterStatus);
+      if (base.length === 0) {
+        toast({ title: "Sem dados", description: "Não há agendamentos para gerar resumo." });
+        return;
+      }
+      const nfIds = base.map(a => a.nf_id);
+      // Buscar dados das NFs
+      const nfMap = new Map<string, any>();
+      const itensMap = new Map<string, number>(); // nf_id -> total caixas
+      const batch = 200;
+      for (let i = 0; i < nfIds.length; i += batch) {
+        const slice = nfIds.slice(i, i + batch);
+        const [{ data: nfsData }, { data: itensData }] = await Promise.all([
+          supabase
+            .from("notas_fiscais")
+            .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_bairro, dest_cidade, dest_uf, peso_bruto, volume_m3")
+            .in("id", slice),
+          supabase
+            .from("itens_nf")
+            .select("nf_id, q_com")
+            .in("nf_id", slice),
+        ]);
+        (nfsData || []).forEach(n => nfMap.set(n.id, n));
+        (itensData || []).forEach(it => {
+          const cx = calculateBoxes(Number(it.q_com));
+          itensMap.set(it.nf_id, (itensMap.get(it.nf_id) || 0) + cx);
+        });
+      }
+
+      const items: AgendamentoResumoItem[] = base.map(a => {
+        const nf = nfMap.get(a.nf_id);
+        return {
+          data_agendamento: a.data_agendamento,
+          status: a.status,
+          numero_nf: a.numero_nf || nf?.numero_nf || "—",
+          cnpj_destinatario: nf?.cnpj_destinatario ?? null,
+          dest_razao_social: nf?.dest_razao_social ?? a.dest_razao_social ?? null,
+          dest_bairro: nf?.dest_bairro ?? null,
+          dest_cidade: nf?.dest_cidade ?? a.dest_cidade ?? null,
+          dest_uf: nf?.dest_uf ?? null,
+          peso_bruto: Number(nf?.peso_bruto || 0),
+          volume_m3: Number(nf?.volume_m3 || 0),
+          caixas: itensMap.get(a.nf_id) || 0,
+        };
+      });
+
+      const blob = await generateAgendamentosResumoPDF(items);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resumo-agendamentos-${format(new Date(), "yyyy-MM-dd-HHmm")}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF gerado!", description: `${items.length} agendamentos no resumo.` });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Erro ao gerar resumo PDF", variant: "destructive" });
+    } finally {
+      setGeneratingResumo(false);
+    }
+  }
+
   const filteredAgendamentos = filterStatus === "todos"
     ? agendamentos
     : agendamentos.filter(a => a.status === filterStatus);
@@ -618,17 +688,28 @@ export default function Agendamento() {
               <FileText className="w-5 h-5" />
               Agendamentos Registrados
             </CardTitle>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                {STATUS_OPTIONS.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={gerarResumoPDF}
+                disabled={generatingResumo || loadingAgendamentos}
+              >
+                {generatingResumo ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <FileDown className="w-4 h-4 mr-1" />}
+                Resumo PDF
+              </Button>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {STATUS_OPTIONS.map(s => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingAgendamentos ? (
