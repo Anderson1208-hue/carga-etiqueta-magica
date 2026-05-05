@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation } from "lucide-react";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
 
 interface NfMotorista {
   id: string;
@@ -61,6 +61,35 @@ export default function MotoristaAcesso() {
   const [observacao, setObservacao] = useState("");
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+
+  function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+    setFotoFile(file);
+    setFotoPreview(URL.createObjectURL(file));
+  }
+
+  function clearFoto() {
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+    setFotoFile(null);
+    setFotoPreview(null);
+  }
+
+  function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1] || "";
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+      reader.readAsDataURL(file);
+    });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -99,6 +128,7 @@ export default function MotoristaAcesso() {
     setOcorrencia("");
     setRecebedorNome("");
     setObservacao("");
+    clearFoto();
   }
 
   function selectNf(nf: NfMotorista) {
@@ -144,9 +174,15 @@ export default function MotoristaAcesso() {
       toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
       return;
     }
+    if (!fotoFile) {
+      toast({ title: "Foto obrigatória", description: "Tire ou anexe a foto do canhoto antes de registrar a baixa", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const foto_base64 = await fileToBase64(fotoFile);
+
       const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
         body: {
           code: code.trim().toUpperCase(),
@@ -157,6 +193,8 @@ export default function MotoristaAcesso() {
           observacao: observacao || null,
           latitude: gpsCoords?.lat ?? null,
           longitude: gpsCoords?.lng ?? null,
+          foto_base64,
+          foto_mime: fotoFile.type || "image/jpeg",
         },
       });
 
@@ -404,6 +442,42 @@ export default function MotoristaAcesso() {
                         />
                       </div>
 
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">
+                          Foto do canhoto <span className="text-destructive">*</span>
+                        </Label>
+                        {fotoPreview ? (
+                          <div className="relative">
+                            <img
+                              src={fotoPreview}
+                              alt="Prévia do canhoto"
+                              className="w-full max-h-64 object-contain rounded-md border"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2 h-8 w-8"
+                              onClick={clearFoto}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 rounded-md p-6 cursor-pointer hover:bg-muted/50 transition">
+                            <Camera className="w-8 h-8 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Tirar foto do canhoto</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={handleFotoChange}
+                            />
+                          </label>
+                        )}
+                      </div>
+
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Navigation className="w-3 h-3" />
                         {gpsLoading ? (
@@ -415,7 +489,7 @@ export default function MotoristaAcesso() {
                         )}
                       </div>
 
-                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia} className="w-full" size="lg">
+                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia || !fotoFile} className="w-full" size="lg">
                         {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                         Registrar Baixa
                       </Button>

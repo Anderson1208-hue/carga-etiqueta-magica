@@ -28,6 +28,13 @@ type BaixaEntregaRow = {
   ocorrencia: string | null;
 };
 
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -64,10 +71,26 @@ Deno.serve(async (req) => {
     }
 
     if (action === "registrar-baixa") {
-      const { nf_id, ocorrencia, recebedor_nome, observacao, latitude, longitude } = payload;
+      const {
+        nf_id,
+        ocorrencia,
+        recebedor_nome,
+        observacao,
+        latitude,
+        longitude,
+        foto_base64,
+        foto_mime,
+      } = payload;
 
       if (!nf_id || !ocorrencia) {
         return new Response(JSON.stringify({ error: "Dados da baixa incompletos" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!foto_base64 || typeof foto_base64 !== "string") {
+        return new Response(JSON.stringify({ error: "Foto do canhoto é obrigatória" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -101,13 +124,39 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Upload foto
+      let fotoPath: string | null = null;
+      try {
+        const mime = typeof foto_mime === "string" && foto_mime.startsWith("image/") ? foto_mime : "image/jpeg";
+        const ext = mime.split("/")[1]?.split("+")[0] || "jpg";
+        const fileName = `${veiculo.id}/${nf_id}_${Date.now()}.${ext}`;
+        const bytes = base64ToBytes(foto_base64);
+
+        const { error: uploadErr } = await supabase.storage
+          .from("comprovantes")
+          .upload(fileName, bytes, { contentType: mime, upsert: false });
+
+        if (uploadErr) {
+          return new Response(JSON.stringify({ error: "Falha ao enviar foto" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        fotoPath = fileName;
+      } catch {
+        return new Response(JSON.stringify({ error: "Foto inválida" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { error: insertError } = await supabase.from("baixas_entrega").insert({
         veiculo_id: veiculo.id,
         nf_id,
         status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
         ocorrencia,
         recebedor_nome: recebedor_nome || null,
-        observacao: observacao || null,
+        foto_path: fotoPath,
         latitude: typeof latitude === "number" ? latitude : null,
         longitude: typeof longitude === "number" ? longitude : null,
         registrado_por: null,
