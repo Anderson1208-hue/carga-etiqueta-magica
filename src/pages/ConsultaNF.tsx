@@ -399,6 +399,38 @@ export default function ConsultaNF() {
                       </p>
                     </div>
                   </div>
+
+                  <div className="mt-3 pt-3 border-t border-success/20">
+                    <p className="text-xs text-muted-foreground mb-2">Canhoto / Comprovante</p>
+                    {selectedNf.baixa.foto_path ? (
+                      canhotoUrl ? (
+                        <a href={canhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
+                          <img
+                            src={canhotoUrl}
+                            alt="Canhoto da entrega"
+                            className="max-h-64 rounded border hover:opacity-90 transition-opacity"
+                          />
+                          <p className="text-xs text-primary mt-1">Clique para abrir em tamanho real</p>
+                        </a>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => carregarCanhoto(selectedNf.baixa!.foto_path!)}
+                          disabled={loadingCanhoto}
+                        >
+                          {loadingCanhoto ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <FileText className="w-4 h-4 mr-2" />
+                          )}
+                          Ver canhoto
+                        </Button>
+                      )
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">Sem foto registrada</p>
+                    )}
+                  </div>
                 </div>
               )}
 
