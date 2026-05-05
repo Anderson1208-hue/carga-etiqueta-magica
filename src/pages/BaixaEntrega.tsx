@@ -58,6 +58,10 @@ interface NfEntrega {
   dest_uf: string;
   cnpj_destinatario: string;
   baixa_status: string | null;
+  baixa_ocorrencia?: string | null;
+  baixa_recebedor?: string | null;
+  baixa_registrado_em?: string | null;
+  baixa_foto_path?: string | null;
 }
 
 type OcorrenciaTipo = "entregue" | "recusado" | "endereco_nao_encontrado" | "ausente" | "reentrega" | "outros";
