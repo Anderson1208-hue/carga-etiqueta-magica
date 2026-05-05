@@ -11,7 +11,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code } = await req.json();
+    const payload = await req.json();
+    const { code, action } = payload;
 
     if (!code || typeof code !== "string" || code.length !== 6) {
       return new Response(JSON.stringify({ error: "Código inválido" }), {
@@ -35,6 +36,69 @@ Deno.serve(async (req) => {
     if (veiculoErr || !veiculo) {
       return new Response(JSON.stringify({ error: "Código não encontrado" }), {
         status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "registrar-baixa") {
+      const { nf_id, ocorrencia, recebedor_nome, observacao, latitude, longitude } = payload;
+
+      if (!nf_id || !ocorrencia) {
+        return new Response(JSON.stringify({ error: "Dados da baixa incompletos" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: vinculo } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id")
+        .eq("veiculo_id", veiculo.id)
+        .eq("nf_id", nf_id)
+        .maybeSingle();
+
+      if (!vinculo) {
+        return new Response(JSON.stringify({ error: "NF não vinculada a este código" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: baixaExistente } = await supabase
+        .from("baixas_entrega")
+        .select("id")
+        .eq("veiculo_id", veiculo.id)
+        .eq("nf_id", nf_id)
+        .maybeSingle();
+
+      if (baixaExistente) {
+        return new Response(JSON.stringify({ error: "Esta NF já possui baixa registrada" }), {
+          status: 409,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: insertError } = await supabase.from("baixas_entrega").insert({
+        veiculo_id: veiculo.id,
+        nf_id,
+        status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
+        ocorrencia,
+        recebedor_nome: recebedor_nome || null,
+        observacao: observacao || null,
+        latitude: typeof latitude === "number" ? latitude : null,
+        longitude: typeof longitude === "number" ? longitude : null,
+        registrado_por: null,
+        registrado_em: new Date().toISOString(),
+      });
+
+      if (insertError) {
+        return new Response(JSON.stringify({ error: "Erro ao registrar baixa" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
