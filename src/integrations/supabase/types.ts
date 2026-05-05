@@ -1319,6 +1319,25 @@ export type Database = {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
+      get_cargas_com_contagens: {
+        Args: never
+        Returns: {
+          created_at: string
+          created_by: string
+          data: string
+          id: string
+          import_batch_id: string
+          itens_count: number
+          motorista: string
+          nfs_count: number
+          observacao: string
+          operador_responsavel: string
+          placa: string
+          status: Database["public"]["Enums"]["load_status"]
+          tipo_carga: string
+          updated_at: string
+        }[]
+      }
       get_conferencia_progress: { Args: { p_carga_id: string }; Returns: Json }
       has_profile: { Args: never; Returns: boolean }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
