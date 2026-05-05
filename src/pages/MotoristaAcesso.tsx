@@ -48,11 +48,19 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
 ];
 
 export default function MotoristaAcesso() {
+  const { toast } = useToast();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [veiculo, setVeiculo] = useState<VeiculoInfo | null>(null);
   const [nfs, setNfs] = useState<NfMotorista[]>([]);
+  const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
+  const [ocorrencia, setOcorrencia] = useState<OcorrenciaTipo | "">("");
+  const [recebedorNome, setRecebedorNome] = useState("");
+  const [observacao, setObservacao] = useState("");
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,11 +84,95 @@ export default function MotoristaAcesso() {
       } else {
         setVeiculo(data.veiculo);
         setNfs(data.nfs || []);
+        resetBaixaForm();
+        captureGPS();
       }
     } catch {
       setError("Erro de conexão. Tente novamente.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function resetBaixaForm() {
+    setSelectedNfId(null);
+    setOcorrencia("");
+    setRecebedorNome("");
+    setObservacao("");
+  }
+
+  function selectNf(nf: NfMotorista) {
+    if (nf.entrega) return;
+
+    if (selectedNfId === nf.id) {
+      resetBaixaForm();
+      return;
+    }
+
+    resetBaixaForm();
+    setSelectedNfId(nf.id);
+    captureGPS();
+  }
+
+  function captureGPS() {
+    if (!navigator.geolocation) return;
+
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsLoading(false);
+      },
+      () => setGpsLoading(false),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function reloadMotoristaData() {
+    const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+      body: { code: code.trim().toUpperCase() },
+    });
+
+    if (!fnError && !data?.error) {
+      setVeiculo(data.veiculo);
+      setNfs(data.nfs || []);
+    }
+  }
+
+  async function submitBaixa() {
+    if (!selectedNfId || !ocorrencia) {
+      toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+        body: {
+          code: code.trim().toUpperCase(),
+          action: "registrar-baixa",
+          nf_id: selectedNfId,
+          ocorrencia,
+          recebedor_nome: recebedorNome || null,
+          observacao: observacao || null,
+          latitude: gpsCoords?.lat ?? null,
+          longitude: gpsCoords?.lng ?? null,
+        },
+      });
+
+      if (fnError || data?.error) throw new Error(data?.error || "Erro ao registrar baixa");
+
+      toast({ title: "Baixa registrada!", description: "A NF foi atualizada com sucesso." });
+      resetBaixaForm();
+      await reloadMotoristaData();
+    } catch (err) {
+      toast({
+        title: "Erro",
+        description: err instanceof Error ? err.message : "Erro ao registrar baixa",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
     }
   }
 
