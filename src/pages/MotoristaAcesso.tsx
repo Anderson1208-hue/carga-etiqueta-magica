@@ -322,33 +322,108 @@ export default function MotoristaAcesso() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {nfs.map((nf) => (
-              <Card key={nf.id} className="p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="font-mono font-semibold text-sm">
-                    NF {nf.numero_nf}
-                  </span>
-                  {getStatusBadge(nf)}
-                </div>
-                <p className="text-sm font-medium mb-1">
-                  {nf.dest_razao_social || "Destinatário não informado"}
-                </p>
-                <p className="text-xs text-muted-foreground flex items-start gap-1">
-                  <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                  {formatEndereco(nf)}
-                </p>
-                {nf.entrega?.recebedor_nome && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Recebedor: {nf.entrega.recebedor_nome}
+            {nfs.map((nf) => {
+              const isSelected = selectedNfId === nf.id;
+
+              return (
+                <Card
+                  key={nf.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`p-3 transition-all active:scale-[0.99] ${nf.entrega ? "opacity-70" : "cursor-pointer"} ${isSelected ? "ring-2 ring-primary" : ""}`}
+                  onClick={() => selectNf(nf)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") selectNf(nf);
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="font-mono font-semibold text-sm">
+                      NF {nf.numero_nf}
+                    </span>
+                    {getStatusBadge(nf)}
+                  </div>
+                  <p className="text-sm font-medium mb-1">
+                    {nf.dest_razao_social || "Destinatário não informado"}
                   </p>
-                )}
-                {nf.entrega?.ocorrencia && (
-                  <p className="text-xs text-destructive mt-1">
-                    Ocorrência: {nf.entrega.ocorrencia}
+                  <p className="text-xs text-muted-foreground flex items-start gap-1">
+                    <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                    {formatEndereco(nf)}
                   </p>
-                )}
-              </Card>
-            ))}
+                  {nf.entrega?.recebedor_nome && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Recebedor: {nf.entrega.recebedor_nome}
+                    </p>
+                  )}
+                  {nf.entrega?.ocorrencia && (
+                    <p className="text-xs text-destructive mt-1">
+                      Ocorrência: {nf.entrega.ocorrencia}
+                    </p>
+                  )}
+
+                  {isSelected && !nf.entrega && (
+                    <div className="mt-3 pt-3 border-t space-y-4" onClick={(e) => e.stopPropagation()}>
+                      <div>
+                        <Label className="text-sm font-medium mb-2 block">Ocorrência *</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {OCORRENCIAS.map((oc) => (
+                            <Button
+                              key={oc.value}
+                              type="button"
+                              variant={ocorrencia === oc.value ? "default" : "outline"}
+                              size="sm"
+                              className="justify-start text-xs h-auto py-2"
+                              onClick={() => setOcorrencia(oc.value)}
+                            >
+                              <span className={ocorrencia === oc.value ? "" : oc.color}>{oc.icon}</span>
+                              <span className="ml-1">{oc.label}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {ocorrencia === "entregue" && (
+                        <div>
+                          <Label className="text-sm">Nome do recebedor</Label>
+                          <Input
+                            value={recebedorNome}
+                            onChange={(e) => setRecebedorNome(e.target.value)}
+                            placeholder="Nome de quem recebeu"
+                            className="mt-1"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <Label className="text-sm">Observação</Label>
+                        <Textarea
+                          value={observacao}
+                          onChange={(e) => setObservacao(e.target.value)}
+                          placeholder="Detalhe a ocorrência..."
+                          rows={2}
+                          className="mt-1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Navigation className="w-3 h-3" />
+                        {gpsLoading ? (
+                          <span>Obtendo localização...</span>
+                        ) : gpsCoords ? (
+                          <span>GPS: {gpsCoords.lat.toFixed(6)}, {gpsCoords.lng.toFixed(6)}</span>
+                        ) : (
+                          <span className="text-destructive">GPS indisponível</span>
+                        )}
+                      </div>
+
+                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia} className="w-full" size="lg">
+                        {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                        Registrar Baixa
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
