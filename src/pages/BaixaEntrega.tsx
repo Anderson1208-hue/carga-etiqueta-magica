@@ -731,7 +731,7 @@ export default function BaixaEntrega() {
                       role="button"
                       tabIndex={0}
                       className={`transition-all cursor-pointer active:scale-[0.99] ${
-                        isDone ? "opacity-60" : ""
+                        isDone && !isSelected ? "opacity-70" : ""
                       } ${isSelected ? "ring-2 ring-primary" : ""}`}
                       onClick={() => selectNf(nf.nf_id)}
                     >
