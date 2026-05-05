@@ -47,11 +47,14 @@ import {
   CalendarCheck,
   Loader2,
   FileText,
+  FileDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
+import { generateAgendamentosResumoPDF, type AgendamentoResumoItem } from "@/lib/agendamentos-resumo-pdf";
+import { calculateBoxes } from "@/lib/xml-parser";
 
 type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "REENTREGA" | "DEVOLUCAO";
 
