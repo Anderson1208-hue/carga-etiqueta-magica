@@ -757,6 +757,73 @@ export default function BaixaEntrega() {
                             .join(", ")}
                         </p>
 
+                        {/* Visualização da baixa registrada */}
+                        {isSelected && isDone && (
+                          <div
+                            className="mt-3 pt-3 border-t space-y-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-muted-foreground">Ocorrência</p>
+                                <p className="font-medium">
+                                  {OCORRENCIAS.find((o) => o.value === nf.baixa_ocorrencia)?.label || nf.baixa_ocorrencia || "—"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Data/Hora</p>
+                                <p className="font-medium">
+                                  {nf.baixa_registrado_em
+                                    ? new Date(nf.baixa_registrado_em).toLocaleString("pt-BR")
+                                    : "—"}
+                                </p>
+                              </div>
+                              {nf.baixa_recebedor && (
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Recebedor</p>
+                                  <p className="font-medium">{nf.baixa_recebedor}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {nf.baixa_foto_path ? (
+                              <div>
+                                <Label className="text-xs text-muted-foreground mb-1 block">Comprovante</Label>
+                                {loadingFoto === nf.baixa_foto_path ? (
+                                  <div className="flex justify-center py-6 border rounded-lg">
+                                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                                  </div>
+                                ) : fotoUrls[nf.baixa_foto_path] ? (
+                                  <a
+                                    href={fotoUrls[nf.baixa_foto_path]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <img
+                                      src={fotoUrls[nf.baixa_foto_path]}
+                                      alt="Canhoto"
+                                      className="w-full max-h-64 object-contain rounded-lg border bg-muted"
+                                      loading="lazy"
+                                    />
+                                  </a>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => nf.baixa_foto_path && loadFotoUrl(nf.baixa_foto_path)}
+                                  >
+                                    <ImageIcon className="w-4 h-4 mr-1" />
+                                    Ver foto
+                                  </Button>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs italic text-muted-foreground">Sem foto registrada</p>
+                            )}
+                          </div>
+                        )}
+
                         {/* Expanded form when selected */}
                         {isSelected && !isDone && (
                           <div
