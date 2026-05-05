@@ -694,10 +694,12 @@ export default function BaixaEntrega() {
                   return (
                     <Card
                       key={nf.nf_id}
-                      className={`transition-all ${
-                        isDone ? "opacity-60" : "cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      className={`transition-all cursor-pointer active:scale-[0.99] ${
+                        isDone ? "opacity-60" : ""
                       } ${isSelected ? "ring-2 ring-primary" : ""}`}
-                      onClick={() => !isDone && selectNf(nf.nf_id)}
+                      onClick={() => selectNf(nf.nf_id)}
                     >
                       <CardContent className="pt-4 space-y-2">
                         <div className="flex items-center justify-between">
