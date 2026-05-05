@@ -54,6 +54,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { generateAgendamentosResumoPDF, type AgendamentoResumoItem } from "@/lib/agendamentos-resumo-pdf";
+import { generateAgendamentosResumoExcel } from "@/lib/agendamentos-resumo-excel";
 import { calculateBoxes } from "@/lib/xml-parser";
 
 type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "REENTREGA" | "DEVOLUCAO";
