@@ -185,7 +185,7 @@ export default function ConsultaNF() {
           agendamentos(status, data_agendamento, created_at),
           ctes(numero_cte, chave_cte, razao_social_emitente, cnpj_emitente, valor_frete),
           veiculo_nfs(veiculos(placa, motorista, data, status)),
-          baixas_entrega(status, ocorrencia, recebedor_nome, registrado_em)
+          baixas_entrega(status, ocorrencia, recebedor_nome, registrado_em, foto_path)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
