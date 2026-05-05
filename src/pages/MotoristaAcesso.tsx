@@ -174,9 +174,15 @@ export default function MotoristaAcesso() {
       toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
       return;
     }
+    if (!fotoFile) {
+      toast({ title: "Foto obrigatória", description: "Tire ou anexe a foto do canhoto antes de registrar a baixa", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const foto_base64 = await fileToBase64(fotoFile);
+
       const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
         body: {
           code: code.trim().toUpperCase(),
@@ -187,6 +193,8 @@ export default function MotoristaAcesso() {
           observacao: observacao || null,
           latitude: gpsCoords?.lat ?? null,
           longitude: gpsCoords?.lng ?? null,
+          foto_base64,
+          foto_mime: fotoFile.type || "image/jpeg",
         },
       });
 
