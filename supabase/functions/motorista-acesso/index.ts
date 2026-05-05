@@ -5,6 +5,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+type NotaFiscalMotorista = {
+  id: string;
+  numero_nf: string;
+  dest_razao_social: string | null;
+  dest_logradouro: string | null;
+  dest_numero: string | null;
+  dest_bairro: string | null;
+  dest_cidade: string | null;
+  dest_uf: string | null;
+  dest_cep: string | null;
+  peso_bruto: number | null;
+};
+
+type VeiculoNfRow = { notas_fiscais: NotaFiscalMotorista | null };
+
+type BaixaEntregaRow = {
+  nf_id: string;
+  status: string;
+  registrado_em: string | null;
+  recebedor_nome: string | null;
+  ocorrencia: string | null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -123,9 +146,9 @@ Deno.serve(async (req) => {
       `)
       .eq("veiculo_id", veiculo.id);
 
-    const nfs = (veiculoNfs || [])
-      .map((vnf: any) => vnf.notas_fiscais)
-      .filter(Boolean);
+    const nfs = ((veiculoNfs || []) as VeiculoNfRow[])
+      .map((vnf) => vnf.notas_fiscais)
+      .filter((nf): nf is NotaFiscalMotorista => Boolean(nf));
 
     // Get baixas for this vehicle
     const { data: baixas } = await supabase
@@ -133,12 +156,12 @@ Deno.serve(async (req) => {
       .select("nf_id, status, registrado_em, recebedor_nome, ocorrencia")
       .eq("veiculo_id", veiculo.id);
 
-    const baixasMap: Record<string, any> = {};
-    (baixas || []).forEach((b: any) => {
+    const baixasMap: Record<string, BaixaEntregaRow> = {};
+    ((baixas || []) as BaixaEntregaRow[]).forEach((b) => {
       baixasMap[b.nf_id] = b;
     });
 
-    const nfsComStatus = nfs.map((nf: any) => ({
+    const nfsComStatus = nfs.map((nf) => ({
       ...nf,
       entrega: baixasMap[nf.id] || null,
     }));
