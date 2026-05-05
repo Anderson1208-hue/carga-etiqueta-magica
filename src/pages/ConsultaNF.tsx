@@ -382,6 +382,39 @@ export default function ConsultaNF() {
                 </div>
               )}
 
+              {/* Baixa de Entrega */}
+              {selectedNf.baixa && (
+                <div className="border-t pt-4 -mx-6 px-6 py-4 bg-success/5">
+                  <p className="text-sm font-semibold mb-2 flex items-center gap-1">
+                    <Package className="w-4 h-4" /> Baixa de Entrega
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <Badge className={selectedNf.baixa.status === "entregue" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}>
+                        {selectedNf.baixa.status === "entregue" ? "ENTREGUE" : "OCORRÊNCIA"}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Ocorrência</p>
+                      <p className="font-medium">{selectedNf.baixa.ocorrencia || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Recebedor</p>
+                      <p className="font-medium">{selectedNf.baixa.recebedor_nome || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Registrado em</p>
+                      <p className="font-medium">
+                        {selectedNf.baixa.registrado_em
+                          ? format(new Date(selectedNf.baixa.registrado_em), "dd/MM/yyyy HH:mm")
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* CT-e vinculados */}
               {selectedNf.ctes && selectedNf.ctes.length > 0 && (
                 <div className="border-t pt-4">
