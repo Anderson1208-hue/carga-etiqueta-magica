@@ -303,6 +303,7 @@ export function useOfflineEntregas() {
 
     db.close();
     await loadPendingCount();
+    notifyPendingChanged();
   }, []);
 
   const hasOfflineData = useCallback(async (veiculoId: string): Promise<boolean> => {
