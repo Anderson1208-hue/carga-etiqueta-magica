@@ -116,6 +116,11 @@ export default function BaixaEntrega() {
     enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
   });
 
+  // Mantém tela acesa enquanto há veículo selecionado (em rota).
+  useWakeLock(!!selectedVeiculoId);
+  // Trava retrato no APK.
+  useLockPortrait();
+
   // Baixa form state
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
   const [ocorrencia, setOcorrencia] = useState<OcorrenciaTipo | "">("");
