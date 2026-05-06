@@ -119,17 +119,19 @@ export function useOfflineEntregas() {
 
   async function loadPendingCount() {
     try {
-      const db = await openDB();
-      const tx = db.transaction(STORE_BAIXAS, "readonly");
-      const store = tx.objectStore(STORE_BAIXAS);
-      const index = store.index("synced");
-      const request = index.count(IDBKeyRange.only(0)); // false stored as 0
-      request.onsuccess = () => setPendingSyncCount(request.result);
-      db.close();
+      const count = await getPendingBaixasCount();
+      setPendingSyncCount(count);
     } catch {
       setPendingSyncCount(0);
     }
   }
+
+  // Escuta evento global para sincronizar contador entre abas/componentes
+  useEffect(() => {
+    const handler = () => loadPendingCount();
+    window.addEventListener("offline-pending-changed", handler);
+    return () => window.removeEventListener("offline-pending-changed", handler);
+  }, []);
 
   const downloadNfsForVeiculo = useCallback(async (veiculoId: string, nfs: OfflineNf[]) => {
     const db = await openDB();
