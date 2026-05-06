@@ -33,6 +33,7 @@ type: reference
 - [Conferência Externa](mem://funcionalidades/operacao/conferencia-externa-mobile) — Motorista app requirements and validation.
 - [Conferência Interna](mem://funcionalidades/operacao/conferencia-interna-mobile) — Galpão direct search and label scanning.
 - [Conferência Offline](mem://funcionalidades/operacao/conferencia-interna-offline) — IndexedDB caching for no-signal areas.
+- [Offline Fotos + Auto-sync](mem://funcionalidades/operacao/offline-fotos-autosync) — Foto persistida no IDB, sync automático ao voltar online, badge no bottom nav.
 - [Baixa de Entrega](mem://funcionalidades/operacao/baixa-de-entrega) — Mobile POD, multiple photos, GPS.
 - [Scanner Híbrido](mem://arquitetura/operacao/scanner-offline-hibrido) — Mobile scanner tuning (BarcodeDetector, 60% crop, display:none).
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
