@@ -99,7 +99,30 @@ export async function deleteFotoOffline(baixaId: string): Promise<void> {
   db.close();
 }
 
-export function useOfflineEntregas() {
+// Standalone — usado pelo badge global do MobileBottomNav.
+export async function getPendingBaixasCount(): Promise<number> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_BAIXAS, "readonly");
+    const store = tx.objectStore(STORE_BAIXAS);
+    const index = store.index("synced");
+    const req = index.count(IDBKeyRange.only(0));
+    const count = await new Promise<number>((resolve) => {
+      req.onsuccess = () => resolve(req.result || 0);
+      req.onerror = () => resolve(0);
+    });
+    db.close();
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+// Dispara um evento global para que badges/contadores se atualizem.
+export function notifyPendingChanged() {
+  window.dispatchEvent(new CustomEvent("offline-pending-changed"));
+}
+
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [offlineNfs, setOfflineNfs] = useState<OfflineNf[]>([]);
