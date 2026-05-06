@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,6 +83,9 @@ export default function ConferenciaInterna() {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const canDivergencia = isAdmin || !!(profile as any)?.pode_divergencia;
+
+  // Trava retrato no APK (tela operacional do galpão).
+  useLockPortrait();
 
   // Offline
   const {

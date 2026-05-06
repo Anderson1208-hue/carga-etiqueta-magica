@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { useToast } from "@/hooks/use-toast";
 import {
   useOfflineEntregas,
@@ -113,6 +115,11 @@ export default function BaixaEntrega() {
     monitoramentoRotaId,
     enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
   });
+
+  // Mantém tela acesa enquanto há veículo selecionado (em rota).
+  useWakeLock(!!selectedVeiculoId);
+  // Trava retrato no APK.
+  useLockPortrait();
 
   // Baixa form state
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);

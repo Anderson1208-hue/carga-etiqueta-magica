@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -81,6 +83,10 @@ export default function ConferenciaExterna() {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Mantém tela acesa durante conferência + trava retrato no APK.
+  useWakeLock(true);
+  useLockPortrait();
 
   // Navigation
   const [viewMode, setViewMode] = useState<ViewMode>("vehicle-select");
