@@ -37,6 +37,7 @@ type: reference
 - [Scanner Híbrido](mem://arquitetura/operacao/scanner-offline-hibrido) — Mobile scanner tuning (BarcodeDetector, 60% crop, display:none).
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
+- [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
 - [Smart GPS Tracking](mem://arquitetura/monitoramento/smart-gps-tracking-logic) — Dynamic ping rates (60s/30s) based on distance.
 - [Constraints GPS PWA](mem://constraints/monitoramento-gps-pwa) — Tab must remain active for iOS/Android tracking.
 - [Mapa Leaflet UI](mem://funcionalidades/monitoramento/visualizacao-mapa-leaflet) — Map visuals, tokens, truck icon.
