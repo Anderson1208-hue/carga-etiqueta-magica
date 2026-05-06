@@ -48,10 +48,55 @@ function openDB(): Promise<IDBDatabase> {
         baixaStore.createIndex("synced", "synced", { unique: false });
         baixaStore.createIndex("veiculo_id", "veiculo_id", { unique: false });
       }
+      if (!db.objectStoreNames.contains(STORE_FOTOS)) {
+        // keyPath = baixa_id (1 foto por baixa). Blob persiste mesmo após reload.
+        db.createObjectStore(STORE_FOTOS, { keyPath: "baixa_id" });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+// ---------- Foto offline (Blob no IndexedDB) ----------
+export async function saveFotoOffline(baixaId: string, file: File): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readwrite");
+  tx.objectStore(STORE_FOTOS).put({
+    baixa_id: baixaId,
+    blob: file,
+    contentType: file.type || "image/jpeg",
+    fileName: file.name,
+    savedAt: new Date().toISOString(),
+  });
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function getFotoOffline(baixaId: string): Promise<Blob | null> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readonly");
+  const req = tx.objectStore(STORE_FOTOS).get(baixaId);
+  const result = await new Promise<any>((resolve) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+  db.close();
+  return result?.blob || null;
+}
+
+export async function deleteFotoOffline(baixaId: string): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readwrite");
+  tx.objectStore(STORE_FOTOS).delete(baixaId);
+  await new Promise<void>((resolve) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  db.close();
 }
 
 export function useOfflineEntregas() {
