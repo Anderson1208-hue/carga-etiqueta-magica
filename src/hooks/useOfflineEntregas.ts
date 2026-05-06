@@ -259,7 +259,7 @@ export function useOfflineEntregas() {
 
     db.close();
     await loadPendingCount();
-    return record;
+    notifyPendingChanged();
   }, []);
 
   const getPendingBaixas = useCallback(async (): Promise<OfflineBaixa[]> => {
