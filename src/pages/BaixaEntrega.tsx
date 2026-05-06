@@ -404,6 +404,25 @@ export default function BaixaEntrega() {
     setFotoPreview(URL.createObjectURL(file));
   }
 
+  async function handleNativePhoto(source: PhotoSource) {
+    // Em APK Android usa câmera/galeria nativa; em web cai no <input> tradicional.
+    if (!isNativeCameraAvailable()) {
+      if (source === "camera") cameraInputRef.current?.click();
+      else fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const result = await takeNativePhoto(source);
+      if (!result) return;
+      if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+      setFotoFile(result.file);
+      setFotoPreview(result.previewUrl);
+    } catch (err: any) {
+      // Usuário cancelou ou negou permissão — silencioso, mas loga.
+      console.warn("Captura nativa cancelada/falhou:", err?.message || err);
+    }
+  }
+
   function resetForm() {
     setSelectedNfId(null);
     setOcorrencia("");
