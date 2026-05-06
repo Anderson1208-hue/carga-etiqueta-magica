@@ -908,7 +908,8 @@ export default function BaixaEntrega() {
                             </div>
 
                             {/* Photo capture - only in online mode */}
-                            {!offlineMode && isOnline && (
+                            {/* Photo capture - sempre disponível (foto offline persiste em IndexedDB) */}
+                            {true && (
                               <div>
                                 <Label className="text-sm mb-2 block">
                                   Foto do comprovante {ocorrencia === "entregue" && "*"}
