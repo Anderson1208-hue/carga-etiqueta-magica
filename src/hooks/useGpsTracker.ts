@@ -11,8 +11,8 @@ interface GpsConfig {
 }
 
 const DEFAULT_CONFIG: GpsConfig = {
-  intervalo_padrao_segundos: 60,
-  intervalo_critico_segundos: 30,
+  intervalo_padrao_segundos: 120,
+  intervalo_critico_segundos: 60,
   distance_filter_metros: 100,
   batch_sync_ativo: true,
   batch_max_posicoes: 5,
