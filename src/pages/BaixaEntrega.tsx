@@ -37,6 +37,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
+import { isNativeCameraAvailable, takeNativePhoto, type PhotoSource } from "@/hooks/useNativeCamera";
 
 interface Veiculo {
   id: string;
