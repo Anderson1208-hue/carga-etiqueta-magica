@@ -3,7 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useToast } from "@/hooks/use-toast";
-import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
+import {
+  useOfflineEntregas,
+  type OfflineNf,
+  saveFotoOffline,
+  getFotoOffline,
+  deleteFotoOffline,
+} from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
