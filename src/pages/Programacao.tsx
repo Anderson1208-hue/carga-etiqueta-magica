@@ -94,11 +94,12 @@ export default function Programacao() {
   async function loadNfsDisponiveis() {
     setLoading(true);
     try {
-      // Fetch cargas abertas (não exclui por roteirização - apenas NFs já vinculadas a veículos serão filtradas)
+      // Fetch cargas importadas. O status da carga é manual e não deve bloquear
+      // NFs ainda no depósito; a disponibilidade é definida por NF, veículo e agendamento.
       const cargasRes = await supabase
         .from("cargas")
         .select("id, placa, motorista, data, tipo_carga, status")
-        .eq("status", "aberta");
+        .order("created_at", { ascending: false });
 
       if (cargasRes.error) throw cargasRes.error;
       const cargas = cargasRes.data;
