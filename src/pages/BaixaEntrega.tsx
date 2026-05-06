@@ -136,6 +136,19 @@ export default function BaixaEntrega() {
     captureGPS();
   }, [isOnline]);
 
+  // Auto-sync: ao voltar online (e fora do modo offline manual), sincroniza pendentes
+  // automaticamente, com pequeno debounce para evitar disparo em rajada de eventos.
+  useEffect(() => {
+    if (!isOnline || offlineMode) return;
+    const t = setTimeout(async () => {
+      const pending = await getPendingBaixas();
+      if (pending.length > 0 && !syncing) {
+        handleSync();
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [isOnline, offlineMode]);
+
   useEffect(() => {
     if (selectedVeiculoId) {
       if (isOnline && !offlineMode) {
