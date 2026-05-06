@@ -92,7 +92,8 @@ Deno.serve(async (req) => {
       .from("monitoramento_paradas")
       .select("*")
       .eq("monitoramento_rota_id", monitoramento_rota_id)
-      .order("ordem", { ascending: true });
+      .order("ordem", { ascending: true })
+      .limit(2000);
 
     if (!paradas || paradas.length === 0) {
       return new Response(JSON.stringify({ status: "ok", events: [] }), {
@@ -256,7 +257,8 @@ Deno.serve(async (req) => {
     const { data: updatedParadas } = await supabase
       .from("monitoramento_paradas")
       .select("status")
-      .eq("monitoramento_rota_id", monitoramento_rota_id);
+      .eq("monitoramento_rota_id", monitoramento_rota_id)
+      .limit(2000);
 
     const concluidas = (updatedParadas || []).filter((p: any) =>
       ["finalizada"].includes(p.status)

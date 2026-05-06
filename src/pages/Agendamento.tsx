@@ -180,16 +180,18 @@ export default function Agendamento() {
         const { data: nfsData } = await supabase
           .from("notas_fiscais")
           .select("id, numero_nf, dest_razao_social, dest_cidade, carga_id")
-          .in("id", nfIds);
+          .in("id", nfIds)
+          .limit(2000);
 
         const cargaIds = [...new Set((nfsData || []).map(n => n.carga_id))];
         const [{ data: cargasData }, { data: ctesData }] = await Promise.all([
-          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
+          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds).limit(2000),
           supabase
             .from("ctes")
             .select("nf_id, numero_cte, razao_social_emitente, created_at")
             .in("nf_id", nfIds)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+            .limit(2000),
         ]);
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));
@@ -270,17 +272,19 @@ export default function Agendamento() {
         const cargaIds = [...new Set(allData.map(n => n.carga_id))];
         const nfIdsAll = allData.map(n => n.id);
         const [{ data: cargasData }, { data: agData }, { data: ctesData }] = await Promise.all([
-          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds),
+          supabase.from("cargas").select("id, tipo_carga").in("id", cargaIds).limit(2000),
           supabase
             .from("agendamentos")
             .select("nf_id, status, data_agendamento, created_at")
             .in("nf_id", nfIdsAll)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+            .limit(2000),
           supabase
             .from("ctes")
             .select("nf_id, numero_cte, razao_social_emitente, created_at")
             .in("nf_id", nfIdsAll)
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false })
+            .limit(2000),
         ]);
 
         const cargaMap = new Map((cargasData || []).map(c => [c.id, c.tipo_carga]));

@@ -215,7 +215,8 @@ export default function BaixaEntrega() {
       const { data: vnfs } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
-        .eq("veiculo_id", veiculoId);
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
 
       if (!vnfs || vnfs.length === 0) {
         setNfs([]);
@@ -227,12 +228,14 @@ export default function BaixaEntrega() {
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
-        .in("id", nfIds);
+        .in("id", nfIds)
+        .limit(2000);
 
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
         .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path")
-        .eq("veiculo_id", veiculoId);
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
 
       const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b]));
 
@@ -315,7 +318,8 @@ export default function BaixaEntrega() {
       const { data: vnfs } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
-        .eq("veiculo_id", selectedVeiculoId);
+        .eq("veiculo_id", selectedVeiculoId)
+        .limit(2000);
 
       if (!vnfs || vnfs.length === 0) {
         toast({ title: "Sem NFs", description: "Nenhuma NF vinculada a este veículo", variant: "destructive" });
@@ -327,7 +331,8 @@ export default function BaixaEntrega() {
       const { data: nfsData } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
-        .in("id", nfIds);
+        .in("id", nfIds)
+        .limit(2000);
 
       const offlineData: OfflineNf[] = (nfsData || []).map((nf) => ({
         nf_id: nf.id,
