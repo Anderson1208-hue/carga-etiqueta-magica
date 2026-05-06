@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
 const DB_NAME = "entregas_offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NFS = "nfs_cache";
 const STORE_BAIXAS = "baixas_pendentes";
+const STORE_FOTOS = "fotos_pendentes";
 
 export interface OfflineNf {
   nf_id: string;
@@ -47,10 +48,79 @@ function openDB(): Promise<IDBDatabase> {
         baixaStore.createIndex("synced", "synced", { unique: false });
         baixaStore.createIndex("veiculo_id", "veiculo_id", { unique: false });
       }
+      if (!db.objectStoreNames.contains(STORE_FOTOS)) {
+        // keyPath = baixa_id (1 foto por baixa). Blob persiste mesmo após reload.
+        db.createObjectStore(STORE_FOTOS, { keyPath: "baixa_id" });
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+// ---------- Foto offline (Blob no IndexedDB) ----------
+export async function saveFotoOffline(baixaId: string, file: File): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readwrite");
+  tx.objectStore(STORE_FOTOS).put({
+    baixa_id: baixaId,
+    blob: file,
+    contentType: file.type || "image/jpeg",
+    fileName: file.name,
+    savedAt: new Date().toISOString(),
+  });
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+export async function getFotoOffline(baixaId: string): Promise<Blob | null> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readonly");
+  const req = tx.objectStore(STORE_FOTOS).get(baixaId);
+  const result = await new Promise<any>((resolve) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+  db.close();
+  return result?.blob || null;
+}
+
+export async function deleteFotoOffline(baixaId: string): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_FOTOS, "readwrite");
+  tx.objectStore(STORE_FOTOS).delete(baixaId);
+  await new Promise<void>((resolve) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  db.close();
+}
+
+// Standalone — usado pelo badge global do MobileBottomNav.
+export async function getPendingBaixasCount(): Promise<number> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_BAIXAS, "readonly");
+    const store = tx.objectStore(STORE_BAIXAS);
+    const index = store.index("synced");
+    const req = index.count(IDBKeyRange.only(0));
+    const count = await new Promise<number>((resolve) => {
+      req.onsuccess = () => resolve(req.result || 0);
+      req.onerror = () => resolve(0);
+    });
+    db.close();
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+// Dispara um evento global para que badges/contadores se atualizem.
+export function notifyPendingChanged() {
+  window.dispatchEvent(new CustomEvent("offline-pending-changed"));
 }
 
 export function useOfflineEntregas() {
@@ -73,17 +143,19 @@ export function useOfflineEntregas() {
 
   async function loadPendingCount() {
     try {
-      const db = await openDB();
-      const tx = db.transaction(STORE_BAIXAS, "readonly");
-      const store = tx.objectStore(STORE_BAIXAS);
-      const index = store.index("synced");
-      const request = index.count(IDBKeyRange.only(0)); // false stored as 0
-      request.onsuccess = () => setPendingSyncCount(request.result);
-      db.close();
+      const count = await getPendingBaixasCount();
+      setPendingSyncCount(count);
     } catch {
       setPendingSyncCount(0);
     }
   }
+
+  // Escuta evento global para sincronizar contador entre abas/componentes
+  useEffect(() => {
+    const handler = () => loadPendingCount();
+    window.addEventListener("offline-pending-changed", handler);
+    return () => window.removeEventListener("offline-pending-changed", handler);
+  }, []);
 
   const downloadNfsForVeiculo = useCallback(async (veiculoId: string, nfs: OfflineNf[]) => {
     const db = await openDB();
@@ -187,6 +259,7 @@ export function useOfflineEntregas() {
 
     db.close();
     await loadPendingCount();
+    notifyPendingChanged();
     return record;
   }, []);
 
@@ -230,6 +303,7 @@ export function useOfflineEntregas() {
 
     db.close();
     await loadPendingCount();
+    notifyPendingChanged();
   }, []);
 
   const hasOfflineData = useCallback(async (veiculoId: string): Promise<boolean> => {

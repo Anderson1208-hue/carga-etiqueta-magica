@@ -3,7 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useToast } from "@/hooks/use-toast";
-import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
+import {
+  useOfflineEntregas,
+  type OfflineNf,
+  saveFotoOffline,
+  getFotoOffline,
+  deleteFotoOffline,
+} from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +135,19 @@ export default function BaixaEntrega() {
     }
     captureGPS();
   }, [isOnline]);
+
+  // Auto-sync: ao voltar online (e fora do modo offline manual), sincroniza pendentes
+  // automaticamente, com pequeno debounce para evitar disparo em rajada de eventos.
+  useEffect(() => {
+    if (!isOnline || offlineMode) return;
+    const t = setTimeout(async () => {
+      const pending = await getPendingBaixas();
+      if (pending.length > 0 && !syncing) {
+        handleSync();
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [isOnline, offlineMode]);
 
   useEffect(() => {
     if (selectedVeiculoId) {
@@ -333,23 +352,42 @@ export default function BaixaEntrega() {
       let errors = 0;
 
       for (const baixa of pending) {
-        const { error } = await supabase.from("baixas_entrega").insert({
-          veiculo_id: baixa.veiculo_id,
-          nf_id: baixa.nf_id,
-          status: baixa.status,
-          ocorrencia: baixa.ocorrencia,
-          recebedor_nome: baixa.recebedor_nome,
-          latitude: baixa.latitude,
-          longitude: baixa.longitude,
-          registrado_por: baixa.registrado_por,
-          registrado_em: baixa.registrado_em,
-        });
+        try {
+          // 1) Tenta upload da foto, se houver foto offline persistida
+          let fotoPath: string | null = null;
+          const fotoBlob = await getFotoOffline(baixa.id);
+          if (fotoBlob) {
+            const ext = (fotoBlob.type?.split("/")?.[1] || "jpg").replace("jpeg", "jpg");
+            const fileName = `${baixa.veiculo_id}/${baixa.nf_id}_${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("comprovantes")
+              .upload(fileName, fotoBlob, { contentType: fotoBlob.type || "image/jpeg" });
+            if (upErr) throw upErr;
+            fotoPath = fileName;
+          }
 
-        if (error) {
-          console.error("Sync error for baixa:", baixa.id, error);
-          errors++;
-        } else {
+          // 2) Insere a baixa
+          const { error } = await supabase.from("baixas_entrega").insert({
+            veiculo_id: baixa.veiculo_id,
+            nf_id: baixa.nf_id,
+            status: baixa.status,
+            ocorrencia: baixa.ocorrencia,
+            recebedor_nome: baixa.recebedor_nome,
+            foto_path: fotoPath,
+            latitude: baixa.latitude,
+            longitude: baixa.longitude,
+            registrado_por: baixa.registrado_por,
+            registrado_em: baixa.registrado_em,
+          });
+
+          if (error) throw error;
+
           syncedIds.push(baixa.id);
+          // 3) Limpa foto local após sucesso (libera storage do device)
+          await deleteFotoOffline(baixa.id);
+        } catch (err) {
+          console.error("Sync error for baixa:", baixa.id, err);
+          errors++;
         }
       }
 
@@ -476,8 +514,8 @@ export default function BaixaEntrega() {
       return;
     }
 
-    // In offline mode, skip photo requirement
-    if (isOnline && !offlineMode && ocorrencia === "entregue" && !fotoFile) {
+    // Foto obrigatória para entrega — vale online E offline (sync usa a foto salva)
+    if (ocorrencia === "entregue" && !fotoFile) {
       toast({ title: "Atenção", description: "Foto obrigatória para entrega", variant: "destructive" });
       return;
     }
@@ -491,9 +529,9 @@ export default function BaixaEntrega() {
         return;
       }
 
-      // If offline or offlineMode, save locally
+      // If offline or offlineMode, save locally (com foto persistida em IndexedDB)
       if (!isOnline || offlineMode) {
-        await saveBaixaOffline({
+        const record = await saveBaixaOffline({
           veiculo_id: selectedVeiculoId,
           nf_id: selectedNfId,
           status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
@@ -505,6 +543,10 @@ export default function BaixaEntrega() {
           registrado_por: user?.id || null,
           registrado_em: new Date().toISOString(),
         });
+
+        if (fotoFile) {
+          await saveFotoOffline(record.id, fotoFile);
+        }
 
         toast({
           title: "Baixa salva offline!",
@@ -898,7 +940,8 @@ export default function BaixaEntrega() {
                             </div>
 
                             {/* Photo capture - only in online mode */}
-                            {!offlineMode && isOnline && (
+                            {/* Photo capture - sempre disponível (foto offline persiste em IndexedDB) */}
+                            {true && (
                               <div>
                                 <Label className="text-sm mb-2 block">
                                   Foto do comprovante {ocorrencia === "entregue" && "*"}
@@ -966,7 +1009,7 @@ export default function BaixaEntrega() {
 
                             {(offlineMode || !isOnline) && (
                               <p className="text-xs text-muted-foreground italic">
-                                📷 Foto será solicitada quando transmitir online
+                                📷 Foto salva no aparelho — será enviada ao sincronizar
                               </p>
                             )}
 
