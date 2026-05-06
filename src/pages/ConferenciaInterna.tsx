@@ -84,6 +84,9 @@ export default function ConferenciaInterna() {
   const inputRef = useRef<HTMLInputElement>(null);
   const canDivergencia = isAdmin || !!(profile as any)?.pode_divergencia;
 
+  // Trava retrato no APK (tela operacional do galpão).
+  useLockPortrait();
+
   // Offline
   const {
     isOnline,
