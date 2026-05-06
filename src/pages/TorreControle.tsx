@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,18 +36,24 @@ export default function TorreControle() {
 
   const loadRotas = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("monitoramento_rotas")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setRotas((data as any[]) || []);
+      const rotasAll = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("monitoramento_rotas")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      );
+      setRotas(rotasAll);
 
-      // Load alert counts per route
-      const { data: alertas } = await supabase
-        .from("alertas_monitoramento")
-        .select("monitoramento_rota_id")
-        .eq("lido", false);
+      // Load alert counts per route (paginado)
+      const alertas = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("alertas_monitoramento")
+          .select("monitoramento_rota_id")
+          .eq("lido", false)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      );
 
       const counts: Record<string, number> = {};
       (alertas || []).forEach((a: any) => {

@@ -5,6 +5,7 @@ import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao } from "@/lib/macro-regioes";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -94,16 +95,19 @@ export default function Cargas() {
   async function handlePrintNotaCarga(carga: Carga) {
     setPrintingCargaId(carga.id);
     try {
-      const { data: nfsData } = await supabase
-        .from("notas_fiscais")
-        .select(`
-          id, numero_nf, razao_social_emitente, cnpj_emitente,
-          cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero,
-          dest_bairro, dest_cidade, dest_uf, dest_cep, data_emissao,
-          itens_nf(c_prod, x_prod, q_com)
-        `)
-        .eq("carga_id", carga.id)
-        .order("numero_nf", { ascending: true });
+      const nfsData = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("notas_fiscais")
+          .select(`
+            id, numero_nf, razao_social_emitente, cnpj_emitente,
+            cnpj_destinatario, dest_razao_social, dest_logradouro, dest_numero,
+            dest_bairro, dest_cidade, dest_uf, dest_cep, data_emissao,
+            itens_nf(c_prod, x_prod, q_com)
+          `)
+          .eq("carga_id", carga.id)
+          .order("numero_nf", { ascending: true })
+          .range(from, to)
+      );
 
       if (!nfsData || nfsData.length === 0) {
         toast({ title: "Sem NFs", description: "Nenhuma NF encontrada nesta carga.", variant: "destructive" });

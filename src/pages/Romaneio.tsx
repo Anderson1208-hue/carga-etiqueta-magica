@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -159,29 +160,33 @@ export default function Romaneio() {
         setSelectedCarga(cargaData);
       }
 
-      const { data: nfsData } = await supabase
-        .from("notas_fiscais")
-        .select(`
-          id,
-          numero_nf,
-          razao_social_emitente,
-          cnpj_emitente,
-          cnpj_destinatario,
-          dest_razao_social,
-          dest_logradouro,
-          dest_numero,
-          dest_bairro,
-          dest_cidade,
-          dest_uf,
-          dest_cep,
-          data_emissao,
-          itens_nf(
-            c_prod,
-            x_prod,
-            q_com
-          )
-        `)
-        .eq("carga_id", cargaId);
+      const nfsData = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("notas_fiscais")
+          .select(`
+            id,
+            numero_nf,
+            razao_social_emitente,
+            cnpj_emitente,
+            cnpj_destinatario,
+            dest_razao_social,
+            dest_logradouro,
+            dest_numero,
+            dest_bairro,
+            dest_cidade,
+            dest_uf,
+            dest_cep,
+            data_emissao,
+            itens_nf(
+              c_prod,
+              x_prod,
+              q_com
+            )
+          `)
+          .eq("carga_id", cargaId)
+          .order("numero_nf", { ascending: true })
+          .range(from, to)
+      );
 
       if (!nfsData) return;
 

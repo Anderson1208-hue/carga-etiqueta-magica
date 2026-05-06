@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -94,31 +95,54 @@ export default function HistoricoEntregas() {
   async function loadBaixas() {
     setLoading(true);
     try {
-      // Load baixas with related data
-      const { data: baixasData, error } = await supabase
-        .from("baixas_entrega")
-        .select("*")
-        .order("registrado_em", { ascending: false });
+      // Load baixas with related data (paginado para >1000 registros)
+      const baixasData = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("baixas_entrega")
+          .select("*")
+          .order("registrado_em", { ascending: false })
+          .range(from, to)
+      );
 
-      if (error) throw error;
       if (!baixasData || baixasData.length === 0) {
         setBaixas([]);
         return;
       }
 
       // Get unique NF IDs and Vehicle IDs
-      const nfIds = [...new Set(baixasData.map((b) => b.nf_id))];
-      const veiculoIds = [...new Set(baixasData.map((b) => b.veiculo_id))];
-      const operadorIds = [...new Set(baixasData.map((b) => b.registrado_por).filter(Boolean))] as string[];
+      const nfIds = [...new Set(baixasData.map((b: any) => b.nf_id as string))];
+      const veiculoIds = [...new Set(baixasData.map((b: any) => b.veiculo_id as string))];
+      const operadorIds = [...new Set(baixasData.map((b: any) => b.registrado_por).filter(Boolean))] as string[];
 
-      // Parallel fetch related data
-      const [nfsRes, veiculosRes, profilesRes] = await Promise.all([
-        supabase.from("notas_fiscais").select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf").in("id", nfIds),
-        supabase.from("veiculos").select("id, placa, motorista").in("id", veiculoIds),
+      // Parallel fetch related data — chunked para suportar >1000 ids
+      const [nfsArr, veiculosArr, profilesArr] = await Promise.all([
+        fetchInChunks<string, any>(nfIds, async (chunk) => {
+          const { data } = await supabase
+            .from("notas_fiscais")
+            .select("id, numero_nf, dest_razao_social, dest_cidade, dest_uf")
+            .in("id", chunk);
+          return data || [];
+        }),
+        fetchInChunks<string, any>(veiculoIds, async (chunk) => {
+          const { data } = await supabase
+            .from("veiculos")
+            .select("id, placa, motorista")
+            .in("id", chunk);
+          return data || [];
+        }),
         operadorIds.length > 0
-          ? supabase.from("profiles").select("id, full_name, email").in("id", operadorIds)
-          : Promise.resolve({ data: [] }),
+          ? fetchInChunks<string, any>(operadorIds, async (chunk) => {
+              const { data } = await supabase
+                .from("profiles")
+                .select("id, full_name, email")
+                .in("id", chunk);
+              return data || [];
+            })
+          : Promise.resolve([] as any[]),
       ]);
+      const nfsRes = { data: nfsArr };
+      const veiculosRes = { data: veiculosArr };
+      const profilesRes = { data: profilesArr };
 
       const nfMap = new Map((nfsRes.data || []).map((n) => [n.id, n]));
       const veiculoMap = new Map((veiculosRes.data || []).map((v) => [v.id, v]));

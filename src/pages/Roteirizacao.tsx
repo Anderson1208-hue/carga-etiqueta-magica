@@ -45,6 +45,7 @@ import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
+import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
 import {
@@ -212,11 +213,13 @@ export default function Roteirizacao() {
   }, [selectedCargaIds, modoNfIds]);
 
   async function loadCargas() {
-    const { data } = await supabase
-      .from("cargas")
-      .select("id, data, placa, motorista, tipo_carga")
-      .order("created_at", { ascending: false });
-
+    const data = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("cargas")
+        .select("id, data, placa, motorista, tipo_carga")
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    );
     setCargas(data || []);
   }
 
@@ -233,33 +236,43 @@ export default function Roteirizacao() {
     setRoteirizacao(null);
     setFiltroMacroRegiao("todas");
     try {
-      // Fetch NFs from all selected cargas
-      const { data: nfsData } = await supabase
-        .from("notas_fiscais")
-        .select(`
-          id,
-          numero_nf,
-          carga_id,
-          cnpj_destinatario,
-          dest_razao_social,
-          dest_logradouro,
-          dest_numero,
-          dest_bairro,
-          dest_cidade,
-          dest_uf,
-          dest_cep,
-          peso_bruto,
-          peso_liquido,
-          volume_m3,
-          itens_nf(q_com)
-        `)
-        .in("carga_id", cargaIds);
+      // Fetch NFs from all selected cargas (paginado, chunk de cargaIds)
+      const nfsData = await fetchInChunks<string, any>(cargaIds, async (chunk) => {
+        return await fetchAllPages<any>((from, to) =>
+          supabase
+            .from("notas_fiscais")
+            .select(`
+              id,
+              numero_nf,
+              carga_id,
+              cnpj_destinatario,
+              dest_razao_social,
+              dest_logradouro,
+              dest_numero,
+              dest_bairro,
+              dest_cidade,
+              dest_uf,
+              dest_cep,
+              peso_bruto,
+              peso_liquido,
+              volume_m3,
+              itens_nf(q_com)
+            `)
+            .in("carga_id", chunk)
+            .order("numero_nf", { ascending: true })
+            .range(from, to)
+        );
+      });
 
-      // Fetch NFs that already have delivery confirmation (entregue)
-      const { data: baixasData } = await supabase
-        .from("baixas_entrega")
-        .select("nf_id, status")
-        .eq("status", "entregue");
+      // Fetch NFs that already have delivery confirmation (entregue) — paginado
+      const baixasData = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("baixas_entrega")
+          .select("nf_id, status")
+          .eq("status", "entregue")
+          .order("registrado_em", { ascending: false })
+          .range(from, to)
+      );
 
       const nfsEntregues = new Set((baixasData || []).map((b) => b.nf_id));
 
@@ -1114,10 +1127,13 @@ export default function Roteirizacao() {
       const ids = (data || []).map((v) => v.id);
       let comNfs = new Set<string>(ids);
       if (ids.length > 0) {
-        const { data: vnfs } = await supabase
-          .from("veiculo_nfs")
-          .select("veiculo_id")
-          .in("veiculo_id", ids);
+        const vnfs = await fetchInChunks<string, any>(ids, async (chunk) => {
+          const { data: rows } = await supabase
+            .from("veiculo_nfs")
+            .select("veiculo_id")
+            .in("veiculo_id", chunk);
+          return rows || [];
+        });
         comNfs = new Set((vnfs || []).map((r: any) => r.veiculo_id));
       }
       setVeiculos((data || []).filter((v) => comNfs.has(v.id)));
