@@ -977,7 +977,7 @@ export default function BaixaEntrega() {
 
                             {(offlineMode || !isOnline) && (
                               <p className="text-xs text-muted-foreground italic">
-                                📷 Foto será solicitada quando transmitir online
+                                📷 Foto salva no aparelho — será enviada ao sincronizar
                               </p>
                             )}
 
