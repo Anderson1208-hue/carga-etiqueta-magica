@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
+import { useNativeScanner } from "@/hooks/useNativeScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
