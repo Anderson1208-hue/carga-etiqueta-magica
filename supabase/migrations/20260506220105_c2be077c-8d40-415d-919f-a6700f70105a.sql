@@ -1,0 +1,2 @@
+insert into storage.buckets (id, name, public) values ('docs-publicos', 'docs-publicos', true) on conflict (id) do nothing;
+create policy "public read docs-publicos" on storage.objects for select using (bucket_id = 'docs-publicos');
