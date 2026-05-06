@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 
 const DB_NAME = "entregas_offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NFS = "nfs_cache";
 const STORE_BAIXAS = "baixas_pendentes";
+const STORE_FOTOS = "fotos_pendentes";
 
 export interface OfflineNf {
   nf_id: string;
