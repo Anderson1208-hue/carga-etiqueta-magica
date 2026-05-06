@@ -84,6 +84,10 @@ export default function ConferenciaExterna() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Mantém tela acesa durante conferência + trava retrato no APK.
+  useWakeLock(true);
+  useLockPortrait();
+
   // Navigation
   const [viewMode, setViewMode] = useState<ViewMode>("vehicle-select");
 
