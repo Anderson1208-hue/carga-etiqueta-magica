@@ -908,7 +908,7 @@ export default function BaixaEntrega() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => cameraInputRef.current?.click()}
+                                    onClick={() => handleNativePhoto("camera")}
                                     className="flex-1"
                                   >
                                     <Camera className="w-4 h-4 mr-1" />
@@ -918,7 +918,7 @@ export default function BaixaEntrega() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() => handleNativePhoto("gallery")}
                                     className="flex-1"
                                   >
                                     <ImageIcon className="w-4 h-4 mr-1" />
