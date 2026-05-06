@@ -339,23 +339,42 @@ export default function BaixaEntrega() {
       let errors = 0;
 
       for (const baixa of pending) {
-        const { error } = await supabase.from("baixas_entrega").insert({
-          veiculo_id: baixa.veiculo_id,
-          nf_id: baixa.nf_id,
-          status: baixa.status,
-          ocorrencia: baixa.ocorrencia,
-          recebedor_nome: baixa.recebedor_nome,
-          latitude: baixa.latitude,
-          longitude: baixa.longitude,
-          registrado_por: baixa.registrado_por,
-          registrado_em: baixa.registrado_em,
-        });
+        try {
+          // 1) Tenta upload da foto, se houver foto offline persistida
+          let fotoPath: string | null = null;
+          const fotoBlob = await getFotoOffline(baixa.id);
+          if (fotoBlob) {
+            const ext = (fotoBlob.type?.split("/")?.[1] || "jpg").replace("jpeg", "jpg");
+            const fileName = `${baixa.veiculo_id}/${baixa.nf_id}_${Date.now()}.${ext}`;
+            const { error: upErr } = await supabase.storage
+              .from("comprovantes")
+              .upload(fileName, fotoBlob, { contentType: fotoBlob.type || "image/jpeg" });
+            if (upErr) throw upErr;
+            fotoPath = fileName;
+          }
 
-        if (error) {
-          console.error("Sync error for baixa:", baixa.id, error);
-          errors++;
-        } else {
+          // 2) Insere a baixa
+          const { error } = await supabase.from("baixas_entrega").insert({
+            veiculo_id: baixa.veiculo_id,
+            nf_id: baixa.nf_id,
+            status: baixa.status,
+            ocorrencia: baixa.ocorrencia,
+            recebedor_nome: baixa.recebedor_nome,
+            foto_path: fotoPath,
+            latitude: baixa.latitude,
+            longitude: baixa.longitude,
+            registrado_por: baixa.registrado_por,
+            registrado_em: baixa.registrado_em,
+          });
+
+          if (error) throw error;
+
           syncedIds.push(baixa.id);
+          // 3) Limpa foto local após sucesso (libera storage do device)
+          await deleteFotoOffline(baixa.id);
+        } catch (err) {
+          console.error("Sync error for baixa:", baixa.id, err);
+          errors++;
         }
       }
 
