@@ -723,20 +723,37 @@ export default function BaixaEntrega() {
 
         {/* Vehicle Selector */}
         <Card>
-          <CardContent className="pt-4">
-            <Label className="text-sm font-medium mb-2 block">Veículo</Label>
-            <Select value={selectedVeiculoId} onValueChange={setSelectedVeiculoId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o veículo..." />
-              </SelectTrigger>
-              <SelectContent>
-                {veiculos.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.placa} - {v.motorista}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <CardContent className="pt-4 space-y-3">
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Data da carga</Label>
+              <Input
+                type="date"
+                value={selectedData}
+                onChange={(e) => {
+                  setSelectedData(e.target.value);
+                  setSelectedVeiculoId("");
+                }}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Veículo</Label>
+              <Select value={selectedVeiculoId} onValueChange={setSelectedVeiculoId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={
+                    veiculosFiltrados.length === 0
+                      ? "Nenhum veículo nesta data"
+                      : "Selecione o veículo..."
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {veiculosFiltrados.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.placa} - {v.motorista}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 
