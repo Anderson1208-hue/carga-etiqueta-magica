@@ -1127,10 +1127,13 @@ export default function Roteirizacao() {
       const ids = (data || []).map((v) => v.id);
       let comNfs = new Set<string>(ids);
       if (ids.length > 0) {
-        const { data: vnfs } = await supabase
-          .from("veiculo_nfs")
-          .select("veiculo_id")
-          .in("veiculo_id", ids);
+        const vnfs = await fetchInChunks<string, any>(ids, async (chunk) => {
+          const { data: rows } = await supabase
+            .from("veiculo_nfs")
+            .select("veiculo_id")
+            .in("veiculo_id", chunk);
+          return rows || [];
+        });
         comNfs = new Set((vnfs || []).map((r: any) => r.veiculo_id));
       }
       setVeiculos((data || []).filter((v) => comNfs.has(v.id)));
