@@ -164,10 +164,29 @@ export default function Programacao() {
         return all;
       };
 
-      const [nfResults, assigned, { data: agendamentos }, { data: ctes }] = await Promise.all([
+      // Paginar agendamentos (default Supabase corta em 1000)
+      const fetchAllAgendamentos = async () => {
+        const all: { nf_id: string; data_agendamento: string | null; status: string; created_at: string }[] = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("agendamentos")
+            .select("nf_id, data_agendamento, status, created_at")
+            .order("created_at", { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          all.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      };
+
+      const [nfResults, assigned, agendamentos, { data: ctes }] = await Promise.all([
         Promise.all(nfPromises),
         fetchAllAssigned(),
-        supabase.from("agendamentos").select("nf_id, data_agendamento, status, created_at").order("created_at", { ascending: false }),
+        fetchAllAgendamentos(),
         supabase.from("ctes" as any).select("nf_id, numero_cte").in("carga_id", cargaIds),
       ]);
 
