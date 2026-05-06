@@ -36,6 +36,7 @@ type: reference
 - [Offline Fotos + Auto-sync](mem://funcionalidades/operacao/offline-fotos-autosync) — Foto persistida no IDB, sync automático ao voltar online, badge no bottom nav.
 - [Baixa de Entrega](mem://funcionalidades/operacao/baixa-de-entrega) — Mobile POD, multiple photos, GPS.
 - [Scanner Híbrido](mem://arquitetura/operacao/scanner-offline-hibrido) — Mobile scanner tuning (BarcodeDetector, 60% crop, display:none).
+- [Scanner Nativo MLKit](mem://funcionalidades/operacao/scanner-nativo-mlkit) — Fase 3: useNativeScanner via @capacitor-mlkit/barcode-scanning, fallback web.
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
 - [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
