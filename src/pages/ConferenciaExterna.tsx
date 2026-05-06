@@ -155,7 +155,8 @@ export default function ConferenciaExterna() {
       const { data: vnfs, error: vnfsError } = await supabase
         .from("veiculo_nfs")
         .select("nf_id, carga_origem_id")
-        .eq("veiculo_id", veiculoId);
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
 
       if (vnfsError) throw vnfsError;
 
@@ -172,7 +173,8 @@ export default function ConferenciaExterna() {
       const { data: nfsData, error: nfsError } = await supabase
         .from("notas_fiscais")
         .select("id, numero_nf, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf")
-        .in("id", nfIds);
+        .in("id", nfIds)
+        .limit(2000);
 
       if (nfsError) throw nfsError;
 
@@ -202,7 +204,8 @@ export default function ConferenciaExterna() {
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
         .select("nf_id, status")
-        .eq("veiculo_id", veiculoId);
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
 
       const baixasMap = new Map((baixasData || []).map((b) => [b.nf_id, b.status]));
 

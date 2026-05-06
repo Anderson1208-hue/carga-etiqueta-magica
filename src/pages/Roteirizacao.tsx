@@ -1218,7 +1218,8 @@ export default function Roteirizacao() {
           id, nf_id, carga_origem_id,
           notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
         `)
-        .eq("veiculo_id", veiculoId);
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
 
       // Fetch CTEs linked to these NFs
       const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
@@ -1227,7 +1228,8 @@ export default function Roteirizacao() {
         const { data: ctesData } = await supabase
           .from("ctes")
           .select("nf_id, numero_cte, razao_social_emitente, valor_frete")
-          .in("nf_id", nfIds);
+          .in("nf_id", nfIds)
+          .limit(2000);
         if (ctesData) {
           for (const cte of ctesData) {
             if (!ctesMap[cte.nf_id!]) ctesMap[cte.nf_id!] = [];
@@ -1277,11 +1279,12 @@ export default function Roteirizacao() {
             nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
           `)
-          .eq("veiculo_id", veiculo.id);
+          .eq("veiculo_id", veiculo.id)
+          .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
         let ctesMap: Record<string, any[]> = {};
         if (nfIds.length > 0) {
-          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds);
+          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
         }
         // Ordem de entrega por CNPJ (rota consolidada prioritária)
@@ -1342,11 +1345,12 @@ export default function Roteirizacao() {
             id, nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
           `)
-          .eq("veiculo_id", veiculo.id);
+          .eq("veiculo_id", veiculo.id)
+          .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
         let ctesMap: Record<string, any[]> = {};
         if (nfIds.length > 0) {
-          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds);
+          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
         }
         nfsData = (data || []).map((vnf: any) => ({ ...vnf, ctes: ctesMap[vnf.nf_id] || [] }));
@@ -1416,7 +1420,8 @@ export default function Roteirizacao() {
             itens_nf(c_prod, x_prod, q_com)
           )
         `)
-        .eq("veiculo_id", veiculo.id);
+        .eq("veiculo_id", veiculo.id)
+        .limit(2000);
 
       if (!vnfs || vnfs.length === 0) {
         toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
@@ -1445,7 +1450,8 @@ export default function Roteirizacao() {
           .from("agendamentos")
           .select("nf_id, status, observacao")
           .in("nf_id", nfIdsVeic)
-          .eq("status", "REENTREGA");
+          .eq("status", "REENTREGA")
+          .limit(2000);
         (agds || []).forEach((a: any) => {
           reentregaMap.set(a.nf_id, a.observacao || "");
         });
@@ -1546,12 +1552,14 @@ export default function Roteirizacao() {
               .from("notas_fiscais")
               .select("id, numero_nf, peso_bruto, volume_m3, cnpj_destinatario")
               .in("id", allNfIds)
+              .limit(2000)
           : Promise.resolve({ data: [] as any[] }),
         selectedCargas.length > 0
           ? supabase
               .from("ctes")
               .select("chave_nf_referenciada, numero_cte, razao_social_emitente, valor_frete, nf_id")
               .in("carga_id", selectedCargaIds)
+              .limit(2000)
           : Promise.resolve({ data: [] as any[] }),
       ]);
 
