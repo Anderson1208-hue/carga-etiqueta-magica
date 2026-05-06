@@ -38,6 +38,7 @@ type: reference
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
 - [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
+- [Câmera Nativa Híbrida](mem://arquitetura/operacao/camera-nativa-hibrida) — useNativeCamera: @capacitor/camera no APK, <input capture> no web.
 - [Smart GPS Tracking](mem://arquitetura/monitoramento/smart-gps-tracking-logic) — Dynamic ping rates (60s/30s) based on distance.
 - [Constraints GPS PWA](mem://constraints/monitoramento-gps-pwa) — Tab must remain active for iOS/Android tracking.
 - [Mapa Leaflet UI](mem://funcionalidades/monitoramento/visualizacao-mapa-leaflet) — Map visuals, tokens, truck icon.

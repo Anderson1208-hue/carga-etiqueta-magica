@@ -37,6 +37,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
+import { isNativeCameraAvailable, takeNativePhoto, type PhotoSource } from "@/hooks/useNativeCamera";
 
 interface Veiculo {
   id: string;
@@ -401,6 +402,25 @@ export default function BaixaEntrega() {
     if (fotoPreview) URL.revokeObjectURL(fotoPreview);
     setFotoFile(file);
     setFotoPreview(URL.createObjectURL(file));
+  }
+
+  async function handleNativePhoto(source: PhotoSource) {
+    // Em APK Android usa câmera/galeria nativa; em web cai no <input> tradicional.
+    if (!isNativeCameraAvailable()) {
+      if (source === "camera") cameraInputRef.current?.click();
+      else fileInputRef.current?.click();
+      return;
+    }
+    try {
+      const result = await takeNativePhoto(source);
+      if (!result) return;
+      if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+      setFotoFile(result.file);
+      setFotoPreview(result.previewUrl);
+    } catch (err: any) {
+      // Usuário cancelou ou negou permissão — silencioso, mas loga.
+      console.warn("Captura nativa cancelada/falhou:", err?.message || err);
+    }
   }
 
   function resetForm() {
@@ -888,7 +908,7 @@ export default function BaixaEntrega() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => cameraInputRef.current?.click()}
+                                    onClick={() => handleNativePhoto("camera")}
                                     className="flex-1"
                                   >
                                     <Camera className="w-4 h-4 mr-1" />
@@ -898,7 +918,7 @@ export default function BaixaEntrega() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() => handleNativePhoto("gallery")}
                                     className="flex-1"
                                   >
                                     <ImageIcon className="w-4 h-4 mr-1" />
