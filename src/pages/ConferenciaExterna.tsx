@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
+import { useNativeScanner } from "@/hooks/useNativeScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import {
@@ -87,6 +88,7 @@ export default function ConferenciaExterna() {
   // Mantém tela acesa durante conferência + trava retrato no APK.
   useWakeLock(true);
   useLockPortrait();
+  const nativeScanner = useNativeScanner();
 
   // Navigation
   const [viewMode, setViewMode] = useState<ViewMode>("vehicle-select");
@@ -808,7 +810,21 @@ export default function ConferenciaExterna() {
                     Scanner de Câmera
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  {nativeScanner.isAvailable && (
+                    <Button
+                      type="button"
+                      className="w-full h-12"
+                      disabled={nativeScanner.scanning}
+                      onClick={async () => {
+                        const code = await nativeScanner.scanOnce();
+                        if (code) processScan(code);
+                      }}
+                    >
+                      <ScanLine className="w-4 h-4 mr-2" />
+                      {nativeScanner.scanning ? "Abrindo câmera..." : "Scanner Nativo (ML Kit)"}
+                    </Button>
+                  )}
                   <CameraScanner onScan={processScan} enabled={true} />
                 </CardContent>
               </Card>
