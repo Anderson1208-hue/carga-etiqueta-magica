@@ -482,8 +482,8 @@ export default function BaixaEntrega() {
       return;
     }
 
-    // In offline mode, skip photo requirement
-    if (isOnline && !offlineMode && ocorrencia === "entregue" && !fotoFile) {
+    // Foto obrigatória para entrega — vale online E offline (sync usa a foto salva)
+    if (ocorrencia === "entregue" && !fotoFile) {
       toast({ title: "Atenção", description: "Foto obrigatória para entrega", variant: "destructive" });
       return;
     }
@@ -497,9 +497,9 @@ export default function BaixaEntrega() {
         return;
       }
 
-      // If offline or offlineMode, save locally
+      // If offline or offlineMode, save locally (com foto persistida em IndexedDB)
       if (!isOnline || offlineMode) {
-        await saveBaixaOffline({
+        const record = await saveBaixaOffline({
           veiculo_id: selectedVeiculoId,
           nf_id: selectedNfId,
           status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
@@ -511,6 +511,10 @@ export default function BaixaEntrega() {
           registrado_por: user?.id || null,
           registrado_em: new Date().toISOString(),
         });
+
+        if (fotoFile) {
+          await saveFotoOffline(record.id, fotoFile);
+        }
 
         toast({
           title: "Baixa salva offline!",
