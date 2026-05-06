@@ -101,6 +101,13 @@ export default function BaixaEntrega() {
 
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [selectedVeiculoId, setSelectedVeiculoId] = useState<string>("");
+  const [selectedData, setSelectedData] = useState<string>(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [nfs, setNfs] = useState<NfEntrega[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -109,6 +116,11 @@ export default function BaixaEntrega() {
   const [offlineMode, setOfflineMode] = useState(false);
   const [vehicleHasOffline, setVehicleHasOffline] = useState(false);
   const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
+
+  const veiculosFiltrados = useMemo(
+    () => veiculos.filter((v) => (v.data || "").startsWith(selectedData)),
+    [veiculos, selectedData]
+  );
 
   // GPS tracker for monitoring (web em browser / Foreground Service em APK Android)
   useGpsTrackerHybrid({
