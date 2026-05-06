@@ -123,6 +123,7 @@ export function notifyPendingChanged() {
   window.dispatchEvent(new CustomEvent("offline-pending-changed"));
 }
 
+export function useOfflineEntregas() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [offlineNfs, setOfflineNfs] = useState<OfflineNf[]>([]);
