@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useGpsTracker } from "@/hooks/useGpsTracker";
+import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineEntregas, type OfflineNf } from "@/hooks/useOfflineEntregas";
 import { Button } from "@/components/ui/button";
@@ -101,8 +101,8 @@ export default function BaixaEntrega() {
   const [vehicleHasOffline, setVehicleHasOffline] = useState(false);
   const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
 
-  // GPS tracker for monitoring
-  useGpsTracker({
+  // GPS tracker for monitoring (web em browser / Foreground Service em APK Android)
+  useGpsTrackerHybrid({
     monitoramentoRotaId,
     enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
   });
