@@ -58,12 +58,14 @@ export default function MonitoramentoRotas() {
   // --- Data loading (unchanged logic) ---
   const loadRotas = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("monitoramento_rotas")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      setRotas((data as any[]) || []);
+      const data = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("monitoramento_rotas")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      );
+      setRotas(data);
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
@@ -72,22 +74,28 @@ export default function MonitoramentoRotas() {
   }, []);
 
   const loadParadas = useCallback(async (rotaId: string) => {
-    const { data } = await supabase
-      .from("monitoramento_paradas")
-      .select("*")
-      .eq("monitoramento_rota_id", rotaId)
-      .order("ordem", { ascending: true });
-    setParadas((data as any[]) || []);
+    const data = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("monitoramento_paradas")
+        .select("*")
+        .eq("monitoramento_rota_id", rotaId)
+        .order("ordem", { ascending: true })
+        .range(from, to)
+    );
+    setParadas(data);
   }, []);
 
   const loadAlertas = useCallback(async (rotaId: string) => {
-    const { data } = await supabase
-      .from("alertas_monitoramento")
-      .select("*")
-      .eq("monitoramento_rota_id", rotaId)
-      .eq("lido", false)
-      .order("created_at", { ascending: false });
-    setAlertas((data as any[]) || []);
+    const data = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("alertas_monitoramento")
+        .select("*")
+        .eq("monitoramento_rota_id", rotaId)
+        .eq("lido", false)
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    );
+    setAlertas(data);
   }, []);
 
   const loadConfig = useCallback(async () => {
