@@ -36,6 +36,7 @@ type: reference
 - [Conferência Offline](mem://funcionalidades/operacao/conferencia-interna-offline) — IndexedDB caching for no-signal areas.
 - [Offline Fotos + Auto-sync](mem://funcionalidades/operacao/offline-fotos-autosync) — Foto persistida no IDB, sync automático ao voltar online, badge no bottom nav.
 - [Baixa de Entrega](mem://funcionalidades/operacao/baixa-de-entrega) — Mobile POD, multiple photos, GPS.
+- [Baixa Sync Idempotente](mem://arquitetura/baixa-sync-idempotente) — Sync verifica (nf_id, registrado_em) antes de INSERT.
 - [Scanner Híbrido](mem://arquitetura/operacao/scanner-offline-hibrido) — Mobile scanner tuning (BarcodeDetector, 60% crop, display:none).
 - [Scanner Nativo MLKit](mem://funcionalidades/operacao/scanner-nativo-mlkit) — Fase 3: useNativeScanner via @capacitor-mlkit/barcode-scanning, fallback web.
 - [Build APK Produção](mem://arquitetura/operacao/build-apk-producao-fase7) — Fase 7: CAP_ENV=prod, keystore, signing, distribuição sideload.
