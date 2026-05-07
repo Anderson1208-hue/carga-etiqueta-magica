@@ -377,6 +377,22 @@ export default function BaixaEntrega() {
 
       for (const baixa of pending) {
         try {
+          // 0) Idempotência: se já existe baixa com (nf_id, registrado_em) no servidor,
+          // não re-insere — apenas marca como sincronizada localmente.
+          // Cobre o caso onde insert anterior funcionou mas markAsSynced falhou.
+          const { data: existente } = await supabase
+            .from("baixas_entrega")
+            .select("id")
+            .eq("nf_id", baixa.nf_id)
+            .eq("registrado_em", baixa.registrado_em)
+            .maybeSingle();
+
+          if (existente) {
+            syncedIds.push(baixa.id);
+            await deleteFotoOffline(baixa.id);
+            continue;
+          }
+
           // 1) Tenta upload da foto, se houver foto offline persistida
           let fotoPath: string | null = null;
           const fotoBlob = await getFotoOffline(baixa.id);
