@@ -369,17 +369,32 @@ export default function ConferenciaExterna() {
         return;
       }
 
-      // Mark as conferido (final)
-      const { error: updateError } = await supabase
+      // Race-safe: só finaliza se ainda estiver em conferido_interno
+      const { data: updated, error: updateError } = await supabase
         .from("etiquetas")
         .update({
           status: "conferido" as any,
           conferido_em: new Date().toISOString(),
           conferido_por: user?.id,
         })
-        .eq("id", etiqueta.id);
+        .eq("id", etiqueta.id)
+        .eq("status", "conferido_interno")
+        .select("id")
+        .maybeSingle();
 
       if (updateError) throw updateError;
+      if (!updated) {
+        const result: ScanResult = {
+          type: "warning",
+          message: "Já conferida (final)",
+          details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}`,
+        };
+        setLastResult(result);
+        addToHistory(result);
+        playSound("warning");
+        await reloadSelectedNfProgress();
+        return;
+      }
 
       const result: ScanResult = {
         type: "success",
