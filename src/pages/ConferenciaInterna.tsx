@@ -408,16 +408,26 @@ export default function ConferenciaInterna() {
           setLastResult(result); addToHistory(result); playSound("warning"); return;
         }
 
-        const { error: updateError } = await supabase
+        // Race-safe: só atualiza se ainda estiver pendente (evita sobrescrever bipe simultâneo)
+        const { data: updated, error: updateError } = await supabase
           .from("etiquetas")
           .update({
             status: "conferido_interno" as any,
             conferido_interno_em: new Date().toISOString(),
             conferido_interno_por: user?.id,
           })
-          .eq("id", etiqueta.id);
+          .eq("id", etiqueta.id)
+          .eq("status", "pendente")
+          .select("id")
+          .maybeSingle();
 
         if (updateError) throw updateError;
+        if (!updated) {
+          const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("warning");
+          await reloadNfProgress();
+          return;
+        }
 
         const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
         setLastResult(result); addToHistory(result); playSound("success");
