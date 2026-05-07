@@ -14,6 +14,7 @@ type: reference
 - **Dias úteis:** Liberação de agendamentos usa próximo dia útil RJ (exclui sáb/dom + feriados nacionais/estaduais) via `src/lib/feriados-rj.ts`.
 
 ## Memories
+- [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.
 - [XML Parser](mem://funcionalidades/xml-parser) — Weights extracted from <transp><vol> (header level).
