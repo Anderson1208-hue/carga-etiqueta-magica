@@ -94,11 +94,13 @@ export default function Programacao() {
   async function loadNfsDisponiveis() {
     setLoading(true);
     try {
-      // Fetch cargas importadas. O status da carga é manual e não deve bloquear
-      // NFs ainda no depósito; a disponibilidade é definida por NF, veículo e agendamento.
+      // Carga 'fechada' = estado inicial (apenas cadastrada). NFs só ficam
+      // disponíveis na Preparação após o operador abrir a carga manualmente
+      // na tela de Cargas. Por isso filtramos apenas cargas com status='aberta'.
       const cargasRes = await supabase
         .from("cargas")
         .select("id, placa, motorista, data, tipo_carga, status")
+        .eq("status", "aberta")
         .order("created_at", { ascending: false });
 
       if (cargasRes.error) throw cargasRes.error;
