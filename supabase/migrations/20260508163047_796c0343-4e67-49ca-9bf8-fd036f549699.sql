@@ -1,0 +1,1 @@
+ALTER TABLE public.cargas ALTER COLUMN status SET DEFAULT 'fechada'::load_status;
