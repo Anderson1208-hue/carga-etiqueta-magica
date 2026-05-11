@@ -316,41 +316,56 @@ export default function Conciliacao() {
 
   const handleExportar = async (prefId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data: concData, error } = await supabase
         .from("prefatura_conciliacao")
-        .select(
-          "status_conciliacao, divergencias, notas_fiscais:nf_id(chave_acesso, numero_nf, serie, cnpj_emitente, valor_nf, peso_bruto, volume_m3, data_emissao), ctes:cte_id(numero_cte, valor_frete)"
-        )
+        .select("status_conciliacao, divergencias, nf_id, cte_id")
         .eq("prefatura_id", prefId);
       if (error) throw error;
+      const concRows = (concData || []) as Array<{
+        status_conciliacao: string;
+        divergencias: { itens?: LinhaRetorno["divergencias"] } | null;
+        nf_id: string | null;
+        cte_id: string | null;
+      }>;
 
-      const linhas: LinhaRetorno[] = (data || []).map((row) => {
-        const r = row as {
-          status_conciliacao: string;
-          divergencias: { itens?: LinhaRetorno["divergencias"] };
-          notas_fiscais?: {
-            chave_acesso: string;
-            numero_nf: string;
-            serie: string | null;
-            cnpj_emitente: string;
-            valor_nf: number | null;
-            peso_bruto: number | null;
-            volume_m3: number | null;
-            data_emissao: string | null;
-          } | null;
-          ctes?: { numero_cte: string; valor_frete: number | null } | null;
-        };
+      const nfIds = Array.from(new Set(concRows.map((r) => r.nf_id).filter(Boolean) as string[]));
+      const cteIds = Array.from(new Set(concRows.map((r) => r.cte_id).filter(Boolean) as string[]));
+
+      const nfMap = new Map<string, {
+        chave_acesso: string; numero_nf: string; serie: string | null; cnpj_emitente: string;
+        valor_nf: number | null; peso_bruto: number | null; volume_m3: number | null; data_emissao: string | null;
+      }>();
+      if (nfIds.length) {
+        const { data: nfs } = await supabase
+          .from("notas_fiscais")
+          .select("id, chave_acesso, numero_nf, serie, cnpj_emitente, valor_nf, peso_bruto, volume_m3, data_emissao")
+          .in("id", nfIds);
+        (nfs || []).forEach((n) => nfMap.set(n.id as string, n as never));
+      }
+
+      const cteMap = new Map<string, { numero_cte: string; valor_frete: number | null }>();
+      if (cteIds.length) {
+        const { data: ctes } = await supabase
+          .from("ctes")
+          .select("id, numero_cte, valor_frete")
+          .in("id", cteIds);
+        (ctes || []).forEach((c) => cteMap.set(c.id as string, c as never));
+      }
+
+      const linhas: LinhaRetorno[] = concRows.map((r) => {
+        const nf = r.nf_id ? nfMap.get(r.nf_id) : null;
+        const cte = r.cte_id ? cteMap.get(r.cte_id) : null;
         return {
-          chave_acesso: r.notas_fiscais?.chave_acesso || "",
-          numero_nf: r.notas_fiscais?.numero_nf || "",
-          serie: r.notas_fiscais?.serie || null,
-          cnpj_emitente: r.notas_fiscais?.cnpj_emitente || "",
-          cte_numero: r.ctes?.numero_cte || null,
-          valor_nf_xml: r.notas_fiscais?.valor_nf ?? null,
-          valor_frete_cte: r.ctes?.valor_frete ?? null,
-          peso: r.notas_fiscais?.peso_bruto ?? null,
-          volume_m3: r.notas_fiscais?.volume_m3 ?? null,
-          data_emissao: r.notas_fiscais?.data_emissao || null,
+          chave_acesso: nf?.chave_acesso || "",
+          numero_nf: nf?.numero_nf || "",
+          serie: nf?.serie || null,
+          cnpj_emitente: nf?.cnpj_emitente || "",
+          cte_numero: cte?.numero_cte || null,
+          valor_nf_xml: nf?.valor_nf ?? null,
+          valor_frete_cte: cte?.valor_frete ?? null,
+          peso: nf?.peso_bruto ?? null,
+          volume_m3: nf?.volume_m3 ?? null,
+          data_emissao: nf?.data_emissao || null,
           status: r.status_conciliacao,
           divergencias: r.divergencias?.itens || [],
         };
