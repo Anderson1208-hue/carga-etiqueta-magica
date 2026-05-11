@@ -110,18 +110,30 @@ export default function Conciliacao() {
     async (prefId: string) => {
       const { data, error } = await supabase
         .from("prefatura_itens")
-        .select("id, linha_arquivo, chave_acesso_cliente, numero_nf_cliente, valor_nf_cliente, valor_frete_cliente, prefatura_conciliacao(nf_id, cte_id, matched_by, status_conciliacao, divergencias)")
+        .select("id, linha_arquivo, chave_acesso_cliente, numero_nf_cliente, valor_nf_cliente, valor_frete_cliente")
         .eq("prefatura_id", prefId)
         .order("linha_arquivo", { ascending: true });
       if (error) {
         toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
         return;
       }
+      const { data: concData } = await supabase
+        .from("prefatura_conciliacao")
+        .select("prefatura_item_id, nf_id, cte_id, matched_by, status_conciliacao, divergencias")
+        .eq("prefatura_id", prefId);
+      const concMap = new Map<string, ItemComConciliacao["conciliacao"]>();
+      (concData || []).forEach((c) => {
+        const r = c as Record<string, unknown>;
+        concMap.set(r.prefatura_item_id as string, {
+          nf_id: (r.nf_id as string | null) ?? null,
+          cte_id: (r.cte_id as string | null) ?? null,
+          matched_by: (r.matched_by as string | null) ?? null,
+          status_conciliacao: r.status_conciliacao as string,
+          divergencias: (r.divergencias as ItemComConciliacao["conciliacao"]["divergencias"]) || { itens: [] },
+        });
+      });
       const mapped: ItemComConciliacao[] = (data || []).map((row) => {
-        const r = row as unknown as Record<string, unknown>;
-        const concVal = r.prefatura_conciliacao;
-        const concArr = Array.isArray(concVal) ? concVal : concVal ? [concVal] : [];
-        const concRow = concArr.length > 0 ? (concArr[0] as ItemComConciliacao["conciliacao"]) : null;
+        const r = row as Record<string, unknown>;
         return {
           id: r.id as string,
           linha_arquivo: r.linha_arquivo as number,
@@ -129,7 +141,7 @@ export default function Conciliacao() {
           numero_nf_cliente: (r.numero_nf_cliente as string | null) ?? null,
           valor_nf_cliente: (r.valor_nf_cliente as number | null) ?? null,
           valor_frete_cliente: (r.valor_frete_cliente as number | null) ?? null,
-          conciliacao: concRow,
+          conciliacao: concMap.get(r.id as string) || null,
         };
       });
       setItens(mapped);
