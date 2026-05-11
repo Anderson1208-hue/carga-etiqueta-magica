@@ -24,6 +24,7 @@ import {
   Radar,
   Eye,
   ShieldCheck,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -156,6 +157,10 @@ export function Sidebar() {
           />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">
+              <NavItem
+                item={{ name: "Conciliação", href: "/conciliacao", icon: FileSpreadsheet }}
+                isActive={location.pathname === "/conciliacao"}
+              />
               <NavItem
                 item={{ name: "Operadores", href: "/operadores", icon: Users }}
                 isActive={location.pathname === "/operadores"}
