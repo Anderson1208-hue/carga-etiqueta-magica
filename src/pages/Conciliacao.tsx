@@ -184,7 +184,7 @@ export default function Conciliacao() {
           prefatura_id: (pf as { id: string }).id,
           ...it,
         }));
-        const { error: errIt } = await supabase.from("prefatura_itens").insert(chunk);
+        const { error: errIt } = await supabase.from("prefatura_itens").insert(chunk as never);
         if (errIt) throw errIt;
       }
 
