@@ -222,7 +222,7 @@ export default function Conciliacao() {
         .select("*")
         .eq("prefatura_id", prefId);
       if (errIt) throw errIt;
-      const items = (itemsRaw || []) as unknown as PrefaturaItemRaw[] & { id: string }[];
+      const items = (itemsRaw || []) as unknown as (PrefaturaItemRaw & { id: string })[];
 
       // Collect candidate keys/numbers
       const chaves = items.map((i) => i.chave_acesso_cliente).filter(Boolean) as string[];
