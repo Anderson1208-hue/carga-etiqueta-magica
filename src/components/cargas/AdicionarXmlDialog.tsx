@@ -102,6 +102,7 @@ export function AdicionarXmlDialog({
         return {
           chave_acesso: d.chaveAcesso,
           numero_nf: d.numeroNf,
+          serie: d.serie,
           cnpj_emitente: d.cnpjEmitente,
           razao_social_emitente: d.razaoSocialEmitente,
           data_emissao: d.dataEmissao,
@@ -116,6 +117,7 @@ export function AdicionarXmlDialog({
           peso_bruto: d.pesoBruto,
           peso_liquido: d.pesoLiquido,
           volume_m3: d.volumeM3,
+          valor_nf: d.valorNf,
           itens: d.itens.map((it) => ({
             c_prod: it.cProd,
             x_prod: it.xProd,

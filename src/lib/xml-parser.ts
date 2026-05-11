@@ -12,11 +12,13 @@ export interface DestinatarioEndereco {
 
 export interface NFeParsed {
   numeroNf: string;
+  serie: string | null;
   chaveAcesso: string;
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
   dataEmissao: string | null;
+  valorNf: number | null;
   itens: ItemNFParsed[];
   destinatario?: DestinatarioEndereco;
   pesoBruto: number;
@@ -77,6 +79,15 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   if (!numeroNf) {
     throw new Error("Número da NF não encontrado");
   }
+
+  // Extract NF serie (optional)
+  const serieNode = xmlDoc.querySelector("ide serie, serie");
+  const serie = serieNode?.textContent?.trim() || null;
+
+  // Extract NF total value (vNF) from total/ICMSTot/vNF
+  const vNFNode = xmlDoc.querySelector("ICMSTot vNF, vNF");
+  const vNFParsed = vNFNode?.textContent ? parseFloat(vNFNode.textContent) : NaN;
+  const valorNf = !isNaN(vNFParsed) && vNFParsed >= 0 ? vNFParsed : null;
 
   // Extract issuer data (emitente)
   const emit = xmlDoc.querySelector("emit");
@@ -173,11 +184,13 @@ export function parseNFeXML(xmlString: string): NFeParsed {
 
   return {
     numeroNf,
+    serie,
     chaveAcesso,
     razaoSocialEmitente,
     cnpjEmitente: cnpjEmitenteFormatted,
     cnpjDestinatario: cnpjDestinatarioFormatted,
     dataEmissao,
+    valorNf,
     itens,
     destinatario,
     pesoBruto,

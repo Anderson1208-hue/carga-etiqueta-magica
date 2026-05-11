@@ -992,7 +992,9 @@ export type Database = {
           peso_bruto: number | null
           peso_liquido: number | null
           razao_social_emitente: string
+          serie: string | null
           status_entrega: string
+          valor_nf: number | null
           volume_m3: number | null
         }
         Insert: {
@@ -1014,7 +1016,9 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente: string
+          serie?: string | null
           status_entrega?: string
+          valor_nf?: number | null
           volume_m3?: number | null
         }
         Update: {
@@ -1036,7 +1040,9 @@ export type Database = {
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente?: string
+          serie?: string | null
           status_entrega?: string
+          valor_nf?: number | null
           volume_m3?: number | null
         }
         Relationships: [
@@ -1083,6 +1089,248 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      prefatura_auditoria: {
+        Row: {
+          acao: string
+          created_at: string
+          detalhes: Json | null
+          id: string
+          prefatura_id: string
+          prefatura_item_id: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          prefatura_id: string
+          prefatura_item_id?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          prefatura_id?: string
+          prefatura_item_id?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prefatura_auditoria_prefatura_id_fkey"
+            columns: ["prefatura_id"]
+            isOneToOne: false
+            referencedRelation: "prefaturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prefatura_auditoria_prefatura_item_id_fkey"
+            columns: ["prefatura_item_id"]
+            isOneToOne: false
+            referencedRelation: "prefatura_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prefatura_conciliacao: {
+        Row: {
+          conferido_em: string | null
+          conferido_por: string | null
+          created_at: string
+          cte_id: string | null
+          divergencias: Json
+          id: string
+          matched_by: string | null
+          nf_id: string | null
+          observacao_manual: string | null
+          prefatura_id: string
+          prefatura_item_id: string
+          status_conciliacao: string
+          tolerancia_aplicada: Json | null
+          updated_at: string
+        }
+        Insert: {
+          conferido_em?: string | null
+          conferido_por?: string | null
+          created_at?: string
+          cte_id?: string | null
+          divergencias?: Json
+          id?: string
+          matched_by?: string | null
+          nf_id?: string | null
+          observacao_manual?: string | null
+          prefatura_id: string
+          prefatura_item_id: string
+          status_conciliacao?: string
+          tolerancia_aplicada?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          conferido_em?: string | null
+          conferido_por?: string | null
+          created_at?: string
+          cte_id?: string | null
+          divergencias?: Json
+          id?: string
+          matched_by?: string | null
+          nf_id?: string | null
+          observacao_manual?: string | null
+          prefatura_id?: string
+          prefatura_item_id?: string
+          status_conciliacao?: string
+          tolerancia_aplicada?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prefatura_conciliacao_prefatura_id_fkey"
+            columns: ["prefatura_id"]
+            isOneToOne: false
+            referencedRelation: "prefaturas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prefatura_conciliacao_prefatura_item_id_fkey"
+            columns: ["prefatura_item_id"]
+            isOneToOne: true
+            referencedRelation: "prefatura_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prefatura_itens: {
+        Row: {
+          chave_acesso_cliente: string | null
+          cnpj_destinatario_cliente: string | null
+          cnpj_emitente_cliente: string | null
+          created_at: string
+          data_emissao_cliente: string | null
+          documento_transporte_cliente: string | null
+          id: string
+          linha_arquivo: number | null
+          numero_nf_cliente: string | null
+          peso_cliente: number | null
+          prefatura_id: string
+          raw_jsonb: Json | null
+          referencia_interna_cliente: string | null
+          serie_cliente: string | null
+          valor_frete_cliente: number | null
+          valor_nf_cliente: number | null
+          volumes_cliente: number | null
+        }
+        Insert: {
+          chave_acesso_cliente?: string | null
+          cnpj_destinatario_cliente?: string | null
+          cnpj_emitente_cliente?: string | null
+          created_at?: string
+          data_emissao_cliente?: string | null
+          documento_transporte_cliente?: string | null
+          id?: string
+          linha_arquivo?: number | null
+          numero_nf_cliente?: string | null
+          peso_cliente?: number | null
+          prefatura_id: string
+          raw_jsonb?: Json | null
+          referencia_interna_cliente?: string | null
+          serie_cliente?: string | null
+          valor_frete_cliente?: number | null
+          valor_nf_cliente?: number | null
+          volumes_cliente?: number | null
+        }
+        Update: {
+          chave_acesso_cliente?: string | null
+          cnpj_destinatario_cliente?: string | null
+          cnpj_emitente_cliente?: string | null
+          created_at?: string
+          data_emissao_cliente?: string | null
+          documento_transporte_cliente?: string | null
+          id?: string
+          linha_arquivo?: number | null
+          numero_nf_cliente?: string | null
+          peso_cliente?: number | null
+          prefatura_id?: string
+          raw_jsonb?: Json | null
+          referencia_interna_cliente?: string | null
+          serie_cliente?: string | null
+          valor_frete_cliente?: number | null
+          valor_nf_cliente?: number | null
+          volumes_cliente?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prefatura_itens_prefatura_id_fkey"
+            columns: ["prefatura_id"]
+            isOneToOne: false
+            referencedRelation: "prefaturas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prefaturas: {
+        Row: {
+          arquivo_origem_nome: string | null
+          cliente_cnpj: string
+          cliente_nome: string | null
+          created_at: string
+          criado_por: string | null
+          data_recebimento: string
+          id: string
+          import_batch_id: string | null
+          numero_prefatura_cliente: string | null
+          observacao: string | null
+          periodo_fim: string | null
+          periodo_inicio: string | null
+          status: string
+          total_itens: number
+          total_valor_frete_cliente: number
+          total_valor_nf_cliente: number
+          updated_at: string
+        }
+        Insert: {
+          arquivo_origem_nome?: string | null
+          cliente_cnpj: string
+          cliente_nome?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_recebimento?: string
+          id?: string
+          import_batch_id?: string | null
+          numero_prefatura_cliente?: string | null
+          observacao?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          total_itens?: number
+          total_valor_frete_cliente?: number
+          total_valor_nf_cliente?: number
+          updated_at?: string
+        }
+        Update: {
+          arquivo_origem_nome?: string | null
+          cliente_cnpj?: string
+          cliente_nome?: string | null
+          created_at?: string
+          criado_por?: string | null
+          data_recebimento?: string
+          id?: string
+          import_batch_id?: string | null
+          numero_prefatura_cliente?: string | null
+          observacao?: string | null
+          periodo_fim?: string | null
+          periodo_inicio?: string | null
+          status?: string
+          total_itens?: number
+          total_valor_frete_cliente?: number
+          total_valor_nf_cliente?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
