@@ -58,7 +58,7 @@ function buildHeaderMap(headers: string[]): Partial<Record<keyof PrefaturaItemRa
   const norm = headers.map(normalizeHeader);
   const map: Partial<Record<keyof PrefaturaItemRaw, number>> = {};
   (Object.keys(HEADER_ALIASES) as (keyof PrefaturaItemRaw)[]).forEach((key) => {
-    const aliases = HEADER_ALIASES[key];
+    const aliases = HEADER_ALIASES[key] || [];
     for (let i = 0; i < norm.length; i++) {
       if (aliases.some((a) => norm[i].includes(a))) {
         map[key] = i;
