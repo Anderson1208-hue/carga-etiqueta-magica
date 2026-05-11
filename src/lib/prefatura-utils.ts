@@ -27,7 +27,7 @@ export interface PrefaturaParseResult {
   total_valor_frete: number;
 }
 
-const HEADER_ALIASES: Record<keyof PrefaturaItemRaw, string[]> = {
+const HEADER_ALIASES: Partial<Record<keyof PrefaturaItemRaw, string[]>> = {
   linha_arquivo: [],
   chave_acesso_cliente: ["chave", "chave acesso", "chave_acesso", "chave de acesso", "chavenfe"],
   numero_nf_cliente: ["nf", "numero nf", "numero_nf", "numeronf", "nota", "nota fiscal", "nro nf"],
