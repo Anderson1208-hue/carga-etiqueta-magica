@@ -129,7 +129,7 @@ export default function Conciliacao() {
           cte_id: (r.cte_id as string | null) ?? null,
           matched_by: (r.matched_by as string | null) ?? null,
           status_conciliacao: r.status_conciliacao as string,
-          divergencias: (r.divergencias as ItemComConciliacao["conciliacao"]["divergencias"]) || { itens: [] },
+          divergencias: (r.divergencias as NonNullable<ItemComConciliacao["conciliacao"]>["divergencias"]) || { itens: [] },
         });
       });
       const mapped: ItemComConciliacao[] = (data || []).map((row) => {
