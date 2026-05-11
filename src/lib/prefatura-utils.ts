@@ -28,7 +28,7 @@ export interface PrefaturaParseResult {
 }
 
 const HEADER_ALIASES: Partial<Record<keyof PrefaturaItemRaw, string[]>> = {
-  linha_arquivo: [],
+  // linha_arquivo / raw_jsonb não vêm do header
   chave_acesso_cliente: ["chave", "chave acesso", "chave_acesso", "chave de acesso", "chavenfe"],
   numero_nf_cliente: ["nf", "numero nf", "numero_nf", "numeronf", "nota", "nota fiscal", "nro nf"],
   serie_cliente: ["serie", "série"],
