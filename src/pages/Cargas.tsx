@@ -335,6 +335,7 @@ export default function Cargas() {
         return {
           chave_acesso: nf.chaveAcesso,
           numero_nf: nf.numeroNf,
+          serie: nf.serie,
           cnpj_emitente: nf.cnpjEmitente,
           razao_social_emitente: nf.razaoSocialEmitente,
           data_emissao: nf.dataEmissao || null,
@@ -349,6 +350,7 @@ export default function Cargas() {
           peso_bruto: nf.pesoBruto || 0,
           peso_liquido: nf.pesoLiquido || 0,
           volume_m3: nf.volumeM3 || 0,
+          valor_nf: nf.valorNf,
           itens: nf.itens.map((item) => ({ c_prod: item.cProd, x_prod: item.xProd, u_com: item.uCom, q_com: item.qCom })),
           etiquetas,
         };
