@@ -12,11 +12,13 @@ export interface DestinatarioEndereco {
 
 export interface NFeParsed {
   numeroNf: string;
+  serie: string | null;
   chaveAcesso: string;
   razaoSocialEmitente: string;
   cnpjEmitente: string;
   cnpjDestinatario: string;
   dataEmissao: string | null;
+  valorNf: number | null;
   itens: ItemNFParsed[];
   destinatario?: DestinatarioEndereco;
   pesoBruto: number;
