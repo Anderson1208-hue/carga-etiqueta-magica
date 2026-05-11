@@ -288,7 +288,7 @@ export default function Conciliacao() {
       const chunkSize = 500;
       for (let i = 0; i < insertRows.length; i += chunkSize) {
         const chunk = insertRows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("prefatura_conciliacao").insert(chunk);
+        const { error } = await supabase.from("prefatura_conciliacao").insert(chunk as never);
         if (error) throw error;
       }
 
