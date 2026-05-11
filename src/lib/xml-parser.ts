@@ -184,11 +184,13 @@ export function parseNFeXML(xmlString: string): NFeParsed {
 
   return {
     numeroNf,
+    serie,
     chaveAcesso,
     razaoSocialEmitente,
     cnpjEmitente: cnpjEmitenteFormatted,
     cnpjDestinatario: cnpjDestinatarioFormatted,
     dataEmissao,
+    valorNf,
     itens,
     destinatario,
     pesoBruto,
