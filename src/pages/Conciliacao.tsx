@@ -118,15 +118,17 @@ export default function Conciliacao() {
         return;
       }
       const mapped: ItemComConciliacao[] = (data || []).map((row) => {
-        const conc = (row as { prefatura_conciliacao?: unknown[] }).prefatura_conciliacao;
-        const concRow = Array.isArray(conc) && conc.length > 0 ? (conc[0] as ItemComConciliacao["conciliacao"]) : null;
+        const r = row as unknown as Record<string, unknown>;
+        const concVal = r.prefatura_conciliacao;
+        const concArr = Array.isArray(concVal) ? concVal : concVal ? [concVal] : [];
+        const concRow = concArr.length > 0 ? (concArr[0] as ItemComConciliacao["conciliacao"]) : null;
         return {
-          id: (row as { id: string }).id,
-          linha_arquivo: (row as { linha_arquivo: number }).linha_arquivo,
-          chave_acesso_cliente: (row as { chave_acesso_cliente: string | null }).chave_acesso_cliente,
-          numero_nf_cliente: (row as { numero_nf_cliente: string | null }).numero_nf_cliente,
-          valor_nf_cliente: (row as { valor_nf_cliente: number | null }).valor_nf_cliente,
-          valor_frete_cliente: (row as { valor_frete_cliente: number | null }).valor_frete_cliente,
+          id: r.id as string,
+          linha_arquivo: r.linha_arquivo as number,
+          chave_acesso_cliente: (r.chave_acesso_cliente as string | null) ?? null,
+          numero_nf_cliente: (r.numero_nf_cliente as string | null) ?? null,
+          valor_nf_cliente: (r.valor_nf_cliente as number | null) ?? null,
+          valor_frete_cliente: (r.valor_frete_cliente as number | null) ?? null,
           conciliacao: concRow,
         };
       });
