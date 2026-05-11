@@ -8,7 +8,7 @@ export function MobileLogoutButton() {
 
   return (
     <div className="flex items-center gap-2">
-      <Link to="/conferencia">
+      <Link to="/">
         <Button
           variant="ghost"
           size="sm"
