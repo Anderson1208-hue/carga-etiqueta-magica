@@ -125,8 +125,8 @@ Deno.serve(async (req) => {
       .order("ordem", { ascending: true })
       .limit(2000);
 
-    if (!paradas || paradas.length === 0) {
-      return new Response(JSON.stringify({ status: "ok", events: [] }), {
+    if (!paradas || paradas.length === 0 || isHeartbeatOnly) {
+      return new Response(JSON.stringify({ status: "ok", events: [], heartbeat: isHeartbeatOnly }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
