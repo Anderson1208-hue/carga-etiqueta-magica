@@ -4,8 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { MobileRedirect } from "@/components/layout/MobileRedirect";
+
+const IS_NATIVE_APK = Capacitor.isNativePlatform();
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Cargas from "./pages/Cargas";
@@ -41,6 +44,12 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, isLoading, isAdmin, signOut } = useAuth();
+
+  // No APK do motorista, qualquer rota protegida cai direto na tela de código.
+  // Nunca mostrar login de operador no app nativo.
+  if (IS_NATIVE_APK) {
+    return <Navigate to="/motorista" replace />;
+  }
 
   if (isLoading) {
     return (
@@ -82,6 +91,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+
+  // No APK, /login não existe — redireciona para /motorista.
+  if (IS_NATIVE_APK) {
+    return <Navigate to="/motorista" replace />;
+  }
 
   if (isLoading) {
     return (
