@@ -6,6 +6,7 @@ export interface VeiculoDiaData {
   placa: string;
   motorista: string;
   data: string;
+  accessCode?: string | null;
   totalEntregasRota?: number;
   nfs: {
     numero_nf: string;
@@ -122,8 +123,10 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
     doc.text(`VEÍCULO ${vi + 1}/${veiculosCalc.length}  •  ${v.placa}`, M + 3, y + 6);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    const motTxt = v.motorista || "Sem motorista";
-    doc.text(truncate(motTxt, 50), PW - M - doc.getTextWidth(truncate(motTxt, 50)) - 3, y + 6);
+    const motTxt = truncate(v.motorista || "Sem motorista", 50);
+    const codeTxt = v.accessCode ? `  •  Código: ${v.accessCode}` : "";
+    const rightTxt = motTxt + codeTxt;
+    doc.text(rightTxt, PW - M - doc.getTextWidth(rightTxt) - 3, y + 6);
     y += 9;
 
     // Summary line

@@ -6,6 +6,7 @@ interface VeiculoResumoData {
   placa: string;
   motorista: string;
   data: string;
+  accessCode?: string | null;
   totalEntregasRota?: number;
   nfs: {
     numero_nf: string;
@@ -45,6 +46,12 @@ export async function generateResumoVeiculoPDF(data: VeiculoResumoData): Promise
     `${data.placa} | ${data.motorista || "Sem motorista"} | ${format(new Date(data.data + "T12:00:00"), "dd/MM/yyyy")}`,
     M, 18
   );
+  if (data.accessCode) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    const codeLabel = `Código: ${data.accessCode}`;
+    doc.text(codeLabel, PW - M - doc.getTextWidth(codeLabel), 10);
+  }
   y = 27;
 
   // Group by CNPJ, capturando ordem de entrega da rota
