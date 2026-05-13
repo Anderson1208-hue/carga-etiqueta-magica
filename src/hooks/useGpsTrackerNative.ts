@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { enqueue, pendingCount } from "@/lib/gpsQueue";
 
 /**
  * Hook nativo para rastreamento GPS em segundo plano via Capacitor.
- * Usa @capacitor-community/background-geolocation, que ativa um
- * Foreground Service Android (notificação persistente) e mantém o GPS
- * rodando mesmo com a tela bloqueada ou app em segundo plano.
  *
- * Mantém EXATAMENTE a mesma interface pública de useGpsTracker.ts
- * para ser drop-in via useGpsTrackerHybrid.
+ * Estratégia profissional (Fase 1):
+ * - Watcher do plugin emite posições -> entram NA FILA (IndexedDB) primeiro.
+ * - O envio ao backend é feito por `useGpsQueueWorker` em outro lugar
+ *   (drena a fila com retry exponencial + dedup).
+ * - Heartbeat: a cada 60s envia a última posição com flag `heartbeat=true`
+ *   para a Torre saber que o motorista está vivo mesmo parado.
+ * - Auto-restart: se o watcher morrer (sem callback há > 3 min), tentamos
+ *   reiniciar.
  *
- * IMPORTANTE: este hook só faz qualquer coisa em ambiente nativo.
- * Em browser ele simplesmente fica idle (o seletor híbrido já cuida disso).
+ * Mantém a mesma interface pública anterior.
  */
 
 interface GpsConfig {
@@ -32,12 +35,8 @@ const DEFAULT_CONFIG: GpsConfig = {
   raio_aproximacao_metros: 500,
 };
 
-interface GpsPosition {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  timestamp: string;
-}
+const HEARTBEAT_MS = 60_000;
+const WATCHER_STALE_MS = 3 * 60_000; // se não vier callback em 3 min, reinicia
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -46,7 +45,6 @@ interface UseGpsTrackerOptions {
   config?: Partial<GpsConfig>;
 }
 
-// Tipos mínimos do plugin (assinatura oficial)
 interface BgWatcherOptions {
   backgroundMessage?: string;
   backgroundTitle?: string;
@@ -93,51 +91,16 @@ export function useGpsTrackerNative({
   const cfg: GpsConfig = { ...DEFAULT_CONFIG, ...configOverride };
 
   const watcherIdRef = useRef<string | null>(null);
-  const batchRef = useRef<GpsPosition[]>([]);
   const lastSentRef = useRef<{ lat: number; lng: number } | null>(null);
-  const lastFlushRef = useRef<number>(0);
+  const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const lastCallbackAtRef = useRef<number>(Date.now());
+  const restartingRef = useRef<boolean>(false);
 
   const [lastPosition, setLastPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modoCritico, setModoCritico] = useState(false);
-
-  const flushBatch = useCallback(
-    async (positions: GpsPosition[]) => {
-      if (!monitoramentoRotaId || positions.length === 0) return;
-      try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-        const last = positions[positions.length - 1];
-        const res = await fetch(`${supabaseUrl}/functions/v1/processar-gps`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseKey}`,
-            apikey: supabaseKey,
-          },
-          body: JSON.stringify({
-            monitoramento_rota_id: monitoramentoRotaId,
-            latitude: last.latitude,
-            longitude: last.longitude,
-            accuracy: last.accuracy,
-            batch: positions,
-          }),
-        });
-        if (res.ok) {
-          setLastPosition({ lat: last.latitude, lng: last.longitude });
-          lastSentRef.current = { lat: last.latitude, lng: last.longitude };
-          lastFlushRef.current = Date.now();
-          setError(null);
-        }
-      } catch (err) {
-        console.error("[GPS Native] Erro ao enviar:", err);
-        setError("Falha ao enviar posição");
-      }
-    },
-    [monitoramentoRotaId]
-  );
+  const [pendingQueue, setPendingQueue] = useState(0);
 
   const checkModoCritico = useCallback(
     (lat: number, lng: number): boolean => {
@@ -149,17 +112,16 @@ export function useGpsTrackerNative({
     [paradasCoords, cfg.raio_aproximacao_metros]
   );
 
+  // Inicialização do watcher + heartbeat + supervisor de auto-restart
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
-      // Em browser este hook é no-op (seletor híbrido cuida do fallback web)
-      return;
-    }
+    if (!Capacitor.isNativePlatform()) return; // web é tratado por outro hook
 
     let cancelled = false;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    let supervisorTimer: ReturnType<typeof setInterval> | null = null;
 
-    async function start() {
+    async function startWatcher() {
       if (!enabled || !monitoramentoRotaId) return;
-
       try {
         const id = await BackgroundGeolocation.addWatcher(
           {
@@ -169,7 +131,8 @@ export function useGpsTrackerNative({
             stale: false,
             distanceFilter: cfg.distance_filter_metros,
           },
-          (location, errCb) => {
+          async (location, errCb) => {
+            lastCallbackAtRef.current = Date.now();
             if (errCb) {
               console.error("[GPS Native] erro watcher:", errCb);
               if (errCb.code === "NOT_AUTHORIZED") {
@@ -180,11 +143,12 @@ export function useGpsTrackerNative({
               }
               return;
             }
-            if (!location) return;
+            if (!location || !monitoramentoRotaId) return;
 
             const { latitude, longitude, accuracy } = location;
+            lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
 
-            // Distance filter extra (defensivo, além do nativo)
+            // distance filter defensivo
             if (lastSentRef.current) {
               const dist = haversine(
                 lastSentRef.current.lat,
@@ -198,54 +162,41 @@ export function useGpsTrackerNative({
               }
             }
 
-            const position: GpsPosition = {
-              latitude,
-              longitude,
-              accuracy,
-              timestamp: new Date(location.time ?? Date.now()).toISOString(),
-            };
-
             const critico = checkModoCritico(latitude, longitude);
             setModoCritico(critico);
+            setLastPosition({ lat: latitude, lng: longitude });
+            lastSentRef.current = { lat: latitude, lng: longitude };
 
-            // Throttle por intervalo configurado (padrão vs crítico)
-            const intervaloMs =
-              (critico ? cfg.intervalo_critico_segundos : cfg.intervalo_padrao_segundos) * 1000;
-            const elapsed = Date.now() - lastFlushRef.current;
-
-            if (cfg.batch_sync_ativo) {
-              batchRef.current.push(position);
-              const cheio = batchRef.current.length >= cfg.batch_max_posicoes;
-              const respeitouIntervalo = elapsed >= intervaloMs;
-              if (cheio || critico || respeitouIntervalo) {
-                const toSend = [...batchRef.current];
-                batchRef.current = [];
-                flushBatch(toSend);
-              }
-            } else if (elapsed >= intervaloMs || critico) {
-              flushBatch([position]);
+            try {
+              await enqueue({
+                monitoramento_rota_id: monitoramentoRotaId,
+                latitude,
+                longitude,
+                accuracy,
+                timestamp: new Date(location.time ?? Date.now()).toISOString(),
+                heartbeat: false,
+              });
+              setError(null);
+            } catch (err) {
+              console.error("[GPS Native] enqueue err:", err);
             }
           }
         );
 
         if (cancelled) {
-          // Foi desabilitado durante a inicialização
           await BackgroundGeolocation.removeWatcher({ id }).catch(() => {});
           return;
         }
         watcherIdRef.current = id;
         setTracking(true);
+        lastCallbackAtRef.current = Date.now();
       } catch (err) {
         console.error("[GPS Native] Falha ao iniciar:", err);
         setError("Não foi possível iniciar o rastreamento nativo");
       }
     }
 
-    async function stop() {
-      if (batchRef.current.length > 0) {
-        await flushBatch([...batchRef.current]);
-        batchRef.current = [];
-      }
+    async function stopWatcher() {
       if (watcherIdRef.current) {
         try {
           await BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current });
@@ -258,27 +209,63 @@ export function useGpsTrackerNative({
       setModoCritico(false);
     }
 
+    async function restartWatcher() {
+      if (restartingRef.current) return;
+      restartingRef.current = true;
+      try {
+        console.warn("[GPS Native] auto-restart do watcher");
+        await stopWatcher();
+        await startWatcher();
+      } finally {
+        restartingRef.current = false;
+      }
+    }
+
     if (enabled && monitoramentoRotaId) {
-      start();
+      startWatcher();
+
+      // Heartbeat: a cada 60s, enfileira a última posição como heartbeat
+      heartbeatTimer = setInterval(async () => {
+        const last = lastPositionRef.current;
+        if (!last || !monitoramentoRotaId) return;
+        try {
+          await enqueue({
+            monitoramento_rota_id: monitoramentoRotaId,
+            latitude: last.lat,
+            longitude: last.lng,
+            accuracy: last.accuracy,
+            timestamp: new Date().toISOString(),
+            heartbeat: true,
+          });
+          setPendingQueue(await pendingCount());
+        } catch (err) {
+          console.warn("[GPS Native] heartbeat enqueue falhou", err);
+        }
+      }, HEARTBEAT_MS);
+
+      // Supervisor: se watcher ficou silencioso > WATCHER_STALE_MS, reinicia
+      supervisorTimer = setInterval(() => {
+        const silent = Date.now() - lastCallbackAtRef.current;
+        if (silent > WATCHER_STALE_MS && watcherIdRef.current) {
+          restartWatcher();
+        }
+      }, 30_000);
     } else {
-      stop();
+      stopWatcher();
     }
 
     return () => {
       cancelled = true;
-      stop();
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      if (supervisorTimer) clearInterval(supervisorTimer);
+      stopWatcher();
     };
   }, [
     enabled,
     monitoramentoRotaId,
     cfg.distance_filter_metros,
-    cfg.batch_sync_ativo,
-    cfg.batch_max_posicoes,
-    cfg.intervalo_padrao_segundos,
-    cfg.intervalo_critico_segundos,
     checkModoCritico,
-    flushBatch,
   ]);
 
-  return { tracking, lastPosition, error, modoCritico };
+  return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
