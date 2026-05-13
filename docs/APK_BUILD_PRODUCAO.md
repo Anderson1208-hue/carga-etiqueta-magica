@@ -109,7 +109,13 @@ Edite `android/app/src/main/AndroidManifest.xml` e adicione dentro de `<manifest
 <!-- Internet -->
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<!-- Push Notifications (FCM) -->
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
 ```
+
+> **Push (FCM):** o plugin `@capacitor/push-notifications` exige `google-services.json` em `android/app/`. Sem esse arquivo o app compila e roda normal — só não recebe push remoto. Crie projeto no Firebase Console quando quiser ativar.
 
 ---
 
