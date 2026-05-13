@@ -6,6 +6,7 @@ export interface VeiculoDiaData {
   placa: string;
   motorista: string;
   data: string;
+  accessCode?: string | null;
   totalEntregasRota?: number;
   nfs: {
     numero_nf: string;
