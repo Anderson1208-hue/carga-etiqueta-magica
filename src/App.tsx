@@ -45,6 +45,12 @@ const queryClient = new QueryClient({
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, isLoading, isAdmin, signOut } = useAuth();
 
+  // No APK do motorista, qualquer rota protegida cai direto na tela de código.
+  // Nunca mostrar login de operador no app nativo.
+  if (IS_NATIVE_APK) {
+    return <Navigate to="/motorista" replace />;
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
