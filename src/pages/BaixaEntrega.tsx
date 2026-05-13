@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { useToast } from "@/hooks/use-toast";
