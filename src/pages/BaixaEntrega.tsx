@@ -123,10 +123,13 @@ export default function BaixaEntrega() {
   );
 
   // GPS tracker for monitoring (web em browser / Foreground Service em APK Android)
+  // Em ambos os casos, posições entram em fila local (IndexedDB) e o worker
+  // drena com retry exponencial — não perde ponto em área sem sinal.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
     enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
   });
+  useGpsQueueWorker(!!selectedVeiculoId && !!monitoramentoRotaId);
 
   // Mantém tela acesa enquanto há veículo selecionado (em rota).
   useWakeLock(!!selectedVeiculoId);
