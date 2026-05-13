@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
+import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { useToast } from "@/hooks/use-toast";
@@ -123,10 +125,13 @@ export default function BaixaEntrega() {
   );
 
   // GPS tracker for monitoring (web em browser / Foreground Service em APK Android)
+  // Em ambos os casos, posições entram em fila local (IndexedDB) e o worker
+  // drena com retry exponencial — não perde ponto em área sem sinal.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
     enabled: !!selectedVeiculoId && !!monitoramentoRotaId,
   });
+  useGpsQueueWorker(!!selectedVeiculoId && !!monitoramentoRotaId);
 
   // Mantém tela acesa enquanto há veículo selecionado (em rota).
   useWakeLock(!!selectedVeiculoId);
@@ -687,6 +692,7 @@ export default function BaixaEntrega() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PermissoesOnboarding active={!!selectedVeiculoId && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2">

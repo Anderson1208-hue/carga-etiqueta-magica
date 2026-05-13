@@ -1058,6 +1058,8 @@ export type Database = {
       posicoes_gps: {
         Row: {
           accuracy: number | null
+          client_ts: string | null
+          heartbeat: boolean
           id: string
           latitude: number
           longitude: number
@@ -1066,6 +1068,8 @@ export type Database = {
         }
         Insert: {
           accuracy?: number | null
+          client_ts?: string | null
+          heartbeat?: boolean
           id?: string
           latitude: number
           longitude: number
@@ -1074,6 +1078,8 @@ export type Database = {
         }
         Update: {
           accuracy?: number | null
+          client_ts?: string | null
+          heartbeat?: boolean
           id?: string
           latitude?: number
           longitude?: number

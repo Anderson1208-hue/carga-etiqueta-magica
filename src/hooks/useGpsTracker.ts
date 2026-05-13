@@ -192,5 +192,5 @@ export function useGpsTracker({
     };
   }, [enabled, monitoramentoRotaId, modoCritico, cfg.intervalo_padrao_segundos, cfg.intervalo_critico_segundos, getPosition, flushBatch]);
 
-  return { tracking, lastPosition, error, modoCritico };
+  return { tracking, lastPosition, error, modoCritico, pendingQueue: 0 };
 }

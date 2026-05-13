@@ -42,6 +42,7 @@ type: reference
 - [Build APK Produção](mem://arquitetura/operacao/build-apk-producao-fase7) — Fase 7: CAP_ENV=prod, keystore, signing, distribuição sideload.
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
+- [GPS Fila Offline](mem://arquitetura/monitoramento/gps-fila-offline-fase1) — IndexedDB queue + heartbeat 60s + auto-restart + dedup client_ts.
 - [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
 - [Câmera Nativa Híbrida](mem://arquitetura/operacao/camera-nativa-hibrida) — useNativeCamera: @capacitor/camera no APK, <input capture> no web.
 - [UX APK — Wake Lock + Portrait + Splash](mem://funcionalidades/operacao/ux-apk-wakelock-portrait-splash) — Tela acesa em rota, lock retrato, splash configurada.
