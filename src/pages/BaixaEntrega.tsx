@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
+import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { useToast } from "@/hooks/use-toast";
