@@ -4,8 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { MobileRedirect } from "@/components/layout/MobileRedirect";
+
+const IS_NATIVE_APK = Capacitor.isNativePlatform();
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Cargas from "./pages/Cargas";
