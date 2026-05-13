@@ -92,6 +92,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
+  // No APK, /login não existe — redireciona para /motorista.
+  if (IS_NATIVE_APK) {
+    return <Navigate to="/motorista" replace />;
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
