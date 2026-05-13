@@ -1394,6 +1394,7 @@ export default function Roteirizacao() {
         placa: veiculo.placa,
         motorista: veiculo.motorista || "",
         data: veiculo.data,
+        accessCode: veiculo.access_code,
         nfs,
         totalEntregasRota: totalEntregasResumo || undefined,
       });
