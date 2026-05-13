@@ -692,6 +692,7 @@ export default function BaixaEntrega() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PermissoesOnboarding active={!!selectedVeiculoId && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="sticky top-0 z-50 bg-primary text-primary-foreground px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2">
