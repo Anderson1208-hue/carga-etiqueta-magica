@@ -23,6 +23,7 @@ interface GpsPosition {
   longitude: number;
   accuracy: number;
   timestamp?: string;
+  heartbeat?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -32,7 +33,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { monitoramento_rota_id, latitude, longitude, accuracy, batch } = body;
+    const {
+      monitoramento_rota_id,
+      latitude,
+      longitude,
+      accuracy,
+      batch,
+      heartbeat: heartbeatFlag,
+    } = body;
 
     if (!monitoramento_rota_id || (latitude == null && (!batch || batch.length === 0))) {
       return new Response(JSON.stringify({ error: "Dados incompletos" }), {
@@ -46,25 +54,47 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Insert GPS positions (batch or single)
+    // 1. Insert GPS positions (batch or single) — com dedup via client_ts (UPSERT)
     const positions: GpsPosition[] = batch && batch.length > 0
       ? batch
-      : [{ latitude, longitude, accuracy, timestamp: new Date().toISOString() }];
+      : [{
+          latitude,
+          longitude,
+          accuracy,
+          timestamp: new Date().toISOString(),
+          heartbeat: !!heartbeatFlag,
+        }];
 
-    const gpsRows = positions.map((p: GpsPosition) => ({
-      monitoramento_rota_id,
-      latitude: p.latitude,
-      longitude: p.longitude,
-      accuracy: p.accuracy,
-      registrado_em: p.timestamp || new Date().toISOString(),
-    }));
+    const gpsRows = positions.map((p: GpsPosition) => {
+      const ts = p.timestamp || new Date().toISOString();
+      return {
+        monitoramento_rota_id,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        accuracy: p.accuracy,
+        registrado_em: ts,
+        client_ts: ts,
+        heartbeat: !!p.heartbeat,
+      };
+    });
 
-    await supabase.from("posicoes_gps").insert(gpsRows);
+    // upsert ignora duplicatas (mesmo rota+client_ts) graças ao índice único parcial
+    const { error: insertErr } = await supabase
+      .from("posicoes_gps")
+      .upsert(gpsRows, {
+        onConflict: "monitoramento_rota_id,client_ts",
+        ignoreDuplicates: true,
+      });
+    if (insertErr) {
+      console.error("[processar-gps] upsert error:", insertErr);
+    }
 
     // 2. Use last position for route update and geofence checks
+    // Heartbeats puros (sem movimento) não disparam geofence.
     const lastPos = positions[positions.length - 1];
     const lat = lastPos.latitude;
     const lng = lastPos.longitude;
+    const isHeartbeatOnly = positions.every((p) => p.heartbeat === true);
 
     await supabase
       .from("monitoramento_rotas")
