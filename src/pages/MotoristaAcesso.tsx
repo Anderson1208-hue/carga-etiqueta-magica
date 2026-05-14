@@ -12,6 +12,7 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
+import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
 
 interface NfMotorista {
@@ -282,7 +283,8 @@ export default function MotoristaAcesso() {
               <Truck className="w-9 h-9 text-primary-foreground" />
             </div>
             <CardTitle className="text-xl">Acesso do Motorista</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <div className="flex justify-center mt-2"><BuildModeBadge /></div>
+            <p className="text-sm text-muted-foreground mt-2">
               Insira o código de 6 dígitos fornecido pelo administrador
             </p>
           </CardHeader>
@@ -327,7 +329,10 @@ export default function MotoristaAcesso() {
           <div className="flex items-center gap-3">
             <Truck className="w-6 h-6" />
             <div>
-              <h1 className="font-bold text-lg">{veiculo.placa}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-lg">{veiculo.placa}</h1>
+                <BuildModeBadge />
+              </div>
               <p className="text-sm opacity-80">{veiculo.motorista}</p>
             </div>
           </div>
