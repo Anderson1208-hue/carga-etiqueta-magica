@@ -283,7 +283,8 @@ export default function MotoristaAcesso() {
               <Truck className="w-9 h-9 text-primary-foreground" />
             </div>
             <CardTitle className="text-xl">Acesso do Motorista</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <div className="flex justify-center mt-2"><BuildModeBadge /></div>
+            <p className="text-sm text-muted-foreground mt-2">
               Insira o código de 6 dígitos fornecido pelo administrador
             </p>
           </CardHeader>
