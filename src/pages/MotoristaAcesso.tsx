@@ -329,7 +329,10 @@ export default function MotoristaAcesso() {
           <div className="flex items-center gap-3">
             <Truck className="w-6 h-6" />
             <div>
-              <h1 className="font-bold text-lg">{veiculo.placa}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-lg">{veiculo.placa}</h1>
+                <BuildModeBadge />
+              </div>
               <p className="text-sm opacity-80">{veiculo.motorista}</p>
             </div>
           </div>
