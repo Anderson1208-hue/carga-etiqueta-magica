@@ -320,6 +320,7 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
+      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="flex items-center justify-between max-w-lg mx-auto">
