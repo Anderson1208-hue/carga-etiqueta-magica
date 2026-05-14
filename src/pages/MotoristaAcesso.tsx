@@ -7,6 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
 
 interface NfMotorista {
@@ -55,6 +59,7 @@ export default function MotoristaAcesso() {
   const [error, setError] = useState("");
   const [veiculo, setVeiculo] = useState<VeiculoInfo | null>(null);
   const [nfs, setNfs] = useState<NfMotorista[]>([]);
+  const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
   const [ocorrencia, setOcorrencia] = useState<OcorrenciaTipo | "">("");
   const [recebedorNome, setRecebedorNome] = useState("");
@@ -63,6 +68,16 @@ export default function MotoristaAcesso() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+
+  // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
+  // Posições caem na fila IndexedDB e o worker drena para o backend com retry.
+  useGpsTrackerHybrid({
+    monitoramentoRotaId,
+    enabled: !!veiculo && !!monitoramentoRotaId,
+  });
+  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
+  useWakeLock(!!veiculo);
+  useLockPortrait();
 
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -110,9 +125,11 @@ export default function MotoristaAcesso() {
         setError(data?.error || "Código não encontrado");
         setVeiculo(null);
         setNfs([]);
+        setMonitoramentoRotaId(null);
       } else {
         setVeiculo(data.veiculo);
         setNfs(data.nfs || []);
+        setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
         resetBaixaForm();
         captureGPS();
       }
@@ -166,6 +183,7 @@ export default function MotoristaAcesso() {
     if (!fnError && !data?.error) {
       setVeiculo(data.veiculo);
       setNfs(data.nfs || []);
+      setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
     }
   }
 
@@ -318,6 +336,7 @@ export default function MotoristaAcesso() {
             onClick={() => {
               setVeiculo(null);
               setNfs([]);
+              setMonitoramentoRotaId(null);
               setCode("");
             }}
           >
