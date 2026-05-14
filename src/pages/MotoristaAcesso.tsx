@@ -11,6 +11,7 @@ import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
+import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
 
 interface NfMotorista {
@@ -319,6 +320,7 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
+      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="flex items-center justify-between max-w-lg mx-auto">
