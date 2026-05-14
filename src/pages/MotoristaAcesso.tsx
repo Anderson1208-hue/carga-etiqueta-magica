@@ -11,6 +11,7 @@ import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
 import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
+import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
 
 interface NfMotorista {
