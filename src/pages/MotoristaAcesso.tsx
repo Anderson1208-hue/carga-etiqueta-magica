@@ -183,6 +183,7 @@ export default function MotoristaAcesso() {
     if (!fnError && !data?.error) {
       setVeiculo(data.veiculo);
       setNfs(data.nfs || []);
+      setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
     }
   }
 
