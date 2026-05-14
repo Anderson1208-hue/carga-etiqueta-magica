@@ -142,11 +142,22 @@ export function PermissoesOnboarding({
             <div className="flex-1">
               <div className="flex items-center gap-2 font-medium">
                 <MapPin className="h-4 w-4" />
-                Localização: "O tempo todo"
+                Localização: "Permitir o tempo todo"
               </div>
               <p className="text-sm text-muted-foreground">
-                Quando o app pedir a permissão de localização, escolha
-                <strong> Permitir o tempo todo</strong> (não só "Enquanto usa").
+                <strong>Importante:</strong> no Android 10 ou superior, a tela de
+                permissão mostra apenas <em>"Durante o uso do app"</em> e
+                <em> "Apenas desta vez"</em>. A opção <strong>"Permitir o tempo todo"</strong>
+                {" "}<u>não aparece nessa primeira tela</u>.
+              </p>
+              <ol className="text-sm text-muted-foreground list-decimal pl-4 mt-2 space-y-1">
+                <li>Toque em <strong>"Durante o uso do app"</strong> para liberar agora.</li>
+                <li>Depois toque no botão <strong>"Abrir configurações do app"</strong> abaixo.</li>
+                <li>Vá em <strong>Permissões → Localização</strong> e selecione
+                  <strong> "Permitir o tempo todo"</strong>.</li>
+              </ol>
+              <p className="text-xs text-warning mt-2">
+                Sem esse passo, o GPS para de enviar quando a tela bloqueia.
               </p>
             </div>
           </label>
