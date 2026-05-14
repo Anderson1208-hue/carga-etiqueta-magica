@@ -336,6 +336,7 @@ export default function MotoristaAcesso() {
             onClick={() => {
               setVeiculo(null);
               setNfs([]);
+              setMonitoramentoRotaId(null);
               setCode("");
             }}
           >
