@@ -215,6 +215,16 @@ Deno.serve(async (req) => {
       entrega: baixasMap[nf.id] || null,
     }));
 
+    // Rota de monitoramento ativa (para o APK iniciar GPS em segundo plano)
+    const { data: rotaAtiva } = await supabase
+      .from("monitoramento_rotas")
+      .select("id")
+      .eq("veiculo_id", veiculo.id)
+      .eq("status", "ativa")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     return new Response(
       JSON.stringify({
         veiculo: {
@@ -225,6 +235,7 @@ Deno.serve(async (req) => {
           data: veiculo.data,
         },
         nfs: nfsComStatus,
+        monitoramento_rota_id: rotaAtiva?.id ?? null,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
