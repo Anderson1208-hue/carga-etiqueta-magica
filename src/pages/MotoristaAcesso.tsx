@@ -59,6 +59,7 @@ export default function MotoristaAcesso() {
   const [error, setError] = useState("");
   const [veiculo, setVeiculo] = useState<VeiculoInfo | null>(null);
   const [nfs, setNfs] = useState<NfMotorista[]>([]);
+  const [monitoramentoRotaId, setMonitoramentoRotaId] = useState<string | null>(null);
   const [selectedNfId, setSelectedNfId] = useState<string | null>(null);
   const [ocorrencia, setOcorrencia] = useState<OcorrenciaTipo | "">("");
   const [recebedorNome, setRecebedorNome] = useState("");
@@ -67,6 +68,16 @@ export default function MotoristaAcesso() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+
+  // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
+  // Posições caem na fila IndexedDB e o worker drena para o backend com retry.
+  useGpsTrackerHybrid({
+    monitoramentoRotaId,
+    enabled: !!veiculo && !!monitoramentoRotaId,
+  });
+  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
+  useWakeLock(!!veiculo);
+  useLockPortrait();
 
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
