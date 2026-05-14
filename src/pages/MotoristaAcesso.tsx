@@ -125,9 +125,11 @@ export default function MotoristaAcesso() {
         setError(data?.error || "Código não encontrado");
         setVeiculo(null);
         setNfs([]);
+        setMonitoramentoRotaId(null);
       } else {
         setVeiculo(data.veiculo);
         setNfs(data.nfs || []);
+        setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
         resetBaixaForm();
         captureGPS();
       }
