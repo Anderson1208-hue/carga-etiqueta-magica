@@ -24,14 +24,17 @@ export function MobileRedirect({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   useEffect(() => {
+    // /motorista e /motorista/* (ex.: /motorista/diagnostico) são sempre permitidos
+    const isMotoristaRoute = location.pathname.startsWith("/motorista");
+
     if (isNative) {
-      if (!ALLOWED_NATIVE_ROUTES.includes(location.pathname)) {
+      if (!isMotoristaRoute && !ALLOWED_NATIVE_ROUTES.includes(location.pathname)) {
         navigate("/motorista", { replace: true });
       }
       return;
     }
 
-    if (isMobile && !ALLOWED_MOBILE_ROUTES.includes(location.pathname)) {
+    if (isMobile && !isMotoristaRoute && !ALLOWED_MOBILE_ROUTES.includes(location.pathname)) {
       navigate("/conferencia-interna", { replace: true });
     }
   }, [isMobile, location.pathname, navigate]);
