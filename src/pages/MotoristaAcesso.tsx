@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity } from "lucide-react";
 
 interface NfMotorista {
   id: string;
@@ -277,7 +278,15 @@ export default function MotoristaAcesso() {
   if (!veiculo) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-sm">
+        <Card className="w-full max-w-sm relative">
+          <Link
+            to="/motorista/diagnostico"
+            className="absolute top-2 right-2 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+            aria-label="Diagnóstico"
+            title="Diagnóstico técnico"
+          >
+            <Activity className="w-4 h-4" />
+          </Link>
           <CardHeader className="text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary mx-auto mb-4 flex items-center justify-center">
               <Truck className="w-9 h-9 text-primary-foreground" />
@@ -336,19 +345,29 @@ export default function MotoristaAcesso() {
               <p className="text-sm opacity-80">{veiculo.motorista}</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-primary-foreground hover:text-primary-foreground/80"
-            onClick={() => {
-              setVeiculo(null);
-              setNfs([]);
-              setMonitoramentoRotaId(null);
-              setCode("");
-            }}
-          >
-            Sair
-          </Button>
+          <div className="flex items-center gap-1">
+            <Link
+              to="/motorista/diagnostico"
+              className="p-2 rounded-md text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10"
+              aria-label="Diagnóstico"
+              title="Diagnóstico técnico"
+            >
+              <Activity className="w-4 h-4" />
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-primary-foreground hover:text-primary-foreground/80"
+              onClick={() => {
+                setVeiculo(null);
+                setNfs([]);
+                setMonitoramentoRotaId(null);
+                setCode("");
+              }}
+            >
+              Sair
+            </Button>
+          </div>
         </div>
       </div>
 
