@@ -77,3 +77,4 @@ type: reference
 - [Acesso Mobile Restrito](mem://constraints/acesso-mobile-restrito) — Routing constraints by screen size.
 - [Exibição Cód Produto](mem://funcionalidades/pdf/exibicao-codigo-produto) — Presentation of cProd in UI/PDFs.
 - [Diagnóstico Motorista](mem://funcionalidades/operacao/tela-diagnostico-motorista) — /motorista/diagnostico: status GPS/fila/permissões/wakelock + botão copiar p/ suporte.
+- [Ambientes APK](mem://operacao/ambientes-apk-motorista) — DEV (sandbox) / HOMOLOG (URL publicada) / PROD (embedded). Mesmo backend. Scripts: build-apk-homolog.sh, build-apk-release.sh.
