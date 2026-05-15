@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { enqueue, pendingCount } from "@/lib/gpsQueue";
+import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
 
 /**
  * Hook nativo para rastreamento GPS em segundo plano via Capacitor.
@@ -176,9 +177,11 @@ export function useGpsTrackerNative({
                 timestamp: new Date(location.time ?? Date.now()).toISOString(),
                 heartbeat: false,
               });
+              markEnqueue({ lat: latitude, lng: longitude, accuracy });
               setError(null);
             } catch (err) {
               console.error("[GPS Native] enqueue err:", err);
+              markError(err instanceof Error ? err.message : String(err));
             }
           }
         );
@@ -189,6 +192,7 @@ export function useGpsTrackerNative({
         }
         watcherIdRef.current = id;
         setTracking(true);
+        markWatcherStart();
         lastCallbackAtRef.current = Date.now();
       } catch (err) {
         console.error("[GPS Native] Falha ao iniciar:", err);

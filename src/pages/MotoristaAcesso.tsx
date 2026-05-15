@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X } from "lucide-react";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity } from "lucide-react";
 
 interface NfMotorista {
   id: string;

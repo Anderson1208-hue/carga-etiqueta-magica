@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { drainQueue, pendingCount } from "@/lib/gpsQueue";
+import { markSent, markError } from "@/lib/gpsTelemetry";
 
 /**
  * Worker que drena a fila GPS periodicamente.
@@ -23,10 +24,12 @@ export function useGpsQueueWorker(enabled: boolean) {
     async function tick() {
       if (cancelled) return;
       try {
-        const { remaining } = await drainQueue({ endpoint, apikey: supabaseKey });
+        const { sent, remaining } = await drainQueue({ endpoint, apikey: supabaseKey });
+        if (sent > 0) markSent(sent);
         if (!cancelled) setPending(remaining);
       } catch (err) {
         console.warn("[gpsQueueWorker] tick err", err);
+        markError(err instanceof Error ? err.message : String(err));
         if (!cancelled) {
           try {
             setPending(await pendingCount());
