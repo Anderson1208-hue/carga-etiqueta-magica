@@ -31,7 +31,7 @@ CAP_ENV=prod npx cap sync android
 
 echo "==> 4/6 Gerando APK release"
 
-# Auto-detecta JAVA_HOME no Windows (Git Bash) se não estiver setado ou inválido
+# Auto-detecta JAVA_HOME no Windows (Git Bash/WSL) se não estiver setado ou inválido
 detect_java_home() {
   # Já setado e válido?
   if [ -n "${JAVA_HOME:-}" ]; then
@@ -39,7 +39,11 @@ detect_java_home() {
     # converte C:\foo -> /c/foo se necessário
     case "$jh_unix" in
       [A-Za-z]:\\*|[A-Za-z]:/*)
-        jh_unix="/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
+        if [ -d /mnt/c ]; then
+          jh_unix="/mnt/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
+        else
+          jh_unix="/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
+        fi
         ;;
     esac
     if [ -x "$jh_unix/bin/java" ] || [ -x "$jh_unix/bin/java.exe" ]; then
@@ -49,6 +53,12 @@ detect_java_home() {
   fi
   # Candidatos comuns no Windows
   local candidates=(
+    "/mnt/c/jbr"
+    "/mnt/c/Program Files/Android/Android Studio/jbr"
+    "/mnt/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
+    "/mnt/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
+    "/mnt/c/Program Files/Java/jdk-21"
+    "/mnt/c/Program Files/Java/jdk-17"
     "/c/jbr"
     "/c/Program Files/Android/Android Studio/jbr"
     "/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
@@ -69,7 +79,27 @@ detect_java_home() {
 detect_java_home
 export PATH="$JAVA_HOME/bin:$PATH"
 
-( cd android && ./gradlew assembleRelease )
+to_windows_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$p"
+  elif command -v wslpath >/dev/null 2>&1; then
+    wslpath -w "$p"
+  else
+    echo "$p" | sed -E 's|^/mnt/([a-z])/(.*)|\U\1:\\\2|; s|^/([a-z])/(.*)|\U\1:\\\2|' | sed 's|/|\\|g'
+  fi
+}
+
+# Se o Java encontrado é Windows (*.exe), rode o Gradle pelo gradlew.bat.
+# O gradlew Linux exige "$JAVA_HOME/bin/java" sem .exe e falha no WSL.
+if [ -x "$JAVA_HOME/bin/java.exe" ] && [ ! -x "$JAVA_HOME/bin/java" ] && command -v cmd.exe >/dev/null 2>&1; then
+  JAVA_HOME_WIN="$(to_windows_path "$JAVA_HOME")"
+  ANDROID_DIR_WIN="$(to_windows_path "$(pwd)/android")"
+  echo "[info] Usando Gradle Windows com JAVA_HOME=$JAVA_HOME_WIN"
+  cmd.exe /c "cd /d \"$ANDROID_DIR_WIN\" && set \"JAVA_HOME=$JAVA_HOME_WIN\" && set \"PATH=$JAVA_HOME_WIN\\bin;%PATH%\" && gradlew.bat assembleRelease"
+else
+  ( cd android && ./gradlew assembleRelease )
+fi
 
 echo "==> 5/6 Garantindo assinatura"
 sign_if_needed
