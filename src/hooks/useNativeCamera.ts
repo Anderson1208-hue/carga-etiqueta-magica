@@ -30,8 +30,14 @@ async function dataUrlToFile(dataUrl: string, fileName: string): Promise<File> {
 export async function takeNativePhoto(source: PhotoSource): Promise<NativeCameraResult | null> {
   if (!isNativeCameraAvailable()) return null;
 
+  // Qualidade/resolução calibradas para OCR de canhoto pela IA dos clientes.
+  // - quality 92  → mantém detalhe do texto/assinatura sem inflar muito o arquivo.
+  // - width 2000  → resolução mínima recomendada para reconhecimento de
+  //                 documento; abaixo de 1200 começa a falhar.
+  // - correctOrientation → garante que a foto não vai rotacionada (estraga OCR).
   const photo = await Camera.getPhoto({
-    quality: 75,
+    quality: 92,
+    width: 2000,
     allowEditing: false,
     resultType: CameraResultType.DataUrl,
     source: source === "camera" ? CameraSource.Camera : CameraSource.Photos,
