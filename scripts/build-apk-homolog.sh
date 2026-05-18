@@ -26,7 +26,7 @@ echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (server.url=lovable.app)"
 CAP_ENV=homolog npx cap sync android
 
 echo "==> 4/6 Gerando APK release"
-( cd android && ./gradlew assembleRelease )
+run_android_gradle_release
 
 echo "==> 5/6 Garantindo assinatura"
 sign_if_needed

@@ -31,45 +31,7 @@ CAP_ENV=prod npx cap sync android
 
 echo "==> 4/6 Gerando APK release"
 
-# Auto-detecta JAVA_HOME no Windows (Git Bash) se não estiver setado ou inválido
-detect_java_home() {
-  # Já setado e válido?
-  if [ -n "${JAVA_HOME:-}" ]; then
-    local jh_unix="${JAVA_HOME}"
-    # converte C:\foo -> /c/foo se necessário
-    case "$jh_unix" in
-      [A-Za-z]:\\*|[A-Za-z]:/*)
-        jh_unix="/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
-        ;;
-    esac
-    if [ -x "$jh_unix/bin/java" ] || [ -x "$jh_unix/bin/java.exe" ]; then
-      export JAVA_HOME="$jh_unix"
-      return 0
-    fi
-  fi
-  # Candidatos comuns no Windows
-  local candidates=(
-    "/c/jbr"
-    "/c/Program Files/Android/Android Studio/jbr"
-    "/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
-    "/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
-    "/c/Program Files/Java/jdk-21"
-    "/c/Program Files/Java/jdk-17"
-  )
-  for c in "${candidates[@]}"; do
-    if [ -x "$c/bin/java" ] || [ -x "$c/bin/java.exe" ]; then
-      export JAVA_HOME="$c"
-      echo "[info] JAVA_HOME auto-detectado: $JAVA_HOME"
-      return 0
-    fi
-  done
-  echo "ERRO: não encontrei Java. Instale o JBR do Android Studio ou defina JAVA_HOME."
-  exit 1
-}
-detect_java_home
-export PATH="$JAVA_HOME/bin:$PATH"
-
-( cd android && ./gradlew assembleRelease )
+run_android_gradle_release
 
 echo "==> 5/6 Garantindo assinatura"
 sign_if_needed
