@@ -31,11 +31,26 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
   prod: undefined,
 };
 
+// applicationId por ambiente — permite PROD e HOMOLOG coexistirem no mesmo
+// celular sem um sobrescrever o outro. DEV usa o mesmo id do HOMOLOG (mesmo
+// app, hot-reload apenas muda a fonte do frontend).
+const APP_ID_BY_ENV: Record<string, string> = {
+  dev:     'com.expressoebenezer.motorista.homolog',
+  homolog: 'com.expressoebenezer.motorista.homolog',
+  prod:    'com.expressoebenezer.motorista',
+};
+
+const APP_NAME_BY_ENV: Record<string, string> = {
+  dev:     'Motorista DEV',
+  homolog: 'Motorista HOMOLOG',
+  prod:    'Motorista',
+};
+
 const server = SERVER_BY_ENV[env];
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.2b66d97b1a6e498c96c489ff683a59a4',
-  appName: 'Motorista - Carga Etiqueta Mágica',
+  appId: APP_ID_BY_ENV[env] ?? APP_ID_BY_ENV.prod,
+  appName: APP_NAME_BY_ENV[env] ?? APP_NAME_BY_ENV.prod,
   webDir: 'dist',
   ...(server ? { server } : {}),
   android: {
