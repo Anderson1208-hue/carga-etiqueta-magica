@@ -6,15 +6,15 @@ type: feature
 # Ambientes do APK Motorista
 
 ## Resumo
-Um único backend Lovable Cloud (Supabase). Três variações de APK que diferem apenas em **onde o WebView carrega o frontend**:
+Um único backend Lovable Cloud (Supabase). Três variações de APK que diferem em **onde o WebView carrega o frontend** e **applicationId** (para coexistirem no mesmo aparelho):
 
-| Ambiente | `CAP_ENV` | `VITE_BUILD_ENV` | Frontend carregado de | Quem usa | Badge |
-|----------|-----------|------------------|-----------------------|----------|-------|
-| DEV      | `dev` (default) | `dev`     | sandbox `2b66d97b-…lovableproject.com` (hot-reload) | Desenvolvedor | vermelho |
-| HOMOLOG  | `homolog` | `homolog` | URL publicada `carga-etiqueta-magica.lovable.app`   | Time de testes | âmbar |
-| PROD     | `prod`    | `prod`    | `/dist` embutido (`capacitor://localhost`)          | Motoristas em rua | verde |
+| Ambiente | `CAP_ENV` | `VITE_BUILD_ENV` | applicationId | Frontend carregado de | Badge |
+|----------|-----------|------------------|---------------|-----------------------|-------|
+| DEV      | `dev` (default) | `dev`     | `com.expressoebenezer.motorista.homolog` | sandbox `lovableproject.com` (hot-reload) | vermelho |
+| HOMOLOG  | `homolog` | `homolog` | `com.expressoebenezer.motorista.homolog` | URL publicada `carga-etiqueta-magica.lovable.app` | âmbar |
+| PROD     | `prod`    | `prod`    | `com.expressoebenezer.motorista`         | `/dist` embutido (`capacitor://localhost`) | verde |
 
-Web no navegador continua mostrando badge azul `WEB` por inferência.
+PROD e HOMOLOG têm `applicationId` distintos → podem ser instalados lado a lado no mesmo celular sem conflito de assinatura/atualização. `appId` é definido em `capacitor.config.ts` via `APP_ID_BY_ENV` e propagado para `android/app/build.gradle` pelo `cap sync`.
 
 ## Arquivos chave
 - `capacitor.config.ts` — lê `process.env.CAP_ENV`, mapa `SERVER_BY_ENV` com 3 entradas. PROD omite `server`.
