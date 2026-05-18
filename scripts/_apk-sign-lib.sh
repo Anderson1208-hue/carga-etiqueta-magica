@@ -30,6 +30,77 @@ bump_version_code() {
   echo "==> versionCode bump: $current -> $next"
 }
 
+# Auto-detecta JAVA_HOME no Windows (Git Bash/WSL) se não estiver setado ou inválido.
+prepare_java_home() {
+  if [ -n "${JAVA_HOME:-}" ]; then
+    local jh_unix="${JAVA_HOME}"
+    case "$jh_unix" in
+      [A-Za-z]:\\*|[A-Za-z]:/*)
+        if [ -d /mnt/c ]; then
+          jh_unix="/mnt/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
+        else
+          jh_unix="/$(echo "$jh_unix" | sed -e 's|\\|/|g' -e 's|^\([A-Za-z]\):|\L\1|')"
+        fi
+        ;;
+    esac
+    if [ -x "$jh_unix/bin/java" ] || [ -x "$jh_unix/bin/java.exe" ]; then
+      export JAVA_HOME="$jh_unix"
+      export PATH="$JAVA_HOME/bin:$PATH"
+      return 0
+    fi
+  fi
+
+  local candidates=(
+    "/mnt/c/jbr"
+    "/mnt/c/Program Files/Android/Android Studio/jbr"
+    "/mnt/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
+    "/mnt/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
+    "/mnt/c/Program Files/Java/jdk-21"
+    "/mnt/c/Program Files/Java/jdk-17"
+    "/c/jbr"
+    "/c/Program Files/Android/Android Studio/jbr"
+    "/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
+    "/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
+    "/c/Program Files/Java/jdk-21"
+    "/c/Program Files/Java/jdk-17"
+  )
+  for c in "${candidates[@]}"; do
+    if [ -x "$c/bin/java" ] || [ -x "$c/bin/java.exe" ]; then
+      export JAVA_HOME="$c"
+      export PATH="$JAVA_HOME/bin:$PATH"
+      echo "[info] JAVA_HOME auto-detectado: $JAVA_HOME"
+      return 0
+    fi
+  done
+
+  echo "ERRO: não encontrei Java. Instale o JBR do Android Studio ou defina JAVA_HOME."
+  exit 1
+}
+
+to_windows_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -w "$p"
+  elif command -v wslpath >/dev/null 2>&1; then
+    wslpath -w "$p"
+  else
+    echo "$p" | sed -E 's|^/mnt/([a-z])/(.*)|\U\1:\\\2|; s|^/([a-z])/(.*)|\U\1:\\\2|' | sed 's|/|\\|g'
+  fi
+}
+
+run_android_gradle_release() {
+  prepare_java_home
+  if [ -x "$JAVA_HOME/bin/java.exe" ] && [ ! -x "$JAVA_HOME/bin/java" ] && command -v cmd.exe >/dev/null 2>&1; then
+    local java_home_win android_dir_win
+    java_home_win="$(to_windows_path "$JAVA_HOME")"
+    android_dir_win="$(to_windows_path "$(pwd)/android")"
+    echo "[info] Usando Gradle Windows com JAVA_HOME=$java_home_win"
+    cmd.exe /c "cd /d \"$android_dir_win\" && set \"JAVA_HOME=$java_home_win\" && set \"PATH=$java_home_win\\bin;%PATH%\" && gradlew.bat assembleRelease"
+  else
+    ( cd android && ./gradlew assembleRelease )
+  fi
+}
+
 # Assina manualmente um APK unsigned via apksigner se o gradle não assinou.
 sign_if_needed() {
   local release_dir="android/app/build/outputs/apk/release"
