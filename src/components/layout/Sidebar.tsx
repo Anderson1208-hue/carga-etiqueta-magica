@@ -57,6 +57,10 @@ const torreControleItems = [
   { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
 ];
 
+const relatoriosItems = [
+  { name: "Relatório de Baixas", href: "/relatorios/baixas", icon: ClipboardCheck },
+];
+
 function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean }) {
   return (
     <Link
