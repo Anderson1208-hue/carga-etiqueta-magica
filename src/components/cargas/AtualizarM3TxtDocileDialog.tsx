@@ -70,12 +70,37 @@ function getDocileReportText(content: string) {
 
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
+  const allText = normalizeTextForSearch(content);
   const text = getDocileReportText(content);
   const addRow = (nfValue: string, volumeValue: string) => {
     const numeroNf = normalizeNfNumber(nfValue);
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
+
+  const genericNfVolumePattern = /\b0{2,}(\d{3,10})\b[\s\S]{0,220}?\b([0-9]{1,6}[,.][0-9]{1,4})\b/g;
+  let genericMatch: RegExpExecArray | null;
+  while ((genericMatch = genericNfVolumePattern.exec(allText)) !== null) {
+    addRow(genericMatch[1], genericMatch[2]);
+  }
+
+  for (const rawLine of allText.split(/\r\n|\n|\r|\f/)) {
+    const line = rawLine.replace(/\s+/g, " ").trim();
+    const nfCandidates = line.match(/\b0{2,}\d{3,10}\b/g) || [];
+    const volumeCandidates = line.match(/\b\d{1,6}[,.]\d{1,4}\b/g) || [];
+    if (nfCandidates.length > 0 && volumeCandidates.length > 0) {
+      addRow(nfCandidates[nfCandidates.length - 1], volumeCandidates[volumeCandidates.length - 1]);
+    }
+  }
+
+  const cubagemPattern = /CUBAGEM\s*[:.-]\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
+  let cubagemMatch: RegExpExecArray | null;
+  while ((cubagemMatch = cubagemPattern.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, cubagemMatch.index - 120), cubagemMatch.index);
+    const nfCandidates = [...before.matchAll(/0*(\d{3,10})\b/g)];
+    const nfValue = nfCandidates.at(-1)?.[1];
+    if (nfValue) addRow(nfValue, cubagemMatch[1]);
+  }
 
   const reportText = text.replace(/\s+/g, " ");
   const pairPatterns = [
