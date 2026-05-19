@@ -60,7 +60,7 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const text = normalizeTextForSearch(content);
 
   const labelledPattern =
-    /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]+(?:[.,][0-9]+)?)/gi;
+    /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})\b[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4})?)/gi;
 
   for (const match of text.matchAll(labelledPattern)) {
     const numeroNf = normalizeNfNumber(match[1]);
@@ -70,19 +70,25 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
 
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/\s+/g, " ").trim();
-    if (!line || /EMBARQUE|TOTAL|RESUMO|PRE[- ]?FATURAMENTO|CUBAGEM\s*$/i.test(line)) {
+    if (
+      !line ||
+      !/CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS)/i.test(line) ||
+      !/(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)/i.test(line) ||
+      /EMBARQUE|TOTAL|RESUMO|PRE[- ]?FATURAMENTO|CUBAGEM\s*$/i.test(line)
+    ) {
       continue;
     }
 
-    const nfMatch = line.match(/(?:^|\D)0*(\d{4,10})(?=\D|$)/);
-    const volumeMatches = Array.from(line.matchAll(/\b\d{1,4}[,.]\d{1,4}\b/g));
-    if (!nfMatch || volumeMatches.length === 0) continue;
+    const nfMatch = line.match(
+      /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})\b/i
+    );
+    const volumeMatch = line.match(
+      /(?:CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4})?)/i
+    );
+    if (!nfMatch || !volumeMatch) continue;
 
-    const nfIndex = nfMatch.index ?? 0;
-    const volumeMatch =
-      volumeMatches.find((m) => (m.index ?? 0) > nfIndex) ?? volumeMatches[0];
     const numeroNf = normalizeNfNumber(nfMatch[1]);
-    const volumeM3 = parseVolumeNumber(volumeMatch[0]);
+    const volumeM3 = parseVolumeNumber(volumeMatch[1]);
 
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   }
@@ -247,7 +253,8 @@ export function AtualizarM3TxtDocileDialog({
                   : "Clique ou arraste TXTs Docile"}
               </p>
               <p className="text-xs text-muted-foreground">
-                Formato esperado: "Nr Nota: NNNNNNN   Cubagem: X,XX"
+                Lê as linhas "Nr Nota: NNNNNNN   Cubagem: X,XX" do Resumo
+                Pré-Faturamento Docile.
               </p>
             </div>
           </label>
