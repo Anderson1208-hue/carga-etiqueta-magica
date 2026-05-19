@@ -28,11 +28,82 @@ interface Resultado {
   linhasLidas: number;
 }
 
-// "Nr Nota: 0051505   Cubagem: 5,18"
-const LINE_REGEX = /Nr\s*Nota:\s*0*(\d+).*?Cubagem:\s*([\d.,]+)/i;
+interface DocileTxtRow {
+  numeroNf: string;
+  volumeM3: number;
+}
 
-function stripLeadingZeros(s: string) {
-  return s.replace(/^0+/, "") || "0";
+function normalizeNfNumber(value: string | number | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits.replace(/^0+/, "") || "0";
+}
+
+function parseVolumeNumber(value: string | null | undefined) {
+  if (!value) return 0;
+  const raw = value.trim().replace(/\s+/g, "");
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function normalizeTextForSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u00a0/g, " ");
+}
+
+function parseDocileTxtRows(content: string): DocileTxtRow[] {
+  const rows = new Map<string, number>();
+  const text = normalizeTextForSearch(content);
+
+  const labelledPattern =
+    /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]+(?:[.,][0-9]+)?)/gi;
+
+  for (const match of text.matchAll(labelledPattern)) {
+    const numeroNf = normalizeNfNumber(match[1]);
+    const volumeM3 = parseVolumeNumber(match[2]);
+    if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
+  }
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+/g, " ").trim();
+    if (!line || /EMBARQUE|TOTAL|RESUMO|PRE[- ]?FATURAMENTO|CUBAGEM\s*$/i.test(line)) {
+      continue;
+    }
+
+    const nfMatch = line.match(/(?:^|\D)0*(\d{4,10})(?=\D|$)/);
+    const volumeMatches = Array.from(line.matchAll(/\b\d{1,4}[,.]\d{1,4}\b/g));
+    if (!nfMatch || volumeMatches.length === 0) continue;
+
+    const nfIndex = nfMatch.index ?? 0;
+    const volumeMatch =
+      volumeMatches.find((m) => (m.index ?? 0) > nfIndex) ?? volumeMatches[0];
+    const numeroNf = normalizeNfNumber(nfMatch[1]);
+    const volumeM3 = parseVolumeNumber(volumeMatch[0]);
+
+    if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
+  }
+
+  return Array.from(rows, ([numeroNf, volumeM3]) => ({ numeroNf, volumeM3 }));
+}
+
+async function readTxtFile(file: File) {
+  const buffer = await file.arrayBuffer();
+  const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  const invalidChars = (utf8.match(/�/g) || []).length;
+
+  if (invalidChars > 0) {
+    try {
+      return new TextDecoder("windows-1252", { fatal: false }).decode(buffer);
+    } catch {
+      return utf8;
+    }
+  }
+
+  return utf8;
 }
 
 export function AtualizarM3TxtDocileDialog({
@@ -74,41 +145,32 @@ export function AtualizarM3TxtDocileDialog({
       return;
     }
 
-    // mapa: numero_nf normalizado (sem zeros à esquerda) -> id
+    // mapa: numero_nf normalizado (somente dígitos, sem zeros à esquerda) -> id
     const mapaNfs = new Map<string, string>();
     for (const n of nfsCarga || []) {
-      mapaNfs.set(stripLeadingZeros(String(n.numero_nf)), n.id);
+      mapaNfs.set(normalizeNfNumber(n.numero_nf), n.id);
     }
 
     // Evita duplicar update da mesma NF entre arquivos
     const jaAtualizadas = new Set<string>();
 
     for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith(".txt")) continue;
-
       try {
-        const content = await file.text();
-        const linhas = content.split(/\r?\n/);
+        const content = await readTxtFile(file);
+        const linhas = parseDocileTxtRows(content);
+        r.linhasLidas += linhas.length;
 
         for (const linha of linhas) {
-          const m = linha.match(LINE_REGEX);
-          if (!m) continue;
-          r.linhasLidas++;
-
-          const numeroNf = stripLeadingZeros(m[1]);
-          const cubagemStr = m[2].replace(/\./g, "").replace(",", ".");
-          const volumeM3 = parseFloat(cubagemStr);
-
-          if (!volumeM3 || volumeM3 <= 0) {
+          if (!linha.volumeM3 || linha.volumeM3 <= 0) {
             r.semM3++;
             continue;
           }
 
-          const nfId = mapaNfs.get(numeroNf);
+          const nfId = mapaNfs.get(linha.numeroNf);
           if (!nfId) {
             r.naoEncontradas++;
             if (r.detalhesNaoEncontradas.length < 5) {
-              r.detalhesNaoEncontradas.push(`NF ${numeroNf}`);
+              r.detalhesNaoEncontradas.push(`NF ${linha.numeroNf}`);
             }
             continue;
           }
@@ -117,7 +179,7 @@ export function AtualizarM3TxtDocileDialog({
 
           const { error: errUpd } = await supabase
             .from("notas_fiscais")
-            .update({ volume_m3: volumeM3 })
+            .update({ volume_m3: linha.volumeM3 })
             .eq("id", nfId);
 
           if (errUpd) {
