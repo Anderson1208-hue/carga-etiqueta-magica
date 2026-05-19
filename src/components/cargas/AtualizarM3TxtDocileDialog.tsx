@@ -73,8 +73,41 @@ function findHeaderIndex(line: string, pattern: RegExp) {
   return match?.index ?? -1;
 }
 
-function parseDocileTxtRows(content: string): DocileTxtRow[] {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function pickNearbyVolume(text: string, nfStart: number, nfEnd: number) {
+  const after = text.slice(nfEnd, nfEnd + 140);
+  const before = text.slice(Math.max(0, nfStart - 80), nfStart);
+  const labelled = after.match(/(?:CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM|ENTREG)[^0-9]{0,40}(\d{1,6}[,.]\d{1,4})/i);
+  const labelledValue = parseVolumeNumber(labelled?.[1]);
+  if (labelledValue > 0 && labelledValue <= 1000) return labelled?.[1] ?? null;
+
+  const afterDecimals = [...after.matchAll(/\b\d{1,6}[,.]\d{1,4}\b/g)]
+    .map((match) => match[0])
+    .filter((value) => {
+      const volume = parseVolumeNumber(value);
+      return volume > 0 && volume <= 1000;
+    });
+  if (afterDecimals[0]) return afterDecimals[0];
+
+  const beforeDecimals = [...before.matchAll(/\b\d{1,6}[,.]\d{1,4}\b/g)]
+    .map((match) => match[0])
+    .filter((value) => {
+      const volume = parseVolumeNumber(value);
+      return volume > 0 && volume <= 1000;
+    });
+  return beforeDecimals.at(-1) ?? null;
+}
+
+function parseDocileTxtRows(content: string, nfsDaCarga?: Iterable<string>): DocileTxtRow[] {
   const rows = new Map<string, number>();
+  const knownNfSet = new Set(
+    Array.from(nfsDaCarga ?? [])
+      .map((nf) => normalizeNfNumber(nf))
+      .filter((nf) => nf !== "0")
+  );
   const allText = normalizeTextForSearch(content);
   const text = getDocileReportText(content);
   const addRow = (nfValue: string, volumeValue: string) => {
