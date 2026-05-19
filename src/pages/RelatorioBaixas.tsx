@@ -80,6 +80,7 @@ export default function RelatorioBaixas() {
         .from("baixas_entrega")
         .select(
           `id, status, ocorrencia, recebedor_nome, registrado_em, foto_path, latitude, longitude,
+           validacao_score, validacao_status, validacao_problemas,
            veiculo:veiculos!baixas_entrega_veiculo_id_fkey(placa, motorista, data),
            nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario)`
         )
