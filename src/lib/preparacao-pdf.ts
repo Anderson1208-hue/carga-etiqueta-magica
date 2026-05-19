@@ -79,6 +79,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     `${totalCaixas} caixas`,
     `${totalPeso.toFixed(1)} kg`,
     `${totalVolume.toFixed(2)} m³`,
+    fmtBRL(totalValor),
   ];
   doc.text(summaryParts.join("   •   "), MARGIN + 4, y + 7);
   y += 14;
