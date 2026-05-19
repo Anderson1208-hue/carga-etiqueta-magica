@@ -962,6 +962,7 @@ export default function Programacao() {
                       const mrTotalCaixas = nfsMR.reduce((s, n) => s + n.totalCaixas, 0);
                       const mrTotalPeso = nfsMR.reduce((s, n) => s + n.peso_bruto, 0);
                       const mrTotalVolume = nfsMR.reduce((s, n) => s + n.volume_m3, 0);
+                      const mrTotalValor = nfsMR.reduce((s, n) => s + (n.valor_nf || 0), 0);
 
                       const entregasMap = new Map<string, NfDisponivel[]>();
                       nfsMR.forEach((nf) => {
