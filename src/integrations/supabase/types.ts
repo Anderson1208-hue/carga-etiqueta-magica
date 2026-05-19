@@ -396,6 +396,10 @@ export type Database = {
       }
       baixas_entrega: {
         Row: {
+          conferencia_motivo: string | null
+          conferencia_status: string | null
+          conferido_em: string | null
+          conferido_por: string | null
           created_at: string
           foto_path: string | null
           id: string
@@ -415,6 +419,10 @@ export type Database = {
           veiculo_id: string
         }
         Insert: {
+          conferencia_motivo?: string | null
+          conferencia_status?: string | null
+          conferido_em?: string | null
+          conferido_por?: string | null
           created_at?: string
           foto_path?: string | null
           id?: string
@@ -434,6 +442,10 @@ export type Database = {
           veiculo_id: string
         }
         Update: {
+          conferencia_motivo?: string | null
+          conferencia_status?: string | null
+          conferido_em?: string | null
+          conferido_por?: string | null
           created_at?: string
           foto_path?: string | null
           id?: string
@@ -1550,6 +1562,9 @@ export type Database = {
           id: string
           motorista: string | null
           placa: string
+          prestacao_contas_em: string | null
+          prestacao_contas_obs: string | null
+          prestacao_contas_por: string | null
           status: string
           updated_at: string
         }
@@ -1561,6 +1576,9 @@ export type Database = {
           id?: string
           motorista?: string | null
           placa: string
+          prestacao_contas_em?: string | null
+          prestacao_contas_obs?: string | null
+          prestacao_contas_por?: string | null
           status?: string
           updated_at?: string
         }
@@ -1572,6 +1590,9 @@ export type Database = {
           id?: string
           motorista?: string | null
           placa?: string
+          prestacao_contas_em?: string | null
+          prestacao_contas_obs?: string | null
+          prestacao_contas_por?: string | null
           status?: string
           updated_at?: string
         }
