@@ -197,7 +197,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   y += 5;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³  •  ${fmtBRL(totalValor)}`, MARGIN, y + 3);
+  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³`, MARGIN, y + 3);
 
   // Page numbers
   const totalPages = doc.getNumberOfPages();
