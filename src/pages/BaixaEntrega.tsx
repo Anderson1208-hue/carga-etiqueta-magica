@@ -858,7 +858,7 @@ export default function BaixaEntrega() {
             ) : (
               /* NF List */
               <div className="space-y-3">
-                {nfs.map((nf) => {
+                {nfsVisiveis.map((nf) => {
                   const isSelected = selectedNfId === nf.nf_id;
                   const isDone = !!nf.baixa_status;
 
