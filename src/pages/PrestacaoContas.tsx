@@ -181,7 +181,7 @@ export default function PrestacaoContas() {
   async function verFoto(path: string) {
     try {
       const { data, error } = await supabase.storage
-        .from("baixas-fotos")
+        .from("comprovantes")
         .createSignedUrl(path, 300);
       if (error) throw error;
       setFotoUrl(data.signedUrl);
