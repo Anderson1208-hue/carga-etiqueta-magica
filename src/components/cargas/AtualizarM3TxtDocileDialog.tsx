@@ -158,6 +158,7 @@ export function AtualizarM3TxtDocileDialog({
       erros: 0,
       detalhesNaoEncontradas: [],
       linhasLidas: 0,
+      arquivosSemLeitura: [],
     };
 
     const { data: nfsCarga, error: errCarga } = await supabase
@@ -189,6 +190,10 @@ export function AtualizarM3TxtDocileDialog({
         const content = await readTxtFile(file);
         const linhas = parseDocileTxtRows(content);
         r.linhasLidas += linhas.length;
+
+        if (linhas.length === 0) {
+          r.arquivosSemLeitura.push(file.name);
+        }
 
         for (const linha of linhas) {
           if (!linha.volumeM3 || linha.volumeM3 <= 0) {
