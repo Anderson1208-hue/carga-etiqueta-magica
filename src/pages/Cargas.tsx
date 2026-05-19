@@ -50,6 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
+import { AtualizarM3TxtDocileDialog } from "@/components/cargas/AtualizarM3TxtDocileDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { ImportarMinutaDialog } from "@/components/cargas/ImportarMinutaDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
