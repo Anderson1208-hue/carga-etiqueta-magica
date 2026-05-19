@@ -149,6 +149,7 @@ export default function BaixaEntrega() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
   const [loadingFoto, setLoadingFoto] = useState<string | null>(null);
+  const [mostrarBaixadas, setMostrarBaixadas] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -689,6 +690,10 @@ export default function BaixaEntrega() {
 
   const pendingCount = nfs.filter((n) => !n.baixa_status).length;
   const doneCount = nfs.filter((n) => n.baixa_status).length;
+  const nfsVisiveis = useMemo(
+    () => (mostrarBaixadas ? nfs : nfs.filter((n) => !n.baixa_status)),
+    [nfs, mostrarBaixadas]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -831,9 +836,16 @@ export default function BaixaEntrega() {
                   <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => setMostrarBaixadas((v) => !v)}
+                className="cursor-pointer active:scale-[0.99] transition-transform"
+              >
                 <CardContent className="pt-4 text-center">
-                  <p className="text-xs text-muted-foreground">Realizadas</p>
+                  <p className="text-xs text-muted-foreground">
+                    Realizadas {mostrarBaixadas ? "(ocultar)" : "(mostrar)"}
+                  </p>
                   <p className="text-2xl font-bold text-green-600">{doneCount}</p>
                 </CardContent>
               </Card>
@@ -846,7 +858,7 @@ export default function BaixaEntrega() {
             ) : (
               /* NF List */
               <div className="space-y-3">
-                {nfs.map((nf) => {
+                {nfsVisiveis.map((nf) => {
                   const isSelected = selectedNfId === nf.nf_id;
                   const isDone = !!nf.baixa_status;
 

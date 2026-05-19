@@ -25,6 +25,7 @@ import {
   Eye,
   ShieldCheck,
   FileSpreadsheet,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -54,6 +55,10 @@ const transporteItems = [
 const torreControleItems = [
   { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
   { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
+];
+
+const relatoriosItems = [
+  { name: "Relatório de Baixas", href: "/relatorios/baixas", icon: ClipboardCheck },
 ];
 
 function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean }) {
@@ -116,6 +121,7 @@ export function Sidebar() {
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
+  const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
@@ -154,6 +160,13 @@ export function Sidebar() {
             items={torreControleItems}
             pathname={location.pathname}
             defaultOpen={torreActive}
+          />
+          <NavGroup
+            label="Relatórios"
+            icon={BarChart3}
+            items={relatoriosItems}
+            pathname={location.pathname}
+            defaultOpen={relatoriosActive}
           />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">
