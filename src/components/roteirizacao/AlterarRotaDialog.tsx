@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -117,20 +118,24 @@ export function AlterarRotaDialog({
   async function loadNfsDisponiveis(veiculoId: string) {
     setLoadingDisponiveis(true);
     try {
-      // Get NFs already linked to ANY vehicle
-      const { data: allLinked } = await supabase
-        .from("veiculo_nfs")
-        .select("nf_id");
-      const linkedSet = new Set((allLinked || []).map((l) => l.nf_id));
+      // Get NFs already linked to ANY vehicle (paginated)
+      const allLinked = await fetchAllPages<{ nf_id: string }>((from, to) =>
+        supabase.from("veiculo_nfs").select("nf_id").order("nf_id").range(from, to)
+      );
+      const linkedSet = new Set(allLinked.map((l) => l.nf_id));
 
-      // Get NFs not delivered
-      const { data: nfs } = await supabase
-        .from("notas_fiscais")
-        .select("id, numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, carga_id")
-        .neq("status_entrega", "ENTREGUE")
-        .neq("status_entrega", "RECUSADO");
+      // Get NFs not delivered (paginated, all pages)
+      const nfs = await fetchAllPages<NfDisponivel>((from, to) =>
+        supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, dest_razao_social, dest_bairro, peso_bruto, volume_m3, carga_id")
+          .neq("status_entrega", "ENTREGUE")
+          .neq("status_entrega", "RECUSADO")
+          .order("numero_nf")
+          .range(from, to)
+      );
 
-      const disponiveis = (nfs || []).filter((nf) => !linkedSet.has(nf.id));
+      const disponiveis = nfs.filter((nf) => !linkedSet.has(nf.id));
       setNfsDisponiveis(disponiveis);
     } catch (err) {
       console.error("Error loading available NFs:", err);
