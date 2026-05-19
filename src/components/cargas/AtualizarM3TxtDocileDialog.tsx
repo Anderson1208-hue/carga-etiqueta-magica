@@ -26,6 +26,7 @@ interface Resultado {
   erros: number;
   detalhesNaoEncontradas: string[];
   linhasLidas: number;
+  arquivosSemLeitura: string[];
 }
 
 interface DocileTxtRow {
@@ -52,6 +53,7 @@ function normalizeTextForSearch(value: string) {
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u0000/g, "")
     .replace(/\u00a0/g, " ");
 }
 
@@ -98,6 +100,28 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
 
 async function readTxtFile(file: File) {
   const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return new TextDecoder("utf-16le", { fatal: false }).decode(buffer);
+  }
+
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder("utf-16be", { fatal: false }).decode(buffer);
+  }
+
+  const sample = bytes.slice(0, Math.min(bytes.length, 4000));
+  const oddNulls = sample.filter((byte, index) => index % 2 === 1 && byte === 0).length;
+  const evenNulls = sample.filter((byte, index) => index % 2 === 0 && byte === 0).length;
+
+  if (sample.length > 20 && oddNulls > sample.length * 0.2) {
+    return new TextDecoder("utf-16le", { fatal: false }).decode(buffer);
+  }
+
+  if (sample.length > 20 && evenNulls > sample.length * 0.2) {
+    return new TextDecoder("utf-16be", { fatal: false }).decode(buffer);
+  }
+
   const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
   const invalidChars = (utf8.match(/�/g) || []).length;
 
