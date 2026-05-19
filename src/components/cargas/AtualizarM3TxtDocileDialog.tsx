@@ -73,8 +73,41 @@ function findHeaderIndex(line: string, pattern: RegExp) {
   return match?.index ?? -1;
 }
 
-function parseDocileTxtRows(content: string): DocileTxtRow[] {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function pickNearbyVolume(text: string, nfStart: number, nfEnd: number) {
+  const after = text.slice(nfEnd, nfEnd + 140);
+  const before = text.slice(Math.max(0, nfStart - 80), nfStart);
+  const labelled = after.match(/(?:CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM|ENTREG)[^0-9]{0,40}(\d{1,6}[,.]\d{1,4})/i);
+  const labelledValue = parseVolumeNumber(labelled?.[1]);
+  if (labelledValue > 0 && labelledValue <= 1000) return labelled?.[1] ?? null;
+
+  const afterDecimals = [...after.matchAll(/\b\d{1,6}[,.]\d{1,4}\b/g)]
+    .map((match) => match[0])
+    .filter((value) => {
+      const volume = parseVolumeNumber(value);
+      return volume > 0 && volume <= 1000;
+    });
+  if (afterDecimals[0]) return afterDecimals[0];
+
+  const beforeDecimals = [...before.matchAll(/\b\d{1,6}[,.]\d{1,4}\b/g)]
+    .map((match) => match[0])
+    .filter((value) => {
+      const volume = parseVolumeNumber(value);
+      return volume > 0 && volume <= 1000;
+    });
+  return beforeDecimals.at(-1) ?? null;
+}
+
+function parseDocileTxtRows(content: string, nfsDaCarga?: Iterable<string>): DocileTxtRow[] {
   const rows = new Map<string, number>();
+  const knownNfSet = new Set(
+    Array.from(nfsDaCarga ?? [])
+      .map((nf) => normalizeNfNumber(nf))
+      .filter((nf) => nf !== "0")
+  );
   const allText = normalizeTextForSearch(content);
   const text = getDocileReportText(content);
   const addRow = (nfValue: string, volumeValue: string) => {
@@ -82,6 +115,29 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
+
+  if (knownNfSet.size > 0) {
+    const digitsText = allText.replace(/\D/g, "");
+    if (!digitsText.includes(Array.from(knownNfSet)[0])) {
+      const onlyDigits = allText.replace(/\D/g, " ").split(/\s+/).filter(Boolean);
+      for (const nf of knownNfSet) {
+        const nfIndex = onlyDigits.findIndex((token) => normalizeNfNumber(token) === nf);
+        if (nfIndex >= 0) {
+          const nearToken = onlyDigits.slice(nfIndex + 1, nfIndex + 8).find((token) => token.length >= 2 && token.length <= 6);
+          if (nearToken) addRow(nf, `${nearToken.slice(0, -2) || "0"},${nearToken.slice(-2)}`);
+        }
+      }
+    }
+
+    for (const nf of knownNfSet) {
+      const nfPattern = new RegExp(`0*${escapeRegExp(nf)}\\b`, "g");
+      let nfMatch: RegExpExecArray | null;
+      while ((nfMatch = nfPattern.exec(allText)) !== null) {
+        const volumeValue = pickNearbyVolume(allText, nfMatch.index, nfPattern.lastIndex);
+        if (volumeValue) addRow(nf, volumeValue);
+      }
+    }
+  }
 
   const nfHeaderPattern = /(?:NR|NRO|NUMERO|N[ºO])\s*\.?\s*NOTA|NOTA\s+FISCAL|\bNF\b/i;
   const cubagemHeaderPattern = /CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM/i;
@@ -241,7 +297,7 @@ export function AtualizarM3TxtDocileDialog({
   const [processing, setProcessing] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
-  async function handleFiles(files: FileList) {
+  async function handleFiles(files: File[]) {
     setProcessing(true);
     setResultado(null);
 
@@ -283,7 +339,7 @@ export function AtualizarM3TxtDocileDialog({
     for (const file of Array.from(files)) {
       try {
         const content = await readTxtFile(file);
-        const linhas = parseDocileTxtRows(content);
+        const linhas = parseDocileTxtRows(content, mapaNfs.keys());
         r.linhasLidas += linhas.length;
 
         if (linhas.length === 0) {
@@ -370,8 +426,9 @@ export function AtualizarM3TxtDocileDialog({
               className="hidden"
               disabled={processing}
               onChange={(e) => {
-                if (e.target.files?.length) handleFiles(e.target.files);
-                e.target.value = "";
+                const selectedFiles = Array.from(e.target.files ?? []);
+                if (selectedFiles.length) handleFiles(selectedFiles);
+                e.currentTarget.value = "";
               }}
             />
             <div className="flex flex-col items-center gap-2 py-4">
