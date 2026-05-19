@@ -297,7 +297,7 @@ export function AtualizarM3TxtDocileDialog({
   const [processing, setProcessing] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
-  async function handleFiles(files: FileList) {
+  async function handleFiles(files: File[]) {
     setProcessing(true);
     setResultado(null);
 
@@ -426,8 +426,9 @@ export function AtualizarM3TxtDocileDialog({
               className="hidden"
               disabled={processing}
               onChange={(e) => {
-                if (e.target.files?.length) handleFiles(e.target.files);
-                e.target.value = "";
+                const selectedFiles = Array.from(e.target.files ?? []);
+                if (selectedFiles.length) handleFiles(selectedFiles);
+                e.currentTarget.value = "";
               }}
             />
             <div className="flex flex-col items-center gap-2 py-4">
