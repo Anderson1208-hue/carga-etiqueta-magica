@@ -80,3 +80,4 @@ type: reference
 - [Ambientes APK](mem://operacao/ambientes-apk-motorista) — DEV (sandbox) / HOMOLOG (URL publicada) / PROD (embedded). Mesmo backend. Scripts: build-apk-homolog.sh, build-apk-release.sh.
 - [Assinatura APK Release](mem://operacao/assinatura-apk-release) — Setup único (setup-android-signing.sh) gera keystore + patcheia gradle. Build scripts bumpam versionCode e fazem fallback apksigner se sair unsigned.
 - [Validação Canhoto IA](mem://funcionalidades/operacao/validacao-canhoto-ia) — Edge function validar-canhoto (Gemini 2.5 Flash) audita foto em background e grava score/status em baixas_entrega.
+- [ARQUIVADO: APP tipo Waze](mem://operacao/projeto-arquivado-app-tipo-waze) — Projeto futuro de APP motorista parrudo com alertas. NÃO iniciar até usuário pedir. Plano em .lovable/plan.md.
