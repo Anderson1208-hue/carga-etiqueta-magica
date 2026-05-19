@@ -161,6 +161,13 @@ export function Sidebar() {
             pathname={location.pathname}
             defaultOpen={torreActive}
           />
+          <NavGroup
+            label="Relatórios"
+            icon={BarChart3}
+            items={relatoriosItems}
+            pathname={location.pathname}
+            defaultOpen={relatoriosActive}
+          />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">
               <NavItem
