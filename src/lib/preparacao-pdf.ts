@@ -91,6 +91,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     const cx = nfsEntrega.reduce((s, n) => s + n.totalCaixas, 0);
     const peso = nfsEntrega.reduce((s, n) => s + n.peso_bruto, 0);
     const vol = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
+    const valor = nfsEntrega.reduce((s, n) => s + (n.valor_nf || 0), 0);
     const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
     const cidadeUf = [first.dest_cidade, first.dest_uf].filter(Boolean).join("/");
     const nfNums = nfsEntrega.map((n) => n.numero_nf).join(", ");
