@@ -77,6 +77,15 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
+  const cubagemPattern = /CUBAGEM\s*[:.-]\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
+  let cubagemMatch: RegExpExecArray | null;
+  while ((cubagemMatch = cubagemPattern.exec(text)) !== null) {
+    const before = text.slice(Math.max(0, cubagemMatch.index - 120), cubagemMatch.index);
+    const nfCandidates = [...before.matchAll(/0*(\d{3,10})\b/g)];
+    const nfValue = nfCandidates.at(-1)?.[1];
+    if (nfValue) addRow(nfValue, cubagemMatch[1]);
+  }
+
   const reportText = text.replace(/\s+/g, " ");
   const pairPatterns = [
     /(?:NR|NRO|NUMERO|N[ºO])\s+NOTA\s*[:.-]?\s*0*(\d{3,10})\b[\s\S]{0,160}?(?:CUBAGEM|CUB\.?)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi,
