@@ -339,7 +339,7 @@ export function AtualizarM3TxtDocileDialog({
     for (const file of Array.from(files)) {
       try {
         const content = await readTxtFile(file);
-        const linhas = parseDocileTxtRows(content);
+        const linhas = parseDocileTxtRows(content, mapaNfs.keys());
         r.linhasLidas += linhas.length;
 
         if (linhas.length === 0) {
