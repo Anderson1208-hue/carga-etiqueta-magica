@@ -47,9 +47,10 @@ import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { Badge } from "@/components/ui/badge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature, FileType } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
+import { AtualizarM3TxtDocileDialog } from "@/components/cargas/AtualizarM3TxtDocileDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { ImportarMinutaDialog } from "@/components/cargas/ImportarMinutaDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
@@ -87,6 +88,7 @@ export default function Cargas() {
   const [printingCargaId, setPrintingCargaId] = useState<string | null>(null);
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
   const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
+  const [m3TxtDocileCarga, setM3TxtDocileCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [minutaCarga, setMinutaCarga] = useState<Carga | null>(null);
   const [addXmlCarga, setAddXmlCarga] = useState<Carga | null>(null);
@@ -728,6 +730,9 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => setM3XmlCarga(carga)} title="Atualizar m³ via XML">
                           <Box className="w-4 h-4" />
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setM3TxtDocileCarga(carga)} title="Atualizar m³ via TXT Docile">
+                          <FileType className="w-4 h-4" />
+                        </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
                         </Link>
@@ -812,6 +817,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setM3XmlCarga(null)}
             cargaId={m3XmlCarga.id}
             cargaPlaca={m3XmlCarga.placa}
+            onUpdated={loadCargas}
+          />
+        )}
+        {/* Atualizar m³ via TXT Docile Dialog */}
+        {m3TxtDocileCarga && (
+          <AtualizarM3TxtDocileDialog
+            open={!!m3TxtDocileCarga}
+            onOpenChange={(open) => !open && setM3TxtDocileCarga(null)}
+            cargaId={m3TxtDocileCarga.id}
+            cargaPlaca={m3TxtDocileCarga.placa}
             onUpdated={loadCargas}
           />
         )}
