@@ -27,6 +27,7 @@ interface Resultado {
   detalhesNaoEncontradas: string[];
   linhasLidas: number;
   arquivosSemLeitura: string[];
+  amostrasArquivo: string[];
 }
 
 interface DocileTxtRow {
@@ -66,16 +67,29 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
-  const docileLinePattern =
-    /(?:NR\s+NOTA|NRO\s+NOTA|NUMERO\s+NOTA|N[ºO]\s+NOTA|NOTA\s+FISCAL|NOTA|NF)\s*[:.-]?\s*0*(\d{3,10})\b.*?(?:CUBAGEM|CUB\.?|METRAGEM|VOLUME|ENTREG(?:A)?\s*M?\s*[³3]?|M\s*[³3])\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4})?)/i;
-
   for (const rawLine of text.split(/\r\n|\n|\r|\f/)) {
     const line = rawLine.replace(/\s+/g, " ").trim();
-    const match = line.match(docileLinePattern);
-    if (match) addRow(match[1], match[2]);
+    if (!/NOTA|NF/i.test(line) || !/CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM|ENTREG/i.test(line)) continue;
+
+    const numbers = line.match(/\d+(?:[.,]\d+)?/g) || [];
+    const nfValue = numbers.find((value) => /^0*\d{3,10}$/.test(value));
+    const volumeValue = [...numbers].reverse().find((value) => /[.,]\d+/.test(value));
+
+    if (nfValue && volumeValue) addRow(nfValue, volumeValue);
   }
 
   return Array.from(rows, ([numeroNf, volumeM3]) => ({ numeroNf, volumeM3 }));
+}
+
+function getDocileTxtSamples(content: string) {
+  const text = normalizeTextForSearch(content);
+  const lines = text
+    .split(/\r\n|\n|\r|\f/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const relevant = lines.filter((line) => /NOTA|NF|CUBAGEM|CUB\.?|M\s*[³3]/i.test(line));
+  return (relevant.length > 0 ? relevant : lines).slice(0, 6);
 }
 
 async function readTxtFile(file: File) {
