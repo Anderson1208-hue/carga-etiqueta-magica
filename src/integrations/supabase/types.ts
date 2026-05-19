@@ -408,6 +408,10 @@ export type Database = {
           registrado_por: string | null
           status: string
           updated_at: string
+          validacao_em: string | null
+          validacao_problemas: Json | null
+          validacao_score: number | null
+          validacao_status: string | null
           veiculo_id: string
         }
         Insert: {
@@ -423,6 +427,10 @@ export type Database = {
           registrado_por?: string | null
           status?: string
           updated_at?: string
+          validacao_em?: string | null
+          validacao_problemas?: Json | null
+          validacao_score?: number | null
+          validacao_status?: string | null
           veiculo_id: string
         }
         Update: {
@@ -438,6 +446,10 @@ export type Database = {
           registrado_por?: string | null
           status?: string
           updated_at?: string
+          validacao_em?: string | null
+          validacao_problemas?: Json | null
+          validacao_score?: number | null
+          validacao_status?: string | null
           veiculo_id?: string
         }
         Relationships: [
