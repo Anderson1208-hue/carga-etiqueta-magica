@@ -70,12 +70,22 @@ function getDocileReportText(content: string) {
 
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
+  const allText = normalizeTextForSearch(content);
   const text = getDocileReportText(content);
   const addRow = (nfValue: string, volumeValue: string) => {
     const numeroNf = normalizeNfNumber(nfValue);
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
+
+  for (const rawLine of allText.split(/\r\n|\n|\r|\f/)) {
+    const line = rawLine.replace(/\s+/g, " ").trim();
+    const nfCandidates = line.match(/\b0{2,}\d{3,10}\b/g) || [];
+    const volumeCandidates = line.match(/\b\d{1,6}[,.]\d{1,4}\b/g) || [];
+    if (nfCandidates.length > 0 && volumeCandidates.length > 0) {
+      addRow(nfCandidates[nfCandidates.length - 1], volumeCandidates[volumeCandidates.length - 1]);
+    }
+  }
 
   const cubagemPattern = /CUBAGEM\s*[:.-]\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
   let cubagemMatch: RegExpExecArray | null;
