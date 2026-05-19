@@ -15,6 +15,7 @@ interface NfPrepPdf {
   dest_uf: string;
   peso_bruto: number;
   volume_m3: number;
+  valor_nf: number;
   totalCaixas: number;
   macroRegiao: number;
   carga_placa: string;
