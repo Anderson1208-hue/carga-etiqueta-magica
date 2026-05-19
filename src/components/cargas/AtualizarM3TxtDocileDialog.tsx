@@ -253,7 +253,8 @@ export function AtualizarM3TxtDocileDialog({
                   : "Clique ou arraste TXTs Docile"}
               </p>
               <p className="text-xs text-muted-foreground">
-                Formato esperado: "Nr Nota: NNNNNNN   Cubagem: X,XX"
+                Lê as linhas "Nr Nota: NNNNNNN   Cubagem: X,XX" do Resumo
+                Pré-Faturamento Docile.
               </p>
             </div>
           </label>
