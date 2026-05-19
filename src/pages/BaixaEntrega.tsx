@@ -413,7 +413,7 @@ export default function BaixaEntrega() {
           }
 
           // 2) Insere a baixa
-          const { error } = await supabase.from("baixas_entrega").insert({
+          const { data: baixaSync, error } = await supabase.from("baixas_entrega").insert({
             veiculo_id: baixa.veiculo_id,
             nf_id: baixa.nf_id,
             status: baixa.status,
@@ -424,9 +424,16 @@ export default function BaixaEntrega() {
             longitude: baixa.longitude,
             registrado_por: baixa.registrado_por,
             registrado_em: baixa.registrado_em,
-          });
+          }).select("id").single();
 
           if (error) throw error;
+
+          // Valida foto em background
+          if (fotoPath && baixaSync?.id) {
+            supabase.functions
+              .invoke("validar-canhoto", { body: { baixa_id: baixaSync.id } })
+              .catch((e) => console.warn("validar-canhoto (sync) falhou:", e));
+          }
 
           syncedIds.push(baixa.id);
           // 3) Limpa foto local após sucesso (libera storage do device)
