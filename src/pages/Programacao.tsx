@@ -630,7 +630,7 @@ export default function Programacao() {
         </div>
 
         {/* Dashboard */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-6">
           <Card className={hasSelection ? "border-success/30 bg-success/5" : "border-primary/30 bg-primary/5"}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-primary"}`}>Volume {dashLabel}</CardTitle>
