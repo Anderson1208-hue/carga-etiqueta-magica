@@ -54,8 +54,8 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   const totalCaixas = nfs.reduce((s, n) => s + n.totalCaixas, 0);
   const totalPeso = nfs.reduce((s, n) => s + n.peso_bruto, 0);
   const totalVolume = nfs.reduce((s, n) => s + n.volume_m3, 0);
-  const totalValor = nfs.reduce((s, n) => s + (n.valor_nf || 0), 0);
-  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // === HEADER ===
 
   // === HEADER ===
   doc.setFontSize(14);
@@ -79,7 +79,6 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     `${totalCaixas} caixas`,
     `${totalPeso.toFixed(1)} kg`,
     `${totalVolume.toFixed(2)} m³`,
-    fmtBRL(totalValor),
   ];
   doc.text(summaryParts.join("   •   "), MARGIN + 4, y + 7);
   y += 14;
@@ -147,7 +146,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     // Totals on right
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(7.5);
-    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}${valor > 0 ? `  •  ${fmtBRL(valor)}` : ""}`;
+    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}`;
     doc.text(totalsLine, badgeX, y + 17, { align: "right" });
 
     doc.setTextColor(0, 0, 0);
@@ -198,7 +197,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   y += 5;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³  •  ${fmtBRL(totalValor)}`, MARGIN, y + 3);
+  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³`, MARGIN, y + 3);
 
   // Page numbers
   const totalPages = doc.getNumberOfPages();
