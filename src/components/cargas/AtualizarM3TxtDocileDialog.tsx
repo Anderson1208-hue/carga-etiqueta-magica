@@ -60,39 +60,64 @@ function normalizeTextForSearch(value: string) {
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
   const text = normalizeTextForSearch(content);
+  const nfLabelSource = String.raw`(?:N\s*(?:R|RO|UMERO|º|°|O)?[\s.:-]*(?:NOTA|NF)|NOTA\s*(?:FISCAL)?|NF)`;
+  const volumeLabelSource = String.raw`(?:ENTREG(?:A)?[\s.:-]*M\s*[³3]?|M\s*[³3]\s*ENTREG(?:A)?|VOLUME[\s.:-]*(?:M\s*[³3])?|CUBAGEM|CUB\.?|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS)|M\s*[³3])`;
+  const decimalSource = String.raw`([0-9]{1,6}(?:[.,][0-9]{1,4})?)`;
+  const addRow = (nfValue: string, volumeValue: string) => {
+    const numeroNf = normalizeNfNumber(nfValue);
+    const volumeM3 = parseVolumeNumber(volumeValue);
+    if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
+  };
 
-  const labelledPattern =
-    /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})\b[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4})?)/gi;
+  const labelledPattern = new RegExp(
+    `${nfLabelSource}\\s*[:.-]?\\s*0*(\\d{3,10})\\b[^\\n\\r]{0,240}?${volumeLabelSource}\\s*[:.-]?\\s*${decimalSource}`,
+    "gi"
+  );
+  const reverseLabelledPattern = new RegExp(
+    `${volumeLabelSource}\\s*[:.-]?\\s*${decimalSource}[^\\n\\r]{0,240}?${nfLabelSource}\\s*[:.-]?\\s*0*(\\d{3,10})\\b`,
+    "gi"
+  );
 
   for (const match of text.matchAll(labelledPattern)) {
-    const numeroNf = normalizeNfNumber(match[1]);
-    const volumeM3 = parseVolumeNumber(match[2]);
-    if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
+    addRow(match[1], match[2]);
   }
+
+  for (const match of text.matchAll(reverseLabelledPattern)) {
+    addRow(match[2], match[1]);
+  }
+
+  const nfLabelPattern = new RegExp(nfLabelSource, "i");
+  const volumeLabelPattern = new RegExp(volumeLabelSource, "i");
+  const nfValuePattern = new RegExp(`${nfLabelSource}\\s*[:.-]?\\s*0*(\\d{3,10})\\b`, "i");
+  const volumeValuePattern = new RegExp(`${volumeLabelSource}\\s*[:.-]?\\s*${decimalSource}`, "i");
+  let inNotaVolumeTable = false;
 
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.replace(/\s+/g, " ").trim();
-    if (
-      !line ||
-      !/CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS)/i.test(line) ||
-      !/(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)/i.test(line) ||
-      /EMBARQUE|TOTAL|RESUMO|PRE[- ]?FATURAMENTO|CUBAGEM\s*$/i.test(line)
-    ) {
+    if (!line) {
       continue;
     }
 
-    const nfMatch = line.match(
-      /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})\b/i
-    );
-    const volumeMatch = line.match(
-      /(?:CUBAGEM|M\s*[³3]|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4})?)/i
-    );
-    if (!nfMatch || !volumeMatch) continue;
+    const hasNfLabel = nfLabelPattern.test(line);
+    const hasVolumeLabel = volumeLabelPattern.test(line);
 
-    const numeroNf = normalizeNfNumber(nfMatch[1]);
-    const volumeM3 = parseVolumeNumber(volumeMatch[1]);
+    if (hasNfLabel && hasVolumeLabel) {
+      inNotaVolumeTable = true;
+      const nfMatch = line.match(nfValuePattern);
+      const volumeMatch = line.match(volumeValuePattern);
+      if (nfMatch && volumeMatch) addRow(nfMatch[1], volumeMatch[1]);
+      continue;
+    }
 
-    if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
+    if (/EMBARQUE|TOTAL|RESUMO|PRE[- ]?FATURAMENTO|PRODUTO|ITEM/i.test(line)) {
+      inNotaVolumeTable = false;
+      continue;
+    }
+
+    if (inNotaVolumeTable) {
+      const tableMatch = line.match(/(?:^|\s)0*(\d{3,10})\b[^\n\r]{0,120}?([0-9]{1,6}[.,][0-9]{1,4})\b/i);
+      if (tableMatch) addRow(tableMatch[1], tableMatch[2]);
+    }
   }
 
   return Array.from(rows, ([numeroNf, volumeM3]) => ({ numeroNf, volumeM3 }));
