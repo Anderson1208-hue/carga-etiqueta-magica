@@ -60,14 +60,35 @@ function normalizeTextForSearch(value: string) {
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
   const text = normalizeTextForSearch(content);
-  const nfLabelSource = String.raw`(?:N\s*(?:R|RO|UMERO|º|°|O)?[\s.:-]*(?:NOTA|NF)|NOTA\s*(?:FISCAL)?|NF)`;
-  const volumeLabelSource = String.raw`(?:ENTREG(?:A)?[\s.:-]*M\s*[³3]?|M\s*[³3]\s*ENTREG(?:A)?|VOLUME[\s.:-]*(?:M\s*[³3])?|CUBAGEM|CUB\.?|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS)|M\s*[³3])`;
-  const decimalSource = String.raw`([0-9]{1,6}(?:[.,][0-9]{1,4})?)`;
   const addRow = (nfValue: string, volumeValue: string) => {
     const numeroNf = normalizeNfNumber(nfValue);
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+/g, " ").trim();
+    const upper = line.toUpperCase();
+    const notaIndex = upper.search(/\b(NR|NRO|NUMERO|Nº|NO|NF|NOTA)\b/);
+    const cubagemIndex = upper.search(/\b(CUBAGEM|CUB|METRAGEM|VOLUME|ENTREG)\b|M\s*[³3]/);
+
+    if (notaIndex === -1 || cubagemIndex === -1) continue;
+
+    const notaPart = line.slice(notaIndex, cubagemIndex > notaIndex ? cubagemIndex : undefined);
+    const volumePart = line.slice(cubagemIndex);
+    const nfMatch = notaPart.match(/0*(\d{3,10})\b/);
+    const volumeMatch = volumePart.match(/(\d{1,6}(?:[.,]\d{1,4})?)/);
+
+    if (nfMatch && volumeMatch) addRow(nfMatch[1], volumeMatch[1]);
+  }
+
+  if (rows.size > 0) {
+    return Array.from(rows, ([numeroNf, volumeM3]) => ({ numeroNf, volumeM3 }));
+  }
+
+  const nfLabelSource = String.raw`(?:N\s*(?:R|RO|UMERO|º|°|O)?[\s.:-]*(?:NOTA|NF)|NOTA\s*(?:FISCAL)?|NF)`;
+  const volumeLabelSource = String.raw`(?:ENTREG(?:A)?[\s.:-]*M\s*[³3]?|M\s*[³3]\s*ENTREG(?:A)?|VOLUME[\s.:-]*(?:M\s*[³3])?|CUBAGEM|CUB\.?|METRAGEM|METR(?:O|OS)\s*CUBIC(?:O|OS)|M\s*[³3])`;
+  const decimalSource = String.raw`([0-9]{1,6}(?:[.,][0-9]{1,4})?)`;
 
   const labelledPattern = new RegExp(
     `${nfLabelSource}\\s*[:.-]?\\s*0*(\\d{3,10})\\b[^\\n\\r]{0,240}?${volumeLabelSource}\\s*[:.-]?\\s*${decimalSource}`,
