@@ -993,6 +993,7 @@ export default function Programacao() {
                                 <span>{mrTotalCaixas} cx</span>
                                 <span>{mrTotalPeso.toFixed(1)} kg</span>
                                 {mrTotalVolume > 0 && <span className="font-semibold text-primary">{mrTotalVolume.toFixed(2)} m³</span>}
+                                {mrTotalValor > 0 && <span className="font-semibold text-success">{fmtBRL(mrTotalValor)}</span>}
                               </div>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
