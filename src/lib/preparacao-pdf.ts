@@ -146,7 +146,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     // Totals on right
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(7.5);
-    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}${valor > 0 ? `  •  ${fmtBRL(valor)}` : ""}`;
+    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}`;
     doc.text(totalsLine, badgeX, y + 17, { align: "right" });
 
     doc.setTextColor(0, 0, 0);
