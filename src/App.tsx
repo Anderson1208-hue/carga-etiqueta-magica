@@ -28,6 +28,7 @@ import TorreControle from "./pages/TorreControle";
 import Operadores from "./pages/Operadores";
 import AuditoriaLog from "./pages/AuditoriaLog";
 import Conciliacao from "./pages/Conciliacao";
+import RelatorioBaixas from "./pages/RelatorioBaixas";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
 import NotFound from "./pages/NotFound";
