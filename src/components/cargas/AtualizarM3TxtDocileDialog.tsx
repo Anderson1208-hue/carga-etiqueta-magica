@@ -337,6 +337,14 @@ export function AtualizarM3TxtDocileDialog({
                   </span>
                 </div>
               )}
+              {resultado.amostrasArquivo.length > 0 && (
+                <div className="rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
+                  <div className="mb-1 font-medium text-foreground">Amostra lida do arquivo:</div>
+                  <pre className="whitespace-pre-wrap break-words font-mono">
+                    {resultado.amostrasArquivo.join("\n")}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
 
