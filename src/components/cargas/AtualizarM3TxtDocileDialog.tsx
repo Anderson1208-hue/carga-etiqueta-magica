@@ -263,6 +263,12 @@ export function AtualizarM3TxtDocileDialog({
         description: `${r.atualizadas} NF(s) atualizada(s) com sucesso.`,
       });
       onUpdated?.();
+    } else if (r.linhasLidas === 0) {
+      toast({
+        variant: "destructive",
+        title: "TXT Docile não reconhecido",
+        description: "Nenhuma linha de NF/cubagem foi encontrada no arquivo selecionado.",
+      });
     }
   }
 
@@ -348,6 +354,14 @@ export function AtualizarM3TxtDocileDialog({
                 <div className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="w-4 h-4" />
                   <span>{resultado.erros} erro(s) ao processar</span>
+                </div>
+              )}
+              {resultado.arquivosSemLeitura.length > 0 && (
+                <div className="flex items-start gap-2 text-destructive">
+                  <AlertCircle className="w-4 h-4 mt-0.5" />
+                  <span>
+                    Arquivo sem linhas reconhecidas: {resultado.arquivosSemLeitura.join(", ")}
+                  </span>
                 </div>
               )}
             </div>
