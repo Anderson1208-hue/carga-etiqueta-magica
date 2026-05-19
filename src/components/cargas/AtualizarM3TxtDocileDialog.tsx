@@ -78,6 +78,12 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
+  const genericNfVolumePattern = /\b0{2,}(\d{3,10})\b[\s\S]{0,220}?\b([0-9]{1,6}[,.][0-9]{1,4})\b/g;
+  let genericMatch: RegExpExecArray | null;
+  while ((genericMatch = genericNfVolumePattern.exec(allText)) !== null) {
+    addRow(genericMatch[1], genericMatch[2]);
+  }
+
   for (const rawLine of allText.split(/\r\n|\n|\r|\f/)) {
     const line = rawLine.replace(/\s+/g, " ").trim();
     const nfCandidates = line.match(/\b0{2,}\d{3,10}\b/g) || [];
