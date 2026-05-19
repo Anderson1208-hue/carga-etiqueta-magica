@@ -33,6 +33,9 @@ interface BaixaRow {
   foto_path: string | null;
   latitude: number | null;
   longitude: number | null;
+  validacao_score: number | null;
+  validacao_status: string | null;
+  validacao_problemas: { lista?: string[]; observacoes?: string } | null;
   veiculo: { placa: string | null; motorista: string | null; data: string | null } | null;
   nf: {
     numero_nf: string | null;
