@@ -820,6 +820,16 @@ export default function Cargas() {
             onUpdated={loadCargas}
           />
         )}
+        {/* Atualizar m³ via TXT Docile Dialog */}
+        {m3TxtDocileCarga && (
+          <AtualizarM3TxtDocileDialog
+            open={!!m3TxtDocileCarga}
+            onOpenChange={(open) => !open && setM3TxtDocileCarga(null)}
+            cargaId={m3TxtDocileCarga.id}
+            cargaPlaca={m3TxtDocileCarga.placa}
+            onUpdated={loadCargas}
+          />
+        )}
         {/* Adicionar XML à Carga Dialog */}
         {addXmlCarga && (
           <AdicionarXmlDialog
