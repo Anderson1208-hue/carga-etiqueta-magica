@@ -149,6 +149,7 @@ export default function BaixaEntrega() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
   const [loadingFoto, setLoadingFoto] = useState<string | null>(null);
+  const [mostrarBaixadas, setMostrarBaixadas] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
