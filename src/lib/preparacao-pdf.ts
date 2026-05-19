@@ -54,8 +54,8 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   const totalCaixas = nfs.reduce((s, n) => s + n.totalCaixas, 0);
   const totalPeso = nfs.reduce((s, n) => s + n.peso_bruto, 0);
   const totalVolume = nfs.reduce((s, n) => s + n.volume_m3, 0);
-  const totalValor = nfs.reduce((s, n) => s + (n.valor_nf || 0), 0);
-  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  // === HEADER ===
 
   // === HEADER ===
   doc.setFontSize(14);
