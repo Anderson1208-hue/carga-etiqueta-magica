@@ -169,6 +169,7 @@ export function Sidebar() {
             items={depositoItems}
             pathname={location.pathname}
             defaultOpen={depositoActive}
+            storageKey="deposito"
           />
           <NavGroup
             label="Transporte"
@@ -176,6 +177,7 @@ export function Sidebar() {
             items={transporteItems}
             pathname={location.pathname}
             defaultOpen={transporteActive}
+            storageKey="transporte"
           />
           <NavGroup
             label="Torre de Controle"
@@ -183,6 +185,7 @@ export function Sidebar() {
             items={torreControleItems}
             pathname={location.pathname}
             defaultOpen={torreActive}
+            storageKey="torre"
           />
           <NavGroup
             label="Relatórios"
@@ -190,6 +193,7 @@ export function Sidebar() {
             items={relatoriosItems}
             pathname={location.pathname}
             defaultOpen={relatoriosActive}
+            storageKey="relatorios"
           />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">
