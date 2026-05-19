@@ -145,6 +145,9 @@ export default function RelatorioBaixas() {
       "Latitude",
       "Longitude",
       "Tem Foto",
+      "Qualidade IA",
+      "Score IA",
+      "Problemas IA",
     ];
     const lines = rowsFiltradas.map((r) =>
       [
@@ -160,6 +163,9 @@ export default function RelatorioBaixas() {
         r.latitude ?? "",
         r.longitude ?? "",
         r.foto_path ? "Sim" : "Não",
+        r.validacao_status ?? "",
+        r.validacao_score ?? "",
+        (r.validacao_problemas?.lista || []).join(" | "),
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
         .join(";")
