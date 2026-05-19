@@ -84,19 +84,42 @@ function NavGroup({
   items,
   pathname,
   defaultOpen,
+  storageKey,
 }: {
   label: string;
   icon: React.ElementType;
   items: typeof depositoItems;
   pathname: string;
   defaultOpen: boolean;
+  storageKey: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const fullKey = `sidebar:group:${storageKey}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem(fullKey);
+      if (stored === "1") return true;
+      if (stored === "0") return false;
+    } catch {}
+    return defaultOpen;
+  });
+
+  // Se a rota ativa pertence ao grupo, garante que ele esteja aberto.
+  if (defaultOpen && !open) {
+    setOpen(true);
+  }
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(fullKey, next ? "1" : "0");
+    } catch {}
+  };
 
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-sidebar-foreground/90 hover:bg-sidebar-accent transition-colors"
       >
         <Icon className="w-5 h-5" />
@@ -146,6 +169,7 @@ export function Sidebar() {
             items={depositoItems}
             pathname={location.pathname}
             defaultOpen={depositoActive}
+            storageKey="deposito"
           />
           <NavGroup
             label="Transporte"
@@ -153,6 +177,7 @@ export function Sidebar() {
             items={transporteItems}
             pathname={location.pathname}
             defaultOpen={transporteActive}
+            storageKey="transporte"
           />
           <NavGroup
             label="Torre de Controle"
@@ -160,6 +185,7 @@ export function Sidebar() {
             items={torreControleItems}
             pathname={location.pathname}
             defaultOpen={torreActive}
+            storageKey="torre"
           />
           <NavGroup
             label="Relatórios"
@@ -167,6 +193,7 @@ export function Sidebar() {
             items={relatoriosItems}
             pathname={location.pathname}
             defaultOpen={relatoriosActive}
+            storageKey="relatorios"
           />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">
