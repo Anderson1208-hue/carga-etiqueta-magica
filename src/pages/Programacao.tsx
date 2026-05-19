@@ -691,7 +691,18 @@ export default function Programacao() {
               </p>
             </CardContent>
           </Card>
+          <Card className={hasSelection ? "border-success/30 bg-success/5" : ""}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className={`text-sm font-medium ${hasSelection ? "text-success" : "text-muted-foreground"}`}>Valor {hasSelection ? dashLabel : "Disponível"}</CardTitle>
+              <FileText className={`h-5 w-5 ${hasSelection ? "text-success" : "text-primary"}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${hasSelection ? "text-success" : ""}`}>{fmtBRL(dashValor)}</div>
+              {hasSelection && <p className="text-[10px] text-muted-foreground mt-1">Disponível: {fmtBRL(totalValorDisponivel)}</p>}
+            </CardContent>
+          </Card>
         </div>
+
 
         {/* Filtros */}
         <Card>
