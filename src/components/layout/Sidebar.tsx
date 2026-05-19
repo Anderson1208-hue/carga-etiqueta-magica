@@ -25,6 +25,7 @@ import {
   Eye,
   ShieldCheck,
   FileSpreadsheet,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
