@@ -116,6 +116,29 @@ function parseDocileTxtRows(content: string, nfsDaCarga?: Iterable<string>): Doc
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
+  if (knownNfSet.size > 0) {
+    const digitsText = allText.replace(/\D/g, "");
+    if (!digitsText.includes(Array.from(knownNfSet)[0])) {
+      const onlyDigits = allText.replace(/\D/g, " ").split(/\s+/).filter(Boolean);
+      for (const nf of knownNfSet) {
+        const nfIndex = onlyDigits.findIndex((token) => normalizeNfNumber(token) === nf);
+        if (nfIndex >= 0) {
+          const nearToken = onlyDigits.slice(nfIndex + 1, nfIndex + 8).find((token) => token.length >= 2 && token.length <= 6);
+          if (nearToken) addRow(nf, `${nearToken.slice(0, -2) || "0"},${nearToken.slice(-2)}`);
+        }
+      }
+    }
+
+    for (const nf of knownNfSet) {
+      const nfPattern = new RegExp(`0*${escapeRegExp(nf)}\\b`, "g");
+      let nfMatch: RegExpExecArray | null;
+      while ((nfMatch = nfPattern.exec(allText)) !== null) {
+        const volumeValue = pickNearbyVolume(allText, nfMatch.index, nfPattern.lastIndex);
+        if (volumeValue) addRow(nf, volumeValue);
+      }
+    }
+  }
+
   const nfHeaderPattern = /(?:NR|NRO|NUMERO|N[ºO])\s*\.?\s*NOTA|NOTA\s+FISCAL|\bNF\b/i;
   const cubagemHeaderPattern = /CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM/i;
 
