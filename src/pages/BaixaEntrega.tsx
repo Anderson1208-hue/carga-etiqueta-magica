@@ -413,7 +413,7 @@ export default function BaixaEntrega() {
           }
 
           // 2) Insere a baixa
-          const { error } = await supabase.from("baixas_entrega").insert({
+          const { data: baixaSync, error } = await supabase.from("baixas_entrega").insert({
             veiculo_id: baixa.veiculo_id,
             nf_id: baixa.nf_id,
             status: baixa.status,
@@ -424,9 +424,16 @@ export default function BaixaEntrega() {
             longitude: baixa.longitude,
             registrado_por: baixa.registrado_por,
             registrado_em: baixa.registrado_em,
-          });
+          }).select("id").single();
 
           if (error) throw error;
+
+          // Valida foto em background
+          if (fotoPath && baixaSync?.id) {
+            supabase.functions
+              .invoke("validar-canhoto", { body: { baixa_id: baixaSync.id } })
+              .catch((e) => console.warn("validar-canhoto (sync) falhou:", e));
+          }
 
           syncedIds.push(baixa.id);
           // 3) Limpa foto local após sucesso (libera storage do device)
@@ -620,7 +627,7 @@ export default function BaixaEntrega() {
         fotoPath = fileName;
       }
 
-      const { error: insertError } = await supabase
+      const { data: baixaInserida, error: insertError } = await supabase
         .from("baixas_entrega")
         .insert({
           veiculo_id: selectedVeiculoId,
@@ -633,9 +640,33 @@ export default function BaixaEntrega() {
           longitude: gpsCoords?.lng || null,
           registrado_por: user?.id || null,
           registrado_em: new Date().toISOString(),
-        });
+        })
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
+
+      // Valida foto do canhoto em background (não bloqueia o motorista)
+      if (fotoPath && baixaInserida?.id) {
+        supabase.functions
+          .invoke("validar-canhoto", { body: { baixa_id: baixaInserida.id } })
+          .then(({ data }) => {
+            const status = (data as { status?: string } | null)?.status;
+            if (status === "ruim") {
+              toast({
+                title: "⚠️ Foto do canhoto com problemas",
+                description: "Confira no Relatório de Baixas — pode ser necessário refazer.",
+                variant: "destructive",
+              });
+            } else if (status === "alerta") {
+              toast({
+                title: "Atenção na foto do canhoto",
+                description: "Qualidade abaixo do ideal — confira no Relatório.",
+              });
+            }
+          })
+          .catch((e) => console.warn("validar-canhoto falhou (não-crítico):", e));
+      }
 
       // Se for "Reentrega": NF volta para a Preparação
       if (ocorrencia === "reentrega") {

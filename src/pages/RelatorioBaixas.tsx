@@ -33,6 +33,9 @@ interface BaixaRow {
   foto_path: string | null;
   latitude: number | null;
   longitude: number | null;
+  validacao_score: number | null;
+  validacao_status: string | null;
+  validacao_problemas: { lista?: string[]; observacoes?: string } | null;
   veiculo: { placa: string | null; motorista: string | null; data: string | null } | null;
   nf: {
     numero_nf: string | null;
@@ -77,6 +80,7 @@ export default function RelatorioBaixas() {
         .from("baixas_entrega")
         .select(
           `id, status, ocorrencia, recebedor_nome, registrado_em, foto_path, latitude, longitude,
+           validacao_score, validacao_status, validacao_problemas,
            veiculo:veiculos!baixas_entrega_veiculo_id_fkey(placa, motorista, data),
            nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario)`
         )
@@ -141,6 +145,9 @@ export default function RelatorioBaixas() {
       "Latitude",
       "Longitude",
       "Tem Foto",
+      "Qualidade IA",
+      "Score IA",
+      "Problemas IA",
     ];
     const lines = rowsFiltradas.map((r) =>
       [
@@ -156,6 +163,9 @@ export default function RelatorioBaixas() {
         r.latitude ?? "",
         r.longitude ?? "",
         r.foto_path ? "Sim" : "Não",
+        r.validacao_status ?? "",
+        r.validacao_score ?? "",
+        (r.validacao_problemas?.lista || []).join(" | "),
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
         .join(";")
@@ -262,45 +272,82 @@ export default function RelatorioBaixas() {
                         <TableHead>Ocorrência</TableHead>
                         <TableHead>Recebedor</TableHead>
                         <TableHead>Foto</TableHead>
+                        <TableHead>Qualidade IA</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {rowsFiltradas.map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="whitespace-nowrap text-xs">
-                            {r.registrado_em
-                              ? new Date(r.registrado_em).toLocaleString("pt-BR")
-                              : "—"}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{r.veiculo?.placa || "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{r.nf?.numero_nf || "—"}</TableCell>
-                          <TableCell className="text-xs max-w-[240px] truncate">
-                            {r.nf?.dest_razao_social || "—"}
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {[r.nf?.dest_cidade, r.nf?.dest_uf].filter(Boolean).join("/") || "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={r.ocorrencia === "entregue" ? "default" : "secondary"} className="text-xs">
-                              {OCORRENCIA_LABEL[r.ocorrencia || ""] || r.ocorrencia || "—"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs">{r.recebedor_nome || "—"}</TableCell>
-                          <TableCell>
-                            {r.foto_path ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => abrirFoto(r.foto_path!)}
-                              >
-                                <ImageIcon className="w-4 h-4" />
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {rowsFiltradas.map((r) => {
+                        const vStatus = r.validacao_status;
+                        const vScore = r.validacao_score;
+                        const vProblemas = r.validacao_problemas?.lista || [];
+                        const vObs = r.validacao_problemas?.observacoes || "";
+                        const tooltip = [vObs, ...vProblemas].filter(Boolean).join(" • ");
+                        const vVariant =
+                          vStatus === "ok"
+                            ? "default"
+                            : vStatus === "alerta"
+                            ? "secondary"
+                            : vStatus === "ruim"
+                            ? "destructive"
+                            : undefined;
+                        const vLabel =
+                          vStatus === "ok"
+                            ? `OK (${vScore})`
+                            : vStatus === "alerta"
+                            ? `Atenção (${vScore})`
+                            : vStatus === "ruim"
+                            ? `Ruim (${vScore})`
+                            : r.foto_path
+                            ? "—"
+                            : "Sem foto";
+                        return (
+                          <TableRow key={r.id}>
+                            <TableCell className="whitespace-nowrap text-xs">
+                              {r.registrado_em
+                                ? new Date(r.registrado_em).toLocaleString("pt-BR")
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{r.veiculo?.placa || "—"}</TableCell>
+                            <TableCell className="font-mono text-xs">{r.nf?.numero_nf || "—"}</TableCell>
+                            <TableCell className="text-xs max-w-[240px] truncate">
+                              {r.nf?.dest_razao_social || "—"}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {[r.nf?.dest_cidade, r.nf?.dest_uf].filter(Boolean).join("/") || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={r.ocorrencia === "entregue" ? "default" : "secondary"} className="text-xs">
+                                {OCORRENCIA_LABEL[r.ocorrencia || ""] || r.ocorrencia || "—"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{r.recebedor_nome || "—"}</TableCell>
+                            <TableCell>
+                              {r.foto_path ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => abrirFoto(r.foto_path!)}
+                                >
+                                  <ImageIcon className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {vVariant ? (
+                                <Badge variant={vVariant} className="text-xs" title={tooltip}>
+                                  {vLabel}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-muted-foreground" title="Aguardando análise">
+                                  {vLabel}
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

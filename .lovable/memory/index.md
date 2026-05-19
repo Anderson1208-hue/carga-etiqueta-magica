@@ -79,3 +79,4 @@ type: reference
 - [Diagnóstico Motorista](mem://funcionalidades/operacao/tela-diagnostico-motorista) — /motorista/diagnostico: status GPS/fila/permissões/wakelock + botão copiar p/ suporte.
 - [Ambientes APK](mem://operacao/ambientes-apk-motorista) — DEV (sandbox) / HOMOLOG (URL publicada) / PROD (embedded). Mesmo backend. Scripts: build-apk-homolog.sh, build-apk-release.sh.
 - [Assinatura APK Release](mem://operacao/assinatura-apk-release) — Setup único (setup-android-signing.sh) gera keystore + patcheia gradle. Build scripts bumpam versionCode e fazem fallback apksigner se sair unsigned.
+- [Validação Canhoto IA](mem://funcionalidades/operacao/validacao-canhoto-ia) — Edge function validar-canhoto (Gemini 2.5 Flash) audita foto em background e grava score/status em baixas_entrega.
