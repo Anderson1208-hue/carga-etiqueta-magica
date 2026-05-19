@@ -62,10 +62,15 @@ function getDocileReportText(content: string) {
   const text = normalizeTextForSearch(content);
   const pages = text.split(/\f/g);
   const reportPages = pages.filter((page) =>
-    /(?:NR|NRO|NUMERO|N[ºO])\s+NOTA|\bNOTA\s+FISCAL\b|\bNF\b|RES\s+PEDIDO\s+DESTINO/i.test(page)
+    /(?:NR|NRO|NUMERO|N[ºO])\s*\.?\s*NOTA|\bNOTA\s+FISCAL\b|\bNF\b|RES\s+PEDIDO\s+DESTINO/i.test(page)
   );
 
   return reportPages.length > 0 ? reportPages.join("\n") : text;
+}
+
+function findHeaderIndex(line: string, pattern: RegExp) {
+  const match = pattern.exec(line);
+  return match?.index ?? -1;
 }
 
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
@@ -78,7 +83,39 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
-  const exactDocilePattern = /(?:NR|NRO|NUMERO|N[ºO])\s*NOTA\s*[:.-]?\s*0*(\d{3,10})\D{0,80}?(?:CUBAGEM|CUB\.?)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
+  const nfHeaderPattern = /(?:NR|NRO|NUMERO|N[ºO])\s*\.?\s*NOTA|NOTA\s+FISCAL|\bNF\b/i;
+  const cubagemHeaderPattern = /CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM/i;
+
+  let activeColumns: { nfStart: number; cubagemStart: number; misses: number } | null = null;
+  for (const rawLine of allText.split(/\r\n|\n|\r|\f/)) {
+    const line = rawLine.replace(/\t/g, " ").replace(/\s+$/g, "");
+    const compact = line.replace(/\s+/g, " ").trim();
+    if (!compact) continue;
+
+    const nfHeaderIndex = findHeaderIndex(line, nfHeaderPattern);
+    const cubagemHeaderIndex = findHeaderIndex(line, cubagemHeaderPattern);
+    if (nfHeaderIndex >= 0 && cubagemHeaderIndex >= 0) {
+      activeColumns = { nfStart: nfHeaderIndex, cubagemStart: cubagemHeaderIndex, misses: 0 };
+      continue;
+    }
+
+    if (activeColumns) {
+      const nfWindow = line.slice(Math.max(0, activeColumns.nfStart - 6), Math.min(line.length, activeColumns.cubagemStart));
+      const volumeWindow = line.slice(Math.max(0, activeColumns.cubagemStart - 8), Math.min(line.length, activeColumns.cubagemStart + 28));
+      const nfMatch = nfWindow.match(/\b0*\d{3,10}\b/);
+      const volumeMatch = volumeWindow.match(/\b\d{1,6}[,.]\d{1,4}\b/);
+
+      if (nfMatch && volumeMatch) {
+        addRow(nfMatch[0], volumeMatch[0]);
+        activeColumns.misses = 0;
+      } else {
+        activeColumns.misses++;
+        if (activeColumns.misses > 20) activeColumns = null;
+      }
+    }
+  }
+
+  const exactDocilePattern = /(?:NR|NRO|NUMERO|N[ºO])\s*\.?\s*NOTA\s*[:.-]?\s*0*(\d{3,10})[\s\S]{0,180}?(?:CUBAGEM|CUB\.?)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
   let exactMatch: RegExpExecArray | null;
   while ((exactMatch = exactDocilePattern.exec(allText)) !== null) {
     addRow(exactMatch[1], exactMatch[2]);
