@@ -58,6 +58,7 @@ interface NfDisponivel {
   dest_uf: string;
   peso_bruto: number;
   volume_m3: number;
+  valor_nf: number;
   totalCaixas: number;
   macroRegiao: number;
   carga_id: string;
@@ -119,7 +120,7 @@ export default function Programacao() {
         id, numero_nf, chave_acesso, cnpj_destinatario,
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
-        peso_bruto, volume_m3, carga_id, status_entrega,
+        peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
         itens_nf(q_com)
       `;
 
@@ -257,6 +258,7 @@ export default function Programacao() {
             dest_uf: nf.dest_uf || "",
             peso_bruto: Number(nf.peso_bruto) || 0,
             volume_m3: Number(nf.volume_m3) || 0,
+            valor_nf: Number(nf.valor_nf) || 0,
             totalCaixas,
             macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
             carga_id: nf.carga_id,

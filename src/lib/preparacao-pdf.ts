@@ -15,6 +15,7 @@ interface NfPrepPdf {
   dest_uf: string;
   peso_bruto: number;
   volume_m3: number;
+  valor_nf: number;
   totalCaixas: number;
   macroRegiao: number;
   carga_placa: string;
@@ -53,6 +54,8 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   const totalCaixas = nfs.reduce((s, n) => s + n.totalCaixas, 0);
   const totalPeso = nfs.reduce((s, n) => s + n.peso_bruto, 0);
   const totalVolume = nfs.reduce((s, n) => s + n.volume_m3, 0);
+  const totalValor = nfs.reduce((s, n) => s + (n.valor_nf || 0), 0);
+  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   // === HEADER ===
   doc.setFontSize(14);
@@ -76,6 +79,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     `${totalCaixas} caixas`,
     `${totalPeso.toFixed(1)} kg`,
     `${totalVolume.toFixed(2)} m³`,
+    fmtBRL(totalValor),
   ];
   doc.text(summaryParts.join("   •   "), MARGIN + 4, y + 7);
   y += 14;
@@ -87,6 +91,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     const cx = nfsEntrega.reduce((s, n) => s + n.totalCaixas, 0);
     const peso = nfsEntrega.reduce((s, n) => s + n.peso_bruto, 0);
     const vol = nfsEntrega.reduce((s, n) => s + n.volume_m3, 0);
+    const valor = nfsEntrega.reduce((s, n) => s + (n.valor_nf || 0), 0);
     const endereco = [first.dest_logradouro, first.dest_numero].filter(Boolean).join(", ");
     const cidadeUf = [first.dest_cidade, first.dest_uf].filter(Boolean).join("/");
     const nfNums = nfsEntrega.map((n) => n.numero_nf).join(", ");
@@ -142,7 +147,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     // Totals on right
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(7.5);
-    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}`;
+    const totalsLine = `${cx} cx  •  ${peso.toFixed(1)} kg${vol > 0 ? `  •  ${vol.toFixed(2)} m³` : ""}${valor > 0 ? `  •  ${fmtBRL(valor)}` : ""}`;
     doc.text(totalsLine, badgeX, y + 17, { align: "right" });
 
     doc.setTextColor(0, 0, 0);
@@ -193,7 +198,7 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
   y += 5;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³`, MARGIN, y + 3);
+  doc.text(`TOTAL: ${totalEntregas} entregas  •  ${totalNfs} NFs  •  ${totalCaixas} caixas  •  ${totalPeso.toFixed(1)} kg  •  ${totalVolume.toFixed(2)} m³  •  ${fmtBRL(totalValor)}`, MARGIN, y + 3);
 
   // Page numbers
   const totalPages = doc.getNumberOfPages();
