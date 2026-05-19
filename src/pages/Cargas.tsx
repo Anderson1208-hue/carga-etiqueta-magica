@@ -730,6 +730,9 @@ export default function Cargas() {
                         <Button variant="ghost" size="sm" onClick={() => setM3XmlCarga(carga)} title="Atualizar m³ via XML">
                           <Box className="w-4 h-4" />
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setM3TxtDocileCarga(carga)} title="Atualizar m³ via TXT Docile">
+                          <FileType className="w-4 h-4" />
+                        </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
                           <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
                         </Link>
