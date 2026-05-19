@@ -229,3 +229,17 @@
     }
   }
 }
+
+/* Leaflet z-index fix: ensure map stays below sidebar popovers/dialogs */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1 !important;
+}
+.leaflet-control {
+  z-index: 2 !important;
+}
+.leaflet-popup,
+.leaflet-tooltip {
+  z-index: 3 !important;
+}
