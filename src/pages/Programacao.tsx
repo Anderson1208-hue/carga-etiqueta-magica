@@ -577,6 +577,7 @@ export default function Programacao() {
   const selTotalCaixas = selectedNfs.reduce((sum, nf) => sum + nf.totalCaixas, 0);
   const selTotalPeso = selectedNfs.reduce((sum, nf) => sum + nf.peso_bruto, 0);
   const selTotalVolume = selectedNfs.reduce((sum, nf) => sum + nf.volume_m3, 0);
+  const selTotalValor = selectedNfs.reduce((sum, nf) => sum + (nf.valor_nf || 0), 0);
   const selTotalEntregas = useMemo(() => {
     if (selectedNfs.length === 0) return 0;
     return new Set(selectedNfs.map((nf) => nf.cnpj_destinatario || nf.id)).size;
@@ -586,10 +587,13 @@ export default function Programacao() {
   const totalPesoDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.peso_bruto, 0);
   const totalVolumeDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.volume_m3, 0);
   const totalCaixasDisponivel = cargaFilteredNfs.reduce((s, nf) => s + nf.totalCaixas, 0);
+  const totalValorDisponivel = cargaFilteredNfs.reduce((s, nf) => s + (nf.valor_nf || 0), 0);
   const totalEntregasDisponivel = useMemo(() => {
     const cnpjs = new Set(cargaFilteredNfs.map((nf) => nf.cnpj_destinatario || nf.id));
     return cnpjs.size;
   }, [cargaFilteredNfs]);
+
+  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   // Dashboard shows selected when there's a selection, otherwise available
   const hasSelection = selectedNfIds.size > 0;
@@ -598,6 +602,7 @@ export default function Programacao() {
   const dashCaixas = hasSelection ? selTotalCaixas : totalCaixasDisponivel;
   const dashNfs = hasSelection ? selTotalNfs : totalNfsDisponiveis;
   const dashEntregas = hasSelection ? selTotalEntregas : totalEntregasDisponivel;
+  const dashValor = hasSelection ? selTotalValor : totalValorDisponivel;
   const dashLabel = hasSelection ? "Selecionado" : "Disponível";
 
   if (loading) {
