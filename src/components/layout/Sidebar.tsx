@@ -14,7 +14,6 @@ import {
   ClipboardCheck,
   History,
   Warehouse,
-  ChevronDown,
   Package,
   MapPin,
   CalendarClock,
@@ -26,8 +25,11 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   BarChart3,
+  ChevronRight,
+  HandCoins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useState } from "react";
 
 const topNav = [
@@ -49,6 +51,7 @@ const transporteItems = [
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
   { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
+  { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
@@ -61,10 +64,11 @@ const relatoriosItems = [
   { name: "Relatório de Baixas", href: "/relatorios/baixas", icon: ClipboardCheck },
 ];
 
-function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean }) {
+function NavItem({ item, isActive, onClick }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean; onClick?: () => void }) {
   return (
     <Link
       to={item.href}
+      onClick={onClick}
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
         isActive
@@ -78,62 +82,58 @@ function NavItem({ item, isActive }: { item: { name: string; href: string; icon:
   );
 }
 
-function NavGroup({
+function NavGroupFlyout({
   label,
   icon: Icon,
   items,
   pathname,
-  defaultOpen,
-  storageKey,
+  groupActive,
 }: {
   label: string;
   icon: React.ElementType;
   items: typeof depositoItems;
   pathname: string;
-  defaultOpen: boolean;
-  storageKey: string;
+  groupActive: boolean;
 }) {
-  const fullKey = `sidebar:group:${storageKey}`;
-  const [open, setOpen] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(fullKey);
-      if (stored === "1") return true;
-      if (stored === "0") return false;
-    } catch {}
-    return defaultOpen;
-  });
-
-  // Se a rota ativa pertence ao grupo, garante que ele esteja aberto.
-  if (defaultOpen && !open) {
-    setOpen(true);
-  }
-
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    try {
-      localStorage.setItem(fullKey, next ? "1" : "0");
-    } catch {}
-  };
+  const [open, setOpen] = useState(false);
 
   return (
-    <div>
-      <button
-        onClick={toggle}
-        className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold text-sidebar-foreground/90 hover:bg-sidebar-accent transition-colors"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold transition-colors",
+            groupActive
+              ? "bg-sidebar-accent text-sidebar-primary"
+              : "text-sidebar-foreground/90 hover:bg-sidebar-accent"
+          )}
+        >
+          <Icon className="w-5 h-5" />
+          <span className="flex-1 text-left">{label}</span>
+          <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="w-60 p-2 bg-sidebar text-sidebar-foreground border-sidebar-border"
       >
-        <Icon className="w-5 h-5" />
-        <span className="flex-1 text-left">{label}</span>
-        <ChevronDown className={cn("w-4 h-4 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
+        <p className="px-2 pt-1 pb-2 text-xs uppercase tracking-wide text-sidebar-foreground/50">
+          {label}
+        </p>
+        <div className="space-y-0.5">
           {items.map((item) => (
-            <NavItem key={item.href} item={item} isActive={pathname === item.href} />
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={pathname === item.href}
+              onClick={() => setOpen(false)}
+            />
           ))}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -163,37 +163,33 @@ export function Sidebar() {
         ))}
 
         <div className="pt-2 space-y-1">
-          <NavGroup
+          <NavGroupFlyout
             label="Depósito"
             icon={Package}
             items={depositoItems}
             pathname={location.pathname}
-            defaultOpen={depositoActive}
-            storageKey="deposito"
+            groupActive={depositoActive}
           />
-          <NavGroup
+          <NavGroupFlyout
             label="Transporte"
             icon={MapPin}
             items={transporteItems}
             pathname={location.pathname}
-            defaultOpen={transporteActive}
-            storageKey="transporte"
+            groupActive={transporteActive}
           />
-          <NavGroup
+          <NavGroupFlyout
             label="Torre de Controle"
             icon={Eye}
             items={torreControleItems}
             pathname={location.pathname}
-            defaultOpen={torreActive}
-            storageKey="torre"
+            groupActive={torreActive}
           />
-          <NavGroup
+          <NavGroupFlyout
             label="Relatórios"
             icon={BarChart3}
             items={relatoriosItems}
             pathname={location.pathname}
-            defaultOpen={relatoriosActive}
-            storageKey="relatorios"
+            groupActive={relatoriosActive}
           />
           {isAdmin && (
             <div className="pt-2 space-y-0.5">

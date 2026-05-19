@@ -29,6 +29,7 @@ import Operadores from "./pages/Operadores";
 import AuditoriaLog from "./pages/AuditoriaLog";
 import Conciliacao from "./pages/Conciliacao";
 import RelatorioBaixas from "./pages/RelatorioBaixas";
+import PrestacaoContas from "./pages/PrestacaoContas";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
 import NotFound from "./pages/NotFound";
@@ -274,6 +275,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RelatorioBaixas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/prestacao-contas"
+        element={
+          <ProtectedRoute>
+            <PrestacaoContas />
           </ProtectedRoute>
         }
       />
