@@ -58,31 +58,63 @@ function normalizeTextForSearch(value: string) {
     .replace(/\u00a0/g, " ");
 }
 
+function getDocileReportText(content: string) {
+  const text = normalizeTextForSearch(content);
+  const pages = text.split(/\f/g);
+  const reportPages = pages.filter((page) =>
+    /(?:NR|NRO|NUMERO|N[ºO])\s+NOTA|\bNOTA\s+FISCAL\b|\bNF\b|RES\s+PEDIDO\s+DESTINO/i.test(page)
+  );
+
+  return reportPages.length > 0 ? reportPages.join("\n") : text;
+}
+
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
-  const text = normalizeTextForSearch(content);
+  const text = getDocileReportText(content);
   const addRow = (nfValue: string, volumeValue: string) => {
     const numeroNf = normalizeNfNumber(nfValue);
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
+  const reportText = text.replace(/\s+/g, " ");
+  const pairPatterns = [
+    /(?:NR|NRO|NUMERO|N[ºO])\s+NOTA\s*[:.-]?\s*0*(\d{3,10})\b[\s\S]{0,160}?(?:CUBAGEM|CUB\.?)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi,
+    /(?:NOTA\s+FISCAL|\bNOTA\b|\bNF\b)\s*[:.-]?\s*0*(\d{3,10})\b[\s\S]{0,160}?(?:CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi,
+  ];
+
+  for (const pattern of pairPatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(reportText)) !== null) {
+      addRow(match[1], match[2]);
+    }
+  }
+
+  let pendingNf: string | null = null;
   for (const rawLine of text.split(/\r\n|\n|\r|\f/)) {
     const line = rawLine.replace(/\s+/g, " ").trim();
-    if (!/NOTA|NF/i.test(line) || !/CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM|ENTREG/i.test(line)) continue;
+    if (!line) continue;
 
-    const numbers = line.match(/\d+(?:[.,]\d+)?/g) || [];
-    const nfValue = numbers.find((value) => /^0*\d{3,10}$/.test(value));
-    const volumeValue = [...numbers].reverse().find((value) => /[.,]\d+/.test(value));
+    const nfMatch = line.match(/(?:NR|NRO|NUMERO|N[ºO])\s+NOTA\s*[:.-]?\s*0*(\d{3,10})\b/i)
+      || line.match(/(?:NOTA\s+FISCAL|\bNOTA\b|\bNF\b)\s*[:.-]?\s*0*(\d{3,10})\b/i);
+    const volumeMatch = line.match(/(?:CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/i);
 
-    if (nfValue && volumeValue) addRow(nfValue, volumeValue);
+    if (nfMatch && volumeMatch) {
+      addRow(nfMatch[1], volumeMatch[1]);
+      pendingNf = null;
+    } else if (nfMatch) {
+      pendingNf = nfMatch[1];
+    } else if (pendingNf && volumeMatch) {
+      addRow(pendingNf, volumeMatch[1]);
+      pendingNf = null;
+    }
   }
 
   return Array.from(rows, ([numeroNf, volumeM3]) => ({ numeroNf, volumeM3 }));
 }
 
 function getDocileTxtSamples(content: string) {
-  const text = normalizeTextForSearch(content);
+  const text = getDocileReportText(content);
   const lines = text
     .split(/\r\n|\n|\r|\f/)
     .map((line) => line.replace(/\s+/g, " ").trim())
