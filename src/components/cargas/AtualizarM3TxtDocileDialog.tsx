@@ -60,7 +60,7 @@ function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const text = normalizeTextForSearch(content);
 
   const labelledPattern =
-    /(?:N\s*[Rº°.]?\s*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]+(?:[.,][0-9]+)?)/gi;
+    /(?:N\s*(?:R|RO|º|°)?[\s.:-]*NOTA|NOTA\s*(?:FISCAL)?|NF)\s*[:.-]?\s*0*(\d{3,10})[^\n\r]{0,160}?(?:CUBAGEM|M\s*[³3]|METR(?:O|OS)\s*CUBIC(?:O|OS))\s*[:.-]?\s*([0-9]+(?:[.,][0-9]+)?)/gi;
 
   for (const match of text.matchAll(labelledPattern)) {
     const numeroNf = normalizeNfNumber(match[1]);
@@ -155,8 +155,6 @@ export function AtualizarM3TxtDocileDialog({
     const jaAtualizadas = new Set<string>();
 
     for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith(".txt")) continue;
-
       try {
         const content = await readTxtFile(file);
         const linhas = parseDocileTxtRows(content);
