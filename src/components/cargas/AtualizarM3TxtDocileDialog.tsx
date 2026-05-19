@@ -145,10 +145,10 @@ export function AtualizarM3TxtDocileDialog({
       return;
     }
 
-    // mapa: numero_nf normalizado (sem zeros à esquerda) -> id
+    // mapa: numero_nf normalizado (somente dígitos, sem zeros à esquerda) -> id
     const mapaNfs = new Map<string, string>();
     for (const n of nfsCarga || []) {
-      mapaNfs.set(stripLeadingZeros(String(n.numero_nf)), n.id);
+      mapaNfs.set(normalizeNfNumber(n.numero_nf), n.id);
     }
 
     // Evita duplicar update da mesma NF entre arquivos
@@ -158,28 +158,21 @@ export function AtualizarM3TxtDocileDialog({
       if (!file.name.toLowerCase().endsWith(".txt")) continue;
 
       try {
-        const content = await file.text();
-        const linhas = content.split(/\r?\n/);
+        const content = await readTxtFile(file);
+        const linhas = parseDocileTxtRows(content);
+        r.linhasLidas += linhas.length;
 
         for (const linha of linhas) {
-          const m = linha.match(LINE_REGEX);
-          if (!m) continue;
-          r.linhasLidas++;
-
-          const numeroNf = stripLeadingZeros(m[1]);
-          const cubagemStr = m[2].replace(/\./g, "").replace(",", ".");
-          const volumeM3 = parseFloat(cubagemStr);
-
-          if (!volumeM3 || volumeM3 <= 0) {
+          if (!linha.volumeM3 || linha.volumeM3 <= 0) {
             r.semM3++;
             continue;
           }
 
-          const nfId = mapaNfs.get(numeroNf);
+          const nfId = mapaNfs.get(linha.numeroNf);
           if (!nfId) {
             r.naoEncontradas++;
             if (r.detalhesNaoEncontradas.length < 5) {
-              r.detalhesNaoEncontradas.push(`NF ${numeroNf}`);
+              r.detalhesNaoEncontradas.push(`NF ${linha.numeroNf}`);
             }
             continue;
           }
@@ -188,7 +181,7 @@ export function AtualizarM3TxtDocileDialog({
 
           const { error: errUpd } = await supabase
             .from("notas_fiscais")
-            .update({ volume_m3: volumeM3 })
+            .update({ volume_m3: linha.volumeM3 })
             .eq("id", nfId);
 
           if (errUpd) {
