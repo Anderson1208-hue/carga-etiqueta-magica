@@ -690,6 +690,10 @@ export default function BaixaEntrega() {
 
   const pendingCount = nfs.filter((n) => !n.baixa_status).length;
   const doneCount = nfs.filter((n) => n.baixa_status).length;
+  const nfsVisiveis = useMemo(
+    () => (mostrarBaixadas ? nfs : nfs.filter((n) => !n.baixa_status)),
+    [nfs, mostrarBaixadas]
+  );
 
   return (
     <div className="min-h-screen bg-background">
