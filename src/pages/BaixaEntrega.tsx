@@ -836,9 +836,16 @@ export default function BaixaEntrega() {
                   <p className="text-2xl font-bold text-orange-600">{pendingCount}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card
+                role="button"
+                tabIndex={0}
+                onClick={() => setMostrarBaixadas((v) => !v)}
+                className="cursor-pointer active:scale-[0.99] transition-transform"
+              >
                 <CardContent className="pt-4 text-center">
-                  <p className="text-xs text-muted-foreground">Realizadas</p>
+                  <p className="text-xs text-muted-foreground">
+                    Realizadas {mostrarBaixadas ? "(ocultar)" : "(mostrar)"}
+                  </p>
                   <p className="text-2xl font-bold text-green-600">{doneCount}</p>
                 </CardContent>
               </Card>
