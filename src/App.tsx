@@ -269,6 +269,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/relatorios/baixas"
+        element={
+          <ProtectedRoute>
+            <RelatorioBaixas />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />
