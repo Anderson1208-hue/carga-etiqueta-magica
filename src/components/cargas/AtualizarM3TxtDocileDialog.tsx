@@ -68,23 +68,6 @@ function getDocileReportText(content: string) {
   return reportPages.length > 0 ? reportPages.join("\n") : text;
 }
 
-function pickVolumeNearNf(text: string, nfIndex: number) {
-  const volumeMatches = [...text.matchAll(/\b\d{1,6}[,.]\d{1,4}\b/g)]
-    .map((match) => ({ raw: match[0], index: match.index ?? 0, value: parseVolumeNumber(match[0]) }))
-    .filter((match) => match.value > 0 && match.value <= 1000);
-
-  if (volumeMatches.length === 0) return null;
-
-  const labelIndex = text.search(/CUBAGEM|CUB\.?|M\s*[³3]|VOLUME|METRAGEM|ENTREG/i);
-  if (labelIndex >= 0) {
-    const afterLabel = volumeMatches.find((match) => match.index >= labelIndex);
-    if (afterLabel) return afterLabel.raw;
-  }
-
-  const afterNf = volumeMatches.filter((match) => match.index > nfIndex);
-  return (afterNf.at(-1) || volumeMatches.at(-1))?.raw || null;
-}
-
 function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
   const allText = normalizeTextForSearch(content);
@@ -263,7 +246,7 @@ export function AtualizarM3TxtDocileDialog({
     for (const file of Array.from(files)) {
       try {
         const content = await readTxtFile(file);
-        const linhas = parseDocileTxtRows(content, mapaNfs.keys());
+        const linhas = parseDocileTxtRows(content);
         r.linhasLidas += linhas.length;
 
         if (linhas.length === 0) {
