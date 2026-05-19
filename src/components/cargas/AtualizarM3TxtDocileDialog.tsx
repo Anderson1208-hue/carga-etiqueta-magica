@@ -85,40 +85,20 @@ function pickVolumeNearNf(text: string, nfIndex: number) {
   return (afterNf.at(-1) || volumeMatches.at(-1))?.raw || null;
 }
 
-function parseDocileTxtRows(content: string, nfsDaCarga: Iterable<string> = []): DocileTxtRow[] {
+function parseDocileTxtRows(content: string): DocileTxtRow[] {
   const rows = new Map<string, number>();
   const allText = normalizeTextForSearch(content);
   const text = getDocileReportText(content);
-  const nfsConhecidas = new Set(
-    Array.from(nfsDaCarga)
-      .map((nf) => normalizeNfNumber(nf))
-      .filter((nf) => nf !== "0")
-  );
   const addRow = (nfValue: string, volumeValue: string) => {
     const numeroNf = normalizeNfNumber(nfValue);
-    if (nfsConhecidas.size > 0 && !nfsConhecidas.has(numeroNf)) return;
     const volumeM3 = parseVolumeNumber(volumeValue);
     if (numeroNf !== "0" && volumeM3 > 0) rows.set(numeroNf, volumeM3);
   };
 
-  if (nfsConhecidas.size > 0) {
-    const lines = allText.split(/\r\n|\n|\r|\f/);
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index].replace(/\s+/g, " ").trim();
-      if (!line) continue;
-
-      for (const nfMatch of line.matchAll(/\b\d{3,12}\b/g)) {
-        const numeroNf = normalizeNfNumber(nfMatch[0]);
-        if (!nfsConhecidas.has(numeroNf)) continue;
-
-        const windowText = [line, lines[index + 1], lines[index + 2]]
-          .filter(Boolean)
-          .join(" ")
-          .replace(/\s+/g, " ");
-        const volumeValue = pickVolumeNearNf(windowText, nfMatch.index ?? 0);
-        if (volumeValue) addRow(numeroNf, volumeValue);
-      }
-    }
+  const exactDocilePattern = /(?:NR|NRO|NUMERO|N[ºO])\s*NOTA\s*[:.-]?\s*0*(\d{3,10})\D{0,80}?(?:CUBAGEM|CUB\.?)\s*[:.-]?\s*([0-9]{1,6}(?:[.,][0-9]{1,4}))/gi;
+  let exactMatch: RegExpExecArray | null;
+  while ((exactMatch = exactDocilePattern.exec(allText)) !== null) {
+    addRow(exactMatch[1], exactMatch[2]);
   }
 
   const genericNfVolumePattern = /\b0{2,}(\d{3,10})\b[\s\S]{0,220}?\b([0-9]{1,6}[,.][0-9]{1,4})\b/g;
