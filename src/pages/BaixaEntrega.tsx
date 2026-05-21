@@ -630,46 +630,87 @@ export default function BaixaEntrega() {
         fotoPath = fileName;
       }
 
-      const { data: baixaInserida, error: insertError } = await supabase
-        .from("baixas_entrega")
-        .insert({
-          veiculo_id: selectedVeiculoId,
-          nf_id: selectedNfId,
-          status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
-          ocorrencia: ocorrencia,
-          recebedor_nome: recebedorNome || null,
-          foto_path: fotoPath,
-          latitude: gpsCoords?.lat || null,
-          longitude: gpsCoords?.lng || null,
-          registrado_por: user?.id || null,
-          registrado_em: new Date().toISOString(),
-        })
-        .select("id")
-        .single();
+      // Modo "refazer foto": já existe baixa criada — apenas atualiza foto_path
+      // e dispara nova validação. Não cria registro duplicado.
+      let baixaId: string | null = revalidacaoBaixaId;
 
-      if (insertError) throw insertError;
-
-      // Valida foto do canhoto em background (não bloqueia o motorista)
-      if (fotoPath && baixaInserida?.id) {
-        supabase.functions
-          .invoke("validar-canhoto", { body: { baixa_id: baixaInserida.id } })
-          .then(({ data }) => {
-            const status = (data as { status?: string } | null)?.status;
-            if (status === "ruim") {
-              toast({
-                title: "⚠️ Foto do canhoto com problemas",
-                description: "Confira no Relatório de Baixas — pode ser necessário refazer.",
-                variant: "destructive",
-              });
-            } else if (status === "alerta") {
-              toast({
-                title: "Atenção na foto do canhoto",
-                description: "Qualidade abaixo do ideal — confira no Relatório.",
-              });
-            }
+      if (revalidacaoBaixaId) {
+        const { error: updErr } = await supabase
+          .from("baixas_entrega")
+          .update({
+            foto_path: fotoPath,
+            // limpa validação anterior para revalidar
+            validacao_score: null,
+            validacao_status: null,
+            validacao_problemas: null,
+            validacao_em: null,
           })
-          .catch((e) => console.warn("validar-canhoto falhou (não-crítico):", e));
+          .eq("id", revalidacaoBaixaId);
+        if (updErr) throw updErr;
+      } else {
+        const { data: baixaInserida, error: insertError } = await supabase
+          .from("baixas_entrega")
+          .insert({
+            veiculo_id: selectedVeiculoId,
+            nf_id: selectedNfId,
+            status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
+            ocorrencia: ocorrencia,
+            recebedor_nome: recebedorNome || null,
+            foto_path: fotoPath,
+            latitude: gpsCoords?.lat || null,
+            longitude: gpsCoords?.lng || null,
+            registrado_por: user?.id || null,
+            registrado_em: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        baixaId = baixaInserida?.id || null;
       }
+
+      // Valida foto do canhoto AGUARDANDO o resultado para permitir refazer
+      // quando a IA classificar como "ruim". Só se aplica a entregas com foto.
+      if (fotoPath && baixaId && ocorrencia === "entregue") {
+        try {
+          const { data } = await supabase.functions.invoke("validar-canhoto", {
+            body: { baixa_id: baixaId },
+          });
+          const status = (data as { status?: string; problemas?: string[] } | null)?.status;
+          const problemas = (data as { problemas?: string[] } | null)?.problemas || [];
+
+          if (status === "ruim") {
+            const lista = problemas.length ? `\n\nProblemas:\n• ${problemas.join("\n• ")}` : "";
+            const refazer = window.confirm(
+              `⚠️ A foto do canhoto está com baixa qualidade.${lista}\n\nDeseja tirar outra foto agora?`
+            );
+            if (refazer) {
+              // Mantém NF/ocorrência/baixa e libera o motorista para tirar nova foto.
+              setRevalidacaoBaixaId(baixaId);
+              if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+              setFotoFile(null);
+              setFotoPreview(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+              if (cameraInputRef.current) cameraInputRef.current.value = "";
+              toast({
+                title: "Tire uma nova foto",
+                description: "A baixa foi mantida — apenas a foto será substituída.",
+              });
+              return;
+            }
+          } else if (status === "alerta") {
+            toast({
+              title: "Atenção na foto do canhoto",
+              description: "Qualidade abaixo do ideal — confira no Relatório.",
+            });
+          }
+        } catch (e) {
+          console.warn("validar-canhoto falhou (não-crítico):", e);
+        }
+      }
+
+      // Concluiu com sucesso — limpa modo revalidação
+      setRevalidacaoBaixaId(null);
 
       // Se for "Reentrega": NF volta para a Preparação
       if (ocorrencia === "reentrega") {
