@@ -204,7 +204,7 @@ export default function PrestacaoContas() {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Conferido" });
+    
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
 
