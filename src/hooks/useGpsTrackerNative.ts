@@ -120,6 +120,51 @@ export function useGpsTrackerNative({
     let cancelled = false;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let supervisorTimer: ReturnType<typeof setInterval> | null = null;
+    let foregroundFallbackTimer: ReturnType<typeof setInterval> | null = null;
+
+    async function enqueueForegroundFallback(reason: string) {
+      if (!enabled || !monitoramentoRotaId || !navigator.geolocation) return;
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          if (cancelled || !monitoramentoRotaId) return;
+
+          const { latitude, longitude, accuracy } = pos.coords;
+          const last = lastSentRef.current;
+          const movedEnough = !last || haversine(last.lat, last.lng, latitude, longitude) >= cfg.distance_filter_metros;
+
+          lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
+          setLastPosition({ lat: latitude, lng: longitude });
+          if (movedEnough) lastSentRef.current = { lat: latitude, lng: longitude };
+
+          try {
+            await enqueue({
+              monitoramento_rota_id: monitoramentoRotaId,
+              latitude,
+              longitude,
+              accuracy,
+              timestamp: new Date(pos.timestamp || Date.now()).toISOString(),
+              heartbeat: !movedEnough,
+            });
+            markEnqueue({ lat: latitude, lng: longitude, accuracy });
+            setPendingQueue(await pendingCount());
+            setError(null);
+            console.info(`[GPS Native] fallback foreground enfileirou posição (${reason})`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.warn("[GPS Native] fallback enqueue falhou", err);
+            markError(msg);
+          }
+        },
+        (err) => {
+          const msg = err.message || "GPS sem retorno no fallback foreground";
+          console.warn("[GPS Native] fallback geolocation falhou", err);
+          markError(msg);
+          setError(msg);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    }
 
     async function startWatcher() {
       if (!enabled || !monitoramentoRotaId) return;
@@ -228,6 +273,21 @@ export function useGpsTrackerNative({
     if (enabled && monitoramentoRotaId) {
       startWatcher();
 
+      // Fallback foreground: se o plugin nativo não emitir callback inicial,
+      // usa a geolocalização do WebView para pelo menos registrar posição.
+      setTimeout(() => {
+        if (cancelled) return;
+        const silent = Date.now() - lastCallbackAtRef.current;
+        if (silent > 10_000) enqueueForegroundFallback("callback-inicial-ausente");
+      }, 12_000);
+
+      foregroundFallbackTimer = setInterval(() => {
+        const silent = Date.now() - lastCallbackAtRef.current;
+        if (silent > Math.max(HEARTBEAT_MS, cfg.intervalo_padrao_segundos * 1000 - 5_000)) {
+          enqueueForegroundFallback("watcher-silencioso");
+        }
+      }, cfg.intervalo_padrao_segundos * 1000);
+
       // Heartbeat: a cada 60s, enfileira a última posição como heartbeat
       heartbeatTimer = setInterval(async () => {
         const last = lastPositionRef.current;
@@ -262,12 +322,14 @@ export function useGpsTrackerNative({
       cancelled = true;
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       if (supervisorTimer) clearInterval(supervisorTimer);
+      if (foregroundFallbackTimer) clearInterval(foregroundFallbackTimer);
       stopWatcher();
     };
   }, [
     enabled,
     monitoramentoRotaId,
     cfg.distance_filter_metros,
+    cfg.intervalo_padrao_segundos,
     checkModoCritico,
   ]);
 
