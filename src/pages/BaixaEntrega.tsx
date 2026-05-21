@@ -150,6 +150,9 @@ export default function BaixaEntrega() {
   const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
   const [loadingFoto, setLoadingFoto] = useState<string | null>(null);
   const [mostrarBaixadas, setMostrarBaixadas] = useState(false);
+  // Quando a IA detecta foto ruim, mantemos a baixa criada para permitir
+  // refazer apenas a foto sem criar nova baixa.
+  const [revalidacaoBaixaId, setRevalidacaoBaixaId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
