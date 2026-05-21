@@ -84,7 +84,7 @@ export default function TorreControle() {
   useEffect(() => {
     loadRotas();
 
-    // Realtime updates for all routes
+    // Realtime updates for routes and vehicle accountability changes
     const channel = supabase
       .channel("torre-controle-rotas")
       .on("postgres_changes", {
@@ -92,10 +92,19 @@ export default function TorreControle() {
         schema: "public",
         table: "monitoramento_rotas",
       }, () => loadRotas())
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "veiculos",
+      }, () => loadRotas())
       .subscribe();
+
+    // Auto-refresh a cada 60s como fallback
+    const interval = setInterval(() => loadRotas(), 60000);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [loadRotas]);
 
