@@ -531,6 +531,7 @@ export default function BaixaEntrega() {
     // Clear file inputs so device doesn't keep temp files referenced
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+    setRevalidacaoBaixaId(null);
   }
 
   function selectNf(nfId: string) {
