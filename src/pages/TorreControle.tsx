@@ -43,7 +43,20 @@ export default function TorreControle() {
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      setRotas(rotasAll);
+
+      // Exclui rotas de veículos que já tiveram baixa na prestação de contas
+      const veiculoIds = Array.from(new Set(rotasAll.map((r: any) => r.veiculo_id).filter(Boolean)));
+      let baixados = new Set<string>();
+      if (veiculoIds.length > 0) {
+        const { data: veics } = await supabase
+          .from("veiculos")
+          .select("id, prestacao_contas_em")
+          .in("id", veiculoIds)
+          .not("prestacao_contas_em", "is", null);
+        baixados = new Set((veics || []).map((v: any) => v.id));
+      }
+      const rotasFiltradas = rotasAll.filter((r: any) => !baixados.has(r.veiculo_id));
+      setRotas(rotasFiltradas);
 
       // Load alert counts per route (paginado)
       const alertas = await fetchAllPages<any>((from, to) =>
@@ -60,6 +73,7 @@ export default function TorreControle() {
         counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
       });
       setAlertasCount(counts);
+
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
