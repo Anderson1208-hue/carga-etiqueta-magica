@@ -41,6 +41,7 @@ type: reference
 - [Scanner Nativo MLKit](mem://funcionalidades/operacao/scanner-nativo-mlkit) — Fase 3: useNativeScanner via @capacitor-mlkit/barcode-scanning, fallback web.
 - [Build APK Produção](mem://arquitetura/operacao/build-apk-producao-fase7) — Fase 7: CAP_ENV=prod, keystore, signing, distribuição sideload.
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
+- [Parada Finaliza por Baixa](mem://logica/parada-finalizada-por-baixa) — Trigger fecha monitoramento_paradas quando baixa entregue casa CNPJ, sem depender de GPS.
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
 - [GPS Fila Offline](mem://arquitetura/monitoramento/gps-fila-offline-fase1) — IndexedDB queue + heartbeat 60s + auto-restart + dedup client_ts.
 - [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
