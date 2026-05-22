@@ -29,6 +29,9 @@ import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import type { MonitoramentoRota } from "@/components/monitoramento/types";
 
+const normalizePlate = (placa?: string | null) =>
+  (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
 export default function TorreControle() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
@@ -59,12 +62,13 @@ export default function TorreControle() {
         baixados = new Set((veics || []).map((v: any) => v.id));
       }
       const rotasFiltradas = rotasAll.filter((r: any) => !baixados.has(r.veiculo_id));
-      // Dedup por veiculo_id — mantém a rota mais recente (já vem ordenada desc por created_at)
+      // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc por created_at)
       const seenVeic = new Set<string>();
       const rotasDedup = rotasFiltradas.filter((r: any) => {
-        if (!r.veiculo_id) return true;
-        if (seenVeic.has(r.veiculo_id)) return false;
-        seenVeic.add(r.veiculo_id);
+        const key = normalizePlate(r.placa) || r.veiculo_id;
+        if (!key) return true;
+        if (seenVeic.has(key)) return false;
+        seenVeic.add(key);
         return true;
       });
       setRotas(rotasDedup);
