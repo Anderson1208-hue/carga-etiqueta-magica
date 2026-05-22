@@ -670,16 +670,19 @@ export default function BaixaEntrega() {
       // quando a IA classificar como "ruim". Só se aplica a entregas com foto.
       if (fotoPath && baixaId && ocorrencia === "entregue") {
         try {
-          const { data } = await supabase.functions.invoke("validar-canhoto", {
+          const { data, error: invokeErr } = await supabase.functions.invoke("validar-canhoto", {
             body: { baixa_id: baixaId },
           });
-          const status = (data as { status?: string; problemas?: string[] } | null)?.status;
+          if (invokeErr) throw invokeErr;
+          const status = (data as { status?: string; problemas?: string[]; observacoes?: string; score?: number } | null)?.status;
           const problemas = (data as { problemas?: string[] } | null)?.problemas || [];
+          const observacoes = (data as { observacoes?: string } | null)?.observacoes || "";
+          const score = (data as { score?: number } | null)?.score ?? 0;
 
           if (status === "ruim") {
             const lista = problemas.length ? `\n\nProblemas:\n• ${problemas.join("\n• ")}` : "";
             const refazer = window.confirm(
-              `⚠️ A foto do canhoto está com baixa qualidade.${lista}\n\nDeseja tirar outra foto agora?`
+              `⚠️ IA: foto com baixa qualidade (score ${score}).${lista}\n\n${observacoes}\n\nDeseja tirar outra foto agora?`
             );
             if (refazer) {
               // Mantém NF/ocorrência/baixa e libera o motorista para tirar nova foto.
@@ -692,19 +695,36 @@ export default function BaixaEntrega() {
               toast({
                 title: "Tire uma nova foto",
                 description: "A baixa foi mantida — apenas a foto será substituída.",
+                variant: "destructive",
               });
               return;
             }
           } else if (status === "alerta") {
+            const lista = problemas.length ? ` (${problemas.slice(0, 2).join("; ")})` : "";
             toast({
-              title: "Atenção na foto do canhoto",
-              description: "Qualidade abaixo do ideal — confira no Relatório.",
+              title: `⚠️ IA: qualidade média — score ${score}`,
+              description: `${observacoes}${lista}`,
+            });
+          } else if (status === "ok") {
+            toast({
+              title: `✅ IA: canhoto aprovado — score ${score}`,
+              description: observacoes || "Foto com boa qualidade.",
+            });
+          } else {
+            toast({
+              title: "IA não conseguiu avaliar a foto",
+              description: "A baixa foi salva, mas sem crítica automática.",
             });
           }
         } catch (e) {
           console.warn("validar-canhoto falhou (não-crítico):", e);
+          toast({
+            title: "IA indisponível para avaliar a foto",
+            description: e instanceof Error ? e.message : "Erro ao chamar validação.",
+          });
         }
       }
+
 
       // Concluiu com sucesso — limpa modo revalidação
       setRevalidacaoBaixaId(null);
