@@ -130,10 +130,14 @@ export default function TorreControle() {
     });
   }
 
+  const TOLERANCIA_SEM_SINAL_MIN = 25;
+  function minutosSemSinal(rota: MonitoramentoRota): number | null {
+    if (!rota.ultima_atualizacao || rota.status !== "ativa") return null;
+    return Math.floor((Date.now() - new Date(rota.ultima_atualizacao).getTime()) / 60000);
+  }
   function isInactive(rota: MonitoramentoRota) {
-    if (!rota.ultima_atualizacao || rota.status !== "ativa") return false;
-    const diff = (Date.now() - new Date(rota.ultima_atualizacao).getTime()) / 60000;
-    return diff > 15;
+    const m = minutosSemSinal(rota);
+    return m !== null && m > TOLERANCIA_SEM_SINAL_MIN;
   }
 
   const ativas = rotas.filter((r) => r.status === "ativa");
@@ -258,7 +262,9 @@ export default function TorreControle() {
                       ? Math.round((rota.paradas_concluidas / rota.total_paradas) * 100)
                       : 0;
                     const alerts = alertasCount[rota.id] || 0;
+                    const minSemSinal = minutosSemSinal(rota);
                     const inactive = isInactive(rota);
+                    const semSinalRecente = minSemSinal !== null && minSemSinal >= 5 && !inactive;
 
                     return (
                       <TableRow key={rota.id}>
@@ -270,6 +276,13 @@ export default function TorreControle() {
                             {inactive && (
                               <Badge variant="destructive" className="text-xs gap-1">
                                 <WifiOff className="w-3 h-3" />
+                                {minSemSinal} min
+                              </Badge>
+                            )}
+                            {semSinalRecente && (
+                              <Badge variant="outline" className="text-xs gap-1 bg-warning/15 text-warning border-warning/30">
+                                <WifiOff className="w-3 h-3" />
+                                {minSemSinal} min
                               </Badge>
                             )}
                           </div>

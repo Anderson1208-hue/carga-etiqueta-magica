@@ -1,0 +1,2 @@
+UPDATE public.monitoramento_config SET tempo_max_sem_atualizacao_min = 25, updated_at = now() WHERE tempo_max_sem_atualizacao_min = 15;
+ALTER TABLE public.monitoramento_config ALTER COLUMN tempo_max_sem_atualizacao_min SET DEFAULT 25;
