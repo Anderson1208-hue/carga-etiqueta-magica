@@ -130,10 +130,14 @@ export default function TorreControle() {
     });
   }
 
+  const TOLERANCIA_SEM_SINAL_MIN = 25;
+  function minutosSemSinal(rota: MonitoramentoRota): number | null {
+    if (!rota.ultima_atualizacao || rota.status !== "ativa") return null;
+    return Math.floor((Date.now() - new Date(rota.ultima_atualizacao).getTime()) / 60000);
+  }
   function isInactive(rota: MonitoramentoRota) {
-    if (!rota.ultima_atualizacao || rota.status !== "ativa") return false;
-    const diff = (Date.now() - new Date(rota.ultima_atualizacao).getTime()) / 60000;
-    return diff > 15;
+    const m = minutosSemSinal(rota);
+    return m !== null && m > TOLERANCIA_SEM_SINAL_MIN;
   }
 
   const ativas = rotas.filter((r) => r.status === "ativa");
