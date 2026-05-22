@@ -59,7 +59,15 @@ export default function TorreControle() {
         baixados = new Set((veics || []).map((v: any) => v.id));
       }
       const rotasFiltradas = rotasAll.filter((r: any) => !baixados.has(r.veiculo_id));
-      setRotas(rotasFiltradas);
+      // Dedup por veiculo_id — mantém a rota mais recente (já vem ordenada desc por created_at)
+      const seenVeic = new Set<string>();
+      const rotasDedup = rotasFiltradas.filter((r: any) => {
+        if (!r.veiculo_id) return true;
+        if (seenVeic.has(r.veiculo_id)) return false;
+        seenVeic.add(r.veiculo_id);
+        return true;
+      });
+      setRotas(rotasDedup);
 
       // Load alert counts per route (paginado)
       const alertas = await fetchAllPages<any>((from, to) =>

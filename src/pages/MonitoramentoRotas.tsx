@@ -69,7 +69,15 @@ export default function MonitoramentoRotas() {
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      setRotas(data);
+      // Dedup por veiculo_id — mantém a rota mais recente (já vem ordenada desc)
+      const seen = new Set<string>();
+      const dedup = data.filter((r: any) => {
+        if (!r.veiculo_id) return true;
+        if (seen.has(r.veiculo_id)) return false;
+        seen.add(r.veiculo_id);
+        return true;
+      });
+      setRotas(dedup);
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
@@ -150,6 +158,24 @@ export default function MonitoramentoRotas() {
   async function handleIniciarMonitoramento(veiculo: any) {
     setIniciandoRota(true);
     try {
+      // Guard: impede duplicar monitoramento para o mesmo veículo
+      const { data: existente } = await supabase
+        .from("monitoramento_rotas")
+        .select("id")
+        .eq("veiculo_id", veiculo.id)
+        .eq("status", "ativa")
+        .limit(1)
+        .maybeSingle();
+      if (existente) {
+        toast({
+          title: "Monitoramento já ativo",
+          description: `${veiculo.placa} já possui uma rota em andamento.`,
+          variant: "destructive",
+        });
+        setShowIniciar(false);
+        loadRotas();
+        return;
+      }
       const { data: veiculoNfs } = await supabase
         .from("veiculo_nfs")
         .select(`
