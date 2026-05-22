@@ -59,13 +59,13 @@ export default function MonitoramentoRotas() {
   // --- Data loading (unchanged logic) ---
   const loadRotas = useCallback(async () => {
     try {
-      const hoje = new Date();
-      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+      const inicioHoje = new Date();
+      inicioHoje.setHours(0, 0, 0, 0);
       const data = await fetchAllPages<any>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .eq("data", hojeStr)
+          .gte("created_at", inicioHoje.toISOString())
           .order("created_at", { ascending: false })
           .range(from, to)
       );
