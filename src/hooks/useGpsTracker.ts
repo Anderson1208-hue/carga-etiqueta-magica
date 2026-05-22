@@ -129,6 +129,14 @@ export function useGpsTracker({
       timestamp: new Date().toISOString(),
     };
 
+    // Primeiro ponto precisa chegar imediatamente na Torre.
+    // Se esperar o lote fechar (5 pontos x 120s), a rota fica vários minutos
+    // aparecendo como "Sem posição GPS" mesmo com internet e permissão ativa.
+    if (!lastSentRef.current) {
+      flushBatch([position]);
+      return;
+    }
+
     // Verifica modo crítico
     const critico = checkModoCritico(latitude, longitude);
     setModoCritico(critico);
