@@ -36,10 +36,13 @@ export default function TorreControle() {
 
   const loadRotas = useCallback(async () => {
     try {
+      const hoje = new Date();
+      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
       const rotasAll = await fetchAllPages<any>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
+          .eq("data", hojeStr)
           .order("created_at", { ascending: false })
           .range(from, to)
       );
