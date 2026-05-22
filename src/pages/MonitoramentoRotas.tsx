@@ -158,6 +158,24 @@ export default function MonitoramentoRotas() {
   async function handleIniciarMonitoramento(veiculo: any) {
     setIniciandoRota(true);
     try {
+      // Guard: impede duplicar monitoramento para o mesmo veículo
+      const { data: existente } = await supabase
+        .from("monitoramento_rotas")
+        .select("id")
+        .eq("veiculo_id", veiculo.id)
+        .eq("status", "ativa")
+        .limit(1)
+        .maybeSingle();
+      if (existente) {
+        toast({
+          title: "Monitoramento já ativo",
+          description: `${veiculo.placa} já possui uma rota em andamento.`,
+          variant: "destructive",
+        });
+        setShowIniciar(false);
+        loadRotas();
+        return;
+      }
       const { data: veiculoNfs } = await supabase
         .from("veiculo_nfs")
         .select(`
