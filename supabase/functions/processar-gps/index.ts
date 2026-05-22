@@ -78,15 +78,15 @@ Deno.serve(async (req) => {
       };
     });
 
-    // upsert ignora duplicatas (mesmo rota+client_ts) graças ao índice único parcial
+    // INSERT direto. O índice único é PARCIAL (WHERE client_ts IS NOT NULL),
+    // e PostgREST não consegue resolver onConflict em índice parcial — por isso
+    // não usamos upsert aqui. Em caso raro de duplicata (mesmo client_ts),
+    // o código 23505 é capturado e ignorado.
     const { error: insertErr } = await supabase
       .from("posicoes_gps")
-      .upsert(gpsRows, {
-        onConflict: "monitoramento_rota_id,client_ts",
-        ignoreDuplicates: true,
-      });
-    if (insertErr) {
-      console.error("[processar-gps] upsert error:", insertErr);
+      .insert(gpsRows);
+    if (insertErr && (insertErr as any).code !== "23505") {
+      console.error("[processar-gps] insert error:", insertErr);
     }
 
     // 2. Use last position for route update and geofence checks
