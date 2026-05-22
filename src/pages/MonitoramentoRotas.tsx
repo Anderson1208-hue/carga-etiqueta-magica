@@ -69,7 +69,15 @@ export default function MonitoramentoRotas() {
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      setRotas(data);
+      // Dedup por veiculo_id — mantém a rota mais recente (já vem ordenada desc)
+      const seen = new Set<string>();
+      const dedup = data.filter((r: any) => {
+        if (!r.veiculo_id) return true;
+        if (seen.has(r.veiculo_id)) return false;
+        seen.add(r.veiculo_id);
+        return true;
+      });
+      setRotas(dedup);
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
