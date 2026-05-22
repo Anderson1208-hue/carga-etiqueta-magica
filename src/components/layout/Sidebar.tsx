@@ -27,6 +27,8 @@ import {
   BarChart3,
   ChevronRight,
   HandCoins,
+  Building2,
+  Contact,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -58,6 +60,11 @@ const transporteItems = [
 const torreControleItems = [
   { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
   { name: "Monitoramento", href: "/monitoramento-rotas", icon: Radio },
+];
+
+const cadastrosItems = [
+  { name: "Embarcadores", href: "/embarcadores", icon: Building2 },
+  { name: "Destinatários", href: "/destinatarios", icon: Contact },
 ];
 
 const relatoriosItems = [
@@ -145,6 +152,7 @@ export function Sidebar() {
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
+  const cadastrosActive = cadastrosItems.some((i) => location.pathname === i.href);
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
@@ -163,6 +171,13 @@ export function Sidebar() {
         ))}
 
         <div className="pt-2 space-y-1">
+          <NavGroupFlyout
+            label="Cadastros"
+            icon={Building2}
+            items={cadastrosItems}
+            pathname={location.pathname}
+            groupActive={cadastrosActive}
+          />
           <NavGroupFlyout
             label="Depósito"
             icon={Package}

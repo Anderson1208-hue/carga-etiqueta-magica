@@ -642,6 +642,214 @@ export type Database = {
           },
         ]
       }
+      destinatario_enderecos: {
+        Row: {
+          apelido: string | null
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          created_at: string
+          destinatario_id: string
+          id: string
+          latitude: number | null
+          logradouro: string | null
+          longitude: number | null
+          numero: string | null
+          principal: boolean
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          apelido?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          created_at?: string
+          destinatario_id: string
+          id?: string
+          latitude?: number | null
+          logradouro?: string | null
+          longitude?: number | null
+          numero?: string | null
+          principal?: boolean
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apelido?: string | null
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          created_at?: string
+          destinatario_id?: string
+          id?: string
+          latitude?: number | null
+          logradouro?: string | null
+          longitude?: number | null
+          numero?: string | null
+          principal?: boolean
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "destinatario_enderecos_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "destinatarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      destinatario_restricoes: {
+        Row: {
+          agendamento_obrigatorio: boolean
+          altura_max_veiculo_m: number | null
+          created_at: string
+          destinatario_id: string
+          dias_semana: number[] | null
+          documentos_canhoto: string[] | null
+          exige_escolta: boolean
+          hora_fim: string | null
+          hora_inicio: string | null
+          id: string
+          observacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          agendamento_obrigatorio?: boolean
+          altura_max_veiculo_m?: number | null
+          created_at?: string
+          destinatario_id: string
+          dias_semana?: number[] | null
+          documentos_canhoto?: string[] | null
+          exige_escolta?: boolean
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agendamento_obrigatorio?: boolean
+          altura_max_veiculo_m?: number | null
+          created_at?: string
+          destinatario_id?: string
+          dias_semana?: number[] | null
+          documentos_canhoto?: string[] | null
+          exige_escolta?: boolean
+          hora_fim?: string | null
+          hora_inicio?: string | null
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "destinatario_restricoes_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: true
+            referencedRelation: "destinatarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      destinatarios: {
+        Row: {
+          ativo: boolean
+          cnpj_cpf: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nome_fantasia: string | null
+          observacao: string | null
+          rascunho: boolean
+          razao_social: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj_cpf: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          observacao?: string | null
+          rascunho?: boolean
+          razao_social: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cnpj_cpf?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          observacao?: string | null
+          rascunho?: boolean
+          razao_social?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      embarcadores: {
+        Row: {
+          ativo: boolean
+          centro_custo: string | null
+          cnpj: string
+          contato_email: string | null
+          contato_nome: string | null
+          contato_telefone: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          nome_fantasia: string | null
+          observacao_operacional: string | null
+          rascunho: boolean
+          razao_social: string
+          sla_padrao_horas: number | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          centro_custo?: string | null
+          cnpj: string
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_telefone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          observacao_operacional?: string | null
+          rascunho?: boolean
+          razao_social: string
+          sla_padrao_horas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          centro_custo?: string | null
+          cnpj?: string
+          contato_email?: string | null
+          contato_nome?: string | null
+          contato_telefone?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_fantasia?: string | null
+          observacao_operacional?: string | null
+          rascunho?: boolean
+          razao_social?: string
+          sla_padrao_horas?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       etiquetas: {
         Row: {
           c_prod: string

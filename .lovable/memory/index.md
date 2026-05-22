@@ -82,3 +82,4 @@ type: reference
 - [Assinatura APK Release](mem://operacao/assinatura-apk-release) — Setup único (setup-android-signing.sh) gera keystore + patcheia gradle. Build scripts bumpam versionCode e fazem fallback apksigner se sair unsigned.
 - [Validação Canhoto IA](mem://funcionalidades/operacao/validacao-canhoto-ia) — Edge function validar-canhoto (Gemini 2.5 Flash) audita foto em background e grava score/status em baixas_entrega.
 - [ARQUIVADO: APP tipo Waze](mem://operacao/projeto-arquivado-app-tipo-waze) — Projeto futuro de APP motorista parrudo com alertas. NÃO iniciar até usuário pedir. Plano em .lovable/plan.md.
+- [Cadastros Fase 1](mem://funcionalidades/cadastros/embarcadores-destinatarios-fase1) — Tabelas embarcadores, destinatarios, destinatario_enderecos, destinatario_restricoes. Trigger auto-cria rascunhos em cada INSERT em notas_fiscais.

@@ -34,6 +34,8 @@ import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import Embarcadores from "./pages/Embarcadores";
+import Destinatarios from "./pages/Destinatarios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -286,6 +288,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
+      <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />
