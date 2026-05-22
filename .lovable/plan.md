@@ -1,64 +1,135 @@
-# Projeto Arquivado: "APP tipo Waze" (APP Motorista Parrudo)
+# Plano: Evolução para WMS Completo
 
-> **Status:** ARQUIVADO — aguardando conclusão dos testes do APK atual.
-> **Retomar quando:** todos os ajustes do APK em campo estiverem mapeados e estabilizados.
-
----
-
-## Contexto
-
-Após os testes do APK atual (GPS híbrido, Foreground Service, fila offline, scanner MLKit, câmera nativa, build release assinado), vamos consolidar a lista de ajustes/inclusões necessários e só então iniciar este projeto.
-
-Apelido interno: **"APP tipo Waze"** — referência a um app mobile parrudo, leve, com baixo consumo de bateria e alertas inteligentes para motorista + torre. **Não** é navegação turn-by-turn rua a rua.
+Transformar o sistema atual (WMS leve baseado em NF) em um WMS de mercado, em **7 fases incrementais**. Cada fase entrega valor isolado e pode ir pra produção sem depender da próxima.
 
 ---
 
-## Escopo planejado (a executar depois)
+## Fase 1 — Cadastros Mestres (Embarcador + Destinatário)
 
-### Fase 1 — GPS resiliente (~100 créditos)
-- Tuning de bateria (intervalos adaptativos, distance filter)
-- Reforço da fila offline + retomada automática
-- Validação em campo de diferentes fabricantes (Xiaomi, Samsung, Motorola)
+**Objetivo:** sair da dependência da NF como fonte única. Ter cliente cadastrado antes de receber a primeira nota.
 
-### Fase 2 — Motor de Alertas + TTS + Torre Realtime (~150 créditos)
-- Motor de regras: saída de rota, pulou parada, parado tempo demais, fora de janela
-- Alerta sonoro/voz nativa (TTS) para o motorista
-- Push em tempo real para a Torre de Controle
-- Tela "Meus Alertas" no APK
-
-### Fase 3 — Tuning bateria + AAB Play Store (~100 créditos)
-- Otimizações finais de consumo
-- Build AAB assinado para Play Store (interno/fechado)
-- Roteiro de publicação
-
-### Opcional — ETA dinâmico
-- Cálculo de ETA por parada com base em histórico + GPS atual
+- Tabela `embarcadores`: CNPJ, razão social, nome fantasia, contato, SLA padrão (h), tabela de frete vinculada, centro de custo, observações operacionais, ativo.
+- Tabela `destinatarios`: CNPJ/CPF, razão social, múltiplos endereços (tabela filha `destinatario_enderecos`), janela de entrega (dias semana + hora início/fim), restrições (altura veículo, agendamento obrigatório, exige escolta, etc), documentos exigidos no canhoto.
+- Tela CRUD para ambos com busca, filtros, importação CSV.
+- **Vínculo automático**: ao importar XML, casar `cnpj_emitente` → embarcador e `cnpj_destinatario` → destinatário. Se não existir, criar rascunho pra revisão.
+- Auto-preencher janela de entrega e restrições no agendamento/roteirização.
 
 ---
 
-## Custos estimados (referência)
+## Fase 2 — Cadastro de Produto com Paletização
 
-- **Desenvolvimento Lovable:** ~350 créditos no total (Fases 1+2+3)
-- **Mensal recorrente:** R$ 0–50/mês (Lovable Cloud + FCM grátis + OSM grátis)
-- **Play Store:** US$ 25 (taxa única)
-- **Comparativo:** Cobli/similar p/ 20 veículos ≈ R$ 2.400/mês. Solução própria ≈ R$ 50–150/mês. ROI 1–2 meses.
+**Objetivo:** habilitar cubagem real, paletização e endereçamento por SKU. Sem isso o WMS continua "chutando" volume.
 
----
-
-## Base já pronta (não refazer)
-
-- APK Capacitor com `appId` próprio
-- Foreground Service GPS (`@capacitor-community/background-geolocation`)
-- Hook híbrido `useGpsTrackerHybrid` (nativo vs web)
-- Fila offline GPS (IndexedDB + heartbeat 60s)
-- Scanner nativo MLKit + câmera nativa
-- Build release assinado (`scripts/build-apk-release.sh`)
-- Ambientes DEV/HOMOLOG/PROD
-- Tela de diagnóstico do motorista
-- Smart GPS tracking (120s normal / 60s crítico)
+- Tabela `produtos`: código interno (SKU), `c_prod` do embarcador, EAN-13, DUN-14, descrição, embarcador_id, NCM, unidade base.
+- **Dados físicos da caixa**: altura, largura, profundidade (cm), peso bruto, peso líquido (kg), volume m³ calculado.
+- **Paletização**: caixas por lastro, lastros por pallet, total caixas por pallet, tipo de pallet (PBR/Chep/descartável), altura máxima empilhamento.
+- **Atributos logísticos**: curva ABC, temperatura (seco/refrigerado/congelado), fragilidade, perecível (sim/não), validade controlada, lote controlado.
+- Tela CRUD + importação Excel + foto do produto.
+- **Vínculo automático**: cruzar `itens_nf.c_prod` + `cnpj_emitente` com `produtos`. Quando bater, usar volume/peso reais ao invés do estimado.
+- Recalcular `calculateBoxes` opcionalmente usando paletização real (mantém regra atual como fallback).
 
 ---
 
-## Decisão atual
+## Fase 3 — Estrutura de Armazém (Endereçamento Hierárquico)
 
-Não iniciar nenhuma das fases agora. Primeiro: rodar o APK atual em campo, coletar feedback dos motoristas e mapear ajustes. Depois retomar este plano.
+**Objetivo:** transformar `nf_enderecamento` (texto livre) em estrutura real de WMS.
+
+- Tabelas: `armazens`, `ruas`, `colunas`, `niveis`, `posicoes`.
+- Cada `posicao` tem: código (ex `A-01-03-B`), tipo (picking/pulmão/bloqueada/avaria), capacidade (pallets ou caixas), peso máx, altura máx, restrições (temperatura, embarcador exclusivo), status (livre/ocupada/bloqueada).
+- Mapa visual 2D do armazém por rua.
+- Migração: converter posições atuais (texto) em posições estruturadas.
+- API de **sugestão de posição** baseada em curva ABC + peso + temperatura.
+
+---
+
+## Fase 4 — Recebimento (ASN + Putaway Dirigido)
+
+**Objetivo:** processo formal de entrada da mercadoria no CD.
+
+- Tabela `recebimentos`: nf_id, status (agendado/em conferência/conferido/divergente), conferente, hora início/fim.
+- Tela mobile de conferência cega ou declarada (config por embarcador): bipa EAN/DUN → confirma quantidade.
+- Registro de divergências (falta/sobra/avaria) com foto.
+- **Putaway dirigido**: após conferir, sistema sugere posição (Fase 3) e mobile guia operador até a posição. Confirma com bipa da posição.
+- Cross-docking: marca NF como "não estoca" → vai direto pra expedição.
+
+---
+
+## Fase 5 — Picking Dirigido (Onda de Separação)
+
+**Objetivo:** separar cargas com produtividade e zero erro, usando endereço.
+
+- Tabela `ondas_separacao`: agrupa cargas/rotas pra separação simultânea.
+- Estratégias: por pedido, por onda (consolidado), por zona.
+- Tela mobile guia separador na sequência ótima de posições (caminho mínimo).
+- Bipa posição + bipa produto + confirma quantidade.
+- **Reposição automática**: quando posição de picking fica abaixo do mínimo, gera tarefa de reposição do pulmão.
+- Integra com etiquetas atuais (etiqueta sai já com posição de origem).
+
+---
+
+## Fase 6 — Inventário Rotativo
+
+**Objetivo:** acuracidade contínua sem parar operação.
+
+- Tabela `inventarios` + `inventario_contagens`.
+- Geração automática de tarefas por curva ABC (A semanal, B quinzenal, C mensal).
+- Tela mobile: bipa posição → conta → confirma. 2ª contagem cega se divergir.
+- Ajuste com motivo + aprovação supervisor.
+- Dashboard de acuracidade por rua/curva/operador.
+
+---
+
+## Fase 7 — KPIs / BI Operacional
+
+**Objetivo:** dashboard executivo com indicadores de mercado.
+
+- **OTIF** (On Time In Full) por embarcador e período
+- **Acuracidade de inventário** %
+- **Produtividade** caixas/hora por operador (recebimento, picking, conferência)
+- **Ocupação de armazém** % por rua/zona
+- **SLA de entrega** vs janela contratada
+- **Taxa de divergência** recebimento / picking / canhoto
+- **Tempo médio** de putaway, picking, conferência, carregamento
+- Filtros: período, embarcador, operador, curva.
+- Export Excel/PDF.
+
+---
+
+## Fora de escopo (futuro)
+
+- Faturamento logístico (tabela de preços por embarcador, fatura mensal de armazenagem + movimentação + entrega)
+- Logística reversa (devolução, troca)
+- EDI/integrações com marketplace e transportadoras externas
+- Picking por voz / pick-to-light (hardware específico)
+
+---
+
+## Ordem sugerida de execução
+
+```text
+Fase 1 (Cadastros)  ──┐
+Fase 2 (Produto)    ──┼─► destrava cubagem real
+Fase 3 (Endereço)   ──┘
+        │
+        ▼
+Fase 4 (Recebimento + Putaway)
+        │
+        ▼
+Fase 5 (Picking dirigido)
+        │
+        ▼
+Fase 6 (Inventário)
+        │
+        ▼
+Fase 7 (KPIs)
+```
+
+**Estimativa por fase:** ~80–150 créditos cada (Fase 1 e 2 são as menores; Fase 4 e 5 as maiores por envolverem mobile + workflow).
+
+---
+
+## Decisões pendentes pra você
+
+1. **Começar por qual fase?** Recomendo Fase 1 (Embarcador + Destinatário) — é a base e é a mais rápida.
+2. **Migração dos dados atuais?** Auto-criar embarcador/destinatário/produto a partir das NFs já importadas, ou começar do zero?
+3. **Multi-embarcador no mesmo CD?** Vai operar mais de um cliente no mesmo armazém (3PL real) ou é monoempresa?
