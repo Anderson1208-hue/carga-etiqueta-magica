@@ -24,6 +24,9 @@ import { JustificativaDialog } from "@/components/monitoramento/JustificativaDia
 import { ConfigDialog } from "@/components/monitoramento/ConfigDialog";
 import { IniciarDialog } from "@/components/monitoramento/IniciarDialog";
 
+const normalizePlate = (placa?: string | null) =>
+  (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
 export default function MonitoramentoRotas() {
   const { toast } = useToast();
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
@@ -69,12 +72,13 @@ export default function MonitoramentoRotas() {
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      // Dedup por veiculo_id — mantém a rota mais recente (já vem ordenada desc)
+      // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc)
       const seen = new Set<string>();
       const dedup = data.filter((r: any) => {
-        if (!r.veiculo_id) return true;
-        if (seen.has(r.veiculo_id)) return false;
-        seen.add(r.veiculo_id);
+        const key = normalizePlate(r.placa) || r.veiculo_id;
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
       });
       setRotas(dedup);
@@ -145,10 +149,11 @@ export default function MonitoramentoRotas() {
         .order("created_at", { ascending: false });
       const { data: monAtivas } = await supabase
         .from("monitoramento_rotas")
-        .select("veiculo_id")
+        .select("veiculo_id, placa")
         .eq("status", "ativa");
       const ativosIds = new Set((monAtivas || []).map((m: any) => m.veiculo_id));
-      setVeiculosDisponiveis((veiculos || []).filter((v: any) => !ativosIds.has(v.id)));
+      const ativosPlacas = new Set((monAtivas || []).map((m: any) => normalizePlate(m.placa)).filter(Boolean));
+      setVeiculosDisponiveis((veiculos || []).filter((v: any) => !ativosIds.has(v.id) && !ativosPlacas.has(normalizePlate(v.placa))));
     } finally {
       setLoadingVeiculos(false);
     }
@@ -158,14 +163,16 @@ export default function MonitoramentoRotas() {
   async function handleIniciarMonitoramento(veiculo: any) {
     setIniciandoRota(true);
     try {
-      // Guard: impede duplicar monitoramento para o mesmo veículo
-      const { data: existente } = await supabase
+      // Guard: impede duplicar monitoramento para a mesma placa, mesmo com veiculo_id diferente
+      const { data: ativas } = await supabase
         .from("monitoramento_rotas")
-        .select("id")
-        .eq("veiculo_id", veiculo.id)
+        .select("id, veiculo_id, placa")
         .eq("status", "ativa")
-        .limit(1)
-        .maybeSingle();
+        .limit(1000);
+      const placaVeiculo = normalizePlate(veiculo.placa);
+      const existente = (ativas || []).find((rota: any) =>
+        rota.veiculo_id === veiculo.id || normalizePlate(rota.placa) === placaVeiculo
+      );
       if (existente) {
         toast({
           title: "Monitoramento já ativo",
