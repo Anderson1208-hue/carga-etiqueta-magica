@@ -262,7 +262,9 @@ export default function TorreControle() {
                       ? Math.round((rota.paradas_concluidas / rota.total_paradas) * 100)
                       : 0;
                     const alerts = alertasCount[rota.id] || 0;
+                    const minSemSinal = minutosSemSinal(rota);
                     const inactive = isInactive(rota);
+                    const semSinalRecente = minSemSinal !== null && minSemSinal >= 5 && !inactive;
 
                     return (
                       <TableRow key={rota.id}>
@@ -274,6 +276,13 @@ export default function TorreControle() {
                             {inactive && (
                               <Badge variant="destructive" className="text-xs gap-1">
                                 <WifiOff className="w-3 h-3" />
+                                {minSemSinal} min
+                              </Badge>
+                            )}
+                            {semSinalRecente && (
+                              <Badge variant="outline" className="text-xs gap-1 bg-warning/15 text-warning border-warning/30">
+                                <WifiOff className="w-3 h-3" />
+                                {minSemSinal} min
                               </Badge>
                             )}
                           </div>
