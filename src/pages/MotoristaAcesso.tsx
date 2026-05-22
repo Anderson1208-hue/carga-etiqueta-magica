@@ -82,6 +82,32 @@ export default function MotoristaAcesso() {
   useWakeLock(!!veiculo);
   useLockPortrait();
 
+  // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
+  // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
+  // consultando a cada 20s até a rota aparecer no backend.
+  useEffect(() => {
+    if (!veiculo || monitoramentoRotaId) return;
+    const codeUpper = code.trim().toUpperCase();
+    if (codeUpper.length !== 6) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code: codeUpper },
+        });
+        if (!fnError && !data?.error && data?.monitoramento_rota_id) {
+          setMonitoramentoRotaId(data.monitoramento_rota_id);
+          setVeiculo(data.veiculo);
+          setNfs(data.nfs || []);
+        }
+      } catch {
+        // silencioso – tenta de novo no próximo tick
+      }
+    }, 20000);
+
+    return () => clearInterval(interval);
+  }, [veiculo, monitoramentoRotaId, code]);
+
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
