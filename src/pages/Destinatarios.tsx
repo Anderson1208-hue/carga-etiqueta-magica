@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -261,16 +261,12 @@ function DestinatarioDialog({
     documentos_canhoto: [], observacao: null,
   });
 
-  // hydrate
-  useState(() => {
+  useEffect(() => {
     if (destinatario) setForm(destinatario);
+  }, [destinatario]);
+  useEffect(() => {
     if (restricao) setRestrForm(restricao);
-  });
-  // re-hydrate on data change
-  if (destinatario && form.id !== destinatario.id) setForm(destinatario);
-  if (restricao && restrForm !== restricao && !(restrForm as any).__hydrated) {
-    setRestrForm({ ...restricao, ...({ __hydrated: true } as any) });
-  }
+  }, [restricao]);
 
   const saveBasic = useMutation({
     mutationFn: async () => {
