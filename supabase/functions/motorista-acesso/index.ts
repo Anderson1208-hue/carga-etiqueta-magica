@@ -89,8 +89,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (!foto_base64 || typeof foto_base64 !== "string") {
-        return new Response(JSON.stringify({ error: "Foto do canhoto é obrigatória" }), {
+      if (ocorrencia === "entregue" && (!foto_base64 || typeof foto_base64 !== "string")) {
+        return new Response(JSON.stringify({ error: "Foto do canhoto é obrigatória para entrega" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -124,30 +124,32 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Upload foto
+      // Upload foto (apenas se enviada)
       let fotoPath: string | null = null;
-      try {
-        const mime = typeof foto_mime === "string" && foto_mime.startsWith("image/") ? foto_mime : "image/jpeg";
-        const ext = mime.split("/")[1]?.split("+")[0] || "jpg";
-        const fileName = `${veiculo.id}/${nf_id}_${Date.now()}.${ext}`;
-        const bytes = base64ToBytes(foto_base64);
+      if (foto_base64 && typeof foto_base64 === "string") {
+        try {
+          const mime = typeof foto_mime === "string" && foto_mime.startsWith("image/") ? foto_mime : "image/jpeg";
+          const ext = mime.split("/")[1]?.split("+")[0] || "jpg";
+          const fileName = `${veiculo.id}/${nf_id}_${Date.now()}.${ext}`;
+          const bytes = base64ToBytes(foto_base64);
 
-        const { error: uploadErr } = await supabase.storage
-          .from("comprovantes")
-          .upload(fileName, bytes, { contentType: mime, upsert: false });
+          const { error: uploadErr } = await supabase.storage
+            .from("comprovantes")
+            .upload(fileName, bytes, { contentType: mime, upsert: false });
 
-        if (uploadErr) {
-          return new Response(JSON.stringify({ error: "Falha ao enviar foto" }), {
-            status: 500,
+          if (uploadErr) {
+            return new Response(JSON.stringify({ error: "Falha ao enviar foto" }), {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          fotoPath = fileName;
+        } catch {
+          return new Response(JSON.stringify({ error: "Foto inválida" }), {
+            status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        fotoPath = fileName;
-      } catch {
-        return new Response(JSON.stringify({ error: "Foto inválida" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
 
       const { error: insertError } = await supabase.from("baixas_entrega").insert({

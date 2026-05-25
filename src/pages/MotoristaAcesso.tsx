@@ -221,14 +221,14 @@ export default function MotoristaAcesso() {
       toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
       return;
     }
-    if (!fotoFile) {
+    if (ocorrencia === "entregue" && !fotoFile) {
       toast({ title: "Foto obrigatória", description: "Tire ou anexe a foto do canhoto antes de registrar a baixa", variant: "destructive" });
       return;
     }
 
     setSubmitting(true);
     try {
-      const foto_base64 = await fileToBase64(fotoFile);
+      const foto_base64 = fotoFile ? await fileToBase64(fotoFile) : null;
 
       const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
         body: {
@@ -241,7 +241,7 @@ export default function MotoristaAcesso() {
           latitude: gpsCoords?.lat ?? null,
           longitude: gpsCoords?.lng ?? null,
           foto_base64,
-          foto_mime: fotoFile.type || "image/jpeg",
+          foto_mime: fotoFile?.type || null,
         },
       });
 
@@ -515,7 +515,7 @@ export default function MotoristaAcesso() {
 
                       <div>
                         <Label className="text-sm font-medium mb-2 block">
-                          Foto do canhoto <span className="text-destructive">*</span>
+                          Foto do canhoto {ocorrencia === "entregue" && <span className="text-destructive">*</span>}
                         </Label>
                         {fotoPreview ? (
                           <div className="relative">
@@ -560,7 +560,7 @@ export default function MotoristaAcesso() {
                         )}
                       </div>
 
-                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia || !fotoFile} className="w-full" size="lg">
+                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia || (ocorrencia === "entregue" && !fotoFile)} className="w-full" size="lg">
                         {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                         Registrar Baixa
                       </Button>
