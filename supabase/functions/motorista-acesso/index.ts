@@ -89,8 +89,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (!foto_base64 || typeof foto_base64 !== "string") {
-        return new Response(JSON.stringify({ error: "Foto do canhoto é obrigatória" }), {
+      if (ocorrencia === "entregue" && (!foto_base64 || typeof foto_base64 !== "string")) {
+        return new Response(JSON.stringify({ error: "Foto do canhoto é obrigatória para entrega" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
