@@ -560,7 +560,7 @@ export default function MotoristaAcesso() {
                         )}
                       </div>
 
-                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia || !fotoFile} className="w-full" size="lg">
+                      <Button onClick={submitBaixa} disabled={submitting || !ocorrencia || (ocorrencia === "entregue" && !fotoFile)} className="w-full" size="lg">
                         {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
                         Registrar Baixa
                       </Button>
