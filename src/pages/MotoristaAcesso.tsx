@@ -513,41 +513,43 @@ export default function MotoristaAcesso() {
                         />
                       </div>
 
-                      <div>
-                        <Label className="text-sm font-medium mb-2 block">
-                          Foto do canhoto {ocorrencia === "entregue" && <span className="text-destructive">*</span>}
-                        </Label>
-                        {fotoPreview ? (
-                          <div className="relative">
-                            <img
-                              src={fotoPreview}
-                              alt="Prévia do canhoto"
-                              className="w-full max-h-64 object-contain rounded-md border"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="absolute top-2 right-2 h-8 w-8"
-                              onClick={clearFoto}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 rounded-md p-6 cursor-pointer hover:bg-muted/50 transition">
-                            <Camera className="w-8 h-8 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Tirar foto do canhoto</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={handleFotoChange}
-                            />
-                          </label>
-                        )}
-                      </div>
+                      {ocorrencia === "entregue" && (
+                        <div>
+                          <Label className="text-sm font-medium mb-2 block">
+                            Foto do canhoto <span className="text-destructive">*</span>
+                          </Label>
+                          {fotoPreview ? (
+                            <div className="relative">
+                              <img
+                                src={fotoPreview}
+                                alt="Prévia do canhoto"
+                                className="w-full max-h-64 object-contain rounded-md border"
+                              />
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute top-2 right-2 h-8 w-8"
+                                onClick={clearFoto}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-muted-foreground/30 rounded-md p-6 cursor-pointer hover:bg-muted/50 transition">
+                              <Camera className="w-8 h-8 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">Tirar foto do canhoto</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={handleFotoChange}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      )}
 
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Navigation className="w-3 h-3" />

@@ -1106,12 +1106,11 @@ export default function BaixaEntrega() {
                               />
                             </div>
 
-                            {/* Photo capture - only in online mode */}
-                            {/* Photo capture - sempre disponível (foto offline persiste em IndexedDB) */}
-                            {true && (
+                            {/* Foto só aparece para entrega (reentrega/recusa não exigem) */}
+                            {ocorrencia === "entregue" && (
                               <div>
                                 <Label className="text-sm mb-2 block">
-                                  Foto do comprovante {ocorrencia === "entregue" && "*"}
+                                  Foto do comprovante *
                                 </Label>
                                 <div className="flex gap-2">
                                   <Button
