@@ -228,7 +228,7 @@ export default function MotoristaAcesso() {
 
     setSubmitting(true);
     try {
-      const foto_base64 = await fileToBase64(fotoFile);
+      const foto_base64 = fotoFile ? await fileToBase64(fotoFile) : null;
 
       const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
         body: {
@@ -241,7 +241,7 @@ export default function MotoristaAcesso() {
           latitude: gpsCoords?.lat ?? null,
           longitude: gpsCoords?.lng ?? null,
           foto_base64,
-          foto_mime: fotoFile.type || "image/jpeg",
+          foto_mime: fotoFile?.type || null,
         },
       });
 
