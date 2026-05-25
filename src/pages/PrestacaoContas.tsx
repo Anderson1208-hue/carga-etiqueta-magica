@@ -249,6 +249,41 @@ export default function PrestacaoContas() {
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
 
+  async function solicitarNovaFoto(baixa: BaixaItem) {
+    if (baixa.conferencia_status) {
+      toast({
+        title: "Reabra a conferência primeiro",
+        description: "Esta baixa já foi conferida. Clique em Reabrir antes de solicitar nova foto.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const ok = window.confirm(
+      `Excluir a foto da NF ${baixa.nf?.numero_nf || ""}?\n\n` +
+        `A baixa será removida e o motorista verá a NF como pendente para registrar a entrega novamente com uma nova foto.`
+    );
+    if (!ok) return;
+
+    try {
+      if (baixa.foto_path) {
+        await supabase.storage.from("comprovantes").remove([baixa.foto_path]);
+      }
+      const { error } = await supabase
+        .from("baixas_entrega")
+        .delete()
+        .eq("id", baixa.id);
+      if (error) throw error;
+
+      toast({
+        title: "Foto excluída",
+        description: "O motorista deve registrar a entrega novamente no app.",
+      });
+      if (veiculoSel) carregarBaixas(veiculoSel);
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message, variant: "destructive" });
+    }
+  }
+
   async function encerrarPrestacao() {
     if (!veiculoSel) return;
     setEncerrando(true);
