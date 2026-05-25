@@ -221,7 +221,7 @@ export default function MotoristaAcesso() {
       toast({ title: "Atenção", description: "Selecione a ocorrência", variant: "destructive" });
       return;
     }
-    if (!fotoFile) {
+    if (ocorrencia === "entregue" && !fotoFile) {
       toast({ title: "Foto obrigatória", description: "Tire ou anexe a foto do canhoto antes de registrar a baixa", variant: "destructive" });
       return;
     }
