@@ -477,24 +477,42 @@ export default function PrestacaoContas() {
                                     <TableCell className="text-sm">{b.recebedor_nome || "—"}</TableCell>
                                     <TableCell>
                                       {b.validacao_status ? (
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Badge variant={b.validacao_status === "ok" ? "default" : b.validacao_status === "alerta" ? "secondary" : "destructive"}>
-                                              {b.validacao_score ?? "?"}
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent className="max-w-xs">
-                                            <p className="font-semibold capitalize">{b.validacao_status}</p>
-                                            {b.validacao_problemas?.lista?.length ? (
-                                              <ul className="list-disc pl-4 text-xs mt-1">
-                                                {b.validacao_problemas.lista.map((p, i) => <li key={i}>{p}</li>)}
-                                              </ul>
-                                            ) : null}
-                                            {b.validacao_problemas?.observacoes && (
-                                              <p className="text-xs mt-1">{b.validacao_problemas.observacoes}</p>
-                                            )}
-                                          </TooltipContent>
-                                        </Tooltip>
+                                        <div className="flex items-center gap-1">
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Badge variant={b.validacao_status === "ok" ? "default" : b.validacao_status === "alerta" ? "secondary" : "destructive"}>
+                                                {b.validacao_score ?? "?"}
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent className="max-w-xs">
+                                              <p className="font-semibold capitalize">{b.validacao_status}</p>
+                                              {b.validacao_problemas?.lista?.length ? (
+                                                <ul className="list-disc pl-4 text-xs mt-1">
+                                                  {b.validacao_problemas.lista.map((p, i) => <li key={i}>{p}</li>)}
+                                                </ul>
+                                              ) : null}
+                                              {b.validacao_problemas?.observacoes && (
+                                                <p className="text-xs mt-1">{b.validacao_problemas.observacoes}</p>
+                                              )}
+                                            </TooltipContent>
+                                          </Tooltip>
+                                          {b.validacao_status === "ruim" && (b.validacao_score ?? 100) < 50 && (
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <Button
+                                                  size="sm"
+                                                  variant="ghost"
+                                                  className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                                  disabled={!!veiculoSel.prestacao_contas_em}
+                                                  onClick={() => solicitarNovaFoto(b)}
+                                                >
+                                                  <X className="w-4 h-4" />
+                                                </Button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>Excluir foto e pedir nova ao motorista</TooltipContent>
+                                            </Tooltip>
+                                          )}
+                                        </div>
                                       ) : <span className="text-xs text-muted-foreground">—</span>}
                                     </TableCell>
                                     <TableCell>
