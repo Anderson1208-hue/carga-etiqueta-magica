@@ -515,7 +515,7 @@ export default function MotoristaAcesso() {
 
                       <div>
                         <Label className="text-sm font-medium mb-2 block">
-                          Foto do canhoto <span className="text-destructive">*</span>
+                          Foto do canhoto {ocorrencia === "entregue" && <span className="text-destructive">*</span>}
                         </Label>
                         {fotoPreview ? (
                           <div className="relative">
