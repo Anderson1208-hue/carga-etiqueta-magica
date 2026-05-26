@@ -1,6 +1,6 @@
 // Edge function: validar-canhoto
-// Recebe { baixa_id } - busca foto_path, chama Lovable AI Gateway (Gemini),
-// retorna { score, status, problemas } e grava no banco.
+// Recebe { baixa_id } - busca foto_path + NF esperada, chama Lovable AI Gateway (Gemini),
+// extrai número da NF impresso no canhoto e compara. Grava resultado no banco.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 
 const corsHeaders = {
@@ -17,6 +17,7 @@ type ValidacaoResult = {
   status: "ok" | "alerta" | "ruim";
   problemas: string[];
   observacoes: string;
+  numero_nf_detectado: string | null;
 };
 
 const SYSTEM_PROMPT = `Você é um auditor especializado em comprovantes de entrega (canhotos de nota fiscal) no Brasil.
@@ -33,11 +34,13 @@ Classifique status:
 - "alerta" se score entre 50 e 74
 - "ruim" se score < 50
 
+ADICIONALMENTE: leia o número da Nota Fiscal impresso no canhoto (geralmente rotulado como "Nº", "Nº DA NF", "NOTA FISCAL Nº", "NF-e Nº" — costuma ter 6 a 9 dígitos). Retorne em "numero_nf_detectado" SOMENTE os dígitos (sem pontos, zeros à esquerda removidos). Se não conseguir ler com confiança, retorne null.
+
 Liste problemas concretos encontrados (ex: "Sem assinatura visível", "Foto muito escura", "Carimbo ilegível", "Imagem tremida").
 Se a imagem NÃO parece um canhoto/comprovante de entrega (ex: foto aleatória, paisagem, dedo na lente), classifique como ruim com problema "Imagem não parece um canhoto".
 
 Responda APENAS em JSON com este formato exato:
-{"score": <0-100>, "status": "ok"|"alerta"|"ruim", "problemas": ["..."], "observacoes": "uma frase curta"}`;
+{"score": <0-100>, "status": "ok"|"alerta"|"ruim", "problemas": ["..."], "observacoes": "uma frase curta", "numero_nf_detectado": "<digitos>" | null}`;
 
 async function validarComIA(imageUrl: string): Promise<ValidacaoResult> {
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -53,7 +56,7 @@ async function validarComIA(imageUrl: string): Promise<ValidacaoResult> {
         {
           role: "user",
           content: [
-            { type: "text", text: "Avalie este canhoto:" },
+            { type: "text", text: "Avalie este canhoto e extraia o número da NF impresso:" },
             { type: "image_url", image_url: { url: imageUrl } },
           ],
         },
@@ -71,27 +74,32 @@ async function validarComIA(imageUrl: string): Promise<ValidacaoResult> {
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error("Resposta vazia do modelo");
 
-  let parsed: ValidacaoResult;
+  let parsed: any;
   try {
     parsed = JSON.parse(content);
   } catch {
-    // Tenta extrair JSON entre chaves
     const match = content.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("Resposta não-JSON: " + content.slice(0, 200));
     parsed = JSON.parse(match[0]);
   }
 
-  // Normalização defensiva
   const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score) || 0)));
   let status: ValidacaoResult["status"] = "ruim";
   if (score >= 75) status = "ok";
   else if (score >= 50) status = "alerta";
+
+  let nfDet: string | null = null;
+  if (parsed.numero_nf_detectado != null) {
+    const onlyDigits = String(parsed.numero_nf_detectado).replace(/\D/g, "").replace(/^0+/, "");
+    if (onlyDigits.length >= 3) nfDet = onlyDigits;
+  }
 
   return {
     score,
     status,
     problemas: Array.isArray(parsed.problemas) ? parsed.problemas.slice(0, 10) : [],
     observacoes: typeof parsed.observacoes === "string" ? parsed.observacoes : "",
+    numero_nf_detectado: nfDet,
   };
 }
 
@@ -111,7 +119,7 @@ Deno.serve(async (req) => {
 
     const { data: baixa, error: bErr } = await supabase
       .from("baixas_entrega")
-      .select("id, foto_path")
+      .select("id, foto_path, nf_id, notas_fiscais:nf_id(numero_nf)")
       .eq("id", baixa_id)
       .maybeSingle();
 
@@ -129,7 +137,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Signed URL temporária para o modelo baixar a imagem
+    const numeroNfEsperado = (baixa as any).notas_fiscais?.numero_nf
+      ? String((baixa as any).notas_fiscais.numero_nf).replace(/\D/g, "").replace(/^0+/, "")
+      : null;
+
     const { data: signed, error: sErr } = await supabase.storage
       .from("comprovantes")
       .createSignedUrl(baixa.foto_path, 300);
@@ -140,19 +151,43 @@ Deno.serve(async (req) => {
 
     const result = await validarComIA(signed.signedUrl);
 
+    // Cross-check NF detectada vs esperada
+    let status = result.status;
+    const problemas = [...result.problemas];
+    let nfMatch: "ok" | "divergente" | "nao_detectado" = "nao_detectado";
+
+    if (result.numero_nf_detectado && numeroNfEsperado) {
+      if (result.numero_nf_detectado === numeroNfEsperado) {
+        nfMatch = "ok";
+      } else {
+        nfMatch = "divergente";
+        status = "ruim";
+        problemas.unshift(
+          `NF divergente: canhoto mostra ${result.numero_nf_detectado}, esperado ${numeroNfEsperado}`,
+        );
+      }
+    }
+
     await supabase
       .from("baixas_entrega")
       .update({
         validacao_score: result.score,
-        validacao_status: result.status,
-        validacao_problemas: { lista: result.problemas, observacoes: result.observacoes },
+        validacao_status: status,
+        validacao_problemas: {
+          lista: problemas,
+          observacoes: result.observacoes,
+          numero_nf_detectado: result.numero_nf_detectado,
+          numero_nf_esperado: numeroNfEsperado,
+          nf_match: nfMatch,
+        },
         validacao_em: new Date().toISOString(),
       })
       .eq("id", baixa_id);
 
-    return new Response(JSON.stringify({ success: true, ...result }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, ...result, status, nf_match: nfMatch }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
     console.error("validar-canhoto erro:", err);
     return new Response(

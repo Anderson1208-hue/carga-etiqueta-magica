@@ -71,7 +71,7 @@ interface BaixaItem {
   registrado_em: string | null;
   validacao_score: number | null;
   validacao_status: string | null;
-  validacao_problemas: { lista?: string[]; observacoes?: string } | null;
+  validacao_problemas: { lista?: string[]; observacoes?: string; numero_nf_detectado?: string | null; numero_nf_esperado?: string | null; nf_match?: "ok" | "divergente" | "nao_detectado" } | null;
   conferido_em: string | null;
   conferencia_status: string | null;
   conferencia_motivo: string | null;
@@ -482,10 +482,16 @@ export default function PrestacaoContas() {
                                             <TooltipTrigger>
                                               <Badge variant={b.validacao_status === "ok" ? "default" : b.validacao_status === "alerta" ? "secondary" : "destructive"}>
                                                 {b.validacao_score ?? "?"}
+                                                {b.validacao_problemas?.nf_match === "divergente" && " ⚠NF"}
                                               </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent className="max-w-xs">
                                               <p className="font-semibold capitalize">{b.validacao_status}</p>
+                                              {b.validacao_problemas?.nf_match === "divergente" && (
+                                                <p className="text-xs mt-1 font-semibold text-destructive">
+                                                  NF do canhoto: {b.validacao_problemas.numero_nf_detectado} ≠ esperado {b.validacao_problemas.numero_nf_esperado}
+                                                </p>
+                                              )}
                                               {b.validacao_problemas?.lista?.length ? (
                                                 <ul className="list-disc pl-4 text-xs mt-1">
                                                   {b.validacao_problemas.lista.map((p, i) => <li key={i}>{p}</li>)}
