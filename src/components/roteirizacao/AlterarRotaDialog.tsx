@@ -179,11 +179,27 @@ export function AlterarRotaDialog({
       // 2. Remove selected NFs
       if (nfsToRemove.size > 0) {
         const removeIds = Array.from(nfsToRemove);
+        // Buscar nf_ids antes de deletar para resetar status_entrega
+        const { data: vinculosRemover } = await supabase
+          .from("veiculo_nfs")
+          .select("nf_id")
+          .in("id", removeIds);
+        const nfIdsRemover = (vinculosRemover || []).map((v) => v.nf_id);
+
         const { error: delErr } = await supabase
           .from("veiculo_nfs")
           .delete()
           .in("id", removeIds);
         if (delErr) throw delErr;
+
+        // Reseta status_entrega para a NF reaparecer na Preparação
+        if (nfIdsRemover.length > 0) {
+          await supabase
+            .from("notas_fiscais")
+            .update({ status_entrega: "CARGA NO DEPOSITO" })
+            .in("id", nfIdsRemover)
+            .in("status_entrega", ["NF EM ROTA", "ENTREGUE", "RECUSADO"]);
+        }
       }
 
       // 2.1 Se todas as NFs foram removidas e nenhuma será adicionada,
