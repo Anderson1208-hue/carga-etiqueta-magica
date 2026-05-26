@@ -271,24 +271,48 @@ export default function MonitoramentoRotas() {
   }
 
   async function handleIniciarTodos(veiculos: any[]) {
-    if (veiculos.length === 0) return;
+    // Filtra: veículos da programação de hoje + veículos de dias anteriores ainda sem baixa
+    // (loadVeiculosDisponiveis já restringe status a 'pendente'/'em_rota', então qualquer
+    // data <= hoje significa "do dia ou anterior sem baixa concluída").
+    const hojeStr = new Date().toISOString().slice(0, 10);
+    const hoje = new Date(`${hojeStr}T00:00:00`).getTime();
+    const elegiveis = (veiculos || []).filter((v) => {
+      if (!v?.data) return false;
+      const d = new Date(`${String(v.data).slice(0, 10)}T00:00:00`).getTime();
+      return d <= hoje;
+    });
+
+    if (elegiveis.length === 0) {
+      toast({
+        title: "Nenhum veículo elegível",
+        description: "Não há veículos da programação de hoje ou de dias anteriores sem baixa.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIniciandoRota(true);
     const resultados: Awaited<ReturnType<typeof criarMonitoramentoParaVeiculo>>[] = [];
-    for (const v of veiculos) {
+    for (const v of elegiveis) {
       const res = await criarMonitoramentoParaVeiculo(v);
       resultados.push(res);
     }
     const sucessos = resultados.filter((r) => r.sucesso);
     const falhas = resultados.filter((r) => !r.sucesso);
+    const ignorados = (veiculos?.length || 0) - elegiveis.length;
+    const sufixoIgnorados = ignorados > 0 ? ` ${ignorados} veículo(s) futuro(s) ignorado(s).` : "";
     if (sucessos.length > 0) {
       toast({
         title: `${sucessos.length} monitoramento(s) iniciado(s)`,
-        description: falhas.length > 0 ? `${falhas.length} falha(s): ${falhas.map((f) => `${f.placa} (${f.motivo})`).join(", ")}` : "Todos os veículos foram iniciados com sucesso.",
+        description:
+          (falhas.length > 0
+            ? `${falhas.length} falha(s): ${falhas.map((f) => `${f.placa} (${f.motivo})`).join(", ")}`
+            : "Todos os veículos elegíveis foram iniciados com sucesso.") + sufixoIgnorados,
       });
     } else {
       toast({
         title: "Nenhum monitoramento iniciado",
-        description: falhas.map((f) => `${f.placa}: ${f.motivo}`).join("; "),
+        description: falhas.map((f) => `${f.placa}: ${f.motivo}`).join("; ") + sufixoIgnorados,
         variant: "destructive",
       });
     }
