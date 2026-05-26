@@ -502,6 +502,7 @@ export default function MonitoramentoRotas() {
         loading={loadingVeiculos}
         iniciando={iniciandoRota}
         onIniciar={handleIniciarMonitoramento}
+        onIniciarTodos={handleIniciarTodos}
       />
     </MainLayout>
   );
