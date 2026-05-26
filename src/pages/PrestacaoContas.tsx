@@ -71,7 +71,7 @@ interface BaixaItem {
   registrado_em: string | null;
   validacao_score: number | null;
   validacao_status: string | null;
-  validacao_problemas: { lista?: string[]; observacoes?: string } | null;
+  validacao_problemas: { lista?: string[]; observacoes?: string; numero_nf_detectado?: string | null; numero_nf_esperado?: string | null; nf_match?: "ok" | "divergente" | "nao_detectado" } | null;
   conferido_em: string | null;
   conferencia_status: string | null;
   conferencia_motivo: string | null;
