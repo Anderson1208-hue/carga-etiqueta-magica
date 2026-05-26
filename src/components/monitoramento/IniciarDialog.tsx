@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, Play } from "lucide-react";
 
 interface Veiculo {
   id: string;
@@ -22,14 +22,25 @@ interface IniciarDialogProps {
   loading: boolean;
   iniciando: boolean;
   onIniciar: (veiculo: Veiculo) => void;
+  onIniciarTodos?: (veiculos: Veiculo[]) => void;
 }
 
-export function IniciarDialog({ open, onClose, veiculos, loading, iniciando, onIniciar }: IniciarDialogProps) {
+export function IniciarDialog({ open, onClose, veiculos, loading, iniciando, onIniciar, onIniciarTodos }: IniciarDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle>Iniciar Monitoramento</DialogTitle>
+          {veiculos.length > 0 && onIniciarTodos && (
+            <Button
+              size="sm"
+              onClick={() => onIniciarTodos(veiculos)}
+              disabled={iniciando}
+            >
+              {iniciando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 mr-1" />}
+              Iniciar Todos
+            </Button>
+          )}
         </DialogHeader>
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
           {loading ? (
