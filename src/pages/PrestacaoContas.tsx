@@ -282,7 +282,51 @@ export default function PrestacaoContas() {
       if (veiculoSel) carregarBaixas(veiculoSel);
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message, variant: "destructive" });
+  }
+
+  async function desfazerBaixa(baixa: BaixaItem) {
+    const ok = window.confirm(
+      `Desfazer a baixa da NF ${baixa.nf?.numero_nf || ""}?\n\n` +
+        `A ocorrência registrada pelo motorista (${baixa.ocorrencia ? (OCORRENCIA_LABEL[baixa.ocorrencia] || baixa.ocorrencia) : "—"}) será removida ` +
+        `e a NF voltará para o app do motorista como pendente, permitindo registrar a ocorrência correta.`
+    );
+    if (!ok) return;
+
+    try {
+      if (baixa.foto_path) {
+        await supabase.storage.from("comprovantes").remove([baixa.foto_path]);
+      }
+      const { error: delErr } = await supabase
+        .from("baixas_entrega")
+        .delete()
+        .eq("id", baixa.id);
+      if (delErr) throw delErr;
+
+      // Reverte status da NF para "NF EM ROTA" (trigger de baixa não dispara em DELETE)
+      const { data: nfRow } = await supabase
+        .from("baixas_entrega")
+        .select("id")
+        .eq("nf_id", (baixa as any).nf_id || "")
+        .limit(1)
+        .maybeSingle();
+
+      // Sem outras baixas, reseta a NF
+      if (!nfRow) {
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "NF EM ROTA" })
+          .in("id", baixas.filter((x) => x.id === baixa.id).map((x: any) => x.nf_id).filter(Boolean));
+      }
+
+      toast({
+        title: "Baixa desfeita",
+        description: "O motorista deve registrar a ocorrência novamente no app.",
+      });
+      if (veiculoSel) carregarBaixas(veiculoSel);
+    } catch (err: any) {
+      toast({ title: "Erro ao desfazer baixa", description: err?.message, variant: "destructive" });
     }
+  }
   }
 
   async function encerrarPrestacao() {
