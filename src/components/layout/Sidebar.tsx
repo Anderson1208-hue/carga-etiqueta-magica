@@ -206,22 +206,24 @@ export function Sidebar() {
             pathname={location.pathname}
             groupActive={relatoriosActive}
           />
-          {isAdmin && (
-            <div className="pt-2 space-y-0.5">
-              <NavItem
-                item={{ name: "Conciliação", href: "/conciliacao", icon: FileSpreadsheet }}
-                isActive={location.pathname === "/conciliacao"}
-              />
-              <NavItem
-                item={{ name: "Operadores", href: "/operadores", icon: Users }}
-                isActive={location.pathname === "/operadores"}
-              />
-              <NavItem
-                item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
-                isActive={location.pathname === "/auditoria"}
-              />
-            </div>
-          )}
+          <div className="pt-2 space-y-0.5">
+            <NavItem
+              item={{ name: "Conciliação", href: "/conciliacao", icon: FileSpreadsheet }}
+              isActive={location.pathname === "/conciliacao"}
+            />
+            {isAdmin && (
+              <>
+                <NavItem
+                  item={{ name: "Operadores", href: "/operadores", icon: Users }}
+                  isActive={location.pathname === "/operadores"}
+                />
+                <NavItem
+                  item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
+                  isActive={location.pathname === "/auditoria"}
+                />
+              </>
+            )}
+          </div>
         </div>
       </nav>
 
