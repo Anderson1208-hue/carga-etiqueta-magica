@@ -74,15 +74,28 @@ export default function MotoristaAcesso() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
+  // Gate de validação do GPS background (APK nativo).
+  // No web sempre passa direto — `isBackgroundGpsValidated` retorna true fora de Capacitor.
+  const [gpsValidated, setGpsValidated] = useState<boolean>(() => isBackgroundGpsValidated());
+  const [showValidacao, setShowValidacao] = useState(false);
+
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // Posições caem na fila IndexedDB e o worker drena para o backend com retry.
+  // SÓ ATIVA depois do wizard de validação confirmar que o background funciona.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
-    enabled: !!veiculo && !!monitoramentoRotaId,
+    enabled: !!veiculo && !!monitoramentoRotaId && gpsValidated,
   });
-  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
+  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId && gpsValidated);
   useWakeLock(!!veiculo);
   useLockPortrait();
+
+  // Quando o motorista loga no APK e o GPS ainda não foi validado,
+  // abre o wizard automaticamente. No web (sem Capacitor) já vem true.
+  useEffect(() => {
+    if (!veiculo) return;
+    if (!Capacitor.isNativePlatform()) return;
+    if (!gpsValidated) setShowValidacao(true);
+  }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
   // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
