@@ -70,7 +70,6 @@ export default function MonitoramentoRotas() {
           .range(from, to)
       );
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc).
-      // Considera TODAS as rotas (não apenas as de hoje) para garantir 1 linha por placa.
       const seen = new Set<string>();
       const dedup = data.filter((r: any) => {
         const key = normalizePlate(r.placa) || r.veiculo_id;
@@ -79,7 +78,9 @@ export default function MonitoramentoRotas() {
         seen.add(key);
         return true;
       });
-      setRotas(dedup);
+      // Oculta rotas finalizadas (cargas antigas já encerradas).
+      const ativas = dedup.filter((r: any) => r.status !== "finalizada");
+      setRotas(ativas);
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
