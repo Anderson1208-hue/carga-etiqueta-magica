@@ -22,9 +22,10 @@ interface IniciarDialogProps {
   loading: boolean;
   iniciando: boolean;
   onIniciar: (veiculo: Veiculo) => void;
+  onIniciarTodos?: (veiculos: Veiculo[]) => void;
 }
 
-export function IniciarDialog({ open, onClose, veiculos, loading, iniciando, onIniciar }: IniciarDialogProps) {
+export function IniciarDialog({ open, onClose, veiculos, loading, iniciando, onIniciar, onIniciarTodos }: IniciarDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
