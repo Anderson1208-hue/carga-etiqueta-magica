@@ -96,6 +96,39 @@ Deno.serve(async (req) => {
     const lng = lastPos.longitude;
     const isHeartbeatOnly = positions.every((p) => p.heartbeat === true);
 
+    // 2.1 Detecta GAP de GPS > 5min — provável "Permitir o tempo todo" ausente
+    // ou app morto pelo SO. Cria um alerta único por janela para a Torre.
+    const GAP_THRESHOLD_MS = 5 * 60 * 1000;
+    const nowMs = Date.now();
+    const { data: rotaAtual } = await supabase
+      .from("monitoramento_rotas")
+      .select("ultima_atualizacao, status")
+      .eq("id", monitoramento_rota_id)
+      .maybeSingle();
+
+    if (rotaAtual?.ultima_atualizacao && rotaAtual.status === "ativa") {
+      const gapMs = nowMs - new Date(rotaAtual.ultima_atualizacao).getTime();
+      if (gapMs > GAP_THRESHOLD_MS) {
+        const minutos = Math.round(gapMs / 60000);
+        // Evita duplicar alerta — só insere se não houver gps_instavel nos últimos 10min
+        const { data: jaExiste } = await supabase
+          .from("alertas_monitoramento")
+          .select("id")
+          .eq("monitoramento_rota_id", monitoramento_rota_id)
+          .eq("tipo", "gps_instavel")
+          .gte("created_at", new Date(nowMs - 10 * 60 * 1000).toISOString())
+          .limit(1);
+
+        if (!jaExiste || jaExiste.length === 0) {
+          await supabase.from("alertas_monitoramento").insert({
+            monitoramento_rota_id,
+            tipo: "gps_instavel",
+            mensagem: `GPS ficou ${minutos} min sem enviar posição — provável falha de permissão "Permitir o tempo todo" ou otimização de bateria.`,
+          });
+        }
+      }
+    }
+
     await supabase
       .from("monitoramento_rotas")
       .update({

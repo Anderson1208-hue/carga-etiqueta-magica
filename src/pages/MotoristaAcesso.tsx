@@ -13,8 +13,10 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
+import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
 
 interface NfMotorista {
   id: string;
@@ -72,15 +74,28 @@ export default function MotoristaAcesso() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
+  // Gate de validação do GPS background (APK nativo).
+  // No web sempre passa direto — `isBackgroundGpsValidated` retorna true fora de Capacitor.
+  const [gpsValidated, setGpsValidated] = useState<boolean>(() => isBackgroundGpsValidated());
+  const [showValidacao, setShowValidacao] = useState(false);
+
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // Posições caem na fila IndexedDB e o worker drena para o backend com retry.
+  // SÓ ATIVA depois do wizard de validação confirmar que o background funciona.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
-    enabled: !!veiculo && !!monitoramentoRotaId,
+    enabled: !!veiculo && !!monitoramentoRotaId && gpsValidated,
   });
-  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
+  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId && gpsValidated);
   useWakeLock(!!veiculo);
   useLockPortrait();
+
+  // Quando o motorista loga no APK e o GPS ainda não foi validado,
+  // abre o wizard automaticamente. No web (sem Capacitor) já vem true.
+  useEffect(() => {
+    if (!veiculo) return;
+    if (!Capacitor.isNativePlatform()) return;
+    if (!gpsValidated) setShowValidacao(true);
+  }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
   // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
@@ -357,7 +372,32 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
-      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
+      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId && gpsValidated} />
+      <ValidacaoGpsBackground
+        open={showValidacao}
+        onValidated={() => { setGpsValidated(true); setShowValidacao(false); }}
+        onCancel={() => {
+          setShowValidacao(false);
+          setVeiculo(null);
+          setNfs([]);
+          setMonitoramentoRotaId(null);
+          setCode("");
+        }}
+      />
+      {/* Banner quando GPS ainda não foi validado neste APK */}
+      {Capacitor.isNativePlatform() && veiculo && !gpsValidated && !showValidacao && (
+        <div className="bg-warning/15 border-b border-warning/30 p-3">
+          <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+              <span>GPS de background não validado — rastreamento desativado.</span>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setShowValidacao(true)}>
+              <ShieldCheck className="w-3 h-3 mr-1" /> Validar
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="flex items-center justify-between max-w-lg mx-auto">
