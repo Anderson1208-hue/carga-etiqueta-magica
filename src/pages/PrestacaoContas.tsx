@@ -325,7 +325,7 @@ export default function PrestacaoContas() {
           await supabase
             .from("veiculo_nfs")
             .upsert(
-              { veiculo_id: veiculoId, nf_id: baixa.nf_id },
+              [{ veiculo_id: veiculoId, nf_id: baixa.nf_id } as any],
               { onConflict: "veiculo_id,nf_id", ignoreDuplicates: true }
             );
         }
