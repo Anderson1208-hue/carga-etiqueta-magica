@@ -303,20 +303,18 @@ export default function PrestacaoContas() {
         .eq("id", baixa.id);
       if (delErr) throw delErr;
 
-      // Reverte status da NF para "NF EM ROTA" (trigger de baixa não dispara em DELETE)
-      const { data: nfRow } = await supabase
+      // Reverte status da NF para "NF EM ROTA" se não houver outra baixa ativa para a mesma NF
+      const { data: outras } = await supabase
         .from("baixas_entrega")
         .select("id")
-        .eq("nf_id", (baixa as any).nf_id || "")
-        .limit(1)
-        .maybeSingle();
+        .eq("nf_id", baixa.nf_id)
+        .limit(1);
 
-      // Sem outras baixas, reseta a NF
-      if (!nfRow) {
+      if (!outras || outras.length === 0) {
         await supabase
           .from("notas_fiscais")
           .update({ status_entrega: "NF EM ROTA" })
-          .in("id", baixas.filter((x) => x.id === baixa.id).map((x: any) => x.nf_id).filter(Boolean));
+          .eq("id", baixa.nf_id);
       }
 
       toast({
