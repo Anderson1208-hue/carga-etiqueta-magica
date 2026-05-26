@@ -517,9 +517,25 @@ export default function PrestacaoContas() {
                                     </TableCell>
                                     <TableCell>
                                       {b.foto_path ? (
-                                        <Button size="sm" variant="ghost" onClick={() => verFoto(b.foto_path!)}>
-                                          <ImageIcon className="w-4 h-4" />
-                                        </Button>
+                                        <div className="flex items-center gap-1">
+                                          <Button size="sm" variant="ghost" onClick={() => verFoto(b.foto_path!)}>
+                                            <ImageIcon className="w-4 h-4" />
+                                          </Button>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                                disabled={!!veiculoSel.prestacao_contas_em}
+                                                onClick={() => solicitarNovaFoto(b)}
+                                              >
+                                                <X className="w-4 h-4" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Excluir foto e pedir nova ao motorista</TooltipContent>
+                                          </Tooltip>
+                                        </div>
                                       ) : <span className="text-xs text-muted-foreground">—</span>}
                                     </TableCell>
                                     <TableCell>
