@@ -62,17 +62,15 @@ export default function MonitoramentoRotas() {
   // --- Data loading (unchanged logic) ---
   const loadRotas = useCallback(async () => {
     try {
-      const inicioHoje = new Date();
-      inicioHoje.setHours(0, 0, 0, 0);
       const data = await fetchAllPages<any>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .gte("created_at", inicioHoje.toISOString())
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc)
+      // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc).
+      // Considera TODAS as rotas (não apenas as de hoje) para garantir 1 linha por placa.
       const seen = new Set<string>();
       const dedup = data.filter((r: any) => {
         const key = normalizePlate(r.placa) || r.veiculo_id;
@@ -88,6 +86,7 @@ export default function MonitoramentoRotas() {
       setLoading(false);
     }
   }, []);
+
 
   const loadParadas = useCallback(async (rotaId: string) => {
     const data = await fetchAllPages<any>((from, to) =>
