@@ -615,20 +615,36 @@ export default function PrestacaoContas() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-right whitespace-nowrap">
-                                      {b.conferencia_status ? (
-                                        <Button size="sm" variant="ghost" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
-                                          Reabrir
-                                        </Button>
-                                      ) : (
-                                        <div className="flex gap-1 justify-end">
-                                          <Button size="sm" variant="default" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
-                                            <CheckCircle2 className="w-4 h-4 mr-1" /> OK
+                                      <div className="flex gap-1 justify-end items-center">
+                                        {b.conferencia_status ? (
+                                          <Button size="sm" variant="ghost" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
+                                            Reabrir
                                           </Button>
-                                          <Button size="sm" variant="destructive" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
-                                            <AlertTriangle className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      )}
+                                        ) : (
+                                          <>
+                                            <Button size="sm" variant="default" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
+                                              <CheckCircle2 className="w-4 h-4 mr-1" /> OK
+                                            </Button>
+                                            <Button size="sm" variant="destructive" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
+                                              <AlertTriangle className="w-4 h-4" />
+                                            </Button>
+                                          </>
+                                        )}
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                              disabled={!!veiculoSel.prestacao_contas_em}
+                                              onClick={() => desfazerBaixa(b)}
+                                            >
+                                              <Undo2 className="w-4 h-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
+                                        </Tooltip>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 );
