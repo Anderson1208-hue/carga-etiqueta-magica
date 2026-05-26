@@ -163,7 +163,7 @@ export default function PrestacaoContas() {
       const { data, error } = await supabase
         .from("baixas_entrega")
         .select(`
-          id, status, ocorrencia, recebedor_nome, foto_path, latitude, longitude,
+          id, nf_id, status, ocorrencia, recebedor_nome, foto_path, latitude, longitude,
           registrado_em, validacao_score, validacao_status, validacao_problemas,
           conferido_em, conferencia_status, conferencia_motivo,
           nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf)
