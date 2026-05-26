@@ -160,8 +160,7 @@ export default function MonitoramentoRotas() {
   }, []);
 
   // --- Actions (unchanged logic) ---
-  async function handleIniciarMonitoramento(veiculo: any) {
-    setIniciandoRota(true);
+  async function criarMonitoramentoParaVeiculo(veiculo: any): Promise<{ sucesso: boolean; placa: string; paradas?: number; motivo?: string }> {
     try {
       // Guard: impede duplicar monitoramento para a mesma placa, mesmo com veiculo_id diferente
       const { data: ativas } = await supabase
@@ -174,15 +173,9 @@ export default function MonitoramentoRotas() {
         rota.veiculo_id === veiculo.id || normalizePlate(rota.placa) === placaVeiculo
       );
       if (existente) {
-        toast({
-          title: "Monitoramento já ativo",
-          description: `${veiculo.placa} já possui uma rota em andamento.`,
-          variant: "destructive",
-        });
-        setShowIniciar(false);
-        loadRotas();
-        return;
+        return { sucesso: false, placa: veiculo.placa, motivo: "Já possui rota ativa" };
       }
+
       const { data: veiculoNfs } = await supabase
         .from("veiculo_nfs")
         .select(`
@@ -202,6 +195,10 @@ export default function MonitoramentoRotas() {
         if (!groupedByCnpj[cnpj]) groupedByCnpj[cnpj] = [];
         groupedByCnpj[cnpj].push(nf);
       });
+
+      if (Object.keys(groupedByCnpj).length === 0) {
+        return { sucesso: false, placa: veiculo.placa, motivo: "Sem NF vinculada" };
+      }
 
       const { data: rotParadas } = await supabase
         .from("roteirizacao_paradas")
@@ -246,15 +243,58 @@ export default function MonitoramentoRotas() {
       paradasInsert.forEach((p, i) => (p.ordem = i + 1));
       await supabase.from("monitoramento_paradas").insert(paradasInsert);
 
-      toast({ title: "Monitoramento iniciado!", description: `${veiculo.placa} - ${paradasInsert.length} paradas` });
+      return { sucesso: true, placa: veiculo.placa, paradas: paradasInsert.length };
+    } catch (err) {
+      console.error("Erro ao criar monitoramento:", err);
+      return { sucesso: false, placa: veiculo.placa, motivo: "Erro inesperado" };
+    }
+  }
+
+  async function handleIniciarMonitoramento(veiculo: any) {
+    setIniciandoRota(true);
+    try {
+      const res = await criarMonitoramentoParaVeiculo(veiculo);
+      if (res.sucesso) {
+        toast({ title: "Monitoramento iniciado!", description: `${res.placa} - ${res.paradas} paradas` });
+      } else {
+        toast({
+          title: "Não iniciado",
+          description: `${res.placa}: ${res.motivo}`,
+          variant: "destructive",
+        });
+      }
       setShowIniciar(false);
       loadRotas();
-    } catch (err) {
-      console.error("Erro ao iniciar monitoramento:", err);
-      toast({ title: "Erro ao iniciar monitoramento", variant: "destructive" });
     } finally {
       setIniciandoRota(false);
     }
+  }
+
+  async function handleIniciarTodos(veiculos: any[]) {
+    if (veiculos.length === 0) return;
+    setIniciandoRota(true);
+    const resultados: Awaited<ReturnType<typeof criarMonitoramentoParaVeiculo>>[] = [];
+    for (const v of veiculos) {
+      const res = await criarMonitoramentoParaVeiculo(v);
+      resultados.push(res);
+    }
+    const sucessos = resultados.filter((r) => r.sucesso);
+    const falhas = resultados.filter((r) => !r.sucesso);
+    if (sucessos.length > 0) {
+      toast({
+        title: `${sucessos.length} monitoramento(s) iniciado(s)`,
+        description: falhas.length > 0 ? `${falhas.length} falha(s): ${falhas.map((f) => `${f.placa} (${f.motivo})`).join(", ")}` : "Todos os veículos foram iniciados com sucesso.",
+      });
+    } else {
+      toast({
+        title: "Nenhum monitoramento iniciado",
+        description: falhas.map((f) => `${f.placa}: ${f.motivo}`).join("; "),
+        variant: "destructive",
+      });
+    }
+    setShowIniciar(false);
+    loadRotas();
+    setIniciandoRota(false);
   }
 
   async function handleSaveJustificativa(paradaId: string, tipo: string, texto: string) {
