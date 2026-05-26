@@ -1,46 +1,49 @@
 ---
 name: gps-background-nao-funciona-campo
-description: GPS em background NÃO está funcionando em campo apesar do plugin nativo instalado. Não afirmar que "funciona igual Waze". Diagnóstico das 5 causas prováveis.
-type: constraint
+description: GPS background do APK Motorista — gate de validação ativa + detecção server-side de gaps. Cliente confirmou que "Permitir o tempo todo" não aparecia.
+type: feature
 ---
-# GPS background do APK Motorista — NÃO confiável
+# GPS background do APK Motorista — Gate de validação ativa (A+B)
 
-## Realidade (validada em campo pelo cliente)
-Apesar de:
-- `@capacitor-community/background-geolocation` instalado
-- `useGpsTrackerNative` com Foreground Service, heartbeat, supervisor, fallback
-- Fila offline (`gpsQueue`) com retry
+## Problema confirmado em campo (26/05/2026)
+Mesmo com `@capacitor-community/background-geolocation` instalado e
+`useGpsTrackerNative` com Foreground Service, **o GPS parava de enviar com
+tela bloqueada**. Cliente confirmou: a opção "Permitir o tempo todo" não
+aparecia na tela de permissão do Android — é necessário entrar em
+Configurações → Apps → Permissões → Localização manualmente.
 
-**O motorista relata que com tela bloqueada o GPS para de enviar.** NÃO repetir o discurso de "funciona igual Waze". A memória `gps-tracker-hibrido-capacitor.md` está OTIMISTA demais; este arquivo prevalece.
+## Solução implementada (A+B)
 
-## 5 causas prováveis (em ordem de probabilidade)
+### A — Wizard de validação ativa (bloqueante)
+`src/components/mobile/ValidacaoGpsBackground.tsx`
+- Fullscreen modal antes de o GPS tracker ativar.
+- Fluxo: Intro → Abrir Configurações (via `BackgroundGeolocation.openSettings()`) → Teste 90s.
+- Teste comportamental: registra um watcher temporário e CONTA callbacks
+  recebidos enquanto `document.hidden === true` (tela bloqueada). Exige
+  `>= 2 callbacks com tela apagada` para considerar válido.
+- Por que comportamental e não API: nem `@capacitor/geolocation` nem o
+  plugin de background expõem distinção entre "always" vs "whileInUse" no
+  Android. A única forma confiável de saber se "Permitir o tempo todo"
+  está ativo é observar se o callback continua chegando com tela apagada.
+- Persistência: `localStorage["bg_gps_validated_v2_at"]` com TTL de 14 dias.
+- Web (sem Capacitor) passa direto — `isBackgroundGpsValidated()` retorna true.
 
-1. **Permissão "Permitir o tempo todo" não concedida.** Android 11+ esconde essa opção atrás de 2 cliques extras. `requestPermissions:true` do plugin só pede "Enquanto usando o app". Sem "Allow all the time", o SO mata callbacks ~5min após tela apagar — mesmo com Foreground Service ativo.
+### Gate no MotoristaAcesso
+`src/pages/MotoristaAcesso.tsx` — `useGpsTrackerHybrid` e
+`useGpsQueueWorker` só ativam quando `gpsValidated === true`. Banner
+warning aparece se motorista cancelar o wizard.
 
-2. **Otimização de bateria não desativada.** Xiaomi (MIUI), Samsung (One UI), Motorola, OPPO/Realme matam o app agressivamente. Precisa entrar em Bateria > [app] > Sem restrições + Auto-iniciar (Xiaomi) + "Permitir atividade em segundo plano" (Samsung).
+### B — Detecção server-side de gaps GPS
+`supabase/functions/processar-gps/index.ts` — antes de atualizar
+`monitoramento_rotas.ultima_atualizacao`, compara com o valor antigo.
+Se gap > 5min em rota ativa, insere alerta `tipo='gps_instavel'` em
+`alertas_monitoramento` (dedup: não cria outro nos próximos 10min).
+A Torre vê automaticamente no `AlertasPanel` (lista genérica de alertas).
 
-3. **AndroidManifest faltando permissões.** `android/` é gerado na máquina do dev (não está no repo Lovable). Conferir que tem TODAS:
-   - `ACCESS_FINE_LOCATION`
-   - `ACCESS_COARSE_LOCATION`
-   - `ACCESS_BACKGROUND_LOCATION` (Android 10+)
-   - `FOREGROUND_SERVICE`
-   - `FOREGROUND_SERVICE_LOCATION` (Android 14+)
-   - `POST_NOTIFICATIONS` (Android 13+)
-   - `WAKE_LOCK`
-
-4. **`targetSdkVersion` >= 34 sem declaração de Foreground Service Type.** Android 14 exige `<service android:foregroundServiceType="location" />` no manifest. Versões antigas do plugin podem não declarar isso.
-
-5. **Motorista faz swipe-kill no app.** Foreground Service NÃO sobrevive a swipe-kill em alguns fabricantes (Xiaomi pior). Tela apagada com app vivo = OK. Swipe-kill da lista de recentes = morre.
-
-## O que dá pra fazer dentro do Lovable
-- Melhorar tela `/motorista/diagnostico` com checklist visual: permissão exata concedida, otimização de bateria, última posição enviada, fila pendente.
-- Onboarding obrigatório (`PermissoesOnboarding`) que NÃO deixa começar rota sem "Allow all the time" + envio para `openSettings()` se faltar.
-- Telemetria server-side: ao receber gap > 5min, marcar rota como "GPS instável" no painel da Torre.
-
-## O que precisa ser feito FORA do Lovable (manualmente no PC do dev)
-- Inspecionar `android/app/src/main/AndroidManifest.xml` gerado e adicionar permissões/service type faltantes.
-- Testar em pelo menos 1 Xiaomi e 1 Samsung reais (emulador não reproduz kill agressivo).
-- Considerar trocar plugin por `@transistorsoft/capacitor-background-geolocation` (pago, mas é o que apps de delivery sério usam).
-
-## Status
-Caminho B (GPS nativo) está **incompleto na prática**. Antes de prometer Play Store (Caminho A), validar se o background funciona num celular real.
+## Limitações conhecidas
+- Não resolve otimização de bateria agressiva (Xiaomi/Samsung). O wizard
+  pega esses casos no teste de 90s (callbacks não chegarão) e instrui.
+- Swipe-kill da lista de recentes mata o Foreground Service — sem solução
+  programática, instruído no wizard.
+- AndroidManifest continua fora do controle Lovable. Conferir manualmente
+  que tem `ACCESS_BACKGROUND_LOCATION` e `FOREGROUND_SERVICE_LOCATION`.
