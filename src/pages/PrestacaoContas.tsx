@@ -63,6 +63,7 @@ interface VeiculoLista {
 
 interface BaixaItem {
   id: string;
+  nf_id: string;
   status: string;
   ocorrencia: string | null;
   recebedor_nome: string | null;
