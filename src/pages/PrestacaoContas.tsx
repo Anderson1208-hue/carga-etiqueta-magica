@@ -316,6 +316,26 @@ export default function PrestacaoContas() {
           .from("notas_fiscais")
           .update({ status_entrega: "NF EM ROTA" })
           .eq("id", baixa.nf_id);
+
+        // Re-vincula a NF ao veículo. A trigger fn_sync_nf_status_from_baixa
+        // remove o vínculo em veiculo_nfs quando a baixa é "reentrega" — sem
+        // restaurar, a placa some da tela do motorista.
+        const veiculoId = veiculoSel || (baixa as any).veiculo_id;
+        if (veiculoId) {
+          const { data: nfRow } = await supabase
+            .from("notas_fiscais")
+            .select("carga_id")
+            .eq("id", baixa.nf_id)
+            .maybeSingle();
+          if (nfRow?.carga_id) {
+            await supabase
+              .from("veiculo_nfs")
+              .upsert(
+                [{ veiculo_id: veiculoId, nf_id: baixa.nf_id, carga_origem_id: nfRow.carga_id }],
+                { onConflict: "nf_id", ignoreDuplicates: true }
+              );
+          }
+        }
       }
 
       toast({
