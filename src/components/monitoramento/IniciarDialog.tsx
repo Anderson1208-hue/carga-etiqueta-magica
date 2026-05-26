@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, Play } from "lucide-react";
 
 interface Veiculo {
   id: string;
