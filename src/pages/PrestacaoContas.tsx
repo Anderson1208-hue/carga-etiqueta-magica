@@ -46,6 +46,7 @@ import {
   Truck,
   ClipboardCheck,
   X,
+  Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +63,7 @@ interface VeiculoLista {
 
 interface BaixaItem {
   id: string;
+  nf_id: string;
   status: string;
   ocorrencia: string | null;
   recebedor_nome: string | null;
@@ -161,7 +163,7 @@ export default function PrestacaoContas() {
       const { data, error } = await supabase
         .from("baixas_entrega")
         .select(`
-          id, status, ocorrencia, recebedor_nome, foto_path, latitude, longitude,
+          id, nf_id, status, ocorrencia, recebedor_nome, foto_path, latitude, longitude,
           registrado_em, validacao_score, validacao_status, validacao_problemas,
           conferido_em, conferencia_status, conferencia_motivo,
           nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf)
@@ -283,6 +285,49 @@ export default function PrestacaoContas() {
       toast({ title: "Erro", description: err?.message, variant: "destructive" });
     }
   }
+
+  async function desfazerBaixa(baixa: BaixaItem) {
+    const ok = window.confirm(
+      `Desfazer a baixa da NF ${baixa.nf?.numero_nf || ""}?\n\n` +
+        `A ocorrência registrada pelo motorista (${baixa.ocorrencia ? (OCORRENCIA_LABEL[baixa.ocorrencia] || baixa.ocorrencia) : "—"}) será removida ` +
+        `e a NF voltará para o app do motorista como pendente, permitindo registrar a ocorrência correta.`
+    );
+    if (!ok) return;
+
+    try {
+      if (baixa.foto_path) {
+        await supabase.storage.from("comprovantes").remove([baixa.foto_path]);
+      }
+      const { error: delErr } = await supabase
+        .from("baixas_entrega")
+        .delete()
+        .eq("id", baixa.id);
+      if (delErr) throw delErr;
+
+      // Reverte status da NF para "NF EM ROTA" se não houver outra baixa ativa para a mesma NF
+      const { data: outras } = await supabase
+        .from("baixas_entrega")
+        .select("id")
+        .eq("nf_id", baixa.nf_id)
+        .limit(1);
+
+      if (!outras || outras.length === 0) {
+        await supabase
+          .from("notas_fiscais")
+          .update({ status_entrega: "NF EM ROTA" })
+          .eq("id", baixa.nf_id);
+      }
+
+      toast({
+        title: "Baixa desfeita",
+        description: "O motorista deve registrar a ocorrência novamente no app.",
+      });
+      if (veiculoSel) carregarBaixas(veiculoSel);
+    } catch (err: any) {
+      toast({ title: "Erro ao desfazer baixa", description: err?.message, variant: "destructive" });
+    }
+  }
+
 
   async function encerrarPrestacao() {
     if (!veiculoSel) return;
@@ -571,20 +616,36 @@ export default function PrestacaoContas() {
                                       )}
                                     </TableCell>
                                     <TableCell className="text-right whitespace-nowrap">
-                                      {b.conferencia_status ? (
-                                        <Button size="sm" variant="ghost" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
-                                          Reabrir
-                                        </Button>
-                                      ) : (
-                                        <div className="flex gap-1 justify-end">
-                                          <Button size="sm" variant="default" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
-                                            <CheckCircle2 className="w-4 h-4 mr-1" /> OK
+                                      <div className="flex gap-1 justify-end items-center">
+                                        {b.conferencia_status ? (
+                                          <Button size="sm" variant="ghost" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
+                                            Reabrir
                                           </Button>
-                                          <Button size="sm" variant="destructive" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
-                                            <AlertTriangle className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      )}
+                                        ) : (
+                                          <>
+                                            <Button size="sm" variant="default" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
+                                              <CheckCircle2 className="w-4 h-4 mr-1" /> OK
+                                            </Button>
+                                            <Button size="sm" variant="destructive" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
+                                              <AlertTriangle className="w-4 h-4" />
+                                            </Button>
+                                          </>
+                                        )}
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                              disabled={!!veiculoSel.prestacao_contas_em}
+                                              onClick={() => desfazerBaixa(b)}
+                                            >
+                                              <Undo2 className="w-4 h-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
+                                        </Tooltip>
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 );
