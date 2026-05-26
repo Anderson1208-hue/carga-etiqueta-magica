@@ -283,6 +283,7 @@ export default function PrestacaoContas() {
       if (veiculoSel) carregarBaixas(veiculoSel);
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message, variant: "destructive" });
+    }
   }
 
   async function desfazerBaixa(baixa: BaixaItem) {
@@ -326,7 +327,7 @@ export default function PrestacaoContas() {
       toast({ title: "Erro ao desfazer baixa", description: err?.message, variant: "destructive" });
     }
   }
-  }
+
 
   async function encerrarPrestacao() {
     if (!veiculoSel) return;
