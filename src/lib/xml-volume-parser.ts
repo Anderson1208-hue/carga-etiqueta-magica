@@ -47,10 +47,19 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   const isPandur = /pandur(?:ata)?/i.test(fornecedor);
   const volNodes = getElementsByLocalName(xmlDoc, ["vol", "volume", "volumes"]);
 
+  // Pandurata: <nVol> é usado como cubagem APENAS quando vem como decimal
+  // (ex: 3.918, 39.935). Se vier inteiro (1120, 300), é a quantidade de
+  // caixas padrão da NF-e e NÃO deve virar m³.
+  const tryPandurNVol = (raw: string | null | undefined): number => {
+    const value = parseVolumeNumber(raw);
+    if (value <= 0) return 0;
+    return Number.isInteger(value) ? 0 : value;
+  };
+
   if (isPandur) {
     const nVolNodes = getElementsByLocalName(xmlDoc, ["nvol"]);
     for (const nVolNode of nVolNodes) {
-      const value = parseVolumeNumber(nVolNode?.textContent);
+      const value = tryPandurNVol(nVolNode?.textContent);
       if (value > 0) return value;
     }
   }
@@ -61,7 +70,7 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
 
     if (/pandur(?:ata)?/i.test(marca)) {
       const nVolNode = getChildByLocalName(volNode, ["nvol"]);
-      const value = parseVolumeNumber(nVolNode?.textContent);
+      const value = tryPandurNVol(nVolNode?.textContent);
       if (value > 0) return value;
     }
   }
