@@ -26,11 +26,23 @@ Deno.serve(async (req) => {
   // Modo dry-run: se IBAC ainda não respondeu URL/Key, apenas retorna status da fila
   const credenciaisConfiguradas = !!IBAC_API_URL && !!IBAC_API_KEY;
 
-  const { data: pendentes, error: errSelect } = await supabase
+  // Carrega política de retry configurável
+  const { data: retryCfg } = await supabase
+    .from("ibac_config_retry")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle();
+
+  const maxTentativas = retryCfg?.max_tentativas ?? DEFAULT_MAX_TENTATIVAS;
+  const backoffBase = retryCfg?.backoff_base_segundos ?? 60;
+  const backoffMax = retryCfg?.backoff_max_segundos ?? 3600;
+  const backoffAtivo = retryCfg?.ativo ?? true;
+
+  const { data: pendentesRaw, error: errSelect } = await supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
-    .lt("tentativas", MAX_TENTATIVAS)
+    .lt("tentativas", maxTentativas)
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
 
