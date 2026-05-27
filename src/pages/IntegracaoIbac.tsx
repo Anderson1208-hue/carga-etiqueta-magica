@@ -9,7 +9,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
@@ -112,6 +123,43 @@ export default function IntegracaoIbac() {
     },
   });
 
+  const reenviarTodosErros = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from("ibac_eventos_queue")
+        .update({ status: "pendente", tentativas: 0, erro_mensagem: null })
+        .eq("status", "erro")
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} evento(s) reenfileirado(s) para reenvio`);
+      qc.invalidateQueries({ queryKey: ["ibac-fila"] });
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const limparEnviados = useMutation({
+    mutationFn: async () => {
+      // Apaga eventos enviados há mais de 30 dias para manter a fila enxuta
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("ibac_eventos_queue")
+        .delete()
+        .eq("status", "enviado")
+        .lt("enviado_em", cutoff)
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} evento(s) antigo(s) removido(s) da fila`);
+      qc.invalidateQueries({ queryKey: ["ibac-fila"] });
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
   const counts = {
     pendente: fila.filter((f) => f.status === "pendente").length,
     enviado: fila.filter((f) => f.status === "enviado").length,
@@ -146,10 +194,54 @@ export default function IntegracaoIbac() {
               Fila de eventos, mapeamento e auditoria do EDI com IBAC.
             </p>
           </div>
-          <Button onClick={() => processar.mutate()} disabled={processar.isPending}>
-            <Send className="w-4 h-4 mr-2" />
-            Processar fila agora
-          </Button>
+          <div className="flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={counts.erro === 0 || reenviarTodosErros.isPending}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reenviar erros ({counts.erro})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reenviar todos os eventos com erro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Os {counts.erro} evento(s) em erro voltarão para o status "pendente" com tentativas zeradas. O cron processa em até 2 minutos.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => reenviarTodosErros.mutate()}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={limparEnviados.isPending}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Limpar antigos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar eventos enviados antigos?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Remove permanentemente da fila os eventos com status "enviado" há mais de 30 dias. O histórico em "Logs" é preservado.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => limparEnviados.mutate()}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <Button onClick={() => processar.mutate()} disabled={processar.isPending}>
+              <Send className="w-4 h-4 mr-2" />
+              Processar fila agora
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
