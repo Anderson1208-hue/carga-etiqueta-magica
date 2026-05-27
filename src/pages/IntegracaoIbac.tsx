@@ -307,6 +307,10 @@ export default function IntegracaoIbac() {
             <IbacBackfillPanel />
           </TabsContent>
 
+          <TabsContent value="retry">
+            <IbacRetryPanel />
+          </TabsContent>
+
 
 
           <TabsContent value="fila">
