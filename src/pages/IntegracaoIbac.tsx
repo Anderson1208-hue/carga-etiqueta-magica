@@ -123,6 +123,43 @@ export default function IntegracaoIbac() {
     },
   });
 
+  const reenviarTodosErros = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase
+        .from("ibac_eventos_queue")
+        .update({ status: "pendente", tentativas: 0, erro_mensagem: null })
+        .eq("status", "erro")
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} evento(s) reenfileirado(s) para reenvio`);
+      qc.invalidateQueries({ queryKey: ["ibac-fila"] });
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
+  const limparEnviados = useMutation({
+    mutationFn: async () => {
+      // Apaga eventos enviados há mais de 30 dias para manter a fila enxuta
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("ibac_eventos_queue")
+        .delete()
+        .eq("status", "enviado")
+        .lt("enviado_em", cutoff)
+        .select("id");
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
+    onSuccess: (count) => {
+      toast.success(`${count} evento(s) antigo(s) removido(s) da fila`);
+      qc.invalidateQueries({ queryKey: ["ibac-fila"] });
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
   const counts = {
     pendente: fila.filter((f) => f.status === "pendente").length,
     enviado: fila.filter((f) => f.status === "enviado").length,
