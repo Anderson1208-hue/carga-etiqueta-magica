@@ -75,9 +75,18 @@ Deno.serve(async (req) => {
       .map((d) => [d.evento_interno, d.codigo_ibac]),
   );
 
+  // Aplica backoff exponencial: pula itens cuja próxima janela ainda não chegou
+  const agora = Date.now();
+  const pendentes = (pendentesRaw ?? []).filter((item) => {
+    if (!backoffAtivo || item.tentativas === 0 || !item.ultima_tentativa_em) return true;
+    const espera = Math.min(backoffBase * Math.pow(2, item.tentativas - 1), backoffMax) * 1000;
+    return agora - new Date(item.ultima_tentativa_em).getTime() >= espera;
+  });
+  const adiados = (pendentesRaw?.length ?? 0) - pendentes.length;
+
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
-  for (const item of pendentes ?? []) {
+  for (const item of pendentes) {
     const codigoIbac = deParaMap.get(item.evento_interno);
     if (!codigoIbac) {
       await supabase
