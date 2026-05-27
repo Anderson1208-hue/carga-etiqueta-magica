@@ -263,9 +263,15 @@ export default function IntegracaoIbac() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="fila">Fila ({fila.length})</TabsTrigger>
+            <TabsTrigger value="saude">Saúde</TabsTrigger>
             <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="saude">
+            <IbacSaudePanel />
+          </TabsContent>
+
 
           <TabsContent value="fila">
             <Card>
