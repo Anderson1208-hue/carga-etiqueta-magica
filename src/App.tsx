@@ -292,7 +292,9 @@ function AppRoutes() {
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
+
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
