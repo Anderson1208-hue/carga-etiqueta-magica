@@ -36,6 +36,7 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
+import IntegracaoIbac from "./pages/IntegracaoIbac";
 
 const queryClient = new QueryClient({
   defaultOptions: {
