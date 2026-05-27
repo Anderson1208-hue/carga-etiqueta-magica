@@ -13,7 +13,7 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const IBAC_API_URL = Deno.env.get("IBAC_API_URL") ?? "";
 const IBAC_API_KEY = Deno.env.get("IBAC_API_KEY") ?? "";
 
-const MAX_TENTATIVAS = 5;
+const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
 
 Deno.serve(async (req) => {
@@ -26,11 +26,23 @@ Deno.serve(async (req) => {
   // Modo dry-run: se IBAC ainda não respondeu URL/Key, apenas retorna status da fila
   const credenciaisConfiguradas = !!IBAC_API_URL && !!IBAC_API_KEY;
 
-  const { data: pendentes, error: errSelect } = await supabase
+  // Carrega política de retry configurável
+  const { data: retryCfg } = await supabase
+    .from("ibac_config_retry")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle();
+
+  const maxTentativas = retryCfg?.max_tentativas ?? DEFAULT_MAX_TENTATIVAS;
+  const backoffBase = retryCfg?.backoff_base_segundos ?? 60;
+  const backoffMax = retryCfg?.backoff_max_segundos ?? 3600;
+  const backoffAtivo = retryCfg?.ativo ?? true;
+
+  const { data: pendentesRaw, error: errSelect } = await supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
-    .lt("tentativas", MAX_TENTATIVAS)
+    .lt("tentativas", maxTentativas)
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
 
@@ -46,7 +58,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         status: "aguardando_configuracao",
         mensagem: "Defina os secrets IBAC_API_URL e IBAC_API_KEY para iniciar o envio.",
-        pendentes_na_fila: pendentes?.length ?? 0,
+        pendentes_na_fila: pendentesRaw?.length ?? 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
@@ -63,9 +75,18 @@ Deno.serve(async (req) => {
       .map((d) => [d.evento_interno, d.codigo_ibac]),
   );
 
+  // Aplica backoff exponencial: pula itens cuja próxima janela ainda não chegou
+  const agora = Date.now();
+  const pendentes = (pendentesRaw ?? []).filter((item) => {
+    if (!backoffAtivo || item.tentativas === 0 || !item.ultima_tentativa_em) return true;
+    const espera = Math.min(backoffBase * Math.pow(2, item.tentativas - 1), backoffMax) * 1000;
+    return agora - new Date(item.ultima_tentativa_em).getTime() >= espera;
+  });
+  const adiados = (pendentesRaw?.length ?? 0) - pendentes.length;
+
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
-  for (const item of pendentes ?? []) {
+  for (const item of pendentes) {
     const codigoIbac = deParaMap.get(item.evento_interno);
     if (!codigoIbac) {
       await supabase
@@ -124,7 +145,7 @@ Deno.serve(async (req) => {
     await supabase
       .from("ibac_eventos_queue")
       .update({
-        status: sucesso ? "enviado" : (item.tentativas + 1 >= MAX_TENTATIVAS ? "erro" : "pendente"),
+        status: sucesso ? "enviado" : (item.tentativas + 1 >= maxTentativas ? "erro" : "pendente"),
         tentativas: item.tentativas + 1,
         ultima_tentativa_em: new Date().toISOString(),
         enviado_em: sucesso ? new Date().toISOString() : null,
@@ -204,6 +225,7 @@ Deno.serve(async (req) => {
       processados: resultados.length,
       sucessos: resultados.filter((r) => r.sucesso).length,
       falhas: resultados.filter((r) => !r.sucesso).length,
+      adiados_por_backoff: adiados,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );

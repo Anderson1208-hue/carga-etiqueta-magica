@@ -994,6 +994,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ibac_config_retry: {
+        Row: {
+          ativo: boolean
+          backoff_base_segundos: number
+          backoff_max_segundos: number
+          id: boolean
+          max_tentativas: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          backoff_base_segundos?: number
+          backoff_max_segundos?: number
+          id?: boolean
+          max_tentativas?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          backoff_base_segundos?: number
+          backoff_max_segundos?: number
+          id?: boolean
+          max_tentativas?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ibac_de_para_eventos: {
         Row: {
           ativo: boolean

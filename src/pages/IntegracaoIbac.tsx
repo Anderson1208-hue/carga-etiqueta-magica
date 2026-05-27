@@ -30,6 +30,7 @@ import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
 import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
 import { IbacEventoDetalheDialog } from "@/components/ibac/IbacEventoDetalheDialog";
+import { IbacRetryPanel } from "@/components/ibac/IbacRetryPanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading } = useAuth();
@@ -289,6 +290,7 @@ export default function IntegracaoIbac() {
             <TabsTrigger value="saude">Saúde</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
             <TabsTrigger value="backfill">Backfill</TabsTrigger>
+            <TabsTrigger value="retry">Retry</TabsTrigger>
             <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
@@ -303,6 +305,10 @@ export default function IntegracaoIbac() {
 
           <TabsContent value="backfill">
             <IbacBackfillPanel />
+          </TabsContent>
+
+          <TabsContent value="retry">
+            <IbacRetryPanel />
           </TabsContent>
 
 
