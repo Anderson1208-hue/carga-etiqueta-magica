@@ -265,6 +265,7 @@ export default function IntegracaoIbac() {
           <TabsList>
             <TabsTrigger value="fila">Fila ({fila.length})</TabsTrigger>
             <TabsTrigger value="saude">Saúde</TabsTrigger>
+            <TabsTrigger value="alertas">Alertas</TabsTrigger>
             <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
@@ -272,6 +273,11 @@ export default function IntegracaoIbac() {
           <TabsContent value="saude">
             <IbacSaudePanel />
           </TabsContent>
+
+          <TabsContent value="alertas">
+            <IbacAlertasPanel />
+          </TabsContent>
+
 
 
           <TabsContent value="fila">
