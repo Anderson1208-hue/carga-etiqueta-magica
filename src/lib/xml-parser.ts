@@ -235,7 +235,9 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
 
   // Pandurata/PANDUR: alguns XMLs não trazem o nome do emitente com "Pandurata",
   // mas identificam o fornecedor em tags como <marca>PANDUR</marca>.
-  // Nesses casos, a cubagem vem em <vol><nVol>.
+  // A cubagem vem em <vol><nVol> APENAS quando o valor é decimal (ex: 3.918,
+  // 39.935). Se vier inteiro (ex: 1120, 300), é a quantidade de caixas padrão
+  // da NF-e e NÃO deve ser usada como m³.
   const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
   if (isPandurata) {
     for (const volBlock of volumeBlocks) {
@@ -243,7 +245,7 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
         (el) => getLocalName(el) === "nvol"
       );
       const value = parseNumericText(nVolNode?.textContent);
-      if (value > 0) return value;
+      if (value > 0 && !Number.isInteger(value)) return value;
     }
   }
 
