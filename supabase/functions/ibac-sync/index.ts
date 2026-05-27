@@ -12,8 +12,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const IBAC_API_URL = (Deno.env.get("IBAC_API_URL") ?? "").trim();
 const IBAC_API_KEY = (Deno.env.get("IBAC_API_KEY") ?? "").trim();
-console.log("[ibac-sync] IBAC_API_URL length:", IBAC_API_URL.length, "starts:", IBAC_API_URL.slice(0, 30));
-console.log("[ibac-sync] IBAC_API_KEY length:", IBAC_API_KEY.length, "first4:", IBAC_API_KEY.slice(0, 4), "last4:", IBAC_API_KEY.slice(-4));
 
 const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
