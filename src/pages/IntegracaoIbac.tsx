@@ -29,6 +29,7 @@ import { Navigate } from "react-router-dom";
 import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
 import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
+import { IbacEventoDetalheDialog } from "@/components/ibac/IbacEventoDetalheDialog";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading } = useAuth();
