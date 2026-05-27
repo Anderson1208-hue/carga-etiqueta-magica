@@ -341,6 +341,56 @@ export default function Agendamento() {
     }
   }
 
+  async function exportNfResultsToExcel() {
+    const rows = selectedNfIds.size > 0
+      ? nfResults.filter(nf => selectedNfIds.has(nf.id))
+      : nfResults;
+    if (rows.length === 0) return;
+    try {
+      const XLSX = await import("xlsx");
+      const data = rows.map(nf => ({
+        NF: nf.numero_nf,
+        "Chave de Acesso": nf.chave_acesso,
+        Destinatário: nf.dest_razao_social || "",
+        CNPJ: nf.cnpj_destinatario || "",
+        Cidade: nf.dest_cidade || "",
+        UF: nf.dest_uf || "",
+        "CT-e": nf.numero_cte || "",
+        "Emitente CT-e": nf.cte_emitente || "",
+        "Status Entrega": nf.status_entrega,
+        "Status Agenda": nf.agendamento_status || "",
+        "Data Agenda": nf.agendamento_data
+          ? format(new Date(nf.agendamento_data + "T12:00:00"), "dd/MM/yyyy")
+          : "",
+        Tipo: nf.tipo_carga,
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      ws["!cols"] = [
+        { wch: 10 }, { wch: 46 }, { wch: 36 }, { wch: 20 },
+        { wch: 22 }, { wch: 5 }, { wch: 12 }, { wch: 28 },
+        { wch: 18 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+      ];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "NFs Consultadas");
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buf], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nfs-consulta-${format(new Date(), "yyyy-MM-dd-HHmm")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Excel gerado", description: `${rows.length} NF(s) exportada(s).` });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Erro", description: "Falha ao gerar Excel", variant: "destructive" });
+    }
+  }
+
   function openAgendamentoDialog(nf: NfResult) {
     setSelectedNf(nf);
     setAgStatus("AGUARDANDO AGENDA");
