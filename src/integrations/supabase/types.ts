@@ -1937,6 +1937,17 @@ export type Database = {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
+      fn_ibac_enqueue: {
+        Args: {
+          p_baixa_id: string
+          p_carga_id: string
+          p_chave_acesso: string
+          p_evento: string
+          p_nf_id: string
+          p_payload: Json
+        }
+        Returns: undefined
+      }
       get_cargas_com_contagens: {
         Args: never
         Returns: {
