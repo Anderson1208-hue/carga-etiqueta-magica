@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${IBAC_API_KEY}`,
+          "Api-Key": IBAC_API_KEY,
         },
         body: JSON.stringify(body),
       });
