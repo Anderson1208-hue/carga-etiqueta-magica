@@ -491,6 +491,10 @@ export default function IntegracaoIbac() {
           </TabsContent>
         </Tabs>
       </main>
+      <IbacEventoDetalheDialog
+        eventoId={detalheId}
+        onOpenChange={(o) => !o && setDetalheId(null)}
+      />
     </MainLayout>
 
   );
