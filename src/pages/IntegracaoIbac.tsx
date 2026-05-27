@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2 } from "lucide-react";
+import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,14 +38,31 @@ export default function IntegracaoIbac() {
   if (isLoading) return null;
   if (!isAdmin) return <Navigate to="/" replace />;
 
+  // Filtros da fila
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroEvento, setFiltroEvento] = useState<string>("todos");
+  const [filtroBusca, setFiltroBusca] = useState<string>("");
+  const [filtroDataIni, setFiltroDataIni] = useState<string>("");
+  const [filtroDataFim, setFiltroDataFim] = useState<string>("");
+
   const { data: fila = [], refetch: refetchFila } = useQuery({
-    queryKey: ["ibac-fila"],
+    queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("ibac_eventos_queue")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
+      if (filtroStatus !== "todos") q = q.eq("status", filtroStatus as any);
+      if (filtroEvento !== "todos") q = q.eq("evento_interno", filtroEvento);
+      const busca = filtroBusca.trim();
+      if (busca) {
+        // Busca por chave de acesso ou número de NF dentro do payload
+        q = q.or(`chave_acesso.ilike.%${busca}%,payload->>numero_nf.ilike.%${busca}%`);
+      }
+      if (filtroDataIni) q = q.gte("created_at", `${filtroDataIni}T00:00:00`);
+      if (filtroDataFim) q = q.lte("created_at", `${filtroDataFim}T23:59:59`);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
@@ -294,7 +313,70 @@ export default function IntegracaoIbac() {
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Status</Label>
+                    <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="enviado">Enviado</SelectItem>
+                        <SelectItem value="erro">Erro</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Evento</Label>
+                    <Select value={filtroEvento} onValueChange={setFiltroEvento}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {dePara.map((d: any) => (
+                          <SelectItem key={d.id} value={d.evento_interno}>{d.evento_interno}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label className="text-xs">NF / Chave de acesso</Label>
+                    <Input
+                      placeholder="Número ou chave..."
+                      value={filtroBusca}
+                      onChange={(e) => setFiltroBusca(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">De</Label>
+                    <Input type="date" value={filtroDataIni} onChange={(e) => setFiltroDataIni(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Até</Label>
+                    <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
+                  </div>
+                  <div className="md:col-span-6 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{fila.length} evento(s) carregado(s) (máx. 500)</span>
+                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFiltroStatus("todos");
+                          setFiltroEvento("todos");
+                          setFiltroBusca("");
+                          setFiltroDataIni("");
+                          setFiltroDataFim("");
+                        }}
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Limpar filtros
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 <Table>
                   <TableHeader>
                     <TableRow>
