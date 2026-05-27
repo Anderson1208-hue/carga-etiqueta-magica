@@ -31,6 +31,7 @@ import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
 import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
 import { IbacEventoDetalheDialog } from "@/components/ibac/IbacEventoDetalheDialog";
 import { IbacRetryPanel } from "@/components/ibac/IbacRetryPanel";
+import { ImportarDeParaDialog } from "@/components/ibac/ImportarDeParaDialog";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading } = useAuth();
@@ -434,10 +435,15 @@ export default function IntegracaoIbac() {
           <TabsContent value="depara">
             <Card>
               <CardHeader>
-                <CardTitle>Mapeamento Evento Interno → Código IBAC</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Preencha os códigos quando a IBAC enviar o de-para oficial.
-                </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Mapeamento Evento Interno → Código IBAC</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Preencha manualmente ou importe a planilha enviada pela IBAC.
+                    </p>
+                  </div>
+                  <ImportarDeParaDialog itens={dePara as any} onImported={refetchDePara} />
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
