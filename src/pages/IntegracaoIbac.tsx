@@ -68,6 +68,8 @@ export default function IntegracaoIbac() {
     },
     refetchInterval: 15_000,
   });
+
+  const { data: dePara = [], refetch: refetchDePara } = useQuery({
     queryKey: ["ibac-de-para"],
     queryFn: async () => {
       const { data, error } = await supabase
