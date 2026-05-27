@@ -630,18 +630,24 @@ export default function Agendamento() {
             {nfResults.length > 0 && (
               <>
                 {/* Bulk action bar */}
-                <div className="mt-4 flex items-center justify-between">
+                <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
                   <p className="text-sm text-muted-foreground">
                     {selectedNfIds.size > 0
                       ? `${selectedNfIds.size} de ${nfResults.length} NFs selecionadas`
                       : `${nfResults.length} NFs encontradas — selecione para agendar em lote`}
                   </p>
-                  {selectedNfIds.size > 0 && (
-                    <Button onClick={openBulkDialog} size="sm">
-                      <CalendarCheck className="w-4 h-4 mr-1" />
-                      Agendar {selectedNfIds.size} NF{selectedNfIds.size > 1 ? "s" : ""}
+                  <div className="flex items-center gap-2">
+                    <Button onClick={exportNfResultsToExcel} size="sm" variant="outline">
+                      <FileDown className="w-4 h-4 mr-1" />
+                      Exportar Excel{selectedNfIds.size > 0 ? ` (${selectedNfIds.size})` : ` (${nfResults.length})`}
                     </Button>
-                  )}
+                    {selectedNfIds.size > 0 && (
+                      <Button onClick={openBulkDialog} size="sm">
+                        <CalendarCheck className="w-4 h-4 mr-1" />
+                        Agendar {selectedNfIds.size} NF{selectedNfIds.size > 1 ? "s" : ""}
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-2 border rounded-lg overflow-hidden">
