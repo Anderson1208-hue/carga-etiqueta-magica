@@ -28,6 +28,7 @@ import {
   ChevronRight,
   HandCoins,
   Building2,
+  Plug,
   Contact,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
