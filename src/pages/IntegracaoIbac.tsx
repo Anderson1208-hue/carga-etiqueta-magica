@@ -194,10 +194,54 @@ export default function IntegracaoIbac() {
               Fila de eventos, mapeamento e auditoria do EDI com IBAC.
             </p>
           </div>
-          <Button onClick={() => processar.mutate()} disabled={processar.isPending}>
-            <Send className="w-4 h-4 mr-2" />
-            Processar fila agora
-          </Button>
+          <div className="flex items-center gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={counts.erro === 0 || reenviarTodosErros.isPending}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Reenviar erros ({counts.erro})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reenviar todos os eventos com erro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Os {counts.erro} evento(s) em erro voltarão para o status "pendente" com tentativas zeradas. O cron processa em até 2 minutos.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => reenviarTodosErros.mutate()}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={limparEnviados.isPending}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Limpar antigos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar eventos enviados antigos?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Remove permanentemente da fila os eventos com status "enviado" há mais de 30 dias. O histórico em "Logs" é preservado.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => limparEnviados.mutate()}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <Button onClick={() => processar.mutate()} disabled={processar.isPending}>
+              <Send className="w-4 h-4 mr-2" />
+              Processar fila agora
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
