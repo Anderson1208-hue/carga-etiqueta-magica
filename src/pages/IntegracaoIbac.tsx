@@ -24,6 +24,7 @@ import {
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
+import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading } = useAuth();
