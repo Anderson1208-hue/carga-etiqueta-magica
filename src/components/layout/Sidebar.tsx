@@ -222,6 +222,10 @@ export function Sidebar() {
                   item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
                   isActive={location.pathname === "/auditoria"}
                 />
+                <NavItem
+                  item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
+                  isActive={location.pathname === "/integracoes/ibac"}
+                />
               </>
             )}
           </div>
