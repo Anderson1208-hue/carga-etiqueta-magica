@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         status: "aguardando_configuracao",
         mensagem: "Defina os secrets IBAC_API_URL e IBAC_API_KEY para iniciar o envio.",
-        pendentes_na_fila: pendentes?.length ?? 0,
+        pendentes_na_fila: pendentesRaw?.length ?? 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
