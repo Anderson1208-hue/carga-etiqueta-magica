@@ -931,6 +931,129 @@ export type Database = {
           },
         ]
       }
+      ibac_de_para_eventos: {
+        Row: {
+          ativo: boolean
+          codigo_ibac: string | null
+          created_at: string
+          descricao_ibac: string | null
+          descricao_interna: string
+          evento_interno: string
+          id: string
+          observacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_ibac?: string | null
+          created_at?: string
+          descricao_ibac?: string | null
+          descricao_interna: string
+          evento_interno: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_ibac?: string | null
+          created_at?: string
+          descricao_ibac?: string | null
+          descricao_interna?: string
+          evento_interno?: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ibac_eventos_queue: {
+        Row: {
+          baixa_id: string | null
+          carga_id: string | null
+          chave_acesso: string | null
+          created_at: string
+          enviado_em: string | null
+          erro_mensagem: string | null
+          evento_interno: string
+          id: string
+          nf_id: string | null
+          payload: Json
+          status: string
+          tentativas: number
+          ultima_tentativa_em: string | null
+          updated_at: string
+        }
+        Insert: {
+          baixa_id?: string | null
+          carga_id?: string | null
+          chave_acesso?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          evento_interno: string
+          id?: string
+          nf_id?: string | null
+          payload?: Json
+          status?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          updated_at?: string
+        }
+        Update: {
+          baixa_id?: string | null
+          carga_id?: string | null
+          chave_acesso?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          evento_interno?: string
+          id?: string
+          nf_id?: string | null
+          payload?: Json
+          status?: string
+          tentativas?: number
+          ultima_tentativa_em?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ibac_log_envios: {
+        Row: {
+          created_at: string
+          duracao_ms: number | null
+          endpoint: string | null
+          id: string
+          queue_id: string | null
+          request_body: Json | null
+          response_body: Json | null
+          response_status: number | null
+          sucesso: boolean
+        }
+        Insert: {
+          created_at?: string
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean
+        }
+        Update: {
+          created_at?: string
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean
+        }
+        Relationships: []
+      }
       itens_nf: {
         Row: {
           c_prod: string
