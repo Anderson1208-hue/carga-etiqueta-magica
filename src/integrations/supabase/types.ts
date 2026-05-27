@@ -931,6 +931,69 @@ export type Database = {
           },
         ]
       }
+      ibac_alertas: {
+        Row: {
+          created_at: string
+          id: string
+          lido: boolean
+          lido_em: string | null
+          lido_por: string | null
+          limite: number | null
+          mensagem: string
+          tipo: string
+          valor_atual: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          limite?: number | null
+          mensagem: string
+          tipo: string
+          valor_atual?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lido?: boolean
+          lido_em?: string | null
+          lido_por?: string | null
+          limite?: number | null
+          mensagem?: string
+          tipo?: string
+          valor_atual?: number | null
+        }
+        Relationships: []
+      }
+      ibac_config_alertas: {
+        Row: {
+          ativo: boolean
+          cooldown_minutos: number
+          id: boolean
+          limite_erros_15min: number
+          limite_pendentes: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cooldown_minutos?: number
+          id?: boolean
+          limite_erros_15min?: number
+          limite_pendentes?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cooldown_minutos?: number
+          id?: boolean
+          limite_erros_15min?: number
+          limite_pendentes?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ibac_de_para_eventos: {
         Row: {
           ativo: boolean

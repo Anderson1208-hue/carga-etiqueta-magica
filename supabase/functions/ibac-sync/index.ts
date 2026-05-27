@@ -135,6 +135,70 @@ Deno.serve(async (req) => {
     resultados.push({ id: item.id, sucesso });
   }
 
+  // -------- Verificação de alertas automáticos --------
+  try {
+    const { data: cfg } = await supabase
+      .from("ibac_config_alertas")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle();
+
+    if (cfg?.ativo) {
+      const cooldownMs = (cfg.cooldown_minutos ?? 30) * 60_000;
+      const cooldownIso = new Date(Date.now() - cooldownMs).toISOString();
+
+      // 1) Fila pendente muito alta
+      const { count: pendentesCount } = await supabase
+        .from("ibac_eventos_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pendente");
+
+      if ((pendentesCount ?? 0) >= (cfg.limite_pendentes ?? 100)) {
+        const { data: jaExiste } = await supabase
+          .from("ibac_alertas")
+          .select("id")
+          .eq("tipo", "fila_pendentes_alta")
+          .gte("created_at", cooldownIso)
+          .limit(1);
+        if (!jaExiste || jaExiste.length === 0) {
+          await supabase.from("ibac_alertas").insert({
+            tipo: "fila_pendentes_alta",
+            mensagem: `Fila IBAC com ${pendentesCount} eventos pendentes (limite: ${cfg.limite_pendentes}).`,
+            valor_atual: pendentesCount,
+            limite: cfg.limite_pendentes,
+          });
+        }
+      }
+
+      // 2) Taxa de erro alta nos últimos 15 minutos
+      const quinzeMinAtras = new Date(Date.now() - 15 * 60_000).toISOString();
+      const { count: errosCount } = await supabase
+        .from("ibac_log_envios")
+        .select("id", { count: "exact", head: true })
+        .eq("sucesso", false)
+        .gte("created_at", quinzeMinAtras);
+
+      if ((errosCount ?? 0) >= (cfg.limite_erros_15min ?? 10)) {
+        const { data: jaExiste } = await supabase
+          .from("ibac_alertas")
+          .select("id")
+          .eq("tipo", "erros_alta_taxa")
+          .gte("created_at", cooldownIso)
+          .limit(1);
+        if (!jaExiste || jaExiste.length === 0) {
+          await supabase.from("ibac_alertas").insert({
+            tipo: "erros_alta_taxa",
+            mensagem: `${errosCount} falhas de envio à IBAC nos últimos 15 minutos (limite: ${cfg.limite_erros_15min}).`,
+            valor_atual: errosCount,
+            limite: cfg.limite_erros_15min,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[ibac-sync] Falha ao verificar alertas:", err);
+  }
+
   return new Response(
     JSON.stringify({
       processados: resultados.length,
