@@ -13,7 +13,7 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const IBAC_API_URL = Deno.env.get("IBAC_API_URL") ?? "";
 const IBAC_API_KEY = Deno.env.get("IBAC_API_KEY") ?? "";
 
-const MAX_TENTATIVAS = 5;
+const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
 
 Deno.serve(async (req) => {
