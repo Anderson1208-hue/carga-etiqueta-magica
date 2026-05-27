@@ -286,7 +286,8 @@ export default function IntegracaoIbac() {
           </TabsContent>
         </Tabs>
       </main>
-    </div>
+    </MainLayout>
+
   );
 }
 
