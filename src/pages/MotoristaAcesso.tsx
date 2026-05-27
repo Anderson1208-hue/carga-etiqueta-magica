@@ -133,7 +133,7 @@ export default function MotoristaAcesso() {
 
     const interval = setInterval(async () => {
       // Não atualiza enquanto o motorista está com uma NF aberta para registrar baixa
-      if (selectedNfId || enviando) return;
+      if (selectedNfId || submitting) return;
       try {
         const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
           body: { code: codeUpper },
@@ -149,7 +149,7 @@ export default function MotoristaAcesso() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [veiculo, code, selectedNfId, enviando]);
+  }, [veiculo, code, selectedNfId, submitting]);
 
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
