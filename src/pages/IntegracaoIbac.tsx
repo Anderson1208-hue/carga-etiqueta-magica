@@ -313,7 +313,70 @@ export default function IntegracaoIbac() {
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Status</Label>
+                    <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="enviado">Enviado</SelectItem>
+                        <SelectItem value="erro">Erro</SelectItem>
+                        <SelectItem value="cancelado">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Evento</Label>
+                    <Select value={filtroEvento} onValueChange={setFiltroEvento}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {dePara.map((d: any) => (
+                          <SelectItem key={d.id} value={d.evento_interno}>{d.evento_interno}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label className="text-xs">NF / Chave de acesso</Label>
+                    <Input
+                      placeholder="Número ou chave..."
+                      value={filtroBusca}
+                      onChange={(e) => setFiltroBusca(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">De</Label>
+                    <Input type="date" value={filtroDataIni} onChange={(e) => setFiltroDataIni(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Até</Label>
+                    <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
+                  </div>
+                  <div className="md:col-span-6 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{fila.length} evento(s) carregado(s) (máx. 500)</span>
+                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFiltroStatus("todos");
+                          setFiltroEvento("todos");
+                          setFiltroBusca("");
+                          setFiltroDataIni("");
+                          setFiltroDataFim("");
+                        }}
+                      >
+                        <X className="w-3 h-3 mr-1" />
+                        Limpar filtros
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 <Table>
                   <TableHeader>
                     <TableRow>
