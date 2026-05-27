@@ -38,21 +38,36 @@ export default function IntegracaoIbac() {
   if (isLoading) return null;
   if (!isAdmin) return <Navigate to="/" replace />;
 
+  // Filtros da fila
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroEvento, setFiltroEvento] = useState<string>("todos");
+  const [filtroBusca, setFiltroBusca] = useState<string>("");
+  const [filtroDataIni, setFiltroDataIni] = useState<string>("");
+  const [filtroDataFim, setFiltroDataFim] = useState<string>("");
+
   const { data: fila = [], refetch: refetchFila } = useQuery({
-    queryKey: ["ibac-fila"],
+    queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("ibac_eventos_queue")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(500);
+      if (filtroStatus !== "todos") q = q.eq("status", filtroStatus as any);
+      if (filtroEvento !== "todos") q = q.eq("evento_interno", filtroEvento);
+      const busca = filtroBusca.trim();
+      if (busca) {
+        // Busca por chave de acesso ou número de NF dentro do payload
+        q = q.or(`chave_acesso.ilike.%${busca}%,payload->>numero_nf.ilike.%${busca}%`);
+      }
+      if (filtroDataIni) q = q.gte("created_at", `${filtroDataIni}T00:00:00`);
+      if (filtroDataFim) q = q.lte("created_at", `${filtroDataFim}T23:59:59`);
+      const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
     },
     refetchInterval: 15_000,
   });
-
-  const { data: dePara = [], refetch: refetchDePara } = useQuery({
     queryKey: ["ibac-de-para"],
     queryFn: async () => {
       const { data, error } = await supabase
