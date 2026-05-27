@@ -392,18 +392,27 @@ export default function IntegracaoIbac() {
                   </TableHeader>
                   <TableBody>
                     {fila.map((f) => (
-                      <TableRow key={f.id}>
+                      <TableRow
+                        key={f.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setDetalheId(f.id)}
+                      >
                         <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
                         <TableCell>{statusBadge(f.status)}</TableCell>
                         <TableCell>{f.tentativas}</TableCell>
                         <TableCell className="text-xs">{new Date(f.created_at).toLocaleString("pt-BR")}</TableCell>
                         <TableCell className="text-xs text-destructive max-w-xs truncate">{f.erro_mensagem ?? "—"}</TableCell>
-                        <TableCell>
-                          {f.status === "erro" && (
-                            <Button size="sm" variant="outline" onClick={() => reenviar.mutate(f.id)}>
-                              Reenviar
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
+                              Detalhes
                             </Button>
-                          )}
+                            {f.status === "erro" && (
+                              <Button size="sm" variant="outline" onClick={() => reenviar.mutate(f.id)}>
+                                Reenviar
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
