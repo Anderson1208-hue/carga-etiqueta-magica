@@ -35,6 +35,7 @@ export default function IntegracaoIbac() {
   const { isAdmin, isLoading } = useAuth();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
+  const [detalheId, setDetalheId] = useState<string | null>(null);
 
   if (isLoading) return null;
   if (!isAdmin) return <Navigate to="/" replace />;
