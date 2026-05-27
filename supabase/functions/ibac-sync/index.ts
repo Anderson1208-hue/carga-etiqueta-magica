@@ -225,6 +225,7 @@ Deno.serve(async (req) => {
       processados: resultados.length,
       sucessos: resultados.filter((r) => r.sucesso).length,
       falhas: resultados.filter((r) => !r.sucesso).length,
+      adiados_por_backoff: adiados,
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
