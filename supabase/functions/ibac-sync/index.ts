@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
     await supabase
       .from("ibac_eventos_queue")
       .update({
-        status: sucesso ? "enviado" : (item.tentativas + 1 >= MAX_TENTATIVAS ? "erro" : "pendente"),
+        status: sucesso ? "enviado" : (item.tentativas + 1 >= maxTentativas ? "erro" : "pendente"),
         tentativas: item.tentativas + 1,
         ultima_tentativa_em: new Date().toISOString(),
         enviado_em: sucesso ? new Date().toISOString() : null,
