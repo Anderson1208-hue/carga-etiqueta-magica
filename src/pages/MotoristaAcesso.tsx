@@ -123,6 +123,34 @@ export default function MotoristaAcesso() {
     return () => clearInterval(interval);
   }, [veiculo, monitoramentoRotaId, code]);
 
+  // Polling contínuo da lista de NFs: detecta quando a baixa foi desfeita pela
+  // operação (Prestação de Contas) e a NF precisa voltar a aparecer como pendente,
+  // ou quando novas NFs são vinculadas à placa.
+  useEffect(() => {
+    if (!veiculo) return;
+    const codeUpper = code.trim().toUpperCase();
+    if (codeUpper.length !== 6) return;
+
+    const interval = setInterval(async () => {
+      // Não atualiza enquanto o motorista está com uma NF aberta para registrar baixa
+      if (selectedNfId || enviando) return;
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code: codeUpper },
+        });
+        if (!fnError && !data?.error && Array.isArray(data?.nfs)) {
+          setNfs(data.nfs);
+          if (data.veiculo) setVeiculo(data.veiculo);
+          if (data.monitoramento_rota_id) setMonitoramentoRotaId(data.monitoramento_rota_id);
+        }
+      } catch {
+        // silencioso
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [veiculo, code, selectedNfId, enviando]);
+
   function handleFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
