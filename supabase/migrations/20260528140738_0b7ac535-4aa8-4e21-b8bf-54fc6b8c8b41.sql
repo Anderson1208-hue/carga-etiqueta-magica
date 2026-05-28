@@ -1,0 +1,1 @@
+UPDATE public.ibac_eventos_queue SET status='pendente', tentativas=0, erro_mensagem=NULL, ultima_tentativa_em=NULL WHERE status='erro';
