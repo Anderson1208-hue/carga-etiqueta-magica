@@ -52,6 +52,7 @@ const OCORRENCIA_LABEL: Record<string, string> = {
   endereco_nao_encontrado: "Endereço não encontrado",
   ausente: "Destinatário ausente",
   reentrega: "Reentrega",
+  sem_canhoto: "Sem canhoto/assinatura",
   outros: "Outros",
 };
 
