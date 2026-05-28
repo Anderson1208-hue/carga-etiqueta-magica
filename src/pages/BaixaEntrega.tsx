@@ -1098,17 +1098,19 @@ export default function BaixaEntrega() {
                               </div>
                             )}
 
-                            {/* Observação */}
-                            <div>
-                              <Label className="text-sm">Observação</Label>
-                              <Textarea
-                                value={observacao}
-                                onChange={(e) => setObservacao(e.target.value)}
-                                placeholder="Detalhe a ocorrência..."
-                                rows={2}
-                                className="mt-1"
-                              />
-                            </div>
+                            {/* Observação — apenas para "sem canhoto/assinatura" */}
+                            {ocorrencia === "sem_canhoto" && (
+                              <div>
+                                <Label className="text-sm">Observação *</Label>
+                                <Textarea
+                                  value={observacao}
+                                  onChange={(e) => setObservacao(e.target.value)}
+                                  placeholder="Descreva o motivo (ex: porteiro recusou assinar, cliente ausente...)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                            )}
 
                             {/* Foto só aparece para entrega (reentrega/recusa não exigem) */}
                             {ocorrencia === "entregue" && (
