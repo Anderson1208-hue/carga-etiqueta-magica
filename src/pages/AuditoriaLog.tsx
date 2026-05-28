@@ -183,6 +183,15 @@ export default function AuditoriaLog() {
     );
   }
 
+  if (authLoading || !profile) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+      </MainLayout>
+    );
+  }
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
