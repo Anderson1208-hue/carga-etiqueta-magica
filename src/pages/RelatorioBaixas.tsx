@@ -95,6 +95,8 @@ export default function RelatorioBaixas() {
         q = q.eq("ocorrencia", ocorrenciaFiltro);
       }
 
+      const { data, error } = await q;
+      if (error) throw error;
       const list = (data as unknown as BaixaRow[]) || [];
       setRows(list);
 
