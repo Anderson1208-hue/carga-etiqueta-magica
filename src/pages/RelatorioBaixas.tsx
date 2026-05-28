@@ -332,18 +332,7 @@ export default function RelatorioBaixas() {
           </CardContent>
         </Card>
       </div>
-      {fotoPreview && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
-          onClick={() => setFotoPreview(null)}
-        >
-          <img
-            src={fotoPreview}
-            alt="Canhoto ampliado"
-            className="max-h-full max-w-full object-contain rounded shadow-2xl"
-          />
-        </div>
-      )}
+    </MainLayout>
     </MainLayout>
   );
 }
