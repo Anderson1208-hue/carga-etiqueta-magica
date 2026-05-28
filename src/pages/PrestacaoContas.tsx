@@ -113,6 +113,76 @@ export default function PrestacaoContas() {
   const [pendDialog, setPendDialog] = useState<{ baixa: BaixaItem; motivo: string } | null>(null);
   const [obsEncerramento, setObsEncerramento] = useState("");
   const [encerrando, setEncerrando] = useState(false);
+  const [pernoitando, setPernoitando] = useState(false);
+
+  async function marcarPernoite() {
+    if (!veiculoSel) return;
+    const ok = window.confirm(
+      `Marcar PERNOITE do veículo ${veiculoSel.placa}?\n\n` +
+        `Todas as NFs vinculadas a este veículo serão liberadas para a Preparação do próximo dia ` +
+        `e aparecerão destacadas em AZUL.\n\n` +
+        `A prestação de contas também será encerrada.`
+    );
+    if (!ok) return;
+
+    setPernoitando(true);
+    try {
+      // 1. Buscar todas as NFs vinculadas ao veículo
+      const { data: vinculos, error: vErr } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id")
+        .eq("veiculo_id", veiculoSel.id);
+      if (vErr) throw vErr;
+
+      const nfIds = (vinculos || []).map((v: any) => v.nf_id);
+
+      if (nfIds.length > 0) {
+        // 2. Marcar NFs como pernoite + liberar status para aparecerem na Preparação
+        const { error: upErr } = await supabase
+          .from("notas_fiscais")
+          .update({
+            pernoite: true,
+            pernoite_em: new Date().toISOString(),
+            status_entrega: "CARGA NO DEPOSITO",
+          })
+          .in("id", nfIds);
+        if (upErr) throw upErr;
+
+        // 3. Desvincular as NFs do veículo (para liberá-las na Preparação)
+        const { error: delErr } = await supabase
+          .from("veiculo_nfs")
+          .delete()
+          .eq("veiculo_id", veiculoSel.id);
+        if (delErr) throw delErr;
+      }
+
+      // 4. Encerrar prestação de contas com observação de pernoite
+      const obs = obsEncerramento
+        ? `[PERNOITE] ${obsEncerramento}`
+        : `[PERNOITE] Veículo pernoitou com ${nfIds.length} NF(s).`;
+      const { error: encErr } = await supabase
+        .from("veiculos")
+        .update({
+          prestacao_contas_em: new Date().toISOString(),
+          prestacao_contas_por: user?.id,
+          prestacao_contas_obs: obs,
+        })
+        .eq("id", veiculoSel.id);
+      if (encErr) throw encErr;
+
+      toast({
+        title: "Pernoite registrado",
+        description: `${nfIds.length} NF(s) liberadas em azul na Preparação do próximo dia.`,
+      });
+      await carregarVeiculos();
+      setVeiculoSel(null);
+      setBaixas([]);
+    } catch (err: any) {
+      toast({ title: "Erro ao marcar pernoite", description: err?.message, variant: "destructive" });
+    } finally {
+      setPernoitando(false);
+    }
+  }
 
   async function carregarVeiculos() {
     setLoading(true);
