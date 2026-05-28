@@ -656,6 +656,7 @@ export default function BaixaEntrega() {
             status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
             ocorrencia: ocorrencia,
             recebedor_nome: recebedorNome || null,
+            observacao: observacao || null,
             foto_path: fotoPath,
             latitude: gpsCoords?.lat || null,
             longitude: gpsCoords?.lng || null,
