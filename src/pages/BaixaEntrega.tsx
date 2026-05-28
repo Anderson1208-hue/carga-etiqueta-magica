@@ -576,6 +576,12 @@ export default function BaixaEntrega() {
       return;
     }
 
+    // Observação obrigatória para "sem canhoto/assinatura"
+    if (ocorrencia === "sem_canhoto" && !observacao.trim()) {
+      toast({ title: "Atenção", description: "Preencha a observação para esta ocorrência", variant: "destructive" });
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Reentrega exige conexão (precisa atualizar vínculos no servidor)
