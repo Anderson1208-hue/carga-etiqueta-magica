@@ -1128,7 +1128,9 @@ export default function Programacao() {
                                         <div
                                           key={nf.id}
                                           className={`flex items-center gap-3 p-1.5 rounded text-sm cursor-pointer transition-colors ${
-                                            nf.tem_agendamento
+                                            nf.pernoite
+                                              ? "bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 border-l-4 border-blue-500"
+                                              : nf.tem_agendamento
                                               ? "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-l-4 border-green-500"
                                               : selectedNfIds.has(nf.id)
                                               ? "bg-primary/5"
@@ -1144,6 +1146,11 @@ export default function Programacao() {
                                             NF {nf.numero_nf}
                                           </span>
                                           <TipoCargaBadge tipoCarga={nf.carga_tipo_carga} />
+                                          {nf.pernoite && (
+                                            <Badge className="text-[10px] h-4 px-1 bg-blue-600 hover:bg-blue-700 text-white border-transparent">
+                                              PERNOITE
+                                            </Badge>
+                                          )}
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                               AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
