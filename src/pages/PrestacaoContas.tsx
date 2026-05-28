@@ -119,47 +119,58 @@ export default function PrestacaoContas() {
     if (!veiculoSel) return;
     const ok = window.confirm(
       `Marcar PERNOITE do veículo ${veiculoSel.placa}?\n\n` +
-        `Todas as NFs vinculadas a este veículo serão liberadas para a Preparação do próximo dia ` +
-        `e aparecerão destacadas em AZUL.\n\n` +
-        `A prestação de contas também será encerrada.`
+        `O veículo será replicado para o próximo dia com as mesmas NFs vinculadas ` +
+        `e aparecerá destacado em AZUL na Roteirização.\n\n` +
+        `A prestação de contas deste dia também será encerrada.`
     );
     if (!ok) return;
 
     setPernoitando(true);
     try {
-      // 1. Buscar todas as NFs vinculadas ao veículo
+      // 1. Calcular próximo dia (base na data do veículo)
+      const baseData = veiculoSel.data ? new Date(veiculoSel.data + "T12:00:00") : new Date();
+      baseData.setDate(baseData.getDate() + 1);
+      const proxData = baseData.toISOString().slice(0, 10);
+
+      // 2. Buscar NFs vinculadas ao veículo original
       const { data: vinculos, error: vErr } = await supabase
         .from("veiculo_nfs")
-        .select("nf_id")
+        .select("nf_id, carga_origem_id")
         .eq("veiculo_id", veiculoSel.id);
       if (vErr) throw vErr;
+      const nfRows = (vinculos || []) as Array<{ nf_id: string; carga_origem_id: string }>;
 
-      const nfIds = (vinculos || []).map((v: any) => v.nf_id);
+      // 3. Criar novo veículo para o próximo dia (pernoite)
+      const { data: novoVeic, error: insErr } = await supabase
+        .from("veiculos")
+        .insert({
+          placa: veiculoSel.placa,
+          motorista: veiculoSel.motorista || "",
+          data: proxData,
+          status: "pendente",
+          pernoite: true,
+          pernoite_origem_id: veiculoSel.id,
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+      if (insErr) throw insErr;
 
-      if (nfIds.length > 0) {
-        // 2. Marcar NFs como pernoite + liberar status para aparecerem na Preparação
-        const { error: upErr } = await supabase
-          .from("notas_fiscais")
-          .update({
-            pernoite: true,
-            pernoite_em: new Date().toISOString(),
-            status_entrega: "CARGA NO DEPOSITO",
-          })
-          .in("id", nfIds);
-        if (upErr) throw upErr;
-
-        // 3. Desvincular as NFs do veículo (para liberá-las na Preparação)
-        const { error: delErr } = await supabase
-          .from("veiculo_nfs")
-          .delete()
-          .eq("veiculo_id", veiculoSel.id);
-        if (delErr) throw delErr;
+      // 4. Copiar veiculo_nfs para o novo veículo
+      if (nfRows.length > 0 && novoVeic?.id) {
+        const links = nfRows.map((r) => ({
+          veiculo_id: novoVeic.id,
+          nf_id: r.nf_id,
+          carga_origem_id: r.carga_origem_id,
+        }));
+        const { error: linkErr } = await supabase.from("veiculo_nfs").insert(links);
+        if (linkErr) throw linkErr;
       }
 
-      // 4. Encerrar prestação de contas com observação de pernoite
+      // 5. Encerrar prestação de contas do veículo original
       const obs = obsEncerramento
         ? `[PERNOITE] ${obsEncerramento}`
-        : `[PERNOITE] Veículo pernoitou com ${nfIds.length} NF(s).`;
+        : `[PERNOITE] Veículo pernoitou com ${nfRows.length} NF(s) (continua em ${proxData.split("-").reverse().join("/")}).`;
       const { error: encErr } = await supabase
         .from("veiculos")
         .update({
@@ -172,7 +183,7 @@ export default function PrestacaoContas() {
 
       toast({
         title: "Pernoite registrado",
-        description: `${nfIds.length} NF(s) liberadas em azul na Preparação do próximo dia.`,
+        description: `Veículo replicado para ${proxData.split("-").reverse().join("/")} com ${nfRows.length} NF(s), destacado em azul na Roteirização.`,
       });
       await carregarVeiculos();
       setVeiculoSel(null);

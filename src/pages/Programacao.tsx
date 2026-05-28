@@ -69,7 +69,7 @@ interface NfDisponivel {
   numero_cte: string;
   tem_agendamento: boolean;
   data_agendamento: string | null;
-  pernoite: boolean;
+  
 }
 
 export default function Programacao() {
@@ -121,7 +121,7 @@ export default function Programacao() {
         id, numero_nf, chave_acesso, cnpj_destinatario,
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
-        peso_bruto, volume_m3, valor_nf, carga_id, status_entrega, pernoite,
+        peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
         itens_nf(q_com)
       `;
 
@@ -270,7 +270,6 @@ export default function Programacao() {
             numero_cte: cteMap.get(nf.id) || "",
             tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
-            pernoite: !!nf.pernoite,
           };
         });
 
@@ -1128,9 +1127,7 @@ export default function Programacao() {
                                         <div
                                           key={nf.id}
                                           className={`flex items-center gap-3 p-1.5 rounded text-sm cursor-pointer transition-colors ${
-                                            nf.pernoite
-                                              ? "bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-950/50 border-l-4 border-blue-500"
-                                              : nf.tem_agendamento
+                                            nf.tem_agendamento
                                               ? "bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 border-l-4 border-green-500"
                                               : selectedNfIds.has(nf.id)
                                               ? "bg-primary/5"
@@ -1146,11 +1143,6 @@ export default function Programacao() {
                                             NF {nf.numero_nf}
                                           </span>
                                           <TipoCargaBadge tipoCarga={nf.carga_tipo_carga} />
-                                          {nf.pernoite && (
-                                            <Badge className="text-[10px] h-4 px-1 bg-blue-600 hover:bg-blue-700 text-white border-transparent">
-                                              PERNOITE
-                                            </Badge>
-                                          )}
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                               AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
