@@ -255,7 +255,7 @@ export default function RelatorioBaixas() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-20">Foto</TableHead>
+                        
                         <TableHead>Data/Hora</TableHead>
                         <TableHead>Placa</TableHead>
                         <TableHead>NF</TableHead>
