@@ -298,11 +298,14 @@ export default function PrestacaoContas() {
       if (baixa.foto_path) {
         await supabase.storage.from("comprovantes").remove([baixa.foto_path]);
       }
-      const { error: delErr } = await supabase
+      const { error: delErr, count: delCount } = await supabase
         .from("baixas_entrega")
-        .delete()
+        .delete({ count: "exact" })
         .eq("id", baixa.id);
       if (delErr) throw delErr;
+      if (!delCount || delCount === 0) {
+        throw new Error("Sem permissão para desfazer a baixa. Solicite ao administrador.");
+      }
 
       // Reverte status da NF para "NF EM ROTA" se não houver outra baixa ativa para a mesma NF
       const { data: outras } = await supabase
