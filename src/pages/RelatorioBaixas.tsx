@@ -69,6 +69,8 @@ export default function RelatorioBaixas() {
   const [busca, setBusca] = useState("");
   const [rows, setRows] = useState<BaixaRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
   async function carregar() {
     setLoading(true);
