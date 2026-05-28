@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
+import { Download, Loader2, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BaixaRow {
