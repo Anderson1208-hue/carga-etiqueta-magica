@@ -12,7 +12,7 @@ import { Shield, Users, UserCheck, UserX } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 export default function Operadores() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: operators = [], isLoading } = useQuery({
@@ -43,6 +43,15 @@ export default function Operadores() {
     onError: () => toast.error("Erro ao atualizar operador"),
   });
 
+  if (authLoading || !profile) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
   if (!isAdmin) return <Navigate to="/" replace />;
 
   const activeCount = operators.filter((o) => o.ativo).length;

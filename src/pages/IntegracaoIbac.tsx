@@ -34,12 +34,12 @@ import { IbacRetryPanel } from "@/components/ibac/IbacRetryPanel";
 import { ImportarDeParaDialog } from "@/components/ibac/ImportarDeParaDialog";
 
 export default function IntegracaoIbac() {
-  const { isAdmin, isLoading } = useAuth();
+  const { isAdmin, isLoading, profile } = useAuth();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
   const [detalheId, setDetalheId] = useState<string | null>(null);
 
-  if (isLoading) return null;
+  if (isLoading || !profile) return null;
   if (!isAdmin) return <Navigate to="/" replace />;
 
   // Filtros da fila

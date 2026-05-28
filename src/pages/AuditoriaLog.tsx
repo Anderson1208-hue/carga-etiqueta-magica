@@ -73,7 +73,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditoriaLog() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { isAdmin, profile, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AuditRow[]>([]);
@@ -183,6 +183,15 @@ export default function AuditoriaLog() {
     );
   }
 
+  if (authLoading || !profile) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-6 h-6 animate-spin" />
+        </div>
+      </MainLayout>
+    );
+  }
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
