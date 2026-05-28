@@ -73,6 +73,7 @@ interface NfEntrega {
   baixa_recebedor?: string | null;
   baixa_registrado_em?: string | null;
   baixa_foto_path?: string | null;
+  baixa_observacao?: string | null;
 }
 
 type OcorrenciaTipo = "entregue" | "reentrega" | "sem_canhoto";
