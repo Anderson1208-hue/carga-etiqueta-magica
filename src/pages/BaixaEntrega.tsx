@@ -240,7 +240,7 @@ export default function BaixaEntrega() {
 
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
-        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path")
+        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path, observacao")
         .eq("veiculo_id", veiculoId)
         .limit(2000);
 
