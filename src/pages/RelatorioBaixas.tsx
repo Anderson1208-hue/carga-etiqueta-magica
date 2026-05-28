@@ -284,6 +284,7 @@ export default function RelatorioBaixas() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-20">Foto</TableHead>
                         <TableHead>Data/Hora</TableHead>
                         <TableHead>Placa</TableHead>
                         <TableHead>NF</TableHead>
@@ -291,7 +292,6 @@ export default function RelatorioBaixas() {
                         <TableHead>Cidade/UF</TableHead>
                         <TableHead>Ocorrência</TableHead>
                         <TableHead>Recebedor</TableHead>
-                        <TableHead>Foto</TableHead>
                         <TableHead>Qualidade IA</TableHead>
                       </TableRow>
                     </TableHeader>
