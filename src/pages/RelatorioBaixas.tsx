@@ -322,6 +322,35 @@ export default function RelatorioBaixas() {
                             : "Sem foto";
                         return (
                           <TableRow key={r.id}>
+                            <TableCell>
+                              {r.foto_path ? (
+                                fotoUrls[r.foto_path] ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFotoPreview(fotoUrls[r.foto_path!])}
+                                    className="block rounded overflow-hidden border border-border hover:ring-2 hover:ring-primary transition"
+                                    title="Clique para ampliar"
+                                  >
+                                    <img
+                                      src={fotoUrls[r.foto_path]}
+                                      alt="Canhoto"
+                                      loading="lazy"
+                                      className="h-14 w-14 object-cover"
+                                    />
+                                  </button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => abrirFoto(r.foto_path!)}
+                                  >
+                                    <ImageIcon className="w-4 h-4" />
+                                  </Button>
+                                )
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
                             <TableCell className="whitespace-nowrap text-xs">
                               {r.registrado_em
                                 ? new Date(r.registrado_em).toLocaleString("pt-BR")
@@ -341,35 +370,6 @@ export default function RelatorioBaixas() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs">{r.recebedor_nome || "—"}</TableCell>
-                            <TableCell>
-                              {r.foto_path ? (
-                                fotoUrls[r.foto_path] ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setFotoPreview(fotoUrls[r.foto_path!])}
-                                    className="block rounded overflow-hidden border border-border hover:ring-2 hover:ring-primary transition"
-                                    title="Clique para ampliar"
-                                  >
-                                    <img
-                                      src={fotoUrls[r.foto_path]}
-                                      alt="Canhoto"
-                                      loading="lazy"
-                                      className="h-16 w-16 object-cover"
-                                    />
-                                  </button>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => abrirFoto(r.foto_path!)}
-                                  >
-                                    <ImageIcon className="w-4 h-4" />
-                                  </Button>
-                                )
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
                             <TableCell>
                               {vVariant ? (
                                 <Badge variant={vVariant} className="text-xs" title={tooltip}>
