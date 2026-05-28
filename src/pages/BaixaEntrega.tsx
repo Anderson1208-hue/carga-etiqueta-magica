@@ -75,11 +75,12 @@ interface NfEntrega {
   baixa_foto_path?: string | null;
 }
 
-type OcorrenciaTipo = "entregue" | "reentrega";
+type OcorrenciaTipo = "entregue" | "reentrega" | "sem_canhoto";
 
 const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "entregue", label: "Entregue", icon: <CheckCircle2 className="w-5 h-5" />, color: "text-green-600" },
   { value: "reentrega", label: "Reentrega", icon: <RotateCcw className="w-5 h-5" />, color: "text-blue-600" },
+  { value: "sem_canhoto", label: "Sem canhoto/assinatura", icon: <AlertTriangle className="w-5 h-5" />, color: "text-amber-600" },
 ];
 
 export default function BaixaEntrega() {
