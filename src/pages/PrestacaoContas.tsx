@@ -135,10 +135,10 @@ export default function PrestacaoContas() {
       // 2. Buscar NFs vinculadas ao veículo original
       const { data: vinculos, error: vErr } = await supabase
         .from("veiculo_nfs")
-        .select("nf_id")
+        .select("nf_id, carga_origem_id")
         .eq("veiculo_id", veiculoSel.id);
       if (vErr) throw vErr;
-      const nfIds = (vinculos || []).map((v: any) => v.nf_id);
+      const nfRows = (vinculos || []) as Array<{ nf_id: string; carga_origem_id: string }>;
 
       // 3. Criar novo veículo para o próximo dia (pernoite)
       const { data: novoVeic, error: insErr } = await supabase
@@ -157,8 +157,12 @@ export default function PrestacaoContas() {
       if (insErr) throw insErr;
 
       // 4. Copiar veiculo_nfs para o novo veículo
-      if (nfIds.length > 0 && novoVeic?.id) {
-        const links = nfIds.map((nf_id: string) => ({ veiculo_id: novoVeic.id, nf_id }));
+      if (nfRows.length > 0 && novoVeic?.id) {
+        const links = nfRows.map((r) => ({
+          veiculo_id: novoVeic.id,
+          nf_id: r.nf_id,
+          carga_origem_id: r.carga_origem_id,
+        }));
         const { error: linkErr } = await supabase.from("veiculo_nfs").insert(links);
         if (linkErr) throw linkErr;
       }
