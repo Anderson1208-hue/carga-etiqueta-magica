@@ -1437,6 +1437,8 @@ export type Database = {
           dest_uf: string | null
           id: string
           numero_nf: string
+          pernoite: boolean
+          pernoite_em: string | null
           peso_bruto: number | null
           peso_liquido: number | null
           razao_social_emitente: string
@@ -1461,6 +1463,8 @@ export type Database = {
           dest_uf?: string | null
           id?: string
           numero_nf: string
+          pernoite?: boolean
+          pernoite_em?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente: string
@@ -1485,6 +1489,8 @@ export type Database = {
           dest_uf?: string | null
           id?: string
           numero_nf?: string
+          pernoite?: boolean
+          pernoite_em?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
           razao_social_emitente?: string
