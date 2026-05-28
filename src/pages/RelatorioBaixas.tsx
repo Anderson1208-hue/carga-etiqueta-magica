@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
+import { Download, Loader2, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface BaixaRow {
@@ -69,8 +69,6 @@ export default function RelatorioBaixas() {
   const [busca, setBusca] = useState("");
   const [rows, setRows] = useState<BaixaRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [fotoUrls, setFotoUrls] = useState<Record<string, string>>({});
-  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
   async function carregar() {
     setLoading(true);
@@ -99,23 +97,6 @@ export default function RelatorioBaixas() {
       if (error) throw error;
       const list = (data as unknown as BaixaRow[]) || [];
       setRows(list);
-
-      // Gera URLs assinadas para todas as fotos (em paralelo, em lotes)
-      const paths = list.map((r) => r.foto_path).filter((p): p is string => !!p);
-      const urls: Record<string, string> = {};
-      const BATCH = 50;
-      for (let i = 0; i < paths.length; i += BATCH) {
-        const slice = paths.slice(i, i + BATCH);
-        const results = await Promise.all(
-          slice.map((p) =>
-            supabase.storage.from("comprovantes").createSignedUrl(p, 3600)
-          )
-        );
-        results.forEach((res, idx) => {
-          if (res.data?.signedUrl) urls[slice[idx]] = res.data.signedUrl;
-        });
-      }
-      setFotoUrls(urls);
     } catch (err: any) {
       console.error(err);
       toast({
@@ -201,16 +182,6 @@ export default function RelatorioBaixas() {
     URL.revokeObjectURL(url);
   }
 
-  async function abrirFoto(path: string) {
-    const { data, error } = await supabase.storage
-      .from("comprovantes")
-      .createSignedUrl(path, 300);
-    if (error || !data?.signedUrl) {
-      toast({ title: "Erro", description: "Não foi possível abrir a foto", variant: "destructive" });
-      return;
-    }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  }
 
   return (
     <MainLayout>
@@ -284,7 +255,7 @@ export default function RelatorioBaixas() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-20">Foto</TableHead>
+                        
                         <TableHead>Data/Hora</TableHead>
                         <TableHead>Placa</TableHead>
                         <TableHead>NF</TableHead>
@@ -317,40 +288,9 @@ export default function RelatorioBaixas() {
                             ? `Atenção (${vScore})`
                             : vStatus === "ruim"
                             ? `Ruim (${vScore})`
-                            : r.foto_path
-                            ? "—"
-                            : "Sem foto";
+                            : "—";
                         return (
                           <TableRow key={r.id}>
-                            <TableCell>
-                              {r.foto_path ? (
-                                fotoUrls[r.foto_path] ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setFotoPreview(fotoUrls[r.foto_path!])}
-                                    className="block rounded overflow-hidden border border-border hover:ring-2 hover:ring-primary transition"
-                                    title="Clique para ampliar"
-                                  >
-                                    <img
-                                      src={fotoUrls[r.foto_path]}
-                                      alt="Canhoto"
-                                      loading="lazy"
-                                      className="h-14 w-14 object-cover"
-                                    />
-                                  </button>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => abrirFoto(r.foto_path!)}
-                                  >
-                                    <ImageIcon className="w-4 h-4" />
-                                  </Button>
-                                )
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
                             <TableCell className="whitespace-nowrap text-xs">
                               {r.registrado_em
                                 ? new Date(r.registrado_em).toLocaleString("pt-BR")
@@ -392,18 +332,6 @@ export default function RelatorioBaixas() {
           </CardContent>
         </Card>
       </div>
-      {fotoPreview && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
-          onClick={() => setFotoPreview(null)}
-        >
-          <img
-            src={fotoPreview}
-            alt="Canhoto ampliado"
-            className="max-h-full max-w-full object-contain rounded shadow-2xl"
-          />
-        </div>
-      )}
     </MainLayout>
   );
 }
