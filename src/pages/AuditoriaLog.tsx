@@ -73,7 +73,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function AuditoriaLog() {
-  const { isAdmin, isLoading: authLoading } = useAuth();
+  const { isAdmin, profile, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<AuditRow[]>([]);
