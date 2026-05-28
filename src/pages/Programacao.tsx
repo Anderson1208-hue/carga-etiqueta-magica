@@ -270,7 +270,6 @@ export default function Programacao() {
             numero_cte: cteMap.get(nf.id) || "",
             tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
-            pernoite: !!nf.pernoite,
           };
         });
 
