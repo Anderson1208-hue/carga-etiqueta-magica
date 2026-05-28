@@ -264,6 +264,7 @@ export default function BaixaEntrega() {
           baixa_recebedor: baixa?.recebedor_nome || null,
           baixa_registrado_em: baixa?.registrado_em || null,
           baixa_foto_path: baixa?.foto_path || null,
+          baixa_observacao: baixa?.observacao || null,
         };
       });
 
