@@ -156,14 +156,13 @@ export default function PrestacaoContas() {
         .single();
       if (insErr) throw insErr;
 
-      // 4. Copiar veiculo_nfs para o novo veículo
+      // 4. Mover vínculos veiculo_nfs do veículo antigo para o novo
+      // (nf_id é UNIQUE em veiculo_nfs, então não dá pra duplicar — fazemos UPDATE)
       if (nfRows.length > 0 && novoVeic?.id) {
-        const links = nfRows.map((r) => ({
-          veiculo_id: novoVeic.id,
-          nf_id: r.nf_id,
-          carga_origem_id: r.carga_origem_id,
-        }));
-        const { error: linkErr } = await supabase.from("veiculo_nfs").insert(links);
+        const { error: linkErr } = await supabase
+          .from("veiculo_nfs")
+          .update({ veiculo_id: novoVeic.id })
+          .eq("veiculo_id", veiculoSel.id);
         if (linkErr) throw linkErr;
       }
 
