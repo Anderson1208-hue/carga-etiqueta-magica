@@ -97,23 +97,6 @@ export default function RelatorioBaixas() {
       if (error) throw error;
       const list = (data as unknown as BaixaRow[]) || [];
       setRows(list);
-
-      // Gera URLs assinadas para todas as fotos (em paralelo, em lotes)
-      const paths = list.map((r) => r.foto_path).filter((p): p is string => !!p);
-      const urls: Record<string, string> = {};
-      const BATCH = 50;
-      for (let i = 0; i < paths.length; i += BATCH) {
-        const slice = paths.slice(i, i + BATCH);
-        const results = await Promise.all(
-          slice.map((p) =>
-            supabase.storage.from("comprovantes").createSignedUrl(p, 3600)
-          )
-        );
-        results.forEach((res, idx) => {
-          if (res.data?.signedUrl) urls[slice[idx]] = res.data.signedUrl;
-        });
-      }
-      setFotoUrls(urls);
     } catch (err: any) {
       console.error(err);
       toast({
