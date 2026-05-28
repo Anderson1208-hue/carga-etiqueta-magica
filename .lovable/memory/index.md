@@ -71,6 +71,7 @@ type: reference
 - [Estabilidade Frontend](mem://arquitetura/resiliencia-e-estabilidade) — QueryClient retry, staleTime, try/catch patterns.
 - [Mapeamento Regiões RJ](mem://configuracao/macro-regioes-mapeamento-rj) — Neighborhood -> Macro Region logic map.
 - [Selo Chocolate](mem://funcionalidades/operacao/classificacao-carga-sensivel-chocolate) — Visual highlights for sensitive chocolate loads.
+- [Pernoite Veículo](mem://funcionalidades/operacao/pernoite-veiculo) — Botão em Prestação de Contas libera NFs e destaca em azul na Preparação.
 - [Offline Data Sync](mem://performance/offline-data-sync-lote) — IndexedDB bulk import pauses/tuning.
 - [Gestão RAM Fotos](mem://performance/gestao-memoria-fotos-mobile-v2) — revokeObjectURL for image previews.
 - [Normalização Datas](mem://logica/normalizacao-datas-timezone-v2) — Fix for timezone shifting.
