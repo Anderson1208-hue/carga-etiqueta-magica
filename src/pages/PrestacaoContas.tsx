@@ -170,7 +170,7 @@ export default function PrestacaoContas() {
       // 5. Encerrar prestação de contas do veículo original
       const obs = obsEncerramento
         ? `[PERNOITE] ${obsEncerramento}`
-        : `[PERNOITE] Veículo pernoitou com ${nfIds.length} NF(s) (continua em ${proxData.split("-").reverse().join("/")}).`;
+        : `[PERNOITE] Veículo pernoitou com ${nfRows.length} NF(s) (continua em ${proxData.split("-").reverse().join("/")}).`;
       const { error: encErr } = await supabase
         .from("veiculos")
         .update({
@@ -183,7 +183,7 @@ export default function PrestacaoContas() {
 
       toast({
         title: "Pernoite registrado",
-        description: `Veículo replicado para ${proxData.split("-").reverse().join("/")} com ${nfIds.length} NF(s), destacado em azul na Roteirização.`,
+        description: `Veículo replicado para ${proxData.split("-").reverse().join("/")} com ${nfRows.length} NF(s), destacado em azul na Roteirização.`,
       });
       await carregarVeiculos();
       setVeiculoSel(null);
