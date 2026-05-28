@@ -1,0 +1,1 @@
+ALTER TABLE public.baixas_entrega ADD COLUMN IF NOT EXISTS observacao TEXT;
