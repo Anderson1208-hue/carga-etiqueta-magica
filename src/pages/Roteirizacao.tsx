@@ -1101,7 +1101,7 @@ export default function Roteirizacao() {
     try {
       let query = supabase
         .from("veiculos")
-        .select("id, placa, motorista, data, status, access_code, created_at")
+        .select("id, placa, motorista, data, status, access_code, created_at, pernoite, pernoite_origem_id")
         .order("data", { ascending: false })
         .order("created_at", { ascending: false });
 
