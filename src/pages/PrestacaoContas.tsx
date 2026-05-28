@@ -767,14 +767,26 @@ export default function PrestacaoContas() {
                               ? "Todas as baixas foram conferidas. Pronto para encerrar."
                               : `Faltam conferir ${stats.aConferir} baixa(s).`}
                           </p>
-                          <Button
-                            size="lg"
-                            disabled={!tudoConferido || encerrando}
-                            onClick={encerrarPrestacao}
-                          >
-                            {encerrando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
-                            Encerrar Prestação de Contas
-                          </Button>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Button
+                              size="lg"
+                              variant="outline"
+                              className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                              disabled={pernoitando || encerrando}
+                              onClick={marcarPernoite}
+                            >
+                              {pernoitando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Moon className="w-4 h-4 mr-2" />}
+                              Pernoite
+                            </Button>
+                            <Button
+                              size="lg"
+                              disabled={!tudoConferido || encerrando || pernoitando}
+                              onClick={encerrarPrestacao}
+                            >
+                              {encerrando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Lock className="w-4 h-4 mr-2" />}
+                              Encerrar Prestação de Contas
+                            </Button>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
