@@ -1017,6 +1017,12 @@ export default function BaixaEntrega() {
                                   <p className="font-medium">{nf.baixa_recebedor}</p>
                                 </div>
                               )}
+                              {nf.baixa_observacao && (
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Observação</p>
+                                  <p className="font-medium">{nf.baixa_observacao}</p>
+                                </div>
+                              )}
                             </div>
 
                             {nf.baixa_foto_path ? (
