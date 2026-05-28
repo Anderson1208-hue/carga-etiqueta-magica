@@ -1991,6 +1991,8 @@ export type Database = {
           data: string
           id: string
           motorista: string | null
+          pernoite: boolean
+          pernoite_origem_id: string | null
           placa: string
           prestacao_contas_em: string | null
           prestacao_contas_obs: string | null
@@ -2005,6 +2007,8 @@ export type Database = {
           data?: string
           id?: string
           motorista?: string | null
+          pernoite?: boolean
+          pernoite_origem_id?: string | null
           placa: string
           prestacao_contas_em?: string | null
           prestacao_contas_obs?: string | null
@@ -2019,6 +2023,8 @@ export type Database = {
           data?: string
           id?: string
           motorista?: string | null
+          pernoite?: boolean
+          pernoite_origem_id?: string | null
           placa?: string
           prestacao_contas_em?: string | null
           prestacao_contas_obs?: string | null
