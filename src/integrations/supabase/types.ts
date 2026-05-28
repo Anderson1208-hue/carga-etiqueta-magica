@@ -406,6 +406,7 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           nf_id: string
+          observacao: string | null
           ocorrencia: string | null
           recebedor_nome: string | null
           registrado_em: string | null
@@ -429,6 +430,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           nf_id: string
+          observacao?: string | null
           ocorrencia?: string | null
           recebedor_nome?: string | null
           registrado_em?: string | null
@@ -452,6 +454,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           nf_id?: string
+          observacao?: string | null
           ocorrencia?: string | null
           recebedor_nome?: string | null
           registrado_em?: string | null

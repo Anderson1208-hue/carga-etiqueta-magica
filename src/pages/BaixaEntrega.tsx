@@ -73,6 +73,7 @@ interface NfEntrega {
   baixa_recebedor?: string | null;
   baixa_registrado_em?: string | null;
   baixa_foto_path?: string | null;
+  baixa_observacao?: string | null;
 }
 
 type OcorrenciaTipo = "entregue" | "reentrega" | "sem_canhoto";
@@ -239,7 +240,7 @@ export default function BaixaEntrega() {
 
       const { data: baixasData } = await supabase
         .from("baixas_entrega")
-        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path")
+        .select("nf_id, status, ocorrencia, recebedor_nome, registrado_em, foto_path, observacao")
         .eq("veiculo_id", veiculoId)
         .limit(2000);
 
@@ -263,6 +264,7 @@ export default function BaixaEntrega() {
           baixa_recebedor: baixa?.recebedor_nome || null,
           baixa_registrado_em: baixa?.registrado_em || null,
           baixa_foto_path: baixa?.foto_path || null,
+          baixa_observacao: baixa?.observacao || null,
         };
       });
 
@@ -574,6 +576,12 @@ export default function BaixaEntrega() {
       return;
     }
 
+    // Observação obrigatória para "sem canhoto/assinatura"
+    if (ocorrencia === "sem_canhoto" && !observacao.trim()) {
+      toast({ title: "Atenção", description: "Preencha a observação para esta ocorrência", variant: "destructive" });
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Reentrega exige conexão (precisa atualizar vínculos no servidor)
@@ -654,6 +662,7 @@ export default function BaixaEntrega() {
             status: ocorrencia === "entregue" ? "entregue" : "ocorrencia",
             ocorrencia: ocorrencia,
             recebedor_nome: recebedorNome || null,
+            observacao: observacao || null,
             foto_path: fotoPath,
             latitude: gpsCoords?.lat || null,
             longitude: gpsCoords?.lng || null,
@@ -1014,6 +1023,12 @@ export default function BaixaEntrega() {
                                   <p className="font-medium">{nf.baixa_recebedor}</p>
                                 </div>
                               )}
+                              {nf.baixa_observacao && (
+                                <div className="col-span-2">
+                                  <p className="text-muted-foreground">Observação</p>
+                                  <p className="font-medium">{nf.baixa_observacao}</p>
+                                </div>
+                              )}
                             </div>
 
                             {nf.baixa_foto_path ? (
@@ -1095,17 +1110,19 @@ export default function BaixaEntrega() {
                               </div>
                             )}
 
-                            {/* Observação */}
-                            <div>
-                              <Label className="text-sm">Observação</Label>
-                              <Textarea
-                                value={observacao}
-                                onChange={(e) => setObservacao(e.target.value)}
-                                placeholder="Detalhe a ocorrência..."
-                                rows={2}
-                                className="mt-1"
-                              />
-                            </div>
+                            {/* Observação — apenas para "sem canhoto/assinatura" */}
+                            {ocorrencia === "sem_canhoto" && (
+                              <div>
+                                <Label className="text-sm">Observação *</Label>
+                                <Textarea
+                                  value={observacao}
+                                  onChange={(e) => setObservacao(e.target.value)}
+                                  placeholder="Descreva o motivo (ex: porteiro recusou assinar, cliente ausente...)"
+                                  rows={2}
+                                  className="mt-1"
+                                />
+                              </div>
+                            )}
 
                             {/* Foto só aparece para entrega (reentrega/recusa não exigem) */}
                             {ocorrencia === "entregue" && (
