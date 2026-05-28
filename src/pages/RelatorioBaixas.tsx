@@ -333,6 +333,5 @@ export default function RelatorioBaixas() {
         </Card>
       </div>
     </MainLayout>
-    </MainLayout>
   );
 }
