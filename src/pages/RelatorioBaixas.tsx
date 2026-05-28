@@ -182,16 +182,6 @@ export default function RelatorioBaixas() {
     URL.revokeObjectURL(url);
   }
 
-  async function abrirFoto(path: string) {
-    const { data, error } = await supabase.storage
-      .from("comprovantes")
-      .createSignedUrl(path, 300);
-    if (error || !data?.signedUrl) {
-      toast({ title: "Erro", description: "Não foi possível abrir a foto", variant: "destructive" });
-      return;
-    }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  }
 
   return (
     <MainLayout>
