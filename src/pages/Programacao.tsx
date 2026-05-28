@@ -69,7 +69,7 @@ interface NfDisponivel {
   numero_cte: string;
   tem_agendamento: boolean;
   data_agendamento: string | null;
-  pernoite: boolean;
+  
 }
 
 export default function Programacao() {
