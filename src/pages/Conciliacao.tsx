@@ -30,6 +30,7 @@ import {
   type StatusConciliacao,
   type LinhaRetorno,
 } from "@/lib/prefatura-utils";
+import { parseNotfisFile } from "@/lib/notfis-parser";
 
 interface Prefatura {
   id: string;
@@ -165,10 +166,19 @@ export default function Conciliacao() {
     }
     setImporting(true);
     try {
-      const parsed = await parsePrefaturaExcel(arquivo);
+      // Detect format: NOTFIS EDI (.txt fixed-width) vs Excel/CSV
+      const nome = arquivo.name.toLowerCase();
+      const isNotfis = nome.endsWith(".txt") || nome.endsWith(".edi") || nome.endsWith(".notfis");
+      const parsed = isNotfis
+        ? await parseNotfisFile(arquivo)
+        : await parsePrefaturaExcel(arquivo);
       if (parsed.itens.length === 0) {
         toast({ title: "Arquivo sem itens válidos", variant: "destructive" });
         return;
+      }
+      // If user didn't fill CNPJ, use the one inferred from file (shipper CNPJ).
+      if (!clienteCnpj.trim() && parsed.cliente_cnpj_inferido) {
+        setClienteCnpj(parsed.cliente_cnpj_inferido);
       }
 
       const importBatchId = `pf_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
