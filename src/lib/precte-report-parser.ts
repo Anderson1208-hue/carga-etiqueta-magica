@@ -3,7 +3,8 @@
 // Quando o 396 cobre múltiplas NFs, frete e ICMS são rateados igualmente entre elas (mesma regra
 // usada na conciliação: somando as N linhas dá o total do CT-e).
 //
-// Validado contra arquivo da Ebenezer: ICMS = 5º grupo de 15 dígitos (0-indexed=4) — alíquota ~12% sobre a base; total da prestação = último grupo.
+// Validado contra arquivo da Ebenezer: no registro 394, os valores começam após o prefixo "394".
+// ICMS = 4º bloco fixo de 15 dígitos (0-indexed=3) — alíquota ~12% sobre a base; total da prestação = último bloco fixo.
 
 export interface PreCteLinha {
   numero_nf: string;          // ex.: "107546" (sem zeros à esquerda)
@@ -115,13 +116,18 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
 
     if (tipo === "394") {
       if (!cur) continue;
-      // Captura todos os blocos de 15 dígitos
-      const matches = [...ln.matchAll(/(\d{15})/g)].map((m) => dec(m[1], 2));
-      if (matches.length >= 5) {
-        cur.icms = matches[4];
+      // Registro de largura fixa: ignorar o prefixo "394" antes de quebrar em blocos.
+      // Usar regex na linha inteira desloca os blocos e pode gerar valores na casa de trilhão.
+      const payload = ln.substring(3).replace(/\s+$/, "");
+      const blocos: string[] = [];
+      for (let p = 0; p + 15 <= payload.length; p += 15) {
+        blocos.push(payload.substring(p, p + 15));
       }
-      if (matches.length >= 1) {
-        cur.total = matches[matches.length - 1];
+      if (blocos.length >= 4) {
+        cur.icms = dec(blocos[3], 2);
+      }
+      if (blocos.length >= 1) {
+        cur.total = dec(blocos[blocos.length - 1], 2);
       }
       continue;
     }
