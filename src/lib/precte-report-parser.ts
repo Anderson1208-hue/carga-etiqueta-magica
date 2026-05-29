@@ -118,13 +118,15 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
 
     if (tipo === "394") {
       if (!cur) continue;
-      // Registro de largura fixa: ignorar o prefixo "394" antes de quebrar em blocos.
-      // Usar regex na linha inteira desloca os blocos e pode gerar valores na casa de trilhão.
-      const payload = ln.substring(3).replace(/\s+$/, "");
-      const blocos: string[] = [];
-      for (let p = 0; p + 15 <= payload.length; p += 15) {
-        blocos.push(payload.substring(p, p + 15));
-      }
+      // Layout 394 da Ebenezer (campos numéricos de 15 dígitos, separados por espaços
+      // em posições reservadas a textos). Validado em PEXPRESSO_EBENEZER...:
+      //   bloco[0] = base de cálculo do ICMS
+      //   bloco[3] = valor do ICMS
+      //   bloco[5] = outras taxas (pedágio etc.)
+      //   bloco[6] = valor total da prestação (frete + ICMS + outras)
+      // Frete por NF é derivado em flush396 como (total - ICMS) para garantir o fechamento.
+      const payload = ln.substring(3);
+      const blocos = (payload.match(/\d{15}/g) ?? []);
       if (blocos.length >= 4) {
         cur.icms = dec(blocos[3], 2);
       }
