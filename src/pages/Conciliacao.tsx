@@ -598,7 +598,9 @@ export default function Conciliacao() {
                           <TableHead>NF cliente</TableHead>
                           <TableHead>Chave</TableHead>
                           <TableHead className="text-right">Valor NF</TableHead>
-                          <TableHead className="text-right">Frete</TableHead>
+                          <TableHead className="text-right">Frete cliente</TableHead>
+                          <TableHead className="text-right">Frete CT-e</TableHead>
+                          <TableHead>CT-e</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Divergências</TableHead>
                         </TableRow>
@@ -616,6 +618,14 @@ export default function Conciliacao() {
                               </TableCell>
                               <TableCell className="text-right text-sm">{fmtMoney(it.valor_nf_cliente)}</TableCell>
                               <TableCell className="text-right text-sm">{fmtMoney(it.valor_frete_cliente)}</TableCell>
+                              <TableCell className="text-right text-sm font-medium">
+                                {it.valor_frete_cte === null && status === "sem_cte" ? (
+                                  <span className="text-orange-700">sem CT-e</span>
+                                ) : (
+                                  fmtMoney(it.valor_frete_cte)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs">{it.numero_cte || "—"}</TableCell>
                               <TableCell>
                                 <Badge className={STATUS_COLORS[status]}>{status}</Badge>
                               </TableCell>
