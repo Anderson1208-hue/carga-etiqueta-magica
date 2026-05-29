@@ -3,7 +3,7 @@
 // Quando o 396 cobre múltiplas NFs, frete e ICMS são rateados igualmente entre elas (mesma regra
 // usada na conciliação: somando as N linhas dá o total do CT-e).
 //
-// Validado contra arquivo da Ebenezer: ICMS = grupo de 15 dígitos #9 (0-indexed=8); total = último grupo.
+// Validado contra arquivo da Ebenezer: ICMS = 5º grupo de 15 dígitos (0-indexed=4) — alíquota ~12% sobre a base; total da prestação = último grupo.
 
 export interface PreCteLinha {
   numero_nf: string;          // ex.: "107546" (sem zeros à esquerda)
@@ -117,8 +117,8 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
       if (!cur) continue;
       // Captura todos os blocos de 15 dígitos
       const matches = [...ln.matchAll(/(\d{15})/g)].map((m) => dec(m[1], 2));
-      if (matches.length >= 9) {
-        cur.icms = matches[8];
+      if (matches.length >= 5) {
+        cur.icms = matches[4];
       }
       if (matches.length >= 1) {
         cur.total = matches[matches.length - 1];
