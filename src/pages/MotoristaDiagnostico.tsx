@@ -20,6 +20,8 @@ import { pendingCount } from "@/lib/gpsQueue";
 import { readTelemetry, markSent, markError, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
+import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import {
   ArrowLeft,
   RefreshCw,
@@ -103,6 +105,44 @@ export default function MotoristaDiagnostico() {
   });
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string; detail?: string } | null>(null);
+
+  // Rastreamento contínuo NESTA tela:
+  // resolve o monitoramento_rota_id pelo código salvo e dispara o tracker + worker
+  // sem depender do wizard de validação. Assim, mesmo motoristas que nunca
+  // completaram o wizard começam a mandar GPS para a Torre estando aqui.
+  const [diagRotaId, setDiagRotaId] = useState<string | null>(null);
+  useEffect(() => {
+    const code = (testCode || "").trim().toUpperCase();
+    if (code.length !== 6) {
+      setDiagRotaId(null);
+      return;
+    }
+    let cancelled = false;
+    const resolve = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code },
+        });
+        if (cancelled) return;
+        if (!error && !data?.error && data?.monitoramento_rota_id) {
+          setDiagRotaId(data.monitoramento_rota_id);
+        } else {
+          setDiagRotaId(null);
+        }
+      } catch {
+        /* ignore — tenta de novo no próximo tick */
+      }
+    };
+    resolve();
+    const interval = setInterval(resolve, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [testCode]);
+
+  useGpsTrackerHybrid({ monitoramentoRotaId: diagRotaId, enabled: !!diagRotaId });
+  useGpsQueueWorker(!!diagRotaId);
 
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
@@ -440,6 +480,16 @@ export default function MotoristaDiagnostico() {
               value={wakeSupported ? "Suportado" : "Não suportado"}
               ok={wakeSupported}
               hint="Mantém a tela ligada durante a rota (web/PWA)"
+            />
+            <StatusRow
+              label="Rastreamento desta tela"
+              value={diagRotaId ? "ATIVO" : "Inativo"}
+              ok={!!diagRotaId}
+              hint={
+                diagRotaId
+                  ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
+                  : "Digite o código de 6 caracteres da placa abaixo para ativar"
+              }
             />
           </CardContent>
         </Card>
