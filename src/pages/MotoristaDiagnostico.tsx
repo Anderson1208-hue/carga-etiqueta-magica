@@ -101,7 +101,9 @@ export default function MotoristaDiagnostico() {
 
   // Teste manual de envio para o backend
   const [testCode, setTestCode] = useState<string>(() => {
-    try { return localStorage.getItem("motorista-diag-test-code") || ""; } catch { return ""; }
+    try {
+      return localStorage.getItem("motorista-diag-test-code") || localStorage.getItem("motorista-last-access-code") || "";
+    } catch { return ""; }
   });
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string; detail?: string } | null>(null);
@@ -125,6 +127,7 @@ export default function MotoristaDiagnostico() {
         });
         if (cancelled) return;
         if (!error && !data?.error && data?.monitoramento_rota_id) {
+          try { localStorage.setItem("motorista-last-rota-id", data.monitoramento_rota_id); } catch { /* ignore */ }
           setDiagRotaId(data.monitoramento_rota_id);
         } else {
           setDiagRotaId(null);
@@ -448,7 +451,7 @@ export default function MotoristaDiagnostico() {
                 perm === "denied"
                   ? "Abra Configurações → Apps → Permissões → Localização → Permitir o tempo todo"
                   : perm === "prompt"
-                  ? "App ainda não pediu — entre na tela do motorista"
+                  ? "Captura local pode funcionar, mas o rastreador ainda não recebeu permissão nativa"
                   : undefined
               }
             />
@@ -488,7 +491,7 @@ export default function MotoristaDiagnostico() {
               hint={
                 diagRotaId
                   ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
-                  : "Digite o código de 6 caracteres da placa abaixo para ativar"
+                  : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
             />
           </CardContent>
