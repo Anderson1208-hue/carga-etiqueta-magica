@@ -63,7 +63,11 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
         cnpj_emitente_cliente: cur!.cnpj_emit,
         cnpj_destinatario_cliente: cur!.cnpj_dest,
         documento_transporte_cliente: null,
-        valor_nf_cliente: cur!.valor_nf,
+        // A pré-fatura Ebenezer NÃO carrega o vNF da NF-e do embarcador — o valor
+        // do registro 393 é base interna da prestação (tarifário do transportador).
+        // Por isso deixamos null aqui e guardamos o número original em raw_jsonb
+        // para auditoria. Conciliação deve usar apenas o frete (498,56 etc).
+        valor_nf_cliente: null,
         valor_frete_cliente: cur!.valor_frete,
         peso_cliente: null,
         volumes_cliente: null,
@@ -73,6 +77,7 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
           tipo_registro: "393/394/396",
           frete_consolidado: consolidado,
           nfs_no_bloco: numerosNf,
+          base_prestacao_transportador: cur!.valor_nf,
         },
       };
       itens.push(item);
