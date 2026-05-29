@@ -1,6 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+interface BgLocation { latitude: number; longitude: number; accuracy: number; time: number | null; }
+interface BgWatcherOptions { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number; }
+interface BackgroundGeolocationPlugin {
+  addWatcher(opts: BgWatcherOptions, cb: (loc: BgLocation | null, err?: { code: string; message: string }) => void): Promise<string>;
+  removeWatcher(opts: { id: string }): Promise<void>;
+  openSettings(): Promise<void>;
+}
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +34,8 @@ import {
   Copy,
   RotateCcw,
   Send,
+  ShieldCheck,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -191,6 +202,82 @@ export default function MotoristaDiagnostico() {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });
+  }
+
+  const [permLoading, setPermLoading] = useState(false);
+
+  async function solicitarPermissaoLocalizacao() {
+    setPermLoading(true);
+    try {
+      if (isNative) {
+        // Dispara o diálogo nativo do Android via plugin (requestPermissions:true).
+        // Mantém o watcher por ~3s só para forçar o sistema a registrar a permissão,
+        // depois remove para não deixar serviço rodando sem rota.
+        let watcherId: string | null = null;
+        const got = await new Promise<PermState>((resolve) => {
+          const timeout = setTimeout(() => resolve("unknown"), 30_000);
+          BackgroundGeolocation.addWatcher(
+            {
+              backgroundTitle: "Solicitando permissão",
+              backgroundMessage: "Toque em Permitir na próxima tela",
+              requestPermissions: true,
+              stale: false,
+              distanceFilter: 0,
+            },
+            (loc, err) => {
+              if (err) {
+                clearTimeout(timeout);
+                if (err.code === "NOT_AUTHORIZED") resolve("denied");
+                else resolve("unknown");
+                return;
+              }
+              if (loc) {
+                clearTimeout(timeout);
+                resolve("granted");
+              }
+            }
+          )
+            .then((id) => { watcherId = id; })
+            .catch(() => { clearTimeout(timeout); resolve("unknown"); });
+        });
+
+        // limpa watcher temporário
+        if (watcherId) {
+          BackgroundGeolocation.removeWatcher({ id: watcherId }).catch(() => {});
+        }
+
+        await refreshAll();
+
+        if (got === "granted") {
+          toast({ title: "Permissão concedida ✓", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+        } else if (got === "denied") {
+          toast({
+            title: "Permissão negada",
+            description: "Abra as Configurações do app e libere a localização manualmente.",
+            variant: "destructive",
+          });
+          BackgroundGeolocation.openSettings().catch(() => {});
+        } else {
+          toast({ title: "Sem resposta", description: "Tente novamente ou abra as configurações.", variant: "destructive" });
+        }
+      } else {
+        // Web: getCurrentPosition já dispara o prompt do navegador
+        await new Promise<void>((resolve) => {
+          if (!navigator.geolocation) return resolve();
+          navigator.geolocation.getCurrentPosition(
+            (p) => {
+              setPos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
+              resolve();
+            },
+            () => resolve(),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+          );
+        });
+        await refreshAll();
+      }
+    } finally {
+      setPermLoading(false);
+    }
   }
 
   async function testarEnvioBackend() {
@@ -449,8 +536,43 @@ export default function MotoristaDiagnostico() {
           </CardContent>
         </Card>
 
+        {/* Solicitar permissão de localização — dispara o diálogo nativo do Android */}
+        <Card className="border-primary/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" />
+              Solicitar permissão de localização
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Use quando <strong>Permissão GPS</strong> aparece como <code>prompt</code>. Vai abrir o diálogo do Android pedindo acesso à localização.
+              Depois de tocar em <strong>"Durante o uso do app"</strong>, abra as configurações e mude para <strong>"Permitir o tempo todo"</strong>.
+            </p>
+            <Button
+              className="w-full"
+              onClick={solicitarPermissaoLocalizacao}
+              disabled={permLoading}
+            >
+              <ShieldCheck className={`w-4 h-4 mr-2 ${permLoading ? "animate-pulse" : ""}`} />
+              {permLoading ? "Aguardando resposta…" : "Pedir permissão agora"}
+            </Button>
+            {isNative && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => BackgroundGeolocation.openSettings().catch(() => {})}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Abrir Configurações do app
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Teste manual de envio ao backend — isola permissão vs. acesso à rota vs. rede */}
         <Card className="border-primary/30">
+
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Send className="w-4 h-4" />
