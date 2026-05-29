@@ -7,28 +7,31 @@
 //   311  DEM  dados da embarcadora     (pos 4-17  = CNPJ embarcador)
 //   312  DES  dados do destinatário    (pos 44-57 = CNPJ destinatário)
 //   313  DNF  dados da nota fiscal:
+//              pos   4-10  (N 7)        número do ROMANEIO (agrupador)
 //              pos  33-40  (N 8)        número da NF
 //              pos  41-48  (N 8)        data emissão DDMMAAAA
 //              pos  86-100 (N 13,2)     valor total da NF
-//              pos 198-212 (N 13,2)     VALOR TOTAL DO FRETE  (peso-volume + ad valorem + taxas)
+//              pos 198-212 (N 13,2)     VALOR TOTAL DO FRETE
 //              pos 214-225 (N 10,2)     VALOR DO ICMS DA NOTA
 //              pos 239-282 (A 44)       chave de acesso NF-e
 //
-// Observações:
-//   • Posições do layout são 1-indexed. Em JS usamos substring(pos-1, pos-1+len).
-//   • Sem rateio: cada 313 é uma NF com seus próprios valores.
+// Agrupamento:
+//   Várias 313 com o MESMO romaneio (pos 4-10) e mesmo CNPJ destinatário
+//   representam NFs do mesmo conhecimento — somamos frete/ICMS e listamos
+//   como UMA linha consolidada (NFs separadas por vírgula).
 
 export interface PreCteLinha {
-  numero_nf: string;
+  romaneio: string;
+  numero_nf: string;          // NFs do romaneio, separadas por vírgula
   cnpj_emitente: string | null;
   cnpj_destinatario: string | null;
   chave_acesso: string | null;
   valor_frete: number;
   valor_icms: number;
-  valor_total: number;        // = valor_frete (total da prestação sugerido pela embarcadora)
+  valor_total: number;
   grupo_id: string;
   nfs_no_grupo: number;
-  rateado: boolean;           // sempre false em NOTFIS
+  rateado: boolean;
 }
 
 export interface PreCteReport {
@@ -98,7 +101,7 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
     }
 
     if (tipo === "313") {
-      // Garante tamanho suficiente; se vier menor que 282, ainda tentamos extrair o que dá.
+      const romaneio = ln.substring(3, 10).replace(/\D/g, "");
       const numeroNf = ln.substring(32, 40).replace(/\D/g, "");
       const valorFrete = ln.length >= 212 ? dec(ln.substring(197, 212), 2) : 0;
       const valorIcms = ln.length >= 225 ? dec(ln.substring(213, 225), 2) : 0;
@@ -106,12 +109,13 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
         ? ln.substring(238, 282).replace(/\D/g, "")
         : "";
 
-      if (!numeroNf) continue; // sem NF não vai pra tela
-      const numeroNfNorm = numeroNf.replace(/^0+/, "") || "0";
+      if (!romaneio && !numeroNf) continue;
+      const romaneioNorm = romaneio.replace(/^0+/, "") || romaneio || "0";
+      const numeroNfNorm = numeroNf.replace(/^0+/, "") || "";
 
-      // Agrupa: mesmo número de NF + mesmo CNPJ destinatário => soma frete/icms/total
+      // Agrupa por ROMANEIO (pos 4-10) + mesmo CNPJ destinatário => soma NFs
       const existente = linhas.find(
-        (l) => l.numero_nf === numeroNfNorm && l.cnpj_destinatario === cnpjDestinatarioAtual,
+        (l) => l.romaneio === romaneioNorm && l.cnpj_destinatario === cnpjDestinatarioAtual,
       );
       if (existente) {
         existente.valor_frete = +(existente.valor_frete + valorFrete).toFixed(2);
@@ -119,21 +123,25 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
         existente.valor_total = +(existente.valor_total + valorFrete).toFixed(2);
         existente.nfs_no_grupo += 1;
         existente.rateado = true;
+        if (numeroNfNorm && !existente.numero_nf.split(",").includes(numeroNfNorm)) {
+          existente.numero_nf = existente.numero_nf
+            ? `${existente.numero_nf},${numeroNfNorm}`
+            : numeroNfNorm;
+        }
         if (!existente.chave_acesso && chave.length === 44) existente.chave_acesso = chave;
         continue;
       }
 
       linhas.push({
+        romaneio: romaneioNorm,
         numero_nf: numeroNfNorm,
         cnpj_emitente: cnpjEmbarcadora,
         cnpj_destinatario: cnpjDestinatarioAtual,
         chave_acesso: chave.length === 44 ? chave : null,
         valor_frete: valorFrete,
         valor_icms: valorIcms,
-        // Em NOTFIS, "VALOR TOTAL DO FRETE" (campo 26) já é o total da prestação.
-        // ICMS do registro 313 é o ICMS da NF (informativo) — não soma ao frete.
         valor_total: valorFrete,
-        grupo_id: `nf_${i + 1}`,
+        grupo_id: `rom_${romaneioNorm}_${i + 1}`,
         nfs_no_grupo: 1,
         rateado: false,
       });
