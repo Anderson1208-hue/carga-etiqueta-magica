@@ -66,9 +66,11 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
   const flush396 = (numerosNf: string[]) => {
     if (!cur) return;
     const n = numerosNf.length || 1;
-    const freteRateado = +(cur.frete / n).toFixed(2);
-    const icmsRateado = +(cur.icms / n).toFixed(2);
+    // Regra: frete + ICMS = total da prestação. Para garantir o fechamento por linha,
+    // rateamos total e ICMS, e derivamos o frete como (total - icms) por NF.
     const totalRateado = +(cur.total / n).toFixed(2);
+    const icmsRateado = +(cur.icms / n).toFixed(2);
+    const freteRateado = +(totalRateado - icmsRateado).toFixed(2);
     const grupoId = `g_${cur.linha393}`;
     numerosNf.forEach((num) => {
       linhas.push({
