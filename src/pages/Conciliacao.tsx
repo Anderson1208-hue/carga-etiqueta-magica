@@ -698,7 +698,20 @@ export default function Conciliacao() {
                                 <Badge className={STATUS_COLORS[status]}>{status}</Badge>
                               </TableCell>
                               <TableCell className="text-xs">
-                                {divs.length === 0 ? "—" : divs.map((d) => d.campo).join(", ")}
+                                {divs.length === 0 ? "—" : (
+                                  <div className="space-y-0.5">
+                                    {divs.map((d, i) => {
+                                      if (d.campo === "valor_frete_grupo_cte") {
+                                        return (
+                                          <div key={i} className="text-amber-700">
+                                            Frete CT-e (grupo): cliente {fmtMoney(Number(d.recebido))} vs CT-e {fmtMoney(Number(d.esperado))} ({Number(d.diff) > 0 ? "+" : ""}{fmtMoney(Number(d.diff))})
+                                          </div>
+                                        );
+                                      }
+                                      return <div key={i}>{d.campo}</div>;
+                                    })}
+                                  </div>
+                                )}
                               </TableCell>
                             </TableRow>
                           );
