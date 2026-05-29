@@ -182,6 +182,70 @@ export default function MotoristaDiagnostico() {
     );
   }
 
+  async function getFreshPosition(): Promise<{ lat: number; lng: number; accuracy: number }> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("Geolocation indisponível"));
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+        (err) => reject(new Error(`GPS ${err.code}: ${err.message}`)),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    });
+  }
+
+  async function testarEnvioBackend() {
+    setTestLoading(true);
+    setTestResult(null);
+    const code = testCode.trim().toUpperCase();
+    try {
+      if (code.length !== 6) throw new Error("Digite o código de 6 caracteres da placa");
+      try { localStorage.setItem("motorista-diag-test-code", code); } catch { /* ignore */ }
+
+      // 1) Resolve a rota ativa via motorista-acesso
+      const { data: acessoData, error: acessoErr } = await supabase.functions.invoke("motorista-acesso", {
+        body: { code },
+      });
+      if (acessoErr) throw new Error(`Acesso: ${acessoErr.message}`);
+      if (acessoData?.error) throw new Error(`Acesso: ${acessoData.error}`);
+      const rotaId: string | null = acessoData?.monitoramento_rota_id ?? null;
+      if (!rotaId) throw new Error("Sem rota ativa para esta placa. Abra a rota em /monitoramento primeiro.");
+
+      // 2) Pega posição fresca
+      const fresh = await getFreshPosition();
+      setPos(fresh);
+
+      // 3) Envia ao processar-gps
+      const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("processar-gps", {
+        body: {
+          monitoramento_rota_id: rotaId,
+          latitude: fresh.lat,
+          longitude: fresh.lng,
+          accuracy: fresh.accuracy,
+          heartbeat: false,
+        },
+      });
+      if (gpsErr) throw new Error(`Backend: ${gpsErr.message}`);
+      if (gpsData?.error) throw new Error(`Backend: ${gpsData.error}`);
+
+      markSent(1);
+      setTele(readTelemetry());
+      setTestResult({
+        ok: true,
+        msg: "Envio OK — a Torre já deve mostrar a posição",
+        detail: `Rota ${rotaId.slice(0, 8)}… • ${fresh.lat.toFixed(5)}, ${fresh.lng.toFixed(5)} (±${Math.round(fresh.accuracy)}m)`,
+      });
+      toast({ title: "GPS de teste enviado ✓", description: "Veja na Torre de Controle." });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      markError(msg);
+      setTele(readTelemetry());
+      setTestResult({ ok: false, msg: "Falha no teste", detail: msg });
+      toast({ title: "Teste falhou", description: msg, variant: "destructive" });
+    } finally {
+      setTestLoading(false);
+    }
+  }
+
   const trackerMode = isNative ? "Nativo (Foreground Service)" : "Web (navigator.geolocation)";
   const fsActive = isNative && tele.watcherStartedAt !== null;
 
