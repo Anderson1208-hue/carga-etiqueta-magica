@@ -312,20 +312,72 @@ export default function Conciliacao() {
       const ctesResp = nfIds.length
         ? await supabase
             .from("ctes")
-            .select("id, numero_cte, chave_nf_referenciada, numero_nf_referenciada, valor_frete, nf_id")
+            .select("id, numero_cte, chave_cte, chave_nf_referenciada, numero_nf_referenciada, valor_frete, nf_id")
         : { data: [], error: null };
       if (ctesResp.error) throw ctesResp.error;
-      const ctes = (ctesResp.data || []) as unknown as CteInterno[];
+      const ctes = (ctesResp.data || []) as unknown as (CteInterno & { chave_cte: string })[];
+
+      // Soma do frete original por CT-e (chave_cte): se houver rateio em várias linhas,
+      // a soma reconstitui o valor total cobrado naquele CT-e.
+      const cteFreteTotalPorChave = new Map<string, number>();
+      for (const c of ctes) {
+        const k = c.chave_cte;
+        if (!k) continue;
+        cteFreteTotalPorChave.set(k, (cteFreteTotalPorChave.get(k) || 0) + Number(c.valor_frete || 0));
+      }
 
       // Clear previous conciliacao for this prefatura
       await supabase.from("prefatura_conciliacao").delete().eq("prefatura_id", prefId);
 
-      const insertRows = items.map((it) => {
+      // Primeiro passo: match NF + CT-e por linha
+      type Linha = {
+        item: (PrefaturaItemRaw & { id: string });
+        nf: NFInterna | null;
+        matched_by: string;
+        cte: (CteInterno & { chave_cte: string }) | null;
+        divs: ReturnType<typeof compararCampos>;
+      };
+      const linhas: Linha[] = items.map((it) => {
         const { nf, matched_by } = matchNF(it, nfs);
+        if (!nf) return { item: it, nf: null, matched_by, cte: null, divs: [] };
+        const cte = matchCte(nf, ctes) as (CteInterno & { chave_cte: string }) | null;
+        const divs = compararCampos(it, nf, cte, TOLERANCIA_DEFAULT);
+        return { item: it, nf, matched_by, cte, divs };
+      });
+
+      // Soma do frete cliente por CT-e (agrupando todas as NFs vinculadas ao mesmo CT-e)
+      const clienteFreteTotalPorChave = new Map<string, number>();
+      for (const l of linhas) {
+        const k = l.cte?.chave_cte;
+        if (!k) continue;
+        clienteFreteTotalPorChave.set(
+          k,
+          (clienteFreteTotalPorChave.get(k) || 0) + Number(l.item.valor_frete_cliente || 0)
+        );
+      }
+
+      // Anexa divergência de frete em nível de grupo (CT-e)
+      for (const l of linhas) {
+        const k = l.cte?.chave_cte;
+        if (!k) continue;
+        const somaCliente = clienteFreteTotalPorChave.get(k) || 0;
+        const somaCte = cteFreteTotalPorChave.get(k) || 0;
+        const diff = +(somaCliente - somaCte).toFixed(2);
+        if (Math.abs(diff) > TOLERANCIA_DEFAULT.valor_frete) {
+          l.divs.push({
+            campo: "valor_frete_grupo_cte",
+            esperado: somaCte,
+            recebido: somaCliente,
+            diff,
+          });
+        }
+      }
+
+      const insertRows = linhas.map(({ item, nf, matched_by, cte, divs }) => {
         if (!nf) {
           return {
             prefatura_id: prefId,
-            prefatura_item_id: (it as { id: string }).id,
+            prefatura_item_id: item.id,
             nf_id: null,
             cte_id: null,
             matched_by,
@@ -333,14 +385,12 @@ export default function Conciliacao() {
             divergencias: { itens: [] },
           };
         }
-        const cte = matchCte(nf, ctes);
-        const divs = compararCampos(it, nf, cte, TOLERANCIA_DEFAULT);
         let status: StatusConciliacao = "ok";
         if (!cte) status = "sem_cte";
         else if (divs.length > 0) status = "divergente";
         return {
           prefatura_id: prefId,
-          prefatura_item_id: (it as { id: string }).id,
+          prefatura_item_id: item.id,
           nf_id: nf.id,
           cte_id: cte?.id || null,
           matched_by,
