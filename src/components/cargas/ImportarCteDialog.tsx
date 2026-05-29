@@ -43,19 +43,19 @@ export function ImportarCteDialog({
   const [isDragActive, setIsDragActive] = useState(false);
 
   // Fetch NFs for this carga to match chave_acesso
-  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>>(new Map());
+  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string; razao_social_emitente: string; valor_nf: number | null }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
 
   async function loadNfs() {
     if (nfsLoaded) return;
     const { data } = await supabase
       .from("notas_fiscais")
-      .select("id, chave_acesso, numero_nf, razao_social_emitente")
+      .select("id, chave_acesso, numero_nf, razao_social_emitente, valor_nf")
       .eq("carga_id", cargaId);
 
-    const map = new Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>();
+    const map = new Map<string, { id: string; numero_nf: string; razao_social_emitente: string; valor_nf: number | null }>();
     (data || []).forEach((nf) => {
-      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf, razao_social_emitente: nf.razao_social_emitente || "" });
+      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf, razao_social_emitente: nf.razao_social_emitente || "", valor_nf: nf.valor_nf as any });
     });
     setNfsMap(map);
     setNfsLoaded(true);
