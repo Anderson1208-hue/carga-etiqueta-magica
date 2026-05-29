@@ -126,6 +126,7 @@ export function parseCTeXML(xmlString: string): CTeParsed {
     cnpjEmitente,
     razaoSocialEmitente,
     chaveNfReferenciada,
+    chavesNfReferenciadas,
     valorFrete,
     volumeM3,
   };
