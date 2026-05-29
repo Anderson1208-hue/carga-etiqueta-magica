@@ -107,9 +107,24 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
         : "";
 
       if (!numeroNf) continue; // sem NF não vai pra tela
+      const numeroNfNorm = numeroNf.replace(/^0+/, "") || "0";
+
+      // Agrupa: mesmo número de NF + mesmo CNPJ destinatário => soma frete/icms/total
+      const existente = linhas.find(
+        (l) => l.numero_nf === numeroNfNorm && l.cnpj_destinatario === cnpjDestinatarioAtual,
+      );
+      if (existente) {
+        existente.valor_frete = +(existente.valor_frete + valorFrete).toFixed(2);
+        existente.valor_icms = +(existente.valor_icms + valorIcms).toFixed(2);
+        existente.valor_total = +(existente.valor_total + valorFrete).toFixed(2);
+        existente.nfs_no_grupo += 1;
+        existente.rateado = true;
+        if (!existente.chave_acesso && chave.length === 44) existente.chave_acesso = chave;
+        continue;
+      }
 
       linhas.push({
-        numero_nf: numeroNf.replace(/^0+/, "") || "0",
+        numero_nf: numeroNfNorm,
         cnpj_emitente: cnpjEmbarcadora,
         cnpj_destinatario: cnpjDestinatarioAtual,
         chave_acesso: chave.length === 44 ? chave : null,
