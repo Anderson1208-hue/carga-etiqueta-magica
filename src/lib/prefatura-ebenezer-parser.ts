@@ -119,24 +119,24 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
       const cnpjEmit = ln.substring(76, 90).replace(/\D/g, "");
       const cnpjDest = ln.substring(91, 105).replace(/\D/g, "");
       const serie = ln.substring(106, 107).trim() || null;
-      const valorMerc = dec(ln.substring(122, 137), 2);
+      const valorBaseFrete = dec(ln.substring(107, 122), 2); // base de prestação = frete real
       cur = {
         linha393: i + 1,
         cnpj_emit: cnpjEmit.length === 14 ? cnpjEmit : null,
         cnpj_dest: cnpjDest.length === 14 ? cnpjDest : null,
         serie,
-        valor_nf: valorMerc,
-        valor_frete: null,
+        valor_frete: valorBaseFrete,
+        valor_mercadoria: null,
       };
       continue;
     }
 
     if (tipo === "394") {
       if (!cur) continue;
-      // O último bloco de 15 dígitos antes de espaços de cauda = valor total da prestação (frete)
+      // Último bloco de 15 dígitos = valor da mercadoria (vNF da nota)
       const tail = ln.replace(/\s+$/, "");
       const m = tail.match(/(\d{15})$/);
-      cur.valor_frete = m ? dec(m[1], 2) : null;
+      cur.valor_mercadoria = m ? dec(m[1], 2) : null;
       continue;
     }
 
