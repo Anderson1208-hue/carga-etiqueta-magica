@@ -54,8 +54,12 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
   const flush396 = (numerosNf: string[]) => {
     if (!cur) return;
     const consolidado = numerosNf.length > 1;
-    // Quando uma prestação cobre N NFs, o frete é rateado igualmente entre elas
-    // (o layout não traz rateio por peso/valor).
+    // `grupo_id` = identificador da prestação (linha do 393). Permite à Conciliação
+    // somar o frete cliente das NFs do mesmo bloco e bater com o frete total do
+    // CT-e correspondente, mesmo quando o CT-e no banco não tem todas as NFs
+    // vinculadas (ex.: imports antigos com apenas a 1ª NF).
+    const grupoId = `g_${cur.linha393}`;
+    // Frete rateado igualmente: somando as N linhas do grupo dá o total do CT-e.
     const freteRateado =
       cur.valor_frete !== null && numerosNf.length > 0
         ? +(cur.valor_frete / numerosNf.length).toFixed(2)
@@ -77,6 +81,7 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
         referencia_interna_cliente: null,
         raw_jsonb: {
           tipo_registro: "393/394/396",
+          grupo_id: grupoId,
           frete_consolidado: consolidado,
           nfs_no_bloco: numerosNf,
           frete_total_prestacao: cur!.valor_frete,
