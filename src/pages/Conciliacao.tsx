@@ -317,14 +317,8 @@ export default function Conciliacao() {
       if (ctesResp.error) throw ctesResp.error;
       const ctes = (ctesResp.data || []) as unknown as (CteInterno & { chave_cte: string })[];
 
-      // Soma do frete original por CT-e (chave_cte): se houver rateio em várias linhas,
-      // a soma reconstitui o valor total cobrado naquele CT-e.
-      const cteFreteTotalPorChave = new Map<string, number>();
-      for (const c of ctes) {
-        const k = c.chave_cte;
-        if (!k) continue;
-        cteFreteTotalPorChave.set(k, (cteFreteTotalPorChave.get(k) || 0) + Number(c.valor_frete || 0));
-      }
+      // (frete total por chave_cte não é mais necessário — o agrupamento agora é
+      // feito por grupo_id do arquivo de pré-fatura, mais abaixo)
 
       // Clear previous conciliacao for this prefatura
       await supabase.from("prefatura_conciliacao").delete().eq("prefatura_id", prefId);
@@ -345,32 +339,45 @@ export default function Conciliacao() {
         return { item: it, nf, matched_by, cte, divs };
       });
 
-      // Soma do frete cliente por CT-e (agrupando todas as NFs vinculadas ao mesmo CT-e)
-      const clienteFreteTotalPorChave = new Map<string, number>();
+      // Agrupamento por bloco do arquivo (grupo_id do raw_jsonb): cada prestação
+      // 393/394/396 da pré-fatura é um grupo de NFs cobertas por 1 CT-e. Somando
+      // o frete cliente do grupo dá o frete total do CT-e — funciona mesmo se o
+      // CT-e no banco só tem 1 NF vinculada (basta uma NF do grupo achar o CT-e).
+      type GrupoInfo = {
+        somaCliente: number;
+        cte: (CteInterno & { chave_cte: string }) | null;
+      };
+      const grupos = new Map<string, GrupoInfo>();
       for (const l of linhas) {
-        const k = l.cte?.chave_cte;
-        if (!k) continue;
-        clienteFreteTotalPorChave.set(
-          k,
-          (clienteFreteTotalPorChave.get(k) || 0) + Number(l.item.valor_frete_cliente || 0)
-        );
+        const raw = (l.item.raw_jsonb || {}) as Record<string, unknown>;
+        const grupoId = typeof raw.grupo_id === "string" ? raw.grupo_id : null;
+        if (!grupoId) continue;
+        const g = grupos.get(grupoId) || { somaCliente: 0, cte: null };
+        g.somaCliente += Number(l.item.valor_frete_cliente || 0);
+        if (!g.cte && l.cte) g.cte = l.cte;
+        grupos.set(grupoId, g);
       }
 
-      // Anexa divergência de frete em nível de grupo (CT-e)
+      // Anexa divergência de frete em nível de grupo (do arquivo de pré-fatura).
+      // Aplica apenas na 1ª linha de cada grupo para não duplicar a divergência.
+      const grupoJaMarcado = new Set<string>();
       for (const l of linhas) {
-        const k = l.cte?.chave_cte;
-        if (!k) continue;
-        const somaCliente = clienteFreteTotalPorChave.get(k) || 0;
-        const somaCte = cteFreteTotalPorChave.get(k) || 0;
-        const diff = +(somaCliente - somaCte).toFixed(2);
+        const raw = (l.item.raw_jsonb || {}) as Record<string, unknown>;
+        const grupoId = typeof raw.grupo_id === "string" ? raw.grupo_id : null;
+        if (!grupoId || grupoJaMarcado.has(grupoId)) continue;
+        const g = grupos.get(grupoId);
+        if (!g || !g.cte) continue;
+        const somaCte = Number(g.cte.valor_frete || 0);
+        const diff = +(g.somaCliente - somaCte).toFixed(2);
         if (Math.abs(diff) > TOLERANCIA_DEFAULT.valor_frete) {
           l.divs.push({
             campo: "valor_frete_grupo_cte",
             esperado: somaCte,
-            recebido: somaCliente,
+            recebido: +g.somaCliente.toFixed(2),
             diff,
           });
         }
+        grupoJaMarcado.add(grupoId);
       }
 
       const insertRows = linhas.map(({ item, nf, matched_by, cte, divs }) => {
