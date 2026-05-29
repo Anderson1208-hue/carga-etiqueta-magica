@@ -303,22 +303,33 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <MobileRedirect>
-              <AppRoutes />
-            </MobileRedirect>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
-);
+import { useEffect } from "react";
+import { bootstrapNativePermissions } from "@/lib/bootstrapNativePermissions";
+
+const App = () => {
+  useEffect(() => {
+    // Em APK: dispara o diálogo nativo de localização logo na abertura,
+    // sem depender do motorista chegar até /motorista-acesso.
+    bootstrapNativePermissions();
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <MobileRedirect>
+                <AppRoutes />
+              </MobileRedirect>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;
