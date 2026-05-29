@@ -287,10 +287,10 @@ export function useGpsTrackerNative({
 
       foregroundFallbackTimer = setInterval(() => {
         const silent = Date.now() - lastCallbackAtRef.current;
-        if (silent > Math.max(HEARTBEAT_MS, cfg.intervalo_padrao_segundos * 1000 - 5_000)) {
-          enqueueForegroundFallback("watcher-silencioso");
+        if (silent > FORCED_PING_MS) {
+          enqueueForegroundFallback("forced-ping-20s");
         }
-      }, cfg.intervalo_padrao_segundos * 1000);
+      }, FORCED_PING_MS);
 
       // Heartbeat: a cada 60s, enfileira a última posição como heartbeat
       heartbeatTimer = setInterval(async () => {
