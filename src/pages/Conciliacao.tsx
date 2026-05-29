@@ -30,7 +30,11 @@ import {
   type StatusConciliacao,
   type LinhaRetorno,
 } from "@/lib/prefatura-utils";
-import { parseNotfisFile } from "@/lib/notfis-parser";
+import { parseNotfisFile, isNotfisContent } from "@/lib/notfis-parser";
+import {
+  parsePrefaturaEbenezerFile,
+  isPrefaturaEbenezerContent,
+} from "@/lib/prefatura-ebenezer-parser";
 
 interface Prefatura {
   id: string;
@@ -187,12 +191,26 @@ export default function Conciliacao() {
     }
     setImporting(true);
     try {
-      // Detect format: NOTFIS EDI (.txt fixed-width) vs Excel/CSV
+      // Detect format by extension + content sniff
       const nome = arquivo.name.toLowerCase();
-      const isNotfis = nome.endsWith(".txt") || nome.endsWith(".edi") || nome.endsWith(".notfis");
-      const parsed = isNotfis
-        ? await parseNotfisFile(arquivo)
-        : await parsePrefaturaExcel(arquivo);
+      const isTextFile =
+        nome.endsWith(".txt") || nome.endsWith(".edi") || nome.endsWith(".notfis");
+      let parsed;
+      if (isTextFile) {
+        // Sniff first 1KB to choose between PREFATURA Ebenezer and NOTFIS layouts
+        const headBuf = await arquivo.slice(0, 1024).arrayBuffer();
+        const head = new TextDecoder("iso-8859-1").decode(headBuf);
+        if (isPrefaturaEbenezerContent(head)) {
+          parsed = await parsePrefaturaEbenezerFile(arquivo);
+        } else if (isNotfisContent(head)) {
+          parsed = await parseNotfisFile(arquivo);
+        } else {
+          // fallback: tenta NOTFIS por padrão para .txt desconhecido
+          parsed = await parseNotfisFile(arquivo);
+        }
+      } else {
+        parsed = await parsePrefaturaExcel(arquivo);
+      }
       if (parsed.itens.length === 0) {
         toast({ title: "Arquivo sem itens válidos", variant: "destructive" });
         return;
