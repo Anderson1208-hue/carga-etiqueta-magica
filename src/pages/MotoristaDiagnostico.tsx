@@ -86,6 +86,13 @@ export default function MotoristaDiagnostico() {
   const [wakeSupported] = useState<boolean>(typeof navigator !== "undefined" && "wakeLock" in navigator);
   const [tick, setTick] = useState(0);
 
+  // Teste manual de envio para o backend
+  const [testCode, setTestCode] = useState<string>(() => {
+    try { return localStorage.getItem("motorista-diag-test-code") || ""; } catch { return ""; }
+  });
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string; detail?: string } | null>(null);
+
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
 
