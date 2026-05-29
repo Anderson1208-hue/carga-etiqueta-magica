@@ -90,14 +90,25 @@ export function ImportarCteDialog({
             continue;
           }
 
-          // Check if referenced NF exists in this carga
-          const nfMatch = nfsMap.get(parsed.chaveNfReferenciada);
-          if (!nfMatch) {
+          // Match all referenced NFs in this carga
+          const matches: NonNullable<ParsedCTeFile["nfMatches"]> = [];
+          const naoEncontradas: string[] = [];
+          for (const chave of parsed.chavesNfReferenciadas) {
+            const m = nfsMap.get(chave);
+            if (m) {
+              matches.push({ id: m.id, numero_nf: m.numero_nf, chave, valor_nf: m.valor_nf, razao: m.razao_social_emitente });
+            } else {
+              naoEncontradas.push(chave);
+            }
+          }
+
+          if (matches.length === 0) {
             newFiles.push({
               fileName: file.name,
               data: parsed,
               status: "error",
-              error: `NF referenciada não encontrada nesta carga (chave: ...${parsed.chaveNfReferenciada.slice(-8)})`,
+              error: `Nenhuma NF referenciada encontrada nesta carga (${parsed.chavesNfReferenciadas.length} NF(s) no CT-e)`,
+              nfsNaoEncontradas: naoEncontradas,
             });
             continue;
           }
@@ -106,7 +117,8 @@ export function ImportarCteDialog({
             fileName: file.name,
             data: parsed,
             status: "success",
-            nfNumero: nfMatch.numero_nf,
+            nfMatches: matches,
+            nfsNaoEncontradas: naoEncontradas,
           });
         } catch (error) {
           newFiles.push({
