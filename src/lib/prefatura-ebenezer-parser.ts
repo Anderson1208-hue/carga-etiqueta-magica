@@ -95,22 +95,22 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
     }
 
     if (tipo === "393") {
-      // pos 0-2  : 393
-      // pos 3-16 : CNPJ transportador (14)
-      // pos 17-22: 6 espaços
-      // pos 23-72: tipo doc (50)
-      // pos 73-86: CNPJ emitente (14)
-      // pos 87   : espaço
-      // pos 88-101: CNPJ destinatário (14)
-      // pos 102  : espaço
-      // pos 103  : série (1)
-      // pos 104-118: valor base (15, 2 decimais)
-      // pos 119-133: valor mercadoria (15, 2 decimais)
-      if (ln.length < 134) continue;
-      const cnpjEmit = ln.substring(73, 87).replace(/\D/g, "");
-      const cnpjDest = ln.substring(88, 102).replace(/\D/g, "");
-      const serie = ln.substring(103, 104).trim() || null;
-      const valorMerc = dec(ln.substring(119, 134), 2);
+      // Offsets (0-indexed, validados contra o arquivo da Ebenezer):
+      //   0-2   : "393"
+      //   3-16  : CNPJ transportador (14)
+      //   17-75 : "      NOTA FISCAL" + padding (53)
+      //   76-89 : CNPJ emitente (14)
+      //   90    : espaço
+      //   91-104: CNPJ destinatário (14)
+      //   105   : espaço
+      //   106   : série (1)
+      //   107-121: valor base (15, 2 decimais)
+      //   122-136: valor mercadoria (15, 2 decimais)
+      if (ln.length < 137) continue;
+      const cnpjEmit = ln.substring(76, 90).replace(/\D/g, "");
+      const cnpjDest = ln.substring(91, 105).replace(/\D/g, "");
+      const serie = ln.substring(106, 107).trim() || null;
+      const valorMerc = dec(ln.substring(122, 137), 2);
       cur = {
         linha393: i + 1,
         cnpj_emit: cnpjEmit.length === 14 ? cnpjEmit : null,
