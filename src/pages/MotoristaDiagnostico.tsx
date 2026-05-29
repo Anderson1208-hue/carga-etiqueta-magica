@@ -204,7 +204,83 @@ export default function MotoristaDiagnostico() {
     });
   }
 
-  async function testarEnvioBackend() {
+  const [permLoading, setPermLoading] = useState(false);
+
+  async function solicitarPermissaoLocalizacao() {
+    setPermLoading(true);
+    try {
+      if (isNative) {
+        // Dispara o diálogo nativo do Android via plugin (requestPermissions:true).
+        // Mantém o watcher por ~3s só para forçar o sistema a registrar a permissão,
+        // depois remove para não deixar serviço rodando sem rota.
+        let watcherId: string | null = null;
+        const got = await new Promise<PermState>((resolve) => {
+          const timeout = setTimeout(() => resolve("unknown"), 30_000);
+          BackgroundGeolocation.addWatcher(
+            {
+              backgroundTitle: "Solicitando permissão",
+              backgroundMessage: "Toque em Permitir na próxima tela",
+              requestPermissions: true,
+              stale: false,
+              distanceFilter: 0,
+            },
+            (loc, err) => {
+              if (err) {
+                clearTimeout(timeout);
+                if (err.code === "NOT_AUTHORIZED") resolve("denied");
+                else resolve("unknown");
+                return;
+              }
+              if (loc) {
+                clearTimeout(timeout);
+                resolve("granted");
+              }
+            }
+          )
+            .then((id) => { watcherId = id; })
+            .catch(() => { clearTimeout(timeout); resolve("unknown"); });
+        });
+
+        // limpa watcher temporário
+        if (watcherId) {
+          BackgroundGeolocation.removeWatcher({ id: watcherId }).catch(() => {});
+        }
+
+        await refreshAll();
+
+        if (got === "granted") {
+          toast({ title: "Permissão concedida ✓", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+        } else if (got === "denied") {
+          toast({
+            title: "Permissão negada",
+            description: "Abra as Configurações do app e libere a localização manualmente.",
+            variant: "destructive",
+          });
+          BackgroundGeolocation.openSettings().catch(() => {});
+        } else {
+          toast({ title: "Sem resposta", description: "Tente novamente ou abra as configurações.", variant: "destructive" });
+        }
+      } else {
+        // Web: getCurrentPosition já dispara o prompt do navegador
+        await new Promise<void>((resolve) => {
+          if (!navigator.geolocation) return resolve();
+          navigator.geolocation.getCurrentPosition(
+            (p) => {
+              setPos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
+              resolve();
+            },
+            () => resolve(),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+          );
+        });
+        await refreshAll();
+      }
+    } finally {
+      setPermLoading(false);
+    }
+  }
+
+
     setTestLoading(true);
     setTestResult(null);
     const code = testCode.trim().toUpperCase();
