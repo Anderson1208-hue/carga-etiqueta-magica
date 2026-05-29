@@ -176,7 +176,8 @@ export default function PreCte() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>NF</TableHead>
+                        <TableHead>Romaneio</TableHead>
+                        <TableHead>NFs</TableHead>
                         <TableHead className="text-right">Frete</TableHead>
                         <TableHead className="text-right">ICMS</TableHead>
                         <TableHead className="text-right">Total</TableHead>
@@ -186,14 +187,15 @@ export default function PreCte() {
                     <TableBody>
                       {report.linhas.map((l, idx) => (
                         <TableRow key={`${l.grupo_id}-${idx}`}>
-                          <TableCell className="font-medium">{l.numero_nf}</TableCell>
+                          <TableCell className="font-medium tabular-nums">{l.romaneio}</TableCell>
+                          <TableCell className="text-xs">{l.numero_nf}</TableCell>
                           <TableCell className="text-right tabular-nums">{fmtMoney(l.valor_frete)}</TableCell>
                           <TableCell className="text-right tabular-nums">{fmtMoney(l.valor_icms)}</TableCell>
                           <TableCell className="text-right tabular-nums font-medium">{fmtMoney(l.valor_total)}</TableCell>
                           <TableCell>
                             {l.rateado ? (
                               <Badge variant="secondary" className="text-xs">
-                                Rateado ({l.nfs_no_grupo} NFs)
+                                {l.nfs_no_grupo} NFs somadas
                               </Badge>
                             ) : null}
                           </TableCell>
@@ -202,7 +204,7 @@ export default function PreCte() {
                     </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell className="font-semibold">Total ({report.total_nfs} NFs)</TableCell>
+                        <TableCell className="font-semibold" colSpan={2}>Total ({report.total_nfs} romaneios)</TableCell>
                         <TableCell className="text-right tabular-nums font-semibold">{fmtMoney(report.total_frete)}</TableCell>
                         <TableCell className="text-right tabular-nums font-semibold">{fmtMoney(report.total_icms)}</TableCell>
                         <TableCell className="text-right tabular-nums font-semibold">{fmtMoney(report.total_geral)}</TableCell>

@@ -181,7 +181,9 @@ export async function exportPreCteExcel(report: PreCteReport, nomeArquivo: strin
   const wb = XLSX.utils.book_new();
 
   const dados = report.linhas.map((l) => ({
-    "NF": l.numero_nf,
+    "Romaneio": l.romaneio,
+    "NFs": l.numero_nf,
+    "Qtd NFs": l.nfs_no_grupo,
     "Chave NF-e": l.chave_acesso ?? "",
     "CNPJ Destinatário": fmtCNPJ(l.cnpj_destinatario),
     "Valor Frete (R$)": l.valor_frete,
@@ -190,7 +192,7 @@ export async function exportPreCteExcel(report: PreCteReport, nomeArquivo: strin
   }));
   const ws = XLSX.utils.json_to_sheet(dados);
   ws["!cols"] = [
-    { wch: 12 }, { wch: 46 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
+    { wch: 10 }, { wch: 28 }, { wch: 8 }, { wch: 46 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Pré-CT-e");
 
@@ -227,8 +229,9 @@ export async function exportPreCtePDF(report: PreCteReport, nomeArquivo: string)
 
   autoTable(doc, {
     startY: 38,
-    head: [["NF", "Frete (R$)", "ICMS NF (R$)", "Total (R$)"]],
+    head: [["Romaneio", "NFs", "Frete (R$)", "ICMS (R$)", "Total (R$)"]],
     body: report.linhas.map((l) => [
+      l.romaneio,
       l.numero_nf,
       fmtMoney(l.valor_frete),
       fmtMoney(l.valor_icms),
