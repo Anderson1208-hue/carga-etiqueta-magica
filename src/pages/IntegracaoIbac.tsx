@@ -183,6 +183,9 @@ export default function IntegracaoIbac() {
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
+  if (isLoading || !profile) return null;
+  if (!isAdmin) return <Navigate to="/" replace />;
+
   const counts = {
     pendente: fila.filter((f) => f.status === "pendente").length,
     enviado: fila.filter((f) => f.status === "enviado").length,
