@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
 import { readTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import {
   ArrowLeft,
   RefreshCw,
@@ -20,6 +21,7 @@ import {
   Smartphone,
   Activity,
   Copy,
+  RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -370,6 +372,41 @@ export default function MotoristaDiagnostico() {
             </div>
             <Separator />
             <div className="text-muted-foreground break-all">{navigator.userAgent}</div>
+          </CardContent>
+        </Card>
+
+        {/* Reset wizard de validação GPS — destrava motorista quando o cache de 14d "passou" sem o app ter realmente recebido a permissão "Permitir o tempo todo" */}
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-4 h-4" />
+              Resetar validação GPS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Use quando: <strong>Permissão GPS</strong> aparece como <code>prompt</code> ou <code>denied</code> e o <strong>Watcher</strong> não inicia.
+              Limpa o cache de 14 dias e reabre o passo a passo de permissão na próxima vez que entrar com o código da placa.
+            </p>
+            <Button
+              variant="outline"
+              className="w-full border-amber-400 text-amber-700 hover:bg-amber-100"
+              onClick={() => {
+                try {
+                  localStorage.removeItem(VALIDATION_KEY);
+                } catch { /* ignore */ }
+                toast({
+                  title: "Validação resetada",
+                  description: "Saia, entre de novo com o código da placa e siga o passo a passo do GPS.",
+                });
+                setTimeout(() => {
+                  window.location.href = "/motorista";
+                }, 800);
+              }}
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Resetar e voltar pro login
+            </Button>
           </CardContent>
         </Card>
 
