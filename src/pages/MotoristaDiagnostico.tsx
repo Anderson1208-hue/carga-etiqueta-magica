@@ -449,6 +449,55 @@ export default function MotoristaDiagnostico() {
           </CardContent>
         </Card>
 
+        {/* Teste manual de envio ao backend — isola permissão vs. acesso à rota vs. rede */}
+        <Card className="border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Send className="w-4 h-4" />
+              Testar envio para o backend
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Digite o <strong>código de 6 caracteres</strong> da placa (gerado em <code>/monitoramento</code>) e envie uma posição agora.
+              Confirma se o caminho <em>celular → backend → Torre</em> está funcionando.
+            </p>
+            <Input
+              value={testCode}
+              onChange={(e) => setTestCode(e.target.value.toUpperCase().slice(0, 6))}
+              placeholder="ABC123"
+              maxLength={6}
+              className="font-mono text-center text-lg tracking-widest uppercase"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <Button
+              className="w-full"
+              onClick={testarEnvioBackend}
+              disabled={testLoading || testCode.trim().length !== 6}
+            >
+              <Send className={`w-4 h-4 mr-2 ${testLoading ? "animate-pulse" : ""}`} />
+              {testLoading ? "Enviando…" : "Enviar posição de teste agora"}
+            </Button>
+            {testResult && (
+              <div
+                className={`text-xs rounded-md p-2 border ${
+                  testResult.ok
+                    ? "border-green-300 bg-green-50 text-green-800"
+                    : "border-destructive/40 bg-destructive/5 text-destructive"
+                }`}
+              >
+                <div className="font-medium flex items-center gap-1">
+                  {testResult.ok ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                  {testResult.msg}
+                </div>
+                {testResult.detail && <div className="mt-1 font-mono break-all">{testResult.detail}</div>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Reset wizard de validação GPS — destrava motorista quando o cache de 14d "passou" sem o app ter realmente recebido a permissão "Permitir o tempo todo" */}
         <Card className="border-amber-200 bg-amber-50/40">
           <CardHeader className="pb-2">
