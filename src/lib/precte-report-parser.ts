@@ -168,17 +168,14 @@ export async function exportPreCteExcel(report: PreCteReport, nomeArquivo: strin
 
   const dados = report.linhas.map((l) => ({
     "NF": l.numero_nf,
-    "CNPJ Emitente": fmtCNPJ(l.cnpj_emitente),
-    "CNPJ Destinatário": fmtCNPJ(l.cnpj_destinatario),
     "Valor Frete (R$)": l.valor_frete,
     "Valor ICMS (R$)": l.valor_icms,
     "Valor Total (R$)": l.valor_total,
     "Rateado": l.rateado ? `Sim (${l.nfs_no_grupo} NFs)` : "Não",
-    "Grupo": l.grupo_id,
   }));
   const ws = XLSX.utils.json_to_sheet(dados);
   ws["!cols"] = [
-    { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 10 },
+    { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Pré-CT-e");
 
