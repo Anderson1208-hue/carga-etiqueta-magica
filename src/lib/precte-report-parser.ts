@@ -241,12 +241,14 @@ export async function exportPreCtePDF(report: PreCteReport, nomeArquivo: string)
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
     columnStyles: {
       0: { halign: "left" },
-      1: { halign: "right" },
+      1: { halign: "left" },
       2: { halign: "right" },
       3: { halign: "right" },
+      4: { halign: "right" },
     },
     foot: [[
-      `Total: ${report.total_nfs} NFs`,
+      `Total: ${report.total_nfs} romaneios`,
+      "",
       fmtMoney(report.total_frete),
       fmtMoney(report.total_icms),
       fmtMoney(report.total_geral),
