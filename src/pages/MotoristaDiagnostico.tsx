@@ -481,6 +481,16 @@ export default function MotoristaDiagnostico() {
               ok={wakeSupported}
               hint="Mantém a tela ligada durante a rota (web/PWA)"
             />
+            <StatusRow
+              label="Rastreamento desta tela"
+              value={diagRotaId ? "ATIVO" : "Inativo"}
+              ok={!!diagRotaId}
+              hint={
+                diagRotaId
+                  ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
+                  : "Digite o código de 6 caracteres da placa abaixo para ativar"
+              }
+            />
           </CardContent>
         </Card>
 
