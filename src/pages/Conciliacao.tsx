@@ -52,6 +52,8 @@ interface ItemComConciliacao {
   numero_nf_cliente: string | null;
   valor_nf_cliente: number | null;
   valor_frete_cliente: number | null;
+  valor_frete_cte: number | null;
+  numero_cte: string | null;
   conciliacao: {
     nf_id: string | null;
     cte_id: string | null;
