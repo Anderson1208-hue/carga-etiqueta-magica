@@ -37,6 +37,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
+import PreCte from "./pages/PreCte";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -293,6 +294,7 @@ function AppRoutes() {
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
+      <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
 
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />
