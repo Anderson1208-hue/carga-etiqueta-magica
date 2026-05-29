@@ -456,7 +456,7 @@ export default function Conciliacao() {
                   <Label>Arquivo</Label>
                   <Input
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xls,.csv,.txt,.edi,.notfis"
                     onChange={(e) => setArquivo(e.target.files?.[0] || null)}
                   />
                 </div>
