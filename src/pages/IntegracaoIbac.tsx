@@ -39,9 +39,6 @@ export default function IntegracaoIbac() {
   const [tab, setTab] = useState("fila");
   const [detalheId, setDetalheId] = useState<string | null>(null);
 
-  if (isLoading || !profile) return null;
-  if (!isAdmin) return <Navigate to="/" replace />;
-
   // Filtros da fila
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroEvento, setFiltroEvento] = useState<string>("todos");
