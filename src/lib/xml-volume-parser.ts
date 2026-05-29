@@ -56,23 +56,29 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
     return Number.isInteger(value) ? 0 : value;
   };
 
-  if (isPandur) {
+  // Detecta Pandurata também via <marca>/<xMarca> dentro de <vol>
+  let isPandurataXml = isPandur;
+  if (!isPandurataXml) {
+    for (const volNode of volNodes) {
+      const marca = getChildByLocalName(volNode, ["marca", "xmarca"])
+        ?.textContent?.trim() ?? "";
+      if (/pandur(?:ata)?/i.test(marca)) {
+        isPandurataXml = true;
+        break;
+      }
+    }
+  }
+
+  if (isPandurataXml) {
+    // Pandurata: só aceita <nVol> DECIMAL como m³. Inteiro = caixas → ignora.
+    // NUNCA cair no fallback de texto: ele captura "M3" de descrição de item
+    // e pega número errado adiante (ex: nVol=216 acaba virando volume=216).
     const nVolNodes = getElementsByLocalName(xmlDoc, ["nvol"]);
     for (const nVolNode of nVolNodes) {
       const value = tryPandurNVol(nVolNode?.textContent);
       if (value > 0) return value;
     }
-  }
-
-  for (const volNode of volNodes) {
-    const marca = getChildByLocalName(volNode, ["marca", "xmarca"])
-      ?.textContent?.trim() ?? "";
-
-    if (/pandur(?:ata)?/i.test(marca)) {
-      const nVolNode = getChildByLocalName(volNode, ["nvol"]);
-      const value = tryPandurNVol(nVolNode?.textContent);
-      if (value > 0) return value;
-    }
+    return 0;
   }
 
   const textScopes = [xmlDoc.documentElement, ...volNodes];

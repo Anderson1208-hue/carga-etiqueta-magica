@@ -1,0 +1,1 @@
+UPDATE public.notas_fiscais SET volume_m3 = 0 WHERE razao_social_emitente ILIKE '%pandur%' AND volume_m3 > 0 AND volume_m3 = FLOOR(volume_m3);

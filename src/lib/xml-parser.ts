@@ -247,6 +247,10 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
       const value = parseNumericText(nVolNode?.textContent);
       if (value > 0 && !Number.isInteger(value)) return value;
     }
+    // Pandurata: NUNCA cair no fallback de texto/tags genéricas.
+    // Sem <nVol> decimal → m³ entra zerado (atualiza por Excel/TXT/dialog).
+    // O fallback captura "M3" de descrição e pega número errado adiante.
+    return 0;
   }
 
   // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
