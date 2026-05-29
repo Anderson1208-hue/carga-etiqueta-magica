@@ -34,6 +34,8 @@ import {
   Copy,
   RotateCcw,
   Send,
+  ShieldCheck,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
