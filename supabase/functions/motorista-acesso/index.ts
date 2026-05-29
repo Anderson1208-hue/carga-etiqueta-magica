@@ -217,8 +217,10 @@ Deno.serve(async (req) => {
       entrega: baixasMap[nf.id] || null,
     }));
 
-    // Rota de monitoramento ativa (para o APK iniciar GPS em segundo plano)
-    const { data: rotaAtiva } = await supabase
+    // Rota de monitoramento ativa (para o APK iniciar GPS em segundo plano).
+    // Primeiro tenta pelo veículo exato; se não encontrar, cai para a placa.
+    // Isso cobre placas com múltiplos cadastros/códigos gerados em dias diferentes.
+    const { data: rotaAtivaPorVeiculo } = await supabase
       .from("monitoramento_rotas")
       .select("id")
       .eq("veiculo_id", veiculo.id)
@@ -226,6 +228,19 @@ Deno.serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    let rotaAtiva = rotaAtivaPorVeiculo;
+    if (!rotaAtiva) {
+      const { data: rotaAtivaPorPlaca } = await supabase
+        .from("monitoramento_rotas")
+        .select("id")
+        .eq("placa", veiculo.placa)
+        .eq("status", "ativa")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      rotaAtiva = rotaAtivaPorPlaca;
+    }
 
     return new Response(
       JSON.stringify({
