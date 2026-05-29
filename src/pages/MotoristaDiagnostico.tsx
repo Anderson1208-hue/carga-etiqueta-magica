@@ -4,11 +4,13 @@ import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { readTelemetry, markSent, markError, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft,
   RefreshCw,
@@ -22,6 +24,7 @@ import {
   Activity,
   Copy,
   RotateCcw,
+  Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -82,6 +85,13 @@ export default function MotoristaDiagnostico() {
   const [tele, setTele] = useState<GpsTelemetry>(readTelemetry());
   const [wakeSupported] = useState<boolean>(typeof navigator !== "undefined" && "wakeLock" in navigator);
   const [tick, setTick] = useState(0);
+
+  // Teste manual de envio para o backend
+  const [testCode, setTestCode] = useState<string>(() => {
+    try { return localStorage.getItem("motorista-diag-test-code") || ""; } catch { return ""; }
+  });
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string; detail?: string } | null>(null);
 
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
@@ -170,6 +180,70 @@ export default function MotoristaDiagnostico() {
       () => toast({ title: "Diagnóstico copiado", description: "Cole no WhatsApp do suporte." }),
       () => toast({ title: "Falha ao copiar", variant: "destructive" })
     );
+  }
+
+  async function getFreshPosition(): Promise<{ lat: number; lng: number; accuracy: number }> {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("Geolocation indisponível"));
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+        (err) => reject(new Error(`GPS ${err.code}: ${err.message}`)),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    });
+  }
+
+  async function testarEnvioBackend() {
+    setTestLoading(true);
+    setTestResult(null);
+    const code = testCode.trim().toUpperCase();
+    try {
+      if (code.length !== 6) throw new Error("Digite o código de 6 caracteres da placa");
+      try { localStorage.setItem("motorista-diag-test-code", code); } catch { /* ignore */ }
+
+      // 1) Resolve a rota ativa via motorista-acesso
+      const { data: acessoData, error: acessoErr } = await supabase.functions.invoke("motorista-acesso", {
+        body: { code },
+      });
+      if (acessoErr) throw new Error(`Acesso: ${acessoErr.message}`);
+      if (acessoData?.error) throw new Error(`Acesso: ${acessoData.error}`);
+      const rotaId: string | null = acessoData?.monitoramento_rota_id ?? null;
+      if (!rotaId) throw new Error("Sem rota ativa para esta placa. Abra a rota em /monitoramento primeiro.");
+
+      // 2) Pega posição fresca
+      const fresh = await getFreshPosition();
+      setPos(fresh);
+
+      // 3) Envia ao processar-gps
+      const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("processar-gps", {
+        body: {
+          monitoramento_rota_id: rotaId,
+          latitude: fresh.lat,
+          longitude: fresh.lng,
+          accuracy: fresh.accuracy,
+          heartbeat: false,
+        },
+      });
+      if (gpsErr) throw new Error(`Backend: ${gpsErr.message}`);
+      if (gpsData?.error) throw new Error(`Backend: ${gpsData.error}`);
+
+      markSent(1);
+      setTele(readTelemetry());
+      setTestResult({
+        ok: true,
+        msg: "Envio OK — a Torre já deve mostrar a posição",
+        detail: `Rota ${rotaId.slice(0, 8)}… • ${fresh.lat.toFixed(5)}, ${fresh.lng.toFixed(5)} (±${Math.round(fresh.accuracy)}m)`,
+      });
+      toast({ title: "GPS de teste enviado ✓", description: "Veja na Torre de Controle." });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      markError(msg);
+      setTele(readTelemetry());
+      setTestResult({ ok: false, msg: "Falha no teste", detail: msg });
+      toast({ title: "Teste falhou", description: msg, variant: "destructive" });
+    } finally {
+      setTestLoading(false);
+    }
   }
 
   const trackerMode = isNative ? "Nativo (Foreground Service)" : "Web (navigator.geolocation)";
@@ -372,6 +446,55 @@ export default function MotoristaDiagnostico() {
             </div>
             <Separator />
             <div className="text-muted-foreground break-all">{navigator.userAgent}</div>
+          </CardContent>
+        </Card>
+
+        {/* Teste manual de envio ao backend — isola permissão vs. acesso à rota vs. rede */}
+        <Card className="border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Send className="w-4 h-4" />
+              Testar envio para o backend
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Digite o <strong>código de 6 caracteres</strong> da placa (gerado em <code>/monitoramento</code>) e envie uma posição agora.
+              Confirma se o caminho <em>celular → backend → Torre</em> está funcionando.
+            </p>
+            <Input
+              value={testCode}
+              onChange={(e) => setTestCode(e.target.value.toUpperCase().slice(0, 6))}
+              placeholder="ABC123"
+              maxLength={6}
+              className="font-mono text-center text-lg tracking-widest uppercase"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+            <Button
+              className="w-full"
+              onClick={testarEnvioBackend}
+              disabled={testLoading || testCode.trim().length !== 6}
+            >
+              <Send className={`w-4 h-4 mr-2 ${testLoading ? "animate-pulse" : ""}`} />
+              {testLoading ? "Enviando…" : "Enviar posição de teste agora"}
+            </Button>
+            {testResult && (
+              <div
+                className={`text-xs rounded-md p-2 border ${
+                  testResult.ok
+                    ? "border-green-300 bg-green-50 text-green-800"
+                    : "border-destructive/40 bg-destructive/5 text-destructive"
+                }`}
+              >
+                <div className="font-medium flex items-center gap-1">
+                  {testResult.ok ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                  {testResult.msg}
+                </div>
+                {testResult.detail && <div className="mt-1 font-mono break-all">{testResult.detail}</div>}
+              </div>
+            )}
           </CardContent>
         </Card>
 
