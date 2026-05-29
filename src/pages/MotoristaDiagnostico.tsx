@@ -4,11 +4,13 @@ import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { readTelemetry, markSent, markError, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft,
   RefreshCw,
@@ -22,6 +24,7 @@ import {
   Activity,
   Copy,
   RotateCcw,
+  Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
