@@ -536,8 +536,43 @@ export default function MotoristaDiagnostico() {
           </CardContent>
         </Card>
 
+        {/* Solicitar permissão de localização — dispara o diálogo nativo do Android */}
+        <Card className="border-primary/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4" />
+              Solicitar permissão de localização
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Use quando <strong>Permissão GPS</strong> aparece como <code>prompt</code>. Vai abrir o diálogo do Android pedindo acesso à localização.
+              Depois de tocar em <strong>"Durante o uso do app"</strong>, abra as configurações e mude para <strong>"Permitir o tempo todo"</strong>.
+            </p>
+            <Button
+              className="w-full"
+              onClick={solicitarPermissaoLocalizacao}
+              disabled={permLoading}
+            >
+              <ShieldCheck className={`w-4 h-4 mr-2 ${permLoading ? "animate-pulse" : ""}`} />
+              {permLoading ? "Aguardando resposta…" : "Pedir permissão agora"}
+            </Button>
+            {isNative && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => BackgroundGeolocation.openSettings().catch(() => {})}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Abrir Configurações do app
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Teste manual de envio ao backend — isola permissão vs. acesso à rota vs. rede */}
         <Card className="border-primary/30">
+
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Send className="w-4 h-4" />
