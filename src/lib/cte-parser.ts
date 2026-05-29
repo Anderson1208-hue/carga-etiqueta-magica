@@ -5,7 +5,8 @@ export interface CTeParsed {
   numeroCte: string;
   cnpjEmitente: string;
   razaoSocialEmitente: string;
-  chaveNfReferenciada: string;
+  chaveNfReferenciada: string; // primeira NF (compat)
+  chavesNfReferenciadas: string[]; // todas as NFs do CT-e
   valorFrete: number;
   volumeM3: number;
 }
