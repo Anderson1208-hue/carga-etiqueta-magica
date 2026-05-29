@@ -198,18 +198,6 @@ export default function Conciliacao() {
         .select()
         .single();
       if (errPf) throw errPf;
-          cliente_nome: clienteNome || null,
-          numero_prefatura_cliente: numeroPref || null,
-          arquivo_origem_nome: arquivo.name,
-          import_batch_id: importBatchId,
-          total_itens: parsed.itens.length,
-          total_valor_nf_cliente: parsed.total_valor_nf,
-          total_valor_frete_cliente: parsed.total_valor_frete,
-          status: "importada",
-        })
-        .select()
-        .single();
-      if (errPf) throw errPf;
 
       // Insert in chunks to respect payload limits
       const chunkSize = 500;
