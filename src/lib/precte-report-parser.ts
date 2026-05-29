@@ -1,21 +1,34 @@
-// Parser do relatório Pré-CT-e a partir da pré-fatura Ebenezer (layout 390/391/393/394/396).
-// Para CADA prestação (393/394/396) extrai: valor do frete (base), valor do ICMS e total da prestação.
-// Quando o 396 cobre múltiplas NFs, frete e ICMS são rateados igualmente entre elas (mesma regra
-// usada na conciliação: somando as N linhas dá o total do CT-e).
+// Parser do relatório Pré-CT-e a partir do arquivo NOTFIS 3.1 (PROCEDA).
+// Layout fixo de 240 colunas por registro. Cada registro 313 (DNF) = uma NF.
 //
-// Validado contra arquivo da Ebenezer: no registro 394, os valores começam após o prefixo "394".
-// ICMS = 4º bloco fixo de 15 dígitos (0-indexed=3) — alíquota ~12% sobre a base; total da prestação = último bloco fixo.
+// Registros usados:
+//   000  UNB  cabeçalho de intercâmbio
+//   310  UNH  cabeçalho do documento
+//   311  DEM  dados da embarcadora     (pos 4-17  = CNPJ embarcador)
+//   312  DES  dados do destinatário    (pos 44-57 = CNPJ destinatário)
+//   313  DNF  dados da nota fiscal:
+//              pos  33-40  (N 8)        número da NF
+//              pos  41-48  (N 8)        data emissão DDMMAAAA
+//              pos  86-100 (N 13,2)     valor total da NF
+//              pos 198-212 (N 13,2)     VALOR TOTAL DO FRETE  (peso-volume + ad valorem + taxas)
+//              pos 214-225 (N 10,2)     VALOR DO ICMS DA NOTA
+//              pos 239-282 (A 44)       chave de acesso NF-e
+//
+// Observações:
+//   • Posições do layout são 1-indexed. Em JS usamos substring(pos-1, pos-1+len).
+//   • Sem rateio: cada 313 é uma NF com seus próprios valores.
 
 export interface PreCteLinha {
-  numero_nf: string;          // ex.: "107546" (sem zeros à esquerda)
+  numero_nf: string;
   cnpj_emitente: string | null;
   cnpj_destinatario: string | null;
-  valor_frete: number;        // R$ por NF (rateado se grupo > 1 NF)
-  valor_icms: number;         // R$ por NF (rateado)
-  valor_total: number;        // R$ por NF (rateado)
-  grupo_id: string;           // identificador da prestação (linha do 393)
-  nfs_no_grupo: number;       // quantas NFs o grupo cobre
-  rateado: boolean;           // true quando grupo cobre > 1 NF
+  chave_acesso: string | null;
+  valor_frete: number;
+  valor_icms: number;
+  valor_total: number;        // = valor_frete (total da prestação sugerido pela embarcadora)
+  grupo_id: string;
+  nfs_no_grupo: number;
+  rateado: boolean;           // sempre false em NOTFIS
 }
 
 export interface PreCteReport {
@@ -35,115 +48,83 @@ async function readAsLatin1(file: File): Promise<string> {
 }
 
 function dec(s: string, decimals: number): number {
-  const t = s.replace(/\s+/g, "");
+  const t = (s ?? "").replace(/\s+/g, "");
   if (!/^\d+$/.test(t)) return 0;
   return +(parseInt(t, 10) / Math.pow(10, decimals)).toFixed(decimals);
 }
 
+/** Detecta arquivo NOTFIS 3.1 (PROCEDA): registro 000 inicia o intercâmbio. */
 export function isPreCteEbenezerContent(text: string): boolean {
-  const head = text.substring(0, 800);
-  return /^390PREFAT/m.test(head);
+  const head = text.substring(0, 2400);
+  // 000 no início + presença de pelo menos um 313 nas primeiras linhas
+  return /^000/m.test(head) && /^313/m.test(head + text.substring(2400, 12000));
 }
 
 export async function parsePreCteReport(file: File): Promise<PreCteReport> {
   const text = await readAsLatin1(file);
-  const lines = text.split(/\r?\n/);
+  // NOTFIS é de tamanho fixo (240). Algumas exportações vêm com quebras, outras não.
+  // Tratamos os dois casos: se tem \n, usamos linhas; senão fatiamos a cada 240.
+  let registros: string[];
+  if (/\r?\n/.test(text)) {
+    registros = text.split(/\r?\n/).filter((l) => l.length > 0);
+  } else {
+    registros = [];
+    for (let i = 0; i < text.length; i += 240) registros.push(text.substring(i, i + 240));
+  }
 
   const linhas: PreCteLinha[] = [];
-  let cnpjTransp: string | null = null;
+  let cnpjEmbarcadora: string | null = null;
+  let cnpjDestinatarioAtual: string | null = null;
   let cnpjDestPrincipal: string | null = null;
 
-  // Estado da prestação corrente
-  let cur: {
-    linha393: number;
-    cnpj_emit: string | null;
-    cnpj_dest: string | null;
-    frete: number;
-    icms: number;
-    total: number;
-  } | null = null;
-
-  const flush396 = (numerosNf: string[]) => {
-    if (!cur) return;
-    const n = numerosNf.length || 1;
-    // Regra: frete + ICMS = total da prestação. Para garantir o fechamento por linha,
-    // rateamos total e ICMS, e derivamos o frete como (total - icms) por NF.
-    const totalRateado = +(cur.total / n).toFixed(2);
-    const icmsRateado = +(cur.icms / n).toFixed(2);
-    const freteRateado = +(totalRateado - icmsRateado).toFixed(2);
-    const grupoId = `g_${cur.linha393}`;
-    numerosNf.forEach((num) => {
-      linhas.push({
-        numero_nf: num.replace(/^0+/, "") || "0",
-        cnpj_emitente: cur!.cnpj_emit,
-        cnpj_destinatario: cur!.cnpj_dest,
-        valor_frete: freteRateado,
-        valor_icms: icmsRateado,
-        valor_total: totalRateado,
-        grupo_id: grupoId,
-        nfs_no_grupo: n,
-        rateado: n > 1,
-      });
-    });
-    cur = null;
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
-    if (!ln) continue;
+  for (let i = 0; i < registros.length; i++) {
+    const ln = registros[i];
+    if (!ln || ln.length < 3) continue;
     const tipo = ln.substring(0, 3);
 
-    if (tipo === "391") {
+    if (tipo === "311") {
+      // CNPJ embarcadora: pos 4-17 (14 dígitos)
       const c = ln.substring(3, 17).replace(/\D/g, "");
-      if (c.length === 14 && !cnpjTransp) cnpjTransp = c;
+      if (c.length === 14) cnpjEmbarcadora = c;
       continue;
     }
 
-    if (tipo === "393") {
-      if (ln.length < 137) continue;
-      const cnpjEmit = ln.substring(76, 90).replace(/\D/g, "");
-      const cnpjDest = ln.substring(91, 105).replace(/\D/g, "");
-      const valorBaseFrete = dec(ln.substring(107, 122), 2);
-      cur = {
-        linha393: i + 1,
-        cnpj_emit: cnpjEmit.length === 14 ? cnpjEmit : null,
-        cnpj_dest: cnpjDest.length === 14 ? cnpjDest : null,
-        frete: valorBaseFrete,
-        icms: 0,
-        total: 0,
-      };
-      if (!cnpjDestPrincipal && cur.cnpj_dest) cnpjDestPrincipal = cur.cnpj_dest;
+    if (tipo === "312") {
+      // CNPJ destinatário: pos 44-57 (14 dígitos)
+      const c = ln.substring(43, 57).replace(/\D/g, "");
+      cnpjDestinatarioAtual = c.length === 14 ? c : null;
+      if (!cnpjDestPrincipal && cnpjDestinatarioAtual) cnpjDestPrincipal = cnpjDestinatarioAtual;
       continue;
     }
 
-    if (tipo === "394") {
-      if (!cur) continue;
-      // Layout 394 da Ebenezer (campos numéricos de 15 dígitos, separados por espaços
-      // em posições reservadas a textos). Validado em PEXPRESSO_EBENEZER...:
-      //   bloco[0] = base de cálculo do ICMS
-      //   bloco[3] = valor do ICMS
-      //   bloco[5] = outras taxas (pedágio etc.)
-      //   bloco[6] = valor total da prestação (frete + ICMS + outras)
-      // Frete por NF é derivado em flush396 como (total - ICMS) para garantir o fechamento.
-      const payload = ln.substring(3);
-      const blocos = (payload.match(/\d{15}/g) ?? []);
-      if (blocos.length >= 4) {
-        cur.icms = dec(blocos[3], 2);
-      }
-      if (blocos.length >= 1) {
-        cur.total = dec(blocos[blocos.length - 1], 2);
-      }
-      continue;
-    }
+    if (tipo === "313") {
+      // Garante tamanho suficiente; se vier menor que 282, ainda tentamos extrair o que dá.
+      const numeroNf = ln.substring(32, 40).replace(/\D/g, "");
+      const valorFrete = ln.length >= 212 ? dec(ln.substring(197, 212), 2) : 0;
+      const valorIcms = ln.length >= 225 ? dec(ln.substring(213, 225), 2) : 0;
+      const chave = ln.length >= 282
+        ? ln.substring(238, 282).replace(/\D/g, "")
+        : "";
 
-    if (tipo === "396") {
-      const matches = [...ln.matchAll(/ {2}(\d{8})/g)].map((m) => m[1]);
-      flush396(matches);
+      if (!numeroNf) continue; // sem NF não vai pra tela
+
+      linhas.push({
+        numero_nf: numeroNf.replace(/^0+/, "") || "0",
+        cnpj_emitente: cnpjEmbarcadora,
+        cnpj_destinatario: cnpjDestinatarioAtual,
+        chave_acesso: chave.length === 44 ? chave : null,
+        valor_frete: valorFrete,
+        valor_icms: valorIcms,
+        // Em NOTFIS, "VALOR TOTAL DO FRETE" (campo 26) já é o total da prestação.
+        // ICMS do registro 313 é o ICMS da NF (informativo) — não soma ao frete.
+        valor_total: valorFrete,
+        grupo_id: `nf_${i + 1}`,
+        nfs_no_grupo: 1,
+        rateado: false,
+      });
       continue;
     }
   }
-
-  if (cur) flush396([""]);
 
   const total_frete = +linhas.reduce((s, l) => s + l.valor_frete, 0).toFixed(2);
   const total_icms = +linhas.reduce((s, l) => s + l.valor_icms, 0).toFixed(2);
@@ -151,8 +132,8 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
 
   return {
     arquivo_nome: file.name,
-    cnpj_transportador: cnpjTransp,
-    cnpj_destinatario_principal: cnpjDestPrincipal,
+    cnpj_transportador: null, // NOTFIS não carrega CNPJ da transportadora (ela é destinatária EDI)
+    cnpj_destinatario_principal: cnpjEmbarcadora, // mostramos a embarcadora como "origem"
     total_nfs: linhas.length,
     total_frete,
     total_icms,
@@ -178,24 +159,24 @@ export async function exportPreCteExcel(report: PreCteReport, nomeArquivo: strin
 
   const dados = report.linhas.map((l) => ({
     "NF": l.numero_nf,
+    "Chave NF-e": l.chave_acesso ?? "",
+    "CNPJ Destinatário": fmtCNPJ(l.cnpj_destinatario),
     "Valor Frete (R$)": l.valor_frete,
-    "Valor ICMS (R$)": l.valor_icms,
+    "Valor ICMS NF (R$)": l.valor_icms,
     "Valor Total (R$)": l.valor_total,
-    "Rateado": l.rateado ? `Sim (${l.nfs_no_grupo} NFs)` : "Não",
   }));
   const ws = XLSX.utils.json_to_sheet(dados);
   ws["!cols"] = [
-    { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
+    { wch: 12 }, { wch: 46 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 16 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Pré-CT-e");
 
   const resumo = [
     { Campo: "Arquivo", Valor: report.arquivo_nome },
-    { Campo: "Transportador (CNPJ)", Valor: fmtCNPJ(report.cnpj_transportador) },
-    { Campo: "Destinatário (CNPJ)", Valor: fmtCNPJ(report.cnpj_destinatario_principal) },
+    { Campo: "Embarcadora (CNPJ)", Valor: fmtCNPJ(report.cnpj_destinatario_principal) },
     { Campo: "Total de NFs", Valor: report.total_nfs },
     { Campo: "Total Frete", Valor: report.total_frete },
-    { Campo: "Total ICMS", Valor: report.total_icms },
+    { Campo: "Total ICMS NF", Valor: report.total_icms },
     { Campo: "Total Geral", Valor: report.total_geral },
   ];
   const wsResumo = XLSX.utils.json_to_sheet(resumo);
@@ -214,23 +195,21 @@ export async function exportPreCtePDF(report: PreCteReport, nomeArquivo: string)
 
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("Relatório Pré-CT-e", 14, 16);
+  doc.text("Relatório Pré-CT-e (NOTFIS)", 14, 16);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.text(`Arquivo: ${report.arquivo_nome}`, 14, 22);
-  doc.text(`Transportador: ${fmtCNPJ(report.cnpj_transportador)}`, 14, 27);
-  doc.text(`Destinatário: ${fmtCNPJ(report.cnpj_destinatario_principal)}`, 14, 32);
-  doc.text(`Gerado em: ${dataStr}`, 14, 37);
+  doc.text(`Embarcadora: ${fmtCNPJ(report.cnpj_destinatario_principal)}`, 14, 27);
+  doc.text(`Gerado em: ${dataStr}`, 14, 32);
 
   autoTable(doc, {
-    startY: 42,
-    head: [["NF", "Frete (R$)", "ICMS (R$)", "Total (R$)", "Obs."]],
+    startY: 38,
+    head: [["NF", "Frete (R$)", "ICMS NF (R$)", "Total (R$)"]],
     body: report.linhas.map((l) => [
       l.numero_nf,
       fmtMoney(l.valor_frete),
       fmtMoney(l.valor_icms),
       fmtMoney(l.valor_total),
-      l.rateado ? `Rateado (${l.nfs_no_grupo} NFs)` : "",
     ]),
     styles: { fontSize: 8, cellPadding: 1.5 },
     headStyles: { fillColor: [30, 41, 59], textColor: 255 },
@@ -239,14 +218,12 @@ export async function exportPreCtePDF(report: PreCteReport, nomeArquivo: string)
       1: { halign: "right" },
       2: { halign: "right" },
       3: { halign: "right" },
-      4: { halign: "left" },
     },
     foot: [[
       `Total: ${report.total_nfs} NFs`,
       fmtMoney(report.total_frete),
       fmtMoney(report.total_icms),
       fmtMoney(report.total_geral),
-      "",
     ]],
     footStyles: { fillColor: [241, 245, 249], textColor: 0, fontStyle: "bold" },
   });
