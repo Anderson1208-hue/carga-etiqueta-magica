@@ -117,8 +117,8 @@ export async function parsePreCteReport(file: File): Promise<PreCteReport> {
       if (!cur) continue;
       // Captura todos os blocos de 15 dígitos
       const matches = [...ln.matchAll(/(\d{15})/g)].map((m) => dec(m[1], 2));
-      if (matches.length >= 9) {
-        cur.icms = matches[8];
+      if (matches.length >= 5) {
+        cur.icms = matches[4];
       }
       if (matches.length >= 1) {
         cur.total = matches[matches.length - 1];
