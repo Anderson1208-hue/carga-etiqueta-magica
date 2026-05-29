@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
 import { readTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import {
   ArrowLeft,
   RefreshCw,
