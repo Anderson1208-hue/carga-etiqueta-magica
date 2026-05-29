@@ -21,6 +21,7 @@ import {
   Smartphone,
   Activity,
   Copy,
+  RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
