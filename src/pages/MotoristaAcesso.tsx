@@ -80,12 +80,17 @@ export default function MotoristaAcesso() {
   const [showValidacao, setShowValidacao] = useState(false);
 
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // SÓ ATIVA depois do wizard de validação confirmar que o background funciona.
+  // ATIVA SEMPRE que houver veículo + rota — independente do wizard de validação.
+  // O wizard continua sendo aberto (showValidacao) para confirmar que o background
+  // com tela bloqueada também funciona, mas não é mais pré-requisito para o
+  // envio em primeiro plano. Assim, motoristas que ainda não passaram pelo wizard
+  // (ou cuja validação expirou) continuam alimentando a Torre enquanto o app
+  // estiver aberto.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
-    enabled: !!veiculo && !!monitoramentoRotaId && gpsValidated,
+    enabled: !!veiculo && !!monitoramentoRotaId,
   });
-  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId && gpsValidated);
+  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
   useWakeLock(!!veiculo);
   useLockPortrait();
 
