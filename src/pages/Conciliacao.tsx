@@ -160,10 +160,6 @@ export default function Conciliacao() {
       toast({ title: "Selecione um arquivo", variant: "destructive" });
       return;
     }
-    if (!clienteCnpj.trim()) {
-      toast({ title: "Informe o CNPJ do cliente", variant: "destructive" });
-      return;
-    }
     setImporting(true);
     try {
       // Detect format: NOTFIS EDI (.txt fixed-width) vs Excel/CSV
@@ -176,16 +172,32 @@ export default function Conciliacao() {
         toast({ title: "Arquivo sem itens válidos", variant: "destructive" });
         return;
       }
-      // If user didn't fill CNPJ, use the one inferred from file (shipper CNPJ).
-      if (!clienteCnpj.trim() && parsed.cliente_cnpj_inferido) {
-        setClienteCnpj(parsed.cliente_cnpj_inferido);
+      // Resolve CNPJ: prefer typed value, otherwise use the one inferred from the file.
+      const cnpjFinal = clienteCnpj.trim()
+        ? clienteCnpj.replace(/\D/g, "")
+        : (parsed.cliente_cnpj_inferido || "").replace(/\D/g, "");
+      if (!cnpjFinal) {
+        toast({ title: "Informe o CNPJ do cliente", variant: "destructive" });
+        return;
       }
 
       const importBatchId = `pf_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
       const { data: pf, error: errPf } = await supabase
         .from("prefaturas")
         .insert({
-          cliente_cnpj: clienteCnpj.replace(/\D/g, ""),
+          cliente_cnpj: cnpjFinal,
+          cliente_nome: clienteNome || null,
+          numero_prefatura_cliente: numeroPref || null,
+          arquivo_origem_nome: arquivo.name,
+          import_batch_id: importBatchId,
+          total_itens: parsed.itens.length,
+          total_valor_nf_cliente: parsed.total_valor_nf,
+          total_valor_frete_cliente: parsed.total_valor_frete,
+          status: "importada",
+        })
+        .select()
+        .single();
+      if (errPf) throw errPf;
           cliente_nome: clienteNome || null,
           numero_prefatura_cliente: numeroPref || null,
           arquivo_origem_nome: arquivo.name,
