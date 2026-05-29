@@ -125,18 +125,39 @@ export default function Conciliacao() {
         .select("prefatura_item_id, nf_id, cte_id, matched_by, status_conciliacao, divergencias")
         .eq("prefatura_id", prefId);
       const concMap = new Map<string, ItemComConciliacao["conciliacao"]>();
+      const cteIdsSet = new Set<string>();
       (concData || []).forEach((c) => {
         const r = c as Record<string, unknown>;
+        const cteId = (r.cte_id as string | null) ?? null;
+        if (cteId) cteIdsSet.add(cteId);
         concMap.set(r.prefatura_item_id as string, {
           nf_id: (r.nf_id as string | null) ?? null,
-          cte_id: (r.cte_id as string | null) ?? null,
+          cte_id: cteId,
           matched_by: (r.matched_by as string | null) ?? null,
           status_conciliacao: r.status_conciliacao as string,
           divergencias: (r.divergencias as NonNullable<ItemComConciliacao["conciliacao"]>["divergencias"]) || { itens: [] },
         });
       });
+
+      const cteMap = new Map<string, { numero_cte: string | null; valor_frete: number | null }>();
+      if (cteIdsSet.size > 0) {
+        const { data: ctesData } = await supabase
+          .from("ctes")
+          .select("id, numero_cte, valor_frete")
+          .in("id", Array.from(cteIdsSet));
+        (ctesData || []).forEach((c) => {
+          const r = c as Record<string, unknown>;
+          cteMap.set(r.id as string, {
+            numero_cte: (r.numero_cte as string | null) ?? null,
+            valor_frete: (r.valor_frete as number | null) ?? null,
+          });
+        });
+      }
+
       const mapped: ItemComConciliacao[] = (data || []).map((row) => {
         const r = row as Record<string, unknown>;
+        const conc = concMap.get(r.id as string) || null;
+        const cte = conc?.cte_id ? cteMap.get(conc.cte_id) : null;
         return {
           id: r.id as string,
           linha_arquivo: r.linha_arquivo as number,
@@ -144,7 +165,9 @@ export default function Conciliacao() {
           numero_nf_cliente: (r.numero_nf_cliente as string | null) ?? null,
           valor_nf_cliente: (r.valor_nf_cliente as number | null) ?? null,
           valor_frete_cliente: (r.valor_frete_cliente as number | null) ?? null,
-          conciliacao: concMap.get(r.id as string) || null,
+          valor_frete_cte: cte?.valor_frete ?? null,
+          numero_cte: cte?.numero_cte ?? null,
+          conciliacao: conc,
         };
       });
       setItens(mapped);
