@@ -36,7 +36,11 @@ const DEFAULT_CONFIG: GpsConfig = {
   raio_aproximacao_metros: 500,
 };
 
-const HEARTBEAT_MS = 60_000;
+// Força envio de posição ao backend a cada 20s, independente de movimento.
+// Cobre cenários em que o motorista está parado ou o watcher do plugin
+// está em modo de baixa frequência — garante uma posição na Torre a cada 20s.
+const HEARTBEAT_MS = 20_000;
+const FORCED_PING_MS = 20_000;
 const WATCHER_STALE_MS = 3 * 60_000; // se não vier callback em 3 min, reinicia
 
 interface UseGpsTrackerOptions {
