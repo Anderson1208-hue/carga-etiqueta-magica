@@ -185,7 +185,8 @@ export default function MotoristaAcesso() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (code.trim().length !== 6) {
+    const codeUpper = code.trim().toUpperCase();
+    if (codeUpper.length !== 6) {
       setError("O código deve ter 6 caracteres");
       return;
     }
@@ -195,7 +196,7 @@ export default function MotoristaAcesso() {
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
-        body: { code: code.trim().toUpperCase() },
+        body: { code: codeUpper },
       });
 
       if (fnError || data?.error) {
@@ -204,6 +205,15 @@ export default function MotoristaAcesso() {
         setNfs([]);
         setMonitoramentoRotaId(null);
       } else {
+        try {
+          localStorage.setItem("motorista-last-access-code", codeUpper);
+          localStorage.setItem("motorista-diag-test-code", codeUpper);
+          if (data.monitoramento_rota_id) {
+            localStorage.setItem("motorista-last-rota-id", data.monitoramento_rota_id);
+          }
+        } catch {
+          /* ignore */
+        }
         setVeiculo(data.veiculo);
         setNfs(data.nfs || []);
         setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
