@@ -186,6 +186,7 @@ export interface NFInterna {
 export interface CteInterno {
   id: string;
   numero_cte: string;
+  chave_cte?: string | null;
   chave_nf_referenciada: string | null;
   numero_nf_referenciada: string | null;
   valor_frete: number | null;
