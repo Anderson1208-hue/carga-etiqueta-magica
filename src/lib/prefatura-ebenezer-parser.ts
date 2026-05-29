@@ -47,28 +47,30 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
     cnpj_emit: string | null;
     cnpj_dest: string | null;
     serie: string | null;
-    valor_nf: number | null;
-    valor_frete: number | null; // do 394
+    valor_frete: number | null;      // do 393 pos 122-137 (base_prestacao = frete real, bate com CT-e)
+    valor_mercadoria: number | null; // do 394 últimos 15 dígitos (= vNF da nota)
   } | null = null;
 
   const flush396 = (numerosNf: string[]) => {
     if (!cur) return;
     const consolidado = numerosNf.length > 1;
+    // Quando uma prestação cobre N NFs, o frete é rateado igualmente entre elas
+    // (o layout não traz rateio por peso/valor).
+    const freteRateado =
+      cur.valor_frete !== null && numerosNf.length > 0
+        ? +(cur.valor_frete / numerosNf.length).toFixed(2)
+        : cur.valor_frete;
     numerosNf.forEach((num) => {
       const item: PrefaturaItemRaw = {
         linha_arquivo: cur!.linha393,
-        chave_acesso_cliente: null, // layout não traz chave
+        chave_acesso_cliente: null,
         numero_nf_cliente: num.replace(/^0+/, "") || "0",
         serie_cliente: cur!.serie,
         cnpj_emitente_cliente: cur!.cnpj_emit,
         cnpj_destinatario_cliente: cur!.cnpj_dest,
         documento_transporte_cliente: null,
-        // A pré-fatura Ebenezer NÃO carrega o vNF da NF-e do embarcador — o valor
-        // do registro 393 é base interna da prestação (tarifário do transportador).
-        // Por isso deixamos null aqui e guardamos o número original em raw_jsonb
-        // para auditoria. Conciliação deve usar apenas o frete (498,56 etc).
-        valor_nf_cliente: null,
-        valor_frete_cliente: cur!.valor_frete,
+        valor_nf_cliente: cur!.valor_mercadoria,
+        valor_frete_cliente: freteRateado,
         peso_cliente: null,
         volumes_cliente: null,
         data_emissao_cliente: null,
@@ -77,7 +79,9 @@ export async function parsePrefaturaEbenezerFile(file: File): Promise<PrefaturaP
           tipo_registro: "393/394/396",
           frete_consolidado: consolidado,
           nfs_no_bloco: numerosNf,
-          base_prestacao_transportador: cur!.valor_nf,
+          frete_total_prestacao: cur!.valor_frete,
+          frete_rateado_por_nf: freteRateado,
+          valor_mercadoria_394: cur!.valor_mercadoria,
         },
       };
       itens.push(item);
