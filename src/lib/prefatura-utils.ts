@@ -186,6 +186,7 @@ export interface NFInterna {
 export interface CteInterno {
   id: string;
   numero_cte: string;
+  chave_cte?: string | null;
   chave_nf_referenciada: string | null;
   numero_nf_referenciada: string | null;
   valor_frete: number | null;
@@ -257,7 +258,8 @@ export function compararCampos(
   };
 
   checkNum("valor_nf", nf.valor_nf, item.valor_nf_cliente, tol.valor_nf);
-  if (cte) checkNum("valor_frete", cte.valor_frete, item.valor_frete_cliente, tol.valor_frete);
+  // valor_frete é comparado em nível de GRUPO de CT-e (soma cliente vs soma CT-e),
+  // pois um CT-e pode agrupar várias NFs com rateio. Ver handleConciliar.
   checkNum("peso", nf.peso_bruto, item.peso_cliente, tol.peso);
 
   if (item.data_emissao_cliente && nf.data_emissao && item.data_emissao_cliente !== nf.data_emissao) {
