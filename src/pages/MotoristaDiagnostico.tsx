@@ -280,7 +280,7 @@ export default function MotoristaDiagnostico() {
     }
   }
 
-
+  async function testarEnvioBackend() {
     setTestLoading(true);
     setTestResult(null);
     const code = testCode.trim().toUpperCase();
