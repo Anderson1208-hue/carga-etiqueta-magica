@@ -5,7 +5,8 @@ export interface CTeParsed {
   numeroCte: string;
   cnpjEmitente: string;
   razaoSocialEmitente: string;
-  chaveNfReferenciada: string;
+  chaveNfReferenciada: string; // primeira NF (compat)
+  chavesNfReferenciadas: string[]; // todas as NFs do CT-e
   valorFrete: number;
   volumeM3: number;
 }
@@ -62,29 +63,29 @@ export function parseCTeXML(xmlString: string): CTeParsed {
   const razaoSocialEmitente = xNome?.textContent || "Emitente não identificado";
   const cnpjEmitente = CNPJ?.textContent || "";
 
-  // Extract referenced NF-e key (chave da NF referenciada)
-  // CT-e references NFs in infNFe > chave or infDoc > infNFe > chave
-  let chaveNfReferenciada = "";
-  
-  const infNFe = xmlDoc.querySelector("infDoc infNFe, infNFe");
-  if (infNFe) {
-    const chave = infNFe.querySelector("chave");
-    if (chave) {
-      chaveNfReferenciada = chave.textContent || "";
+  // Extract ALL referenced NF-e keys (CT-e pode agrupar várias NFs)
+  const chavesNfReferenciadas: string[] = [];
+  const infNFeNodes = Array.from(xmlDoc.querySelectorAll("infDoc infNFe, infNFe"));
+  for (const node of infNFeNodes) {
+    const chave = node.querySelector("chave")?.textContent?.trim();
+    if (chave && chave.length === 44 && !chavesNfReferenciadas.includes(chave)) {
+      chavesNfReferenciadas.push(chave);
     }
   }
-
-  // Fallback: try chNFe directly
-  if (!chaveNfReferenciada) {
-    const chNFe = xmlDoc.querySelector("chNFe");
-    if (chNFe) {
-      chaveNfReferenciada = chNFe.textContent || "";
+  // Fallback: chNFe diretos
+  if (chavesNfReferenciadas.length === 0) {
+    const chNFes = Array.from(xmlDoc.querySelectorAll("chNFe"));
+    for (const el of chNFes) {
+      const chave = el.textContent?.trim();
+      if (chave && chave.length === 44 && !chavesNfReferenciadas.includes(chave)) {
+        chavesNfReferenciadas.push(chave);
+      }
     }
   }
-
-  if (!chaveNfReferenciada) {
-    throw new Error("Chave da NF-e referenciada não encontrada no CT-e");
+  if (chavesNfReferenciadas.length === 0) {
+    throw new Error("Nenhuma chave de NF-e referenciada encontrada no CT-e");
   }
+  const chaveNfReferenciada = chavesNfReferenciadas[0];
 
   // Extract freight value (valor do frete)
   const vTPrest = xmlDoc.querySelector("vTPrest vTPrest, vTPrest");
@@ -125,6 +126,7 @@ export function parseCTeXML(xmlString: string): CTeParsed {
     cnpjEmitente,
     razaoSocialEmitente,
     chaveNfReferenciada,
+    chavesNfReferenciadas,
     valorFrete,
     volumeM3,
   };

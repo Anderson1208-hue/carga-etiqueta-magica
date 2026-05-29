@@ -17,7 +17,8 @@ interface ParsedCTeFile {
   data: CTeParsed | null;
   status: "success" | "error";
   error?: string;
-  nfNumero?: string;
+  nfMatches?: Array<{ id: string; numero_nf: string; chave: string; valor_nf: number | null; razao: string }>;
+  nfsNaoEncontradas?: string[]; // chaves não encontradas na carga
 }
 
 interface ImportarCteDialogProps {
@@ -42,19 +43,19 @@ export function ImportarCteDialog({
   const [isDragActive, setIsDragActive] = useState(false);
 
   // Fetch NFs for this carga to match chave_acesso
-  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>>(new Map());
+  const [nfsMap, setNfsMap] = useState<Map<string, { id: string; numero_nf: string; razao_social_emitente: string; valor_nf: number | null }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
 
   async function loadNfs() {
     if (nfsLoaded) return;
     const { data } = await supabase
       .from("notas_fiscais")
-      .select("id, chave_acesso, numero_nf, razao_social_emitente")
+      .select("id, chave_acesso, numero_nf, razao_social_emitente, valor_nf")
       .eq("carga_id", cargaId);
 
-    const map = new Map<string, { id: string; numero_nf: string; razao_social_emitente: string }>();
+    const map = new Map<string, { id: string; numero_nf: string; razao_social_emitente: string; valor_nf: number | null }>();
     (data || []).forEach((nf) => {
-      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf, razao_social_emitente: nf.razao_social_emitente || "" });
+      map.set(nf.chave_acesso, { id: nf.id, numero_nf: nf.numero_nf, razao_social_emitente: nf.razao_social_emitente || "", valor_nf: nf.valor_nf as any });
     });
     setNfsMap(map);
     setNfsLoaded(true);
@@ -89,14 +90,25 @@ export function ImportarCteDialog({
             continue;
           }
 
-          // Check if referenced NF exists in this carga
-          const nfMatch = nfsMap.get(parsed.chaveNfReferenciada);
-          if (!nfMatch) {
+          // Match all referenced NFs in this carga
+          const matches: NonNullable<ParsedCTeFile["nfMatches"]> = [];
+          const naoEncontradas: string[] = [];
+          for (const chave of parsed.chavesNfReferenciadas) {
+            const m = nfsMap.get(chave);
+            if (m) {
+              matches.push({ id: m.id, numero_nf: m.numero_nf, chave, valor_nf: m.valor_nf, razao: m.razao_social_emitente });
+            } else {
+              naoEncontradas.push(chave);
+            }
+          }
+
+          if (matches.length === 0) {
             newFiles.push({
               fileName: file.name,
               data: parsed,
               status: "error",
-              error: `NF referenciada não encontrada nesta carga (chave: ...${parsed.chaveNfReferenciada.slice(-8)})`,
+              error: `Nenhuma NF referenciada encontrada nesta carga (${parsed.chavesNfReferenciadas.length} NF(s) no CT-e)`,
+              nfsNaoEncontradas: naoEncontradas,
             });
             continue;
           }
@@ -105,7 +117,8 @@ export function ImportarCteDialog({
             fileName: file.name,
             data: parsed,
             status: "success",
-            nfNumero: nfMatch.numero_nf,
+            nfMatches: matches,
+            nfsNaoEncontradas: naoEncontradas,
           });
         } catch (error) {
           newFiles.push({
@@ -163,33 +176,59 @@ export function ImportarCteDialog({
 
     setSaving(true);
     try {
-      const inserts = successFiles.map((file) => {
+      const inserts: any[] = [];
+      let totalLinhas = 0;
+      let totalCtesAgrupadores = 0;
+      for (const file of successFiles) {
         const cte = file.data!;
-        const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
-        // Extrai número da NF da chave (posições 26-34 = nNF)
-        const numeroNfRef = cte.chaveNfReferenciada?.length === 44
-          ? cte.chaveNfReferenciada.substring(25, 34).replace(/^0+/, "")
-          : null;
-        return {
-          carga_id: cargaId,
-          nf_id: nfMatch?.id || null,
-          chave_cte: cte.chaveCte,
-          numero_cte: cte.numeroCte,
-          chave_nf_referenciada: cte.chaveNfReferenciada,
-          numero_nf_referenciada: numeroNfRef,
-          cnpj_emitente: cte.cnpjEmitente,
-          razao_social_emitente: cte.razaoSocialEmitente,
-          valor_frete: cte.valorFrete,
-          tipo_documento: "CTE",
-          identificador_interno: null,
-        };
-      });
+        const matches = file.nfMatches || [];
+        if (matches.length > 1) totalCtesAgrupadores++;
+
+        // Rateio do frete: proporcional ao valor_nf; fallback igual
+        const somaValores = matches.reduce((s, m) => s + (Number(m.valor_nf) || 0), 0);
+        const usaProporcional = somaValores > 0;
+        for (let i = 0; i < matches.length; i++) {
+          const m = matches[i];
+          let valorRateado: number;
+          if (usaProporcional) {
+            valorRateado = Number((((Number(m.valor_nf) || 0) / somaValores) * cte.valorFrete).toFixed(2));
+          } else {
+            valorRateado = Number((cte.valorFrete / matches.length).toFixed(2));
+          }
+          // Ajuste de centavos na última linha para fechar o total exato
+          if (i === matches.length - 1) {
+            const acumulado = inserts
+              .slice(inserts.length - i)
+              .reduce((s, r) => s + Number(r.valor_frete || 0), 0);
+            valorRateado = Number((cte.valorFrete - acumulado).toFixed(2));
+          }
+
+          const numeroNfRef = m.chave.length === 44
+            ? m.chave.substring(25, 34).replace(/^0+/, "")
+            : null;
+
+          inserts.push({
+            carga_id: cargaId,
+            nf_id: m.id,
+            chave_cte: cte.chaveCte,
+            numero_cte: cte.numeroCte,
+            chave_nf_referenciada: m.chave,
+            numero_nf_referenciada: numeroNfRef,
+            cnpj_emitente: cte.cnpjEmitente,
+            razao_social_emitente: cte.razaoSocialEmitente,
+            valor_frete: valorRateado,
+            tipo_documento: "CTE",
+            identificador_interno: null,
+          });
+          totalLinhas++;
+        }
+      }
 
       const { error } = await supabase.from("ctes" as any).insert(inserts as any);
 
       if (error) {
         if (error.message?.includes("duplicate key")) {
-          toast({ variant: "destructive", title: "CT-e duplicado", description: "Um ou mais CT-es já foram importados anteriormente." });
+          toast({ variant: "destructive", title: "CT-e duplicado", description: "Um ou mais vínculos CT-e+NF já foram importados anteriormente." });
         } else {
           throw error;
         }
@@ -199,23 +238,25 @@ export function ImportarCteDialog({
         let volumesAtualizados = 0;
         for (const file of successFiles) {
           const cte = file.data!;
-          const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
-          if (!nfMatch || !cte.volumeM3 || cte.volumeM3 <= 0) continue;
-          const razao = (nfMatch.razao_social_emitente || "").toUpperCase();
-          const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
-          if (!isAlvo) continue;
-          const { error: updErr } = await supabase
-            .from("notas_fiscais")
-            .update({ volume_m3: cte.volumeM3 })
-            .eq("id", nfMatch.id);
-          if (!updErr) volumesAtualizados++;
+          if (!cte.volumeM3 || cte.volumeM3 <= 0) continue;
+          for (const m of file.nfMatches || []) {
+            const razao = (m.razao || "").toUpperCase();
+            const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
+            if (!isAlvo) continue;
+            const { error: updErr } = await supabase
+              .from("notas_fiscais")
+              .update({ volume_m3: cte.volumeM3 })
+              .eq("id", m.id);
+            if (!updErr) volumesAtualizados++;
+          }
         }
 
         toast({
           title: "CT-es importados!",
           description:
-            `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` +
-            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado via CT-e (Pandurata/Docile).` : ""),
+            `${successFiles.length} CT-e(s) → ${totalLinhas} vínculo(s) NF na carga ${cargaPlaca}.` +
+            (totalCtesAgrupadores > 0 ? ` ${totalCtesAgrupadores} CT-e(s) agrupador(es) com frete rateado.` : "") +
+            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado (Pandurata/Docile).` : ""),
         });
         handleClose(false);
         onSuccess();
@@ -305,9 +346,18 @@ export function ImportarCteDialog({
                         <span className="text-sm font-medium truncate">{file.fileName}</span>
                       </div>
                       {file.status === "success" ? (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          CT-e {file.data?.numeroCte} → NF {file.nfNumero} • {file.data?.razaoSocialEmitente}
-                        </p>
+                        <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                          <p>
+                            CT-e {file.data?.numeroCte} → {(file.nfMatches?.length || 0)} NF(s): {file.nfMatches?.map((m) => m.numero_nf).join(", ")}
+                            {(file.nfMatches?.length || 0) > 1 && " • frete rateado"}
+                          </p>
+                          <p>{file.data?.razaoSocialEmitente} • Frete total R$ {file.data?.valorFrete.toFixed(2)}</p>
+                          {(file.nfsNaoEncontradas?.length || 0) > 0 && (
+                            <p className="text-warning">
+                              ⚠ {file.nfsNaoEncontradas!.length} NF(s) do CT-e não está(ão) nesta carga (ignorada(s))
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-xs text-destructive mt-0.5">{file.error}</p>
                       )}
