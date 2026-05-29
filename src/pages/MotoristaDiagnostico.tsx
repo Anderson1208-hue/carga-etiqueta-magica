@@ -20,6 +20,8 @@ import { pendingCount } from "@/lib/gpsQueue";
 import { readTelemetry, markSent, markError, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
+import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import {
   ArrowLeft,
   RefreshCw,
