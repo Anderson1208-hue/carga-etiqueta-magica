@@ -106,6 +106,44 @@ export default function MotoristaDiagnostico() {
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string; detail?: string } | null>(null);
 
+  // Rastreamento contínuo NESTA tela:
+  // resolve o monitoramento_rota_id pelo código salvo e dispara o tracker + worker
+  // sem depender do wizard de validação. Assim, mesmo motoristas que nunca
+  // completaram o wizard começam a mandar GPS para a Torre estando aqui.
+  const [diagRotaId, setDiagRotaId] = useState<string | null>(null);
+  useEffect(() => {
+    const code = (testCode || "").trim().toUpperCase();
+    if (code.length !== 6) {
+      setDiagRotaId(null);
+      return;
+    }
+    let cancelled = false;
+    const resolve = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code },
+        });
+        if (cancelled) return;
+        if (!error && !data?.error && data?.monitoramento_rota_id) {
+          setDiagRotaId(data.monitoramento_rota_id);
+        } else {
+          setDiagRotaId(null);
+        }
+      } catch {
+        /* ignore — tenta de novo no próximo tick */
+      }
+    };
+    resolve();
+    const interval = setInterval(resolve, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [testCode]);
+
+  useGpsTrackerHybrid({ monitoramentoRotaId: diagRotaId, enabled: !!diagRotaId });
+  useGpsQueueWorker(!!diagRotaId);
+
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
 
