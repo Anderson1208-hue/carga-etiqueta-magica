@@ -30,6 +30,7 @@ import {
   type StatusConciliacao,
   type LinhaRetorno,
 } from "@/lib/prefatura-utils";
+import { parseNotfisFile } from "@/lib/notfis-parser";
 
 interface Prefatura {
   id: string;
@@ -159,15 +160,24 @@ export default function Conciliacao() {
       toast({ title: "Selecione um arquivo", variant: "destructive" });
       return;
     }
-    if (!clienteCnpj.trim()) {
-      toast({ title: "Informe o CNPJ do cliente", variant: "destructive" });
-      return;
-    }
     setImporting(true);
     try {
-      const parsed = await parsePrefaturaExcel(arquivo);
+      // Detect format: NOTFIS EDI (.txt fixed-width) vs Excel/CSV
+      const nome = arquivo.name.toLowerCase();
+      const isNotfis = nome.endsWith(".txt") || nome.endsWith(".edi") || nome.endsWith(".notfis");
+      const parsed = isNotfis
+        ? await parseNotfisFile(arquivo)
+        : await parsePrefaturaExcel(arquivo);
       if (parsed.itens.length === 0) {
         toast({ title: "Arquivo sem itens válidos", variant: "destructive" });
+        return;
+      }
+      // Resolve CNPJ: prefer typed value, otherwise use the one inferred from the file.
+      const cnpjFinal = clienteCnpj.trim()
+        ? clienteCnpj.replace(/\D/g, "")
+        : (parsed.cliente_cnpj_inferido || "").replace(/\D/g, "");
+      if (!cnpjFinal) {
+        toast({ title: "Informe o CNPJ do cliente", variant: "destructive" });
         return;
       }
 
@@ -175,7 +185,7 @@ export default function Conciliacao() {
       const { data: pf, error: errPf } = await supabase
         .from("prefaturas")
         .insert({
-          cliente_cnpj: clienteCnpj.replace(/\D/g, ""),
+          cliente_cnpj: cnpjFinal,
           cliente_nome: clienteNome || null,
           numero_prefatura_cliente: numeroPref || null,
           arquivo_origem_nome: arquivo.name,
@@ -446,7 +456,7 @@ export default function Conciliacao() {
                   <Label>Arquivo</Label>
                   <Input
                     type="file"
-                    accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xls,.csv,.txt,.edi,.notfis"
                     onChange={(e) => setArquivo(e.target.files?.[0] || null)}
                   />
                 </div>
