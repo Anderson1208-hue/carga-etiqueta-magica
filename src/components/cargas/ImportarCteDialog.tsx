@@ -176,33 +176,59 @@ export function ImportarCteDialog({
 
     setSaving(true);
     try {
-      const inserts = successFiles.map((file) => {
+      const inserts: any[] = [];
+      let totalLinhas = 0;
+      let totalCtesAgrupadores = 0;
+      for (const file of successFiles) {
         const cte = file.data!;
-        const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
-        // Extrai número da NF da chave (posições 26-34 = nNF)
-        const numeroNfRef = cte.chaveNfReferenciada?.length === 44
-          ? cte.chaveNfReferenciada.substring(25, 34).replace(/^0+/, "")
-          : null;
-        return {
-          carga_id: cargaId,
-          nf_id: nfMatch?.id || null,
-          chave_cte: cte.chaveCte,
-          numero_cte: cte.numeroCte,
-          chave_nf_referenciada: cte.chaveNfReferenciada,
-          numero_nf_referenciada: numeroNfRef,
-          cnpj_emitente: cte.cnpjEmitente,
-          razao_social_emitente: cte.razaoSocialEmitente,
-          valor_frete: cte.valorFrete,
-          tipo_documento: "CTE",
-          identificador_interno: null,
-        };
-      });
+        const matches = file.nfMatches || [];
+        if (matches.length > 1) totalCtesAgrupadores++;
+
+        // Rateio do frete: proporcional ao valor_nf; fallback igual
+        const somaValores = matches.reduce((s, m) => s + (Number(m.valor_nf) || 0), 0);
+        const usaProporcional = somaValores > 0;
+        for (let i = 0; i < matches.length; i++) {
+          const m = matches[i];
+          let valorRateado: number;
+          if (usaProporcional) {
+            valorRateado = Number((((Number(m.valor_nf) || 0) / somaValores) * cte.valorFrete).toFixed(2));
+          } else {
+            valorRateado = Number((cte.valorFrete / matches.length).toFixed(2));
+          }
+          // Ajuste de centavos na última linha para fechar o total exato
+          if (i === matches.length - 1) {
+            const acumulado = inserts
+              .slice(inserts.length - i)
+              .reduce((s, r) => s + Number(r.valor_frete || 0), 0);
+            valorRateado = Number((cte.valorFrete - acumulado).toFixed(2));
+          }
+
+          const numeroNfRef = m.chave.length === 44
+            ? m.chave.substring(25, 34).replace(/^0+/, "")
+            : null;
+
+          inserts.push({
+            carga_id: cargaId,
+            nf_id: m.id,
+            chave_cte: cte.chaveCte,
+            numero_cte: cte.numeroCte,
+            chave_nf_referenciada: m.chave,
+            numero_nf_referenciada: numeroNfRef,
+            cnpj_emitente: cte.cnpjEmitente,
+            razao_social_emitente: cte.razaoSocialEmitente,
+            valor_frete: valorRateado,
+            tipo_documento: "CTE",
+            identificador_interno: null,
+          });
+          totalLinhas++;
+        }
+      }
 
       const { error } = await supabase.from("ctes" as any).insert(inserts as any);
 
       if (error) {
         if (error.message?.includes("duplicate key")) {
-          toast({ variant: "destructive", title: "CT-e duplicado", description: "Um ou mais CT-es já foram importados anteriormente." });
+          toast({ variant: "destructive", title: "CT-e duplicado", description: "Um ou mais vínculos CT-e+NF já foram importados anteriormente." });
         } else {
           throw error;
         }
@@ -212,23 +238,25 @@ export function ImportarCteDialog({
         let volumesAtualizados = 0;
         for (const file of successFiles) {
           const cte = file.data!;
-          const nfMatch = nfsMap.get(cte.chaveNfReferenciada);
-          if (!nfMatch || !cte.volumeM3 || cte.volumeM3 <= 0) continue;
-          const razao = (nfMatch.razao_social_emitente || "").toUpperCase();
-          const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
-          if (!isAlvo) continue;
-          const { error: updErr } = await supabase
-            .from("notas_fiscais")
-            .update({ volume_m3: cte.volumeM3 })
-            .eq("id", nfMatch.id);
-          if (!updErr) volumesAtualizados++;
+          if (!cte.volumeM3 || cte.volumeM3 <= 0) continue;
+          for (const m of file.nfMatches || []) {
+            const razao = (m.razao || "").toUpperCase();
+            const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
+            if (!isAlvo) continue;
+            const { error: updErr } = await supabase
+              .from("notas_fiscais")
+              .update({ volume_m3: cte.volumeM3 })
+              .eq("id", m.id);
+            if (!updErr) volumesAtualizados++;
+          }
         }
 
         toast({
           title: "CT-es importados!",
           description:
-            `${successFiles.length} CT-e(s) vinculado(s) à carga ${cargaPlaca}.` +
-            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado via CT-e (Pandurata/Docile).` : ""),
+            `${successFiles.length} CT-e(s) → ${totalLinhas} vínculo(s) NF na carga ${cargaPlaca}.` +
+            (totalCtesAgrupadores > 0 ? ` ${totalCtesAgrupadores} CT-e(s) agrupador(es) com frete rateado.` : "") +
+            (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado (Pandurata/Docile).` : ""),
         });
         handleClose(false);
         onSuccess();
