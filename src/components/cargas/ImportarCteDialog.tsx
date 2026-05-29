@@ -346,9 +346,18 @@ export function ImportarCteDialog({
                         <span className="text-sm font-medium truncate">{file.fileName}</span>
                       </div>
                       {file.status === "success" ? (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          CT-e {file.data?.numeroCte} → NF {file.nfNumero} • {file.data?.razaoSocialEmitente}
-                        </p>
+                        <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                          <p>
+                            CT-e {file.data?.numeroCte} → {(file.nfMatches?.length || 0)} NF(s): {file.nfMatches?.map((m) => m.numero_nf).join(", ")}
+                            {(file.nfMatches?.length || 0) > 1 && " • frete rateado"}
+                          </p>
+                          <p>{file.data?.razaoSocialEmitente} • Frete total R$ {file.data?.valorFrete.toFixed(2)}</p>
+                          {(file.nfsNaoEncontradas?.length || 0) > 0 && (
+                            <p className="text-warning">
+                              ⚠ {file.nfsNaoEncontradas!.length} NF(s) do CT-e não está(ão) nesta carga (ignorada(s))
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-xs text-destructive mt-0.5">{file.error}</p>
                       )}
