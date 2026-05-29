@@ -17,7 +17,8 @@ interface ParsedCTeFile {
   data: CTeParsed | null;
   status: "success" | "error";
   error?: string;
-  nfNumero?: string;
+  nfMatches?: Array<{ id: string; numero_nf: string; chave: string; valor_nf: number | null; razao: string }>;
+  nfsNaoEncontradas?: string[]; // chaves não encontradas na carga
 }
 
 interface ImportarCteDialogProps {
