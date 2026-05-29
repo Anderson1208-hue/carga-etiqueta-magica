@@ -317,14 +317,8 @@ export default function Conciliacao() {
       if (ctesResp.error) throw ctesResp.error;
       const ctes = (ctesResp.data || []) as unknown as (CteInterno & { chave_cte: string })[];
 
-      // Soma do frete original por CT-e (chave_cte): se houver rateio em várias linhas,
-      // a soma reconstitui o valor total cobrado naquele CT-e.
-      const cteFreteTotalPorChave = new Map<string, number>();
-      for (const c of ctes) {
-        const k = c.chave_cte;
-        if (!k) continue;
-        cteFreteTotalPorChave.set(k, (cteFreteTotalPorChave.get(k) || 0) + Number(c.valor_frete || 0));
-      }
+      // (frete total por chave_cte não é mais necessário — o agrupamento agora é
+      // feito por grupo_id do arquivo de pré-fatura, mais abaixo)
 
       // Clear previous conciliacao for this prefatura
       await supabase.from("prefatura_conciliacao").delete().eq("prefatura_id", prefId);
