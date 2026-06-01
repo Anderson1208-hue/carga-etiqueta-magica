@@ -100,6 +100,13 @@ export function useGpsTrackerNative({
   const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastCallbackAtRef = useRef<number>(Date.now());
   const restartingRef = useRef<boolean>(false);
+  // Mantemos o rotaId em ref para que callbacks do watcher peguem o valor
+  // mais recente SEM reiniciar o watcher (Foreground Service permanece vivo
+  // mesmo quando a rota ainda não existe na Torre).
+  const rotaIdRef = useRef<string | null>(monitoramentoRotaId);
+  useEffect(() => {
+    rotaIdRef.current = monitoramentoRotaId;
+  }, [monitoramentoRotaId]);
 
   const [lastPosition, setLastPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [tracking, setTracking] = useState(false);
