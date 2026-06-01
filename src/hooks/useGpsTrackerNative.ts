@@ -188,7 +188,7 @@ export function useGpsTrackerNative({
 
 
     async function startWatcher() {
-      if (!enabled || !monitoramentoRotaId) return;
+      if (!enabled) return;
       try {
         const id = await BackgroundGeolocation.addWatcher(
           {
@@ -210,10 +210,11 @@ export function useGpsTrackerNative({
               }
               return;
             }
-            if (!location || !monitoramentoRotaId) return;
+            if (!location) return;
 
             const { latitude, longitude, accuracy } = location;
             lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
+            const rotaId = rotaIdRef.current;
 
             // distance filter defensivo
             if (lastSentRef.current) {
@@ -234,9 +235,15 @@ export function useGpsTrackerNative({
             setLastPosition({ lat: latitude, lng: longitude });
             lastSentRef.current = { lat: latitude, lng: longitude };
 
+            // Sem rota ativa: watcher continua emitindo (FS vivo) mas não envia.
+            if (!rotaId) {
+              console.info("[GPS Native] watcher emitiu posição sem rota — aguardando rota da Torre");
+              return;
+            }
+
             try {
               await enqueue({
-                monitoramento_rota_id: monitoramentoRotaId,
+                monitoramento_rota_id: rotaId,
                 latitude,
                 longitude,
                 accuracy,
@@ -265,6 +272,7 @@ export function useGpsTrackerNative({
         setError("Não foi possível iniciar o rastreamento nativo");
       }
     }
+
 
     async function stopWatcher() {
       if (watcherIdRef.current) {
