@@ -90,7 +90,7 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 export function useGpsTrackerNative({
   monitoramentoRotaId,
   enabled,
-  paradasCoords = [],
+  paradasCoords,
   config: configOverride,
 }: UseGpsTrackerOptions) {
   const cfg: GpsConfig = { ...DEFAULT_CONFIG, ...configOverride };
@@ -100,13 +100,22 @@ export function useGpsTrackerNative({
   const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastCallbackAtRef = useRef<number>(Date.now());
   const restartingRef = useRef<boolean>(false);
-  // Mantemos o rotaId em ref para que callbacks do watcher peguem o valor
-  // mais recente SEM reiniciar o watcher (Foreground Service permanece vivo
-  // mesmo quando a rota ainda não existe na Torre).
+  // Mantemos rotaId, paradasCoords e raio em refs para que callbacks do
+  // watcher peguem o valor mais recente SEM reiniciar o Foreground Service.
+  // Reiniciar o FS a cada render derruba o processo no Android e faz o
+  // app fechar sozinho em segundo plano (já observado em campo: 77k+ restarts).
   const rotaIdRef = useRef<string | null>(monitoramentoRotaId);
+  const paradasCoordsRef = useRef<{ lat: number; lng: number }[]>(paradasCoords ?? []);
+  const raioAproxRef = useRef<number>(cfg.raio_aproximacao_metros);
   useEffect(() => {
     rotaIdRef.current = monitoramentoRotaId;
   }, [monitoramentoRotaId]);
+  useEffect(() => {
+    paradasCoordsRef.current = paradasCoords ?? [];
+  }, [paradasCoords]);
+  useEffect(() => {
+    raioAproxRef.current = cfg.raio_aproximacao_metros;
+  }, [cfg.raio_aproximacao_metros]);
 
   const [lastPosition, setLastPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -116,12 +125,12 @@ export function useGpsTrackerNative({
 
   const checkModoCritico = useCallback(
     (lat: number, lng: number): boolean => {
-      if (paradasCoords.length === 0) return false;
-      return paradasCoords.some(
-        (p) => haversine(lat, lng, p.lat, p.lng) <= cfg.raio_aproximacao_metros
-      );
+      const coords = paradasCoordsRef.current;
+      if (coords.length === 0) return false;
+      const raio = raioAproxRef.current;
+      return coords.some((p) => haversine(lat, lng, p.lat, p.lng) <= raio);
     },
-    [paradasCoords, cfg.raio_aproximacao_metros]
+    []
   );
 
   // Inicialização do watcher + heartbeat + supervisor de auto-restart
@@ -355,12 +364,7 @@ export function useGpsTrackerNative({
       if (foregroundFallbackTimer) clearInterval(foregroundFallbackTimer);
       stopWatcher();
     };
-  }, [
-    enabled,
-    cfg.distance_filter_metros,
-    cfg.intervalo_padrao_segundos,
-    checkModoCritico,
-  ]);
+  }, [enabled]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
