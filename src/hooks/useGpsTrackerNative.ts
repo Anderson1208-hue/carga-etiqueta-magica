@@ -364,12 +364,7 @@ export function useGpsTrackerNative({
       if (foregroundFallbackTimer) clearInterval(foregroundFallbackTimer);
       stopWatcher();
     };
-  }, [
-    enabled,
-    cfg.distance_filter_metros,
-    cfg.intervalo_padrao_segundos,
-    checkModoCritico,
-  ]);
+  }, [enabled]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
