@@ -100,6 +100,13 @@ export function useGpsTrackerNative({
   const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastCallbackAtRef = useRef<number>(Date.now());
   const restartingRef = useRef<boolean>(false);
+  // Mantemos o rotaId em ref para que callbacks do watcher peguem o valor
+  // mais recente SEM reiniciar o watcher (Foreground Service permanece vivo
+  // mesmo quando a rota ainda não existe na Torre).
+  const rotaIdRef = useRef<string | null>(monitoramentoRotaId);
+  useEffect(() => {
+    rotaIdRef.current = monitoramentoRotaId;
+  }, [monitoramentoRotaId]);
 
   const [lastPosition, setLastPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -127,11 +134,12 @@ export function useGpsTrackerNative({
     let foregroundFallbackTimer: ReturnType<typeof setInterval> | null = null;
 
     async function enqueueForegroundFallback(reason: string) {
-      if (!enabled || !monitoramentoRotaId || !navigator.geolocation) return;
+      if (!enabled || !navigator.geolocation) return;
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          if (cancelled || !monitoramentoRotaId) return;
+          if (cancelled) return;
+          const rotaId = rotaIdRef.current;
 
           const { latitude, longitude, accuracy } = pos.coords;
           const last = lastSentRef.current;
@@ -141,9 +149,17 @@ export function useGpsTrackerNative({
           setLastPosition({ lat: latitude, lng: longitude });
           if (movedEnough) lastSentRef.current = { lat: latitude, lng: longitude };
 
+          // Sem rota ativa ainda: mantém watcher vivo (FS rodando, permissão
+          // "warm"), mas não enfileira — quando a rota for criada na Torre,
+          // o próximo callback já entra na fila normalmente.
+          if (!rotaId) {
+            console.info(`[GPS Native] fallback foreground sem rota ainda (${reason}) — apenas mantém serviço vivo`);
+            return;
+          }
+
           try {
             await enqueue({
-              monitoramento_rota_id: monitoramentoRotaId,
+              monitoramento_rota_id: rotaId,
               latitude,
               longitude,
               accuracy,
@@ -170,8 +186,9 @@ export function useGpsTrackerNative({
       );
     }
 
+
     async function startWatcher() {
-      if (!enabled || !monitoramentoRotaId) return;
+      if (!enabled) return;
       try {
         const id = await BackgroundGeolocation.addWatcher(
           {
@@ -193,10 +210,11 @@ export function useGpsTrackerNative({
               }
               return;
             }
-            if (!location || !monitoramentoRotaId) return;
+            if (!location) return;
 
             const { latitude, longitude, accuracy } = location;
             lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
+            const rotaId = rotaIdRef.current;
 
             // distance filter defensivo
             if (lastSentRef.current) {
@@ -217,9 +235,15 @@ export function useGpsTrackerNative({
             setLastPosition({ lat: latitude, lng: longitude });
             lastSentRef.current = { lat: latitude, lng: longitude };
 
+            // Sem rota ativa: watcher continua emitindo (FS vivo) mas não envia.
+            if (!rotaId) {
+              console.info("[GPS Native] watcher emitiu posição sem rota — aguardando rota da Torre");
+              return;
+            }
+
             try {
               await enqueue({
-                monitoramento_rota_id: monitoramentoRotaId,
+                monitoramento_rota_id: rotaId,
                 latitude,
                 longitude,
                 accuracy,
@@ -249,6 +273,7 @@ export function useGpsTrackerNative({
       }
     }
 
+
     async function stopWatcher() {
       if (watcherIdRef.current) {
         try {
@@ -274,7 +299,7 @@ export function useGpsTrackerNative({
       }
     }
 
-    if (enabled && monitoramentoRotaId) {
+    if (enabled) {
       startWatcher();
 
       // Fallback foreground: se o plugin nativo não emitir callback inicial,
@@ -292,13 +317,14 @@ export function useGpsTrackerNative({
         }
       }, FORCED_PING_MS);
 
-      // Heartbeat: a cada 60s, enfileira a última posição como heartbeat
+      // Heartbeat: a cada 20s, enfileira a última posição como heartbeat
       heartbeatTimer = setInterval(async () => {
         const last = lastPositionRef.current;
-        if (!last || !monitoramentoRotaId) return;
+        const rotaId = rotaIdRef.current;
+        if (!last || !rotaId) return;
         try {
           await enqueue({
-            monitoramento_rota_id: monitoramentoRotaId,
+            monitoramento_rota_id: rotaId,
             latitude: last.lat,
             longitude: last.lng,
             accuracy: last.accuracy,
@@ -331,7 +357,6 @@ export function useGpsTrackerNative({
     };
   }, [
     enabled,
-    monitoramentoRotaId,
     cfg.distance_filter_metros,
     cfg.intervalo_padrao_segundos,
     checkModoCritico,
