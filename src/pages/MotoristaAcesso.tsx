@@ -86,11 +86,16 @@ export default function MotoristaAcesso() {
   // envio em primeiro plano. Assim, motoristas que ainda não passaram pelo wizard
   // (ou cuja validação expirou) continuam alimentando a Torre enquanto o app
   // estiver aberto.
+  // Rastreamento GPS contínuo: ativa assim que o motorista loga, mesmo sem
+  // monitoramento_rota_id ainda. O watcher nativo sobe o Foreground Service,
+  // pede permissão, e segura o serviço vivo. Quando a rota aparecer na Torre
+  // (preenchendo monitoramentoRotaId), os pontos passam a ser enfileirados
+  // automaticamente — não depende de BaixaEntrega nem de qualquer ação manual.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
-    enabled: !!veiculo && !!monitoramentoRotaId,
+    enabled: !!veiculo,
   });
-  useGpsQueueWorker(!!veiculo && !!monitoramentoRotaId);
+  useGpsQueueWorker(!!veiculo);
   useWakeLock(!!veiculo);
   useLockPortrait();
 
