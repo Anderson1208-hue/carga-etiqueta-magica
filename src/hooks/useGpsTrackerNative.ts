@@ -299,7 +299,7 @@ export function useGpsTrackerNative({
       }
     }
 
-    if (enabled && monitoramentoRotaId) {
+    if (enabled) {
       startWatcher();
 
       // Fallback foreground: se o plugin nativo não emitir callback inicial,
@@ -317,13 +317,14 @@ export function useGpsTrackerNative({
         }
       }, FORCED_PING_MS);
 
-      // Heartbeat: a cada 60s, enfileira a última posição como heartbeat
+      // Heartbeat: a cada 20s, enfileira a última posição como heartbeat
       heartbeatTimer = setInterval(async () => {
         const last = lastPositionRef.current;
-        if (!last || !monitoramentoRotaId) return;
+        const rotaId = rotaIdRef.current;
+        if (!last || !rotaId) return;
         try {
           await enqueue({
-            monitoramento_rota_id: monitoramentoRotaId,
+            monitoramento_rota_id: rotaId,
             latitude: last.lat,
             longitude: last.lng,
             accuracy: last.accuracy,
@@ -356,7 +357,6 @@ export function useGpsTrackerNative({
     };
   }, [
     enabled,
-    monitoramentoRotaId,
     cfg.distance_filter_metros,
     cfg.intervalo_padrao_segundos,
     checkModoCritico,
