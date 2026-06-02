@@ -55,8 +55,18 @@ const config: CapacitorConfig = {
   ...(server ? { server } : {}),
   android: {
     allowMixedContent: env === 'dev',
+    // Recomendação oficial do plugin @capacitor-community/background-geolocation:
+    // sem o legacy bridge, callbacks de localização podem parar depois de alguns
+    // minutos em segundo plano no Android/WebView.
+    useLegacyBridge: true,
   },
   plugins: {
+    // Em background, Android pode limitar HTTP iniciado pelo WebView após ~5min.
+    // Habilita o fetch/XHR nativo do Capacitor para o worker da fila GPS continuar
+    // drenando pontos mesmo com o APK em segundo plano.
+    CapacitorHttp: {
+      enabled: true,
+    },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
