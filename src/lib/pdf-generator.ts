@@ -140,7 +140,18 @@ export async function generateRomaneioPDF(
     x = MARGIN;
     doc.text(truncateText(formatCProdDisplay(item.cProd), 35), x + 4, y);
     x += colWidths[0];
-    doc.text(truncateText(item.xProd, 90), x + 4, y);
+    const descMaxWidth = colWidths[1] - 6;
+    let descText = item.xProd || "";
+    while (descText.length > 0 && doc.getTextWidth(descText) > descMaxWidth) {
+      descText = descText.slice(0, -1);
+    }
+    if (descText.length < (item.xProd || "").length) {
+      while (descText.length > 3 && doc.getTextWidth(descText.slice(0, -3) + "...") > descMaxWidth) {
+        descText = descText.slice(0, -1);
+      }
+      descText = descText.slice(0, -3) + "...";
+    }
+    doc.text(descText, x + 4, y);
     x += colWidths[1];
     doc.text(item.quantidadeTotal.toString(), x + colWidths[2] - 8, y, {
       align: "right",
