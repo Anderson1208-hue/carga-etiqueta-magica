@@ -67,3 +67,11 @@ export function markWatcherStart() {
     watcherRestarts: cur.watcherStartedAt ? cur.watcherRestarts + 1 : 0,
   });
 }
+
+export function resetTelemetry() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+}
