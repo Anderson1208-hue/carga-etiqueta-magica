@@ -25,6 +25,9 @@ VITE_BUILD_ENV=homolog npm run build
 echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (server.url=lovable.app)"
 CAP_ENV=homolog npx cap sync android
 
+echo "==> 3.5/6 Validando permissões nativas de GPS background"
+assert_android_background_gps_ready
+
 echo "==> 4/6 Gerando APK release"
 run_android_gradle_release
 

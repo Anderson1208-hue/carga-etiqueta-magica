@@ -29,6 +29,9 @@ VITE_BUILD_ENV=prod npm run build
 echo "==> 3/6 Sincronizando Capacitor em modo PROD (sem hot-reload)"
 CAP_ENV=prod npx cap sync android
 
+echo "==> 3.5/6 Validando permissões nativas de GPS background"
+assert_android_background_gps_ready
+
 echo "==> 4/6 Gerando APK release"
 
 run_android_gradle_release
