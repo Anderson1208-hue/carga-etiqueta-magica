@@ -13,7 +13,7 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
-import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
+import { ValidacaoGpsBackground, VALIDATION_KEY, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { Capacitor } from "@capacitor/core";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
@@ -77,25 +77,19 @@ export default function MotoristaAcesso() {
   // Gate de validação do GPS background (APK nativo).
   // No web sempre passa direto — `isBackgroundGpsValidated` retorna true fora de Capacitor.
   const [gpsValidated, setGpsValidated] = useState<boolean>(() => isBackgroundGpsValidated());
+  const [nativeGpsPermissionReady, setNativeGpsPermissionReady] = useState<boolean>(() => !Capacitor.isNativePlatform());
   const [showValidacao, setShowValidacao] = useState(false);
 
+  const gpsTrackerEnabled = !!veiculo && (!Capacitor.isNativePlatform() || (gpsValidated && nativeGpsPermissionReady));
+
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // ATIVA SEMPRE que houver veículo + rota — independente do wizard de validação.
-  // O wizard continua sendo aberto (showValidacao) para confirmar que o background
-  // com tela bloqueada também funciona, mas não é mais pré-requisito para o
-  // envio em primeiro plano. Assim, motoristas que ainda não passaram pelo wizard
-  // (ou cuja validação expirou) continuam alimentando a Torre enquanto o app
-  // estiver aberto.
-  // Rastreamento GPS contínuo: ativa assim que o motorista loga, mesmo sem
-  // monitoramento_rota_id ainda. O watcher nativo sobe o Foreground Service,
-  // pede permissão, e segura o serviço vivo. Quando a rota aparecer na Torre
-  // (preenchendo monitoramentoRotaId), os pontos passam a ser enfileirados
-  // automaticamente — não depende de BaixaEntrega nem de qualquer ação manual.
+  // No APK, só ativa após a validação comportamental passar. Com permissão ainda
+  // em "prompt", iniciar watcher derruba o app em alguns Androids por loop de FS.
   useGpsTrackerHybrid({
     monitoramentoRotaId,
-    enabled: !!veiculo,
+    enabled: gpsTrackerEnabled,
   });
-  useGpsQueueWorker(!!veiculo);
+  useGpsQueueWorker(gpsTrackerEnabled);
   useWakeLock(!!veiculo);
   useLockPortrait();
 
@@ -104,7 +98,31 @@ export default function MotoristaAcesso() {
   useEffect(() => {
     if (!veiculo) return;
     if (!Capacitor.isNativePlatform()) return;
-    if (!gpsValidated) setShowValidacao(true);
+    let cancelled = false;
+    async function validarPermissaoReal() {
+      try {
+        const status = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
+        if (cancelled) return;
+        if (status && status.state !== "granted") {
+          localStorage.removeItem(VALIDATION_KEY);
+          setNativeGpsPermissionReady(false);
+          setGpsValidated(false);
+          setShowValidacao(true);
+          return;
+        }
+        if (status?.state === "granted") {
+          setNativeGpsPermissionReady(true);
+        }
+      } catch {
+        // Se o Android/WebView não informar, confia apenas na validação comportamental.
+        setNativeGpsPermissionReady(gpsValidated);
+      }
+      if (!cancelled && !gpsValidated) setShowValidacao(true);
+    }
+    validarPermissaoReal();
+    return () => {
+      cancelled = true;
+    };
   }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
@@ -423,7 +441,7 @@ export default function MotoristaAcesso() {
       <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId && gpsValidated} />
       <ValidacaoGpsBackground
         open={showValidacao}
-        onValidated={() => { setGpsValidated(true); setShowValidacao(false); }}
+        onValidated={() => { setGpsValidated(true); setNativeGpsPermissionReady(true); setShowValidacao(false); }}
         onCancel={() => {
           setShowValidacao(false);
           setVeiculo(null);

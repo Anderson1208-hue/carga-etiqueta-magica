@@ -146,11 +146,12 @@ export default function MotoristaDiagnostico() {
     };
   }, [testCode]);
 
-  useGpsTrackerHybrid({ monitoramentoRotaId: diagRotaId, enabled: !!diagRotaId });
-  useGpsQueueWorker(!!diagRotaId);
-
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
+  const diagTrackerEnabled = !!diagRotaId && (!isNative || perm === "granted");
+
+  useGpsTrackerHybrid({ monitoramentoRotaId: diagRotaId, enabled: diagTrackerEnabled });
+  useGpsQueueWorker(diagTrackerEnabled);
 
   const refreshAll = useCallback(async () => {
     setOnline(navigator.onLine);
@@ -379,7 +380,7 @@ export default function MotoristaDiagnostico() {
   }
 
   const trackerMode = isNative ? "Nativo (Foreground Service)" : "Web (navigator.geolocation)";
-  const fsActive = isNative && tele.watcherStartedAt !== null;
+  const fsActive = isNative && diagTrackerEnabled && tele.watcherStartedAt !== null;
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -498,7 +499,9 @@ export default function MotoristaDiagnostico() {
               ok={!!diagRotaId}
               hint={
                 diagRotaId
-                  ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
+                  ? diagTrackerEnabled
+                    ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
+                    : "Rota encontrada, mas falta conceder a permissão GPS antes de iniciar o rastreador"
                   : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
             />

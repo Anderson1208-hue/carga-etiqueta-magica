@@ -81,6 +81,16 @@ function isPageHidden(): boolean {
   return typeof document !== "undefined" && document.visibilityState !== "visible";
 }
 
+async function getGeolocationPermissionState(): Promise<PermissionState | "unknown"> {
+  if (typeof navigator === "undefined" || !("permissions" in navigator)) return "unknown";
+  try {
+    const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+    return status.state;
+  } catch {
+    return "unknown";
+  }
+}
+
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -211,11 +221,24 @@ export function useGpsTrackerNative({
       if (!enabled || watcherIdRef.current || startingRef.current) return;
       startingRef.current = true;
       try {
+        const permissionState = await getGeolocationPermissionState();
+        if (permissionState === "prompt" || permissionState === "denied") {
+          const msg = permissionState === "prompt"
+            ? "GPS ainda sem permissão nativa. Solicite a permissão antes de iniciar o rastreador."
+            : "Permissão de localização negada. Abra Configurações → Permissões → Localização.";
+          setError(msg);
+          markError(msg);
+          return;
+        }
+
         const id = await BackgroundGeolocation.addWatcher(
           {
             backgroundMessage: "Rastreamento da rota ativo",
             backgroundTitle: "Carga Etiqueta Mágica",
-            requestPermissions: true,
+            // Não pedir permissão automaticamente aqui. O watcher operacional só
+            // sobe depois da permissão estar concedida; pedir em loop enquanto
+            // está "prompt" recria Foreground Service e o Android mata o APK.
+            requestPermissions: false,
             stale: false,
             distanceFilter: cfg.distance_filter_metros,
           },
