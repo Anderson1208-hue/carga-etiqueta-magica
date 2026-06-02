@@ -205,7 +205,8 @@ export function useGpsTrackerNative({
 
 
     async function startWatcher() {
-      if (!enabled) return;
+      if (!enabled || watcherIdRef.current || startingRef.current) return;
+      startingRef.current = true;
       try {
         const id = await BackgroundGeolocation.addWatcher(
           {
@@ -233,7 +234,8 @@ export function useGpsTrackerNative({
             lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
             const rotaId = rotaIdRef.current;
 
-            // distance filter defensivo
+            // distance filter defensivo — em rota ativa, enfileira heartbeat
+            // limitado a 20s para não depender de timers da WebView em background.
             if (lastSentRef.current) {
               const dist = haversine(
                 lastSentRef.current.lat,
@@ -243,6 +245,26 @@ export function useGpsTrackerNative({
               );
               if (dist < cfg.distance_filter_metros) {
                 setLastPosition({ lat: latitude, lng: longitude });
+                const now = Date.now();
+                if (rotaId && now - lastHeartbeatEnqueueAtRef.current >= HEARTBEAT_MS) {
+                  lastHeartbeatEnqueueAtRef.current = now;
+                  try {
+                    await enqueue({
+                      monitoramento_rota_id: rotaId,
+                      latitude,
+                      longitude,
+                      accuracy,
+                      timestamp: new Date(location.time ?? now).toISOString(),
+                      heartbeat: true,
+                    });
+                    markEnqueue({ lat: latitude, lng: longitude, accuracy });
+                    setPendingQueue(await pendingCount());
+                    setError(null);
+                  } catch (err) {
+                    console.error("[GPS Native] heartbeat por callback falhou:", err);
+                    markError(err instanceof Error ? err.message : String(err));
+                  }
+                }
                 return;
               }
             }
@@ -287,6 +309,8 @@ export function useGpsTrackerNative({
       } catch (err) {
         console.error("[GPS Native] Falha ao iniciar:", err);
         setError("Não foi possível iniciar o rastreamento nativo");
+      } finally {
+        startingRef.current = false;
       }
     }
 
