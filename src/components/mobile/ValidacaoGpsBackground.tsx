@@ -175,7 +175,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       stopTest("success");
     } else {
       setPermError(
-        `Recebemos apenas ${bgCallbacks} ponto(s) com tela bloqueada. ` +
+        `Recebemos apenas ${bgCallbacksRef.current} ponto(s) com tela bloqueada. ` +
           `Provavelmente a permissão está em "Durante o uso". Abra as configurações e mude para "Permitir o tempo todo".`
       );
       stopTest("fail");
