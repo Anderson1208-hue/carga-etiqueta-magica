@@ -41,7 +41,9 @@ const DEFAULT_CONFIG: GpsConfig = {
 // está em modo de baixa frequência — garante uma posição na Torre a cada 20s.
 const HEARTBEAT_MS = 20_000;
 const FORCED_PING_MS = 20_000;
-const WATCHER_STALE_MS = 3 * 60_000; // se não vier callback em 3 min, reinicia
+// Não reiniciar agressivamente: parado + distanceFilter pode ficar sem callback
+// por vários minutos, e reiniciar Foreground Service em loop faz o Android matar o APK.
+const WATCHER_STALE_MS = 15 * 60_000;
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -75,6 +77,10 @@ interface BackgroundGeolocationPlugin {
 const BackgroundGeolocation =
   registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
+function isPageHidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState !== "visible";
+}
+
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -100,6 +106,8 @@ export function useGpsTrackerNative({
   const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastCallbackAtRef = useRef<number>(Date.now());
   const restartingRef = useRef<boolean>(false);
+  const startingRef = useRef<boolean>(false);
+  const lastHeartbeatEnqueueAtRef = useRef<number>(0);
   // Mantemos rotaId, paradasCoords e raio em refs para que callbacks do
   // watcher peguem o valor mais recente SEM reiniciar o Foreground Service.
   // Reiniciar o FS a cada render derruba o processo no Android e faz o
