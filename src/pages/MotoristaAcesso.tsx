@@ -13,7 +13,7 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
-import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
+import { ValidacaoGpsBackground, VALIDATION_KEY, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { Capacitor } from "@capacitor/core";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
@@ -97,7 +97,26 @@ export default function MotoristaAcesso() {
   useEffect(() => {
     if (!veiculo) return;
     if (!Capacitor.isNativePlatform()) return;
-    if (!gpsValidated) setShowValidacao(true);
+    let cancelled = false;
+    async function validarPermissaoReal() {
+      try {
+        const status = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
+        if (cancelled) return;
+        if (status && status.state !== "granted") {
+          localStorage.removeItem(VALIDATION_KEY);
+          setGpsValidated(false);
+          setShowValidacao(true);
+          return;
+        }
+      } catch {
+        // Se o Android/WebView não informar, mantém a validação comportamental.
+      }
+      if (!cancelled && !gpsValidated) setShowValidacao(true);
+    }
+    validarPermissaoReal();
+    return () => {
+      cancelled = true;
+    };
   }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
