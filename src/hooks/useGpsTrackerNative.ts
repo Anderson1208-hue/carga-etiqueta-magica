@@ -152,6 +152,9 @@ export function useGpsTrackerNative({
 
     async function enqueueForegroundFallback(reason: string) {
       if (!enabled || !navigator.geolocation) return;
+      // navigator.geolocation pertence à WebView; em segundo plano pode travar
+      // ou acordar o processo em loop. Background fica só com o plugin nativo.
+      if (isPageHidden()) return;
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -352,6 +355,7 @@ export function useGpsTrackerNative({
       }, 12_000);
 
       foregroundFallbackTimer = setInterval(() => {
+        if (isPageHidden()) return;
         const silent = Date.now() - lastCallbackAtRef.current;
         if (silent > FORCED_PING_MS) {
           enqueueForegroundFallback("forced-ping-20s");
@@ -380,6 +384,9 @@ export function useGpsTrackerNative({
 
       // Supervisor: se watcher ficou silencioso > WATCHER_STALE_MS, reinicia
       supervisorTimer = setInterval(() => {
+        // Nunca reinicia Foreground Service com app em background: alguns Androids
+        // interpretam isso como instabilidade e encerram o processo.
+        if (isPageHidden()) return;
         const silent = Date.now() - lastCallbackAtRef.current;
         if (silent > WATCHER_STALE_MS && watcherIdRef.current) {
           restartWatcher();
