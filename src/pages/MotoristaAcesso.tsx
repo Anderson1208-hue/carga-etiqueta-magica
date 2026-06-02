@@ -77,9 +77,10 @@ export default function MotoristaAcesso() {
   // Gate de validação do GPS background (APK nativo).
   // No web sempre passa direto — `isBackgroundGpsValidated` retorna true fora de Capacitor.
   const [gpsValidated, setGpsValidated] = useState<boolean>(() => isBackgroundGpsValidated());
+  const [nativeGpsPermissionReady, setNativeGpsPermissionReady] = useState<boolean>(() => !Capacitor.isNativePlatform());
   const [showValidacao, setShowValidacao] = useState(false);
 
-  const gpsTrackerEnabled = !!veiculo && (!Capacitor.isNativePlatform() || gpsValidated);
+  const gpsTrackerEnabled = !!veiculo && (!Capacitor.isNativePlatform() || (gpsValidated && nativeGpsPermissionReady));
 
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
   // No APK, só ativa após a validação comportamental passar. Com permissão ainda
@@ -104,12 +105,17 @@ export default function MotoristaAcesso() {
         if (cancelled) return;
         if (status && status.state !== "granted") {
           localStorage.removeItem(VALIDATION_KEY);
+          setNativeGpsPermissionReady(false);
           setGpsValidated(false);
           setShowValidacao(true);
           return;
         }
+        if (status?.state === "granted") {
+          setNativeGpsPermissionReady(true);
+        }
       } catch {
-        // Se o Android/WebView não informar, mantém a validação comportamental.
+        // Se o Android/WebView não informar, confia apenas na validação comportamental.
+        setNativeGpsPermissionReady(gpsValidated);
       }
       if (!cancelled && !gpsValidated) setShowValidacao(true);
     }
@@ -435,7 +441,7 @@ export default function MotoristaAcesso() {
       <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId && gpsValidated} />
       <ValidacaoGpsBackground
         open={showValidacao}
-        onValidated={() => { setGpsValidated(true); setShowValidacao(false); }}
+        onValidated={() => { setGpsValidated(true); setNativeGpsPermissionReady(true); setShowValidacao(false); }}
         onCancel={() => {
           setShowValidacao(false);
           setVeiculo(null);
