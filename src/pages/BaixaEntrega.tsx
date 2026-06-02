@@ -570,10 +570,13 @@ export default function BaixaEntrega() {
       return;
     }
 
-    // Foto obrigatória para entrega — vale online E offline (sync usa a foto salva)
+    // Operadores web podem registrar entrega sem foto (com confirmação).
+    // O motorista (rota pública /motorista) continua obrigado a enviar foto.
     if (ocorrencia === "entregue" && !fotoFile) {
-      toast({ title: "Atenção", description: "Foto obrigatória para entrega", variant: "destructive" });
-      return;
+      const ok = window.confirm(
+        "Nenhuma foto do canhoto foi anexada. Confirmar baixa como ENTREGUE mesmo assim?"
+      );
+      if (!ok) return;
     }
 
     // Observação obrigatória para "sem canhoto/assinatura"
