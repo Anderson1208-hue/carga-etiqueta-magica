@@ -43,6 +43,8 @@ import { useToast } from "@/hooks/use-toast";
 
 type PermState = "granted" | "denied" | "prompt" | "unknown";
 
+const RESTAR_ALTO = 50;
+
 function fmtTime(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -475,8 +477,14 @@ export default function MotoristaDiagnostico() {
             <StatusRow
               label="Restarts do watcher"
               value={String(tele.watcherRestarts)}
-              ok={tele.watcherRestarts < 3 ? true : tele.watcherRestarts < 10 ? null : false}
-              hint={tele.watcherRestarts >= 3 ? "Muitos restarts — verificar bateria/permissões" : undefined}
+              ok={tele.watcherRestarts < 3 ? true : tele.watcherRestarts < RESTAR_ALTO ? null : false}
+              hint={
+                tele.watcherRestarts >= RESTAR_ALTO
+                  ? "Crítico: não gere outro APK antes de validar AndroidManifest/permissões nativas"
+                  : tele.watcherRestarts >= 3
+                    ? "Muitos restarts — verificar bateria/permissões"
+                    : undefined
+              }
             />
             <StatusRow
               label="Wake Lock"
