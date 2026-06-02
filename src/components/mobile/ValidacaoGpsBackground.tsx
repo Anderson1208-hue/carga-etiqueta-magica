@@ -69,6 +69,8 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
   const watcherIdRef = useRef<string | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHiddenRef = useRef(false);
+  const bgCallbacksRef = useRef(0);
+  const screenLockedRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -78,6 +80,8 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       setSecondsLeft(TEST_DURATION_S);
       setPermError(null);
       setScreenLockedAtLeastOnce(false);
+      bgCallbacksRef.current = 0;
+      screenLockedRef.current = false;
     }
   }, [open]);
 
@@ -87,7 +91,10 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     function onVisChange() {
       const hidden = document.hidden;
       isHiddenRef.current = hidden;
-      if (hidden) setScreenLockedAtLeastOnce(true);
+      if (hidden) {
+        screenLockedRef.current = true;
+        setScreenLockedAtLeastOnce(true);
+      }
     }
     document.addEventListener("visibilitychange", onVisChange);
     return () => document.removeEventListener("visibilitychange", onVisChange);
@@ -97,6 +104,8 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     setPermError(null);
     setCallbacks(0);
     setBgCallbacks(0);
+    bgCallbacksRef.current = 0;
+    screenLockedRef.current = false;
     setSecondsLeft(TEST_DURATION_S);
     setStep("test");
 
@@ -119,7 +128,10 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
           }
           if (!loc) return;
           setCallbacks((c) => c + 1);
-          if (isHiddenRef.current) setBgCallbacks((c) => c + 1);
+          if (isHiddenRef.current) {
+            bgCallbacksRef.current += 1;
+            setBgCallbacks((c) => c + 1);
+          }
         }
       );
       watcherIdRef.current = id;
@@ -153,12 +165,12 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
   function evaluate() {
     // Critério: precisa ter recebido callbacks COM a tela bloqueada.
     // Se o motorista nunca bloqueou a tela, exigimos refazer o teste.
-    if (!screenLockedAtLeastOnce) {
+    if (!screenLockedRef.current) {
       setPermError("Você precisa BLOQUEAR a tela do celular durante o teste (botão de ligar).");
       stopTest("fail");
       return;
     }
-    if (bgCallbacks >= MIN_CALLBACKS_REQUIRED) {
+    if (bgCallbacksRef.current >= MIN_CALLBACKS_REQUIRED) {
       try { localStorage.setItem(VALIDATION_KEY, String(Date.now())); } catch { /* ignore */ }
       stopTest("success");
     } else {
