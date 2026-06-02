@@ -219,7 +219,7 @@ export function useGpsTrackerNative({
             stale: false,
             distanceFilter: cfg.distance_filter_metros,
           },
-          async (location, errCb) => {
+          (location, errCb) => {
             lastCallbackAtRef.current = Date.now();
             if (errCb) {
               console.error("[GPS Native] erro watcher:", errCb);
@@ -251,22 +251,23 @@ export function useGpsTrackerNative({
                 const now = Date.now();
                 if (rotaId && now - lastHeartbeatEnqueueAtRef.current >= HEARTBEAT_MS) {
                   lastHeartbeatEnqueueAtRef.current = now;
-                  try {
-                    await enqueue({
+                  void enqueue({
                       monitoramento_rota_id: rotaId,
                       latitude,
                       longitude,
                       accuracy,
                       timestamp: new Date(location.time ?? now).toISOString(),
                       heartbeat: true,
-                    });
+                    })
+                    .then(async () => {
                     markEnqueue({ lat: latitude, lng: longitude, accuracy });
                     setPendingQueue(await pendingCount());
                     setError(null);
-                  } catch (err) {
+                    })
+                    .catch((err) => {
                     console.error("[GPS Native] heartbeat por callback falhou:", err);
                     markError(err instanceof Error ? err.message : String(err));
-                  }
+                    });
                 }
                 return;
               }
@@ -283,21 +284,22 @@ export function useGpsTrackerNative({
               return;
             }
 
-            try {
-              await enqueue({
+            void enqueue({
                 monitoramento_rota_id: rotaId,
                 latitude,
                 longitude,
                 accuracy,
                 timestamp: new Date(location.time ?? Date.now()).toISOString(),
                 heartbeat: false,
-              });
+              })
+              .then(() => {
               markEnqueue({ lat: latitude, lng: longitude, accuracy });
               setError(null);
-            } catch (err) {
+              })
+              .catch((err) => {
               console.error("[GPS Native] enqueue err:", err);
               markError(err instanceof Error ? err.message : String(err));
-            }
+              });
           }
         );
 
