@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, markSent, markError, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { readTelemetry, markSent, markError, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
@@ -692,6 +692,7 @@ export default function MotoristaDiagnostico() {
               onClick={() => {
                 try {
                   localStorage.removeItem(VALIDATION_KEY);
+                  resetTelemetry();
                 } catch { /* ignore */ }
                 toast({
                   title: "Validação resetada",

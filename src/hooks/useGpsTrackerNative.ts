@@ -41,7 +41,9 @@ const DEFAULT_CONFIG: GpsConfig = {
 // está em modo de baixa frequência — garante uma posição na Torre a cada 20s.
 const HEARTBEAT_MS = 20_000;
 const FORCED_PING_MS = 20_000;
-const WATCHER_STALE_MS = 3 * 60_000; // se não vier callback em 3 min, reinicia
+// Não reiniciar agressivamente: parado + distanceFilter pode ficar sem callback
+// por vários minutos, e reiniciar Foreground Service em loop faz o Android matar o APK.
+const WATCHER_STALE_MS = 15 * 60_000;
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -75,6 +77,10 @@ interface BackgroundGeolocationPlugin {
 const BackgroundGeolocation =
   registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
+function isPageHidden(): boolean {
+  return typeof document !== "undefined" && document.visibilityState !== "visible";
+}
+
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -100,6 +106,8 @@ export function useGpsTrackerNative({
   const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const lastCallbackAtRef = useRef<number>(Date.now());
   const restartingRef = useRef<boolean>(false);
+  const startingRef = useRef<boolean>(false);
+  const lastHeartbeatEnqueueAtRef = useRef<number>(0);
   // Mantemos rotaId, paradasCoords e raio em refs para que callbacks do
   // watcher peguem o valor mais recente SEM reiniciar o Foreground Service.
   // Reiniciar o FS a cada render derruba o processo no Android e faz o
@@ -144,6 +152,9 @@ export function useGpsTrackerNative({
 
     async function enqueueForegroundFallback(reason: string) {
       if (!enabled || !navigator.geolocation) return;
+      // navigator.geolocation pertence à WebView; em segundo plano pode travar
+      // ou acordar o processo em loop. Background fica só com o plugin nativo.
+      if (isPageHidden()) return;
 
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
@@ -197,7 +208,8 @@ export function useGpsTrackerNative({
 
 
     async function startWatcher() {
-      if (!enabled) return;
+      if (!enabled || watcherIdRef.current || startingRef.current) return;
+      startingRef.current = true;
       try {
         const id = await BackgroundGeolocation.addWatcher(
           {
@@ -207,7 +219,7 @@ export function useGpsTrackerNative({
             stale: false,
             distanceFilter: cfg.distance_filter_metros,
           },
-          async (location, errCb) => {
+          (location, errCb) => {
             lastCallbackAtRef.current = Date.now();
             if (errCb) {
               console.error("[GPS Native] erro watcher:", errCb);
@@ -225,7 +237,8 @@ export function useGpsTrackerNative({
             lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
             const rotaId = rotaIdRef.current;
 
-            // distance filter defensivo
+            // distance filter defensivo — em rota ativa, enfileira heartbeat
+            // limitado a 20s para não depender de timers da WebView em background.
             if (lastSentRef.current) {
               const dist = haversine(
                 lastSentRef.current.lat,
@@ -235,6 +248,27 @@ export function useGpsTrackerNative({
               );
               if (dist < cfg.distance_filter_metros) {
                 setLastPosition({ lat: latitude, lng: longitude });
+                const now = Date.now();
+                if (rotaId && now - lastHeartbeatEnqueueAtRef.current >= HEARTBEAT_MS) {
+                  lastHeartbeatEnqueueAtRef.current = now;
+                  void enqueue({
+                      monitoramento_rota_id: rotaId,
+                      latitude,
+                      longitude,
+                      accuracy,
+                      timestamp: new Date(location.time ?? now).toISOString(),
+                      heartbeat: true,
+                    })
+                    .then(async () => {
+                    markEnqueue({ lat: latitude, lng: longitude, accuracy });
+                    setPendingQueue(await pendingCount());
+                    setError(null);
+                    })
+                    .catch((err) => {
+                    console.error("[GPS Native] heartbeat por callback falhou:", err);
+                    markError(err instanceof Error ? err.message : String(err));
+                    });
+                }
                 return;
               }
             }
@@ -250,21 +284,22 @@ export function useGpsTrackerNative({
               return;
             }
 
-            try {
-              await enqueue({
+            void enqueue({
                 monitoramento_rota_id: rotaId,
                 latitude,
                 longitude,
                 accuracy,
                 timestamp: new Date(location.time ?? Date.now()).toISOString(),
                 heartbeat: false,
-              });
+              })
+              .then(() => {
               markEnqueue({ lat: latitude, lng: longitude, accuracy });
               setError(null);
-            } catch (err) {
+              })
+              .catch((err) => {
               console.error("[GPS Native] enqueue err:", err);
               markError(err instanceof Error ? err.message : String(err));
-            }
+              });
           }
         );
 
@@ -279,6 +314,8 @@ export function useGpsTrackerNative({
       } catch (err) {
         console.error("[GPS Native] Falha ao iniciar:", err);
         setError("Não foi possível iniciar o rastreamento nativo");
+      } finally {
+        startingRef.current = false;
       }
     }
 
@@ -320,6 +357,7 @@ export function useGpsTrackerNative({
       }, 12_000);
 
       foregroundFallbackTimer = setInterval(() => {
+        if (isPageHidden()) return;
         const silent = Date.now() - lastCallbackAtRef.current;
         if (silent > FORCED_PING_MS) {
           enqueueForegroundFallback("forced-ping-20s");
@@ -348,6 +386,9 @@ export function useGpsTrackerNative({
 
       // Supervisor: se watcher ficou silencioso > WATCHER_STALE_MS, reinicia
       supervisorTimer = setInterval(() => {
+        // Nunca reinicia Foreground Service com app em background: alguns Androids
+        // interpretam isso como instabilidade e encerram o processo.
+        if (isPageHidden()) return;
         const silent = Date.now() - lastCallbackAtRef.current;
         if (silent > WATCHER_STALE_MS && watcherIdRef.current) {
           restartWatcher();
