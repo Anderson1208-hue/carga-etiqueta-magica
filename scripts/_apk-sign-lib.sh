@@ -101,6 +101,39 @@ run_android_gradle_release() {
   fi
 }
 
+assert_android_background_gps_ready() {
+  local manifest="android/app/src/main/AndroidManifest.xml"
+  if [ ! -f "$manifest" ]; then
+    echo "ERRO: $manifest não encontrado. Rode 'npx cap sync android' antes."
+    exit 1
+  fi
+
+  local missing=0
+  check_manifest_item() {
+    local needle="$1"
+    local label="$2"
+    if ! grep -q "$needle" "$manifest"; then
+      echo "ERRO: AndroidManifest.xml sem $label"
+      missing=1
+    fi
+  }
+
+  check_manifest_item "android.permission.ACCESS_FINE_LOCATION" "ACCESS_FINE_LOCATION"
+  check_manifest_item "android.permission.ACCESS_BACKGROUND_LOCATION" "ACCESS_BACKGROUND_LOCATION"
+  check_manifest_item "android.permission.FOREGROUND_SERVICE" "FOREGROUND_SERVICE"
+  check_manifest_item "android.permission.FOREGROUND_SERVICE_LOCATION" "FOREGROUND_SERVICE_LOCATION"
+  check_manifest_item "android.permission.POST_NOTIFICATIONS" "POST_NOTIFICATIONS"
+  check_manifest_item "android.permission.WAKE_LOCK" "WAKE_LOCK"
+
+  if [ "$missing" -ne 0 ]; then
+    echo ""
+    echo "Build bloqueado: esse APK iria falhar em GPS com tela bloqueada."
+    echo "Adicione as permissões acima dentro de <manifest>, antes de <application>."
+    echo "Referência: docs/APK_BUILD_PRODUCAO.md seção 'Permissões obrigatórias no AndroidManifest'."
+    exit 1
+  fi
+}
+
 # Assina manualmente um APK unsigned via apksigner se o gradle não assinou.
 sign_if_needed() {
   local release_dir="android/app/build/outputs/apk/release"
