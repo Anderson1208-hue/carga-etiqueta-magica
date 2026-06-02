@@ -303,16 +303,7 @@ function AppRoutes() {
   );
 }
 
-import { useEffect } from "react";
-import { bootstrapNativePermissions } from "@/lib/bootstrapNativePermissions";
-
 const App = () => {
-  useEffect(() => {
-    // Em APK: dispara o diálogo nativo de localização logo na abertura,
-    // sem depender do motorista chegar até /motorista-acesso.
-    bootstrapNativePermissions();
-  }, []);
-
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
