@@ -1,5 +1,4 @@
 import * as XLSX from "xlsx";
-import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import type { ResumoDiaData, VeiculoDiaData } from "./resumo-dia-pdf";
 
