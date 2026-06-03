@@ -1,5 +1,4 @@
 import * as XLSX from "xlsx";
-import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import type { ResumoDiaData, VeiculoDiaData } from "./resumo-dia-pdf";
 
@@ -38,13 +37,12 @@ function agruparEntregas(v: VeiculoDiaData) {
 }
 
 export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
-  const dataFormatada = format(new Date(data.data + "T12:00:00"), "dd/MM/yyyy");
+  void data;
   const wb = XLSX.utils.book_new();
 
   // ===== Sheet 1: Detalhado (uma linha por NF) =====
   const rows: (string | number)[][] = [];
   rows.push([
-    "Data",
     "Placa",
     "Motorista",
     "Código Acesso",
@@ -57,7 +55,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     "NF",
     "CT-e",
     "Reentrega",
-    "Obs. Reentrega",
     "Caixas",
     "Peso (kg)",
     "M³",
@@ -77,7 +74,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
         const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
         const cteStr = nf.ctes.map((c) => c.numero_cte).join(", ");
         rows.push([
-          dataFormatada,
           v.placa,
           v.motorista || "",
           v.accessCode || "",
@@ -90,7 +86,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
           nf.numero_nf,
           cteStr,
           (nf as any).reentrega ? "SIM" : "",
-          (nf as any).reentrega_observacao || "",
           cx,
           Number(Number(nf.peso_bruto || 0).toFixed(2)),
           Number(Number(nf.volume_m3 || 0).toFixed(3)),
@@ -101,9 +96,9 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
     // Subtotal veículo
     rows.push([
-      "", v.placa, `Subtotal ${v.placa}`, "", "",
+      v.placa, `Subtotal ${v.placa}`, "", "",
       "", "", "", "", "",
-      `${vNfs} NFs`, "", "", "",
+      `${vNfs} NFs`, "", "",
       vCx,
       Number(vPeso.toFixed(2)),
       Number(vVol.toFixed(3)),
@@ -113,9 +108,9 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   });
 
   rows.push([
-    "", "", "TOTAL GERAL", "", "",
+    "", "TOTAL GERAL", "", "",
     "", "", "", "", "",
-    `${gNfs} NFs`, "", "", "",
+    `${gNfs} NFs`, "", "",
     gCx,
     Number(gPeso.toFixed(2)),
     Number(gVol.toFixed(3)),
@@ -123,15 +118,15 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 12 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
+    { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
     { wch: 36 }, { wch: 36 }, { wch: 20 }, { wch: 20 }, { wch: 32 },
-    { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
+    { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Detalhado");
 
   // ===== Sheet 2: Totais por veículo =====
   const totRows: (string | number)[][] = [];
-  totRows.push(["Data", "Placa", "Motorista", "Código", "NFs", "Caixas", "Peso (kg)", "M³"]);
+  totRows.push(["Placa", "Motorista", "Código", "NFs", "Caixas", "Peso (kg)", "M³"]);
   let tNfs = 0, tCx = 0, tPeso = 0, tVol = 0;
   data.veiculos.forEach((v) => {
     const nNfs = v.nfs.length;
@@ -139,7 +134,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     const nPeso = v.nfs.reduce((s, nf) => s + Number(nf.peso_bruto || 0), 0);
     const nVol = v.nfs.reduce((s, nf) => s + Number(nf.volume_m3 || 0), 0);
     totRows.push([
-      dataFormatada,
       v.placa,
       v.motorista || "",
       v.accessCode || "",
@@ -151,12 +145,12 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     tNfs += nNfs; tCx += nCx; tPeso += nPeso; tVol += nVol;
   });
   totRows.push([
-    "", "", "TOTAL", "",
+    "", "TOTAL", "",
     tNfs, tCx, Number(tPeso.toFixed(2)), Number(tVol.toFixed(3)),
   ]);
   const wsTot = XLSX.utils.aoa_to_sheet(totRows);
   wsTot["!cols"] = [
-    { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 12 },
+    { wch: 10 }, { wch: 28 }, { wch: 12 },
     { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
   XLSX.utils.book_append_sheet(wb, wsTot, "Totais por Veículo");
