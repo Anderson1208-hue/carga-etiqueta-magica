@@ -108,7 +108,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
     // Subtotal veículo
     rows.push([
-      v.placa, `Subtotal ${v.placa}`, "", "",
+      "", v.placa, `Subtotal ${v.placa}`, "", "",
       "", "", "", "", "",
       `${vNfs} NFs`, "", "",
       vCx,
@@ -120,7 +120,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   });
 
   rows.push([
-    "", "TOTAL GERAL", "", "",
+    "", "", "TOTAL GERAL", "", "",
     "", "", "", "", "",
     `${gNfs} NFs`, "", "",
     gCx,
@@ -130,7 +130,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
+    { wch: 12 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
     { wch: 36 }, { wch: 36 }, { wch: 20 }, { wch: 20 }, { wch: 32 },
     { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
