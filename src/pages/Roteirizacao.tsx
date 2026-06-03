@@ -1395,6 +1395,19 @@ export default function Roteirizacao() {
         : new Map<string, number>();
       const totalEntregasResumo = new Set(ordemPorCnpjResumo.keys()).size;
 
+      // Buscar NFs marcadas como REENTREGA
+      const nfIdsResumo = nfsData.map((v: any) => v.nf_id).filter(Boolean);
+      const reentregaMapResumo = new Map<string, string>();
+      if (nfIdsResumo.length > 0) {
+        const { data: agdsR } = await supabase
+          .from("agendamentos")
+          .select("nf_id, observacao")
+          .in("nf_id", nfIdsResumo)
+          .eq("status", "REENTREGA")
+          .limit(2000);
+        (agdsR || []).forEach((a: any) => reentregaMapResumo.set(a.nf_id, a.observacao || ""));
+      }
+
       const nfs = nfsData.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
@@ -1409,6 +1422,8 @@ export default function Roteirizacao() {
           itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
           ordem_entrega: ordemPorCnpjResumo.get(cnpjKey),
+          reentrega: reentregaMapResumo.has(vnf.nf_id),
+          reentrega_observacao: reentregaMapResumo.get(vnf.nf_id) || undefined,
         };
       });
       const blob = await generateResumoVeiculoPDF({
