@@ -46,6 +46,9 @@ export default function RelatorioPendentesBaixa() {
   const [busca, setBusca] = useState("");
   const [rows, setRows] = useState<PendenteRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [ocorenRecords, setOcorenRecords] = useState<OcorenRecord[] | null>(null);
+  const [ocorenFileName, setOcorenFileName] = useState<string>("");
+  const [somenteOcoren, setSomenteOcoren] = useState(false);
 
   async function carregar() {
     setLoading(true);
