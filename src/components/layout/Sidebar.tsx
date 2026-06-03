@@ -72,6 +72,7 @@ const cadastrosItems = [
 
 const relatoriosItems = [
   { name: "Relatório de Baixas", href: "/relatorios/baixas", icon: ClipboardCheck },
+  { name: "NFs Pendentes Baixa", href: "/relatorios/pendentes-baixa", icon: ClipboardList },
 ];
 
 function NavItem({ item, isActive, onClick }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean; onClick?: () => void }) {
