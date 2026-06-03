@@ -329,6 +329,56 @@ export default function RelatorioPendentesBaixa() {
         </Card>
 
         <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Cruzar com arquivo OCOREN (opcional)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="file"
+                accept=".txt,text/plain"
+                className="max-w-xs"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onOcorenFile(f);
+                  e.target.value = "";
+                }}
+              />
+              {ocorenRecords && (
+                <>
+                  <Badge variant="secondary" className="gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {ocorenFileName} — {ocorenRecords.length} ocorrência(s)
+                  </Badge>
+                  <Badge variant="outline">
+                    {totalComOcoren} de {rows.length} pendentes constam no OCOREN
+                  </Badge>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={somenteOcoren}
+                      onChange={(e) => setSomenteOcoren(e.target.checked)}
+                    />
+                    Mostrar somente as do OCOREN
+                  </label>
+                  <Button size="sm" variant="ghost" onClick={limparOcoren}>
+                    <X className="w-3 h-3 mr-1" /> Limpar
+                  </Button>
+                </>
+              )}
+              {!ocorenRecords && (
+                <p className="text-xs text-muted-foreground">
+                  Selecione um arquivo OCOREN (.txt) para destacar quais NFs pendentes já têm ocorrência de entrega.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardContent className="pt-4">
             {loading ? (
               <div className="flex justify-center py-10">
