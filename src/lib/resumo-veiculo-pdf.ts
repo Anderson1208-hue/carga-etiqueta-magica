@@ -18,6 +18,7 @@ interface VeiculoResumoData {
     dest_uf: string;
     dest_cep: string;
     cnpj_destinatario: string;
+    razao_social_emitente?: string;
     peso_bruto: number;
     volume_m3: number;
     itens_nf: { q_com: number }[];
