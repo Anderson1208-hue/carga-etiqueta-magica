@@ -168,6 +168,10 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
         }
         doc.text(`${nf.totalCaixas} cx`, MARGIN + 60, y + 3);
         doc.text(`${nf.peso_bruto.toFixed(1)} kg`, MARGIN + 80, y + 3);
+        if (nf.razao_social_emitente) {
+          const emb = nf.razao_social_emitente.length > 32 ? nf.razao_social_emitente.substring(0, 29) + "..." : nf.razao_social_emitente;
+          doc.text(`Emb: ${emb}`, MARGIN + 105, y + 3);
+        }
         doc.text(nf.carga_placa, MARGIN + CONTENT_W - 4, y + 3, { align: "right" });
         doc.setDrawColor(230, 230, 230);
         doc.line(MARGIN + 4, y + 5, MARGIN + CONTENT_W - 2, y + 5);
