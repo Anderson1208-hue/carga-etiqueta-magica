@@ -296,6 +296,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
+      <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
 
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />
