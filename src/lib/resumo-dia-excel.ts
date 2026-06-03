@@ -56,6 +56,8 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     "Embarcador",
     "NF",
     "CT-e",
+    "Reentrega",
+    "Obs. Reentrega",
     "Caixas",
     "Peso (kg)",
     "M³",
