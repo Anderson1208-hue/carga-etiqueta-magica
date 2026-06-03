@@ -18,6 +18,7 @@ interface VeiculoResumoData {
     dest_uf: string;
     dest_cep: string;
     cnpj_destinatario: string;
+    razao_social_emitente?: string;
     peso_bruto: number;
     volume_m3: number;
     itens_nf: { q_com: number }[];
@@ -116,10 +117,11 @@ export async function generateResumoVeiculoPDF(data: VeiculoResumoData): Promise
       if (y > 285) { doc.addPage(); y = M; }
       const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
       const cteStr = nf.ctes.length > 0 ? `  CT-e ${nf.ctes.map(c => c.numero_cte).join(", ")}` : "";
+      const embStr = nf.razao_social_emitente ? `  •  Emb: ${truncate(nf.razao_social_emitente, 32)}` : "";
 
       doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "normal");
-      doc.text(`NF ${nf.numero_nf}${cteStr}`, M + 4, y + 3);
+      doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 4, y + 3);
 
       const detail = `${cx} cx   ${Number(nf.peso_bruto || 0).toFixed(1)} kg   ${Number(nf.volume_m3 || 0).toFixed(2)} m³`;
       doc.text(detail, PW - M - doc.getTextWidth(detail), y + 3);

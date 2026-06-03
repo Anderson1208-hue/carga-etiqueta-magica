@@ -21,6 +21,7 @@ interface NfPrepPdf {
   carga_placa: string;
   carga_tipo_carga: string;
   numero_cte: string;
+  razao_social_emitente?: string;
 }
 
 const MARGIN = 12;
@@ -138,9 +139,11 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     const addrTrunc = addrLine.length > 90 ? addrLine.substring(0, 87) + "..." : addrLine;
     doc.text(`📍 ${addrTrunc}`, MARGIN + 4, y + 12.5);
 
-    // NFs list
-    const nfsLine = `NFs: ${nfNums}`;
-    const nfsTrunc = nfsLine.length > 95 ? nfsLine.substring(0, 92) + "..." : nfsLine;
+    // NFs list (com embarcadores únicos)
+    const embarcadoresUnicos = Array.from(new Set(nfsEntrega.map((n) => n.razao_social_emitente).filter(Boolean))) as string[];
+    const embStr = embarcadoresUnicos.length > 0 ? `  •  Emb: ${embarcadoresUnicos.join(", ")}` : "";
+    const nfsLine = `NFs: ${nfNums}${embStr}`;
+    const nfsTrunc = nfsLine.length > 110 ? nfsLine.substring(0, 107) + "..." : nfsLine;
     doc.text(nfsTrunc, MARGIN + 4, y + 17);
 
     // Totals on right
@@ -167,6 +170,10 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
         }
         doc.text(`${nf.totalCaixas} cx`, MARGIN + 60, y + 3);
         doc.text(`${nf.peso_bruto.toFixed(1)} kg`, MARGIN + 80, y + 3);
+        if (nf.razao_social_emitente) {
+          const emb = nf.razao_social_emitente.length > 32 ? nf.razao_social_emitente.substring(0, 29) + "..." : nf.razao_social_emitente;
+          doc.text(`Emb: ${emb}`, MARGIN + 105, y + 3);
+        }
         doc.text(nf.carga_placa, MARGIN + CONTENT_W - 4, y + 3, { align: "right" });
         doc.setDrawColor(230, 230, 230);
         doc.line(MARGIN + 4, y + 5, MARGIN + CONTENT_W - 2, y + 5);

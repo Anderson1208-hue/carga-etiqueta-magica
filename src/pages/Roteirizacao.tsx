@@ -1280,7 +1280,7 @@ export default function Roteirizacao() {
           .from("veiculo_nfs")
           .select(`
             nf_id, carga_origem_id,
-            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
+            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, itens_nf(q_com))
           `)
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
@@ -1311,6 +1311,7 @@ export default function Roteirizacao() {
             dest_bairro: nf.dest_bairro || "", dest_cidade: nf.dest_cidade || "",
             dest_uf: nf.dest_uf || "", dest_cep: nf.dest_cep || "",
             cnpj_destinatario: nf.cnpj_destinatario || "",
+            razao_social_emitente: nf.razao_social_emitente || "",
             peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
             itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
@@ -1353,7 +1354,7 @@ export default function Roteirizacao() {
           .from("veiculo_nfs")
           .select(`
             id, nf_id, carga_origem_id,
-            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, itens_nf(q_com))
+            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, itens_nf(q_com))
           `)
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
@@ -1393,6 +1394,7 @@ export default function Roteirizacao() {
           dest_bairro: nf.dest_bairro || "", dest_cidade: nf.dest_cidade || "",
           dest_uf: nf.dest_uf || "", dest_cep: nf.dest_cep || "",
           cnpj_destinatario: nf.cnpj_destinatario || "",
+          razao_social_emitente: nf.razao_social_emitente || "",
           peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
           itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),

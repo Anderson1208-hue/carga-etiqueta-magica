@@ -18,6 +18,7 @@ export interface VeiculoDiaData {
     dest_uf: string;
     dest_cep: string;
     cnpj_destinatario: string;
+    razao_social_emitente?: string;
     peso_bruto: number;
     volume_m3: number;
     itens_nf: { q_com: number }[];
@@ -100,7 +101,7 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
   doc.text("TOTAIS DO DIA", M + 3, y + 5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  const linha1 = `${data.veiculos.length} veículos  |  ${gEntregas} entregas  |  ${gNfs} NFs  |  ${gCx} caixas`;
+  const linha1 = `${data.veiculos.length} veículos  |  ${gNfs} NFs  |  ${gCx} caixas`;
   const linha2 = `${gPeso.toFixed(1)} kg  |  ${gVol.toFixed(2)} m³`;
   doc.text(linha1, M + 3, y + 9.5);
   doc.text(linha2, M + 3, y + 12.8);
@@ -153,7 +154,7 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
       doc.setTextColor(30, 30, 30);
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
-      doc.text(`Entrega ${ordemNum} de ${veiculosCalc[vi].totalRota} — ${truncate(group.razaoSocial, 50)}`, M + 2, y + 4.3);
+      doc.text(`Entrega ${ordemNum} — ${truncate(group.razaoSocial, 60)}`, M + 2, y + 4.3);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.2);
       const summary = `${group.nfs.length} NFs`;
@@ -172,10 +173,11 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
         if (y > PH - 10) { doc.addPage(); y = M; }
         const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
         const cteStr = nf.ctes.length > 0 ? `  CT-e ${nf.ctes.map((c) => c.numero_cte).join(", ")}` : "";
+        const embStr = nf.razao_social_emitente ? `  •  Emb: ${truncate(nf.razao_social_emitente, 38)}` : "";
 
         doc.setTextColor(30, 30, 30);
         doc.setFont("helvetica", "normal");
-        doc.text(`NF ${nf.numero_nf}${cteStr}`, M + 6, y + 3);
+        doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 6, y + 3);
         const detail = `${cx} cx   ${Number(nf.peso_bruto || 0).toFixed(1)} kg   ${Number(nf.volume_m3 || 0).toFixed(2)} m³`;
         doc.text(detail, PW - M - doc.getTextWidth(detail) - 2, y + 3);
         y += 4.2;

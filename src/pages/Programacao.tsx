@@ -67,6 +67,7 @@ interface NfDisponivel {
   carga_data: string;
   carga_tipo_carga: string;
   numero_cte: string;
+  razao_social_emitente: string;
   tem_agendamento: boolean;
   data_agendamento: string | null;
   
@@ -122,6 +123,7 @@ export default function Programacao() {
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
         peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
+        razao_social_emitente,
         itens_nf(q_com)
       `;
 
@@ -268,6 +270,7 @@ export default function Programacao() {
             carga_data: carga?.data || "",
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
+            razao_social_emitente: (nf as any).razao_social_emitente || "",
             tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
           };
@@ -1100,6 +1103,14 @@ export default function Programacao() {
                                           NFs: {nfsEntrega.map((n) => n.numero_nf).join(", ")}
                                         </span>
                                       </div>
+                                      {(() => {
+                                        const embs = Array.from(new Set(nfsEntrega.map((n) => n.razao_social_emitente).filter(Boolean)));
+                                        return embs.length > 0 ? (
+                                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                                            <span className="font-medium">Embarcador:</span> {embs.join(", ")}
+                                          </div>
+                                        ) : null;
+                                      })()}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
                                       <span>{totalCaixasEntrega} cx</span>
