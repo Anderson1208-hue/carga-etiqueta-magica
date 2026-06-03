@@ -227,6 +227,10 @@ export function Sidebar() {
                   item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
                   isActive={location.pathname === "/integracoes/ibac"}
                 />
+                <NavItem
+                  item={{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }}
+                  isActive={location.pathname === "/integracoes/ocoren"}
+                />
               </>
             )}
           </div>
