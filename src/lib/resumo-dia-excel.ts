@@ -53,6 +53,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   // ===== Sheet 1: Detalhado (uma linha por NF) =====
   const rows: (string | number)[][] = [];
   rows.push([
+    "Data NF",
     "Placa",
     "Motorista",
     "Código Acesso",
