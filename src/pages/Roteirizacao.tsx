@@ -65,7 +65,7 @@ import {
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2 } from "lucide-react";
+import { Settings2, FileSpreadsheet } from "lucide-react";
 
 interface Carga {
   id: string;
