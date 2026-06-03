@@ -1286,9 +1286,17 @@ export default function Roteirizacao() {
           .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
         let ctesMap: Record<string, any[]> = {};
+        const reentregaMap = new Map<string, string>();
         if (nfIds.length > 0) {
           const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
+          const { data: agds } = await supabase
+            .from("agendamentos")
+            .select("nf_id, observacao")
+            .in("nf_id", nfIds)
+            .eq("status", "REENTREGA")
+            .limit(2000);
+          (agds || []).forEach((a: any) => reentregaMap.set(a.nf_id, a.observacao || ""));
         }
         // Ordem de entrega por CNPJ (rota consolidada prioritária)
         const cargaIdsDia = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
@@ -1316,6 +1324,8 @@ export default function Roteirizacao() {
             itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
             ordem_entrega: ordemPorCnpjDia.get(cnpjKey),
+            reentrega: reentregaMap.has(vnf.nf_id),
+            reentrega_observacao: reentregaMap.get(vnf.nf_id) || undefined,
           };
         });
         veiculosData.push({
