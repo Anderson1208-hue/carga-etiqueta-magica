@@ -1320,6 +1320,7 @@ export default function Roteirizacao() {
             dest_uf: nf.dest_uf || "", dest_cep: nf.dest_cep || "",
             cnpj_destinatario: nf.cnpj_destinatario || "",
             razao_social_emitente: nf.razao_social_emitente || "",
+            data_emissao: nf.data_emissao || null,
             peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
             itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
