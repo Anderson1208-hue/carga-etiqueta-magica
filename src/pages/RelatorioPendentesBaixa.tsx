@@ -442,6 +442,21 @@ export default function RelatorioPendentesBaixa() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs">{r.status_entrega || "—"}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {(() => {
+                              const oc = hasOcoren(r);
+                              if (!ocorenRecords) return <span className="text-muted-foreground">—</span>;
+                              if (oc) {
+                                return (
+                                  <Badge variant="default" className="gap-1 bg-emerald-600 hover:bg-emerald-600">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {new Date(oc).toLocaleDateString("pt-BR")}
+                                  </Badge>
+                                );
+                              }
+                              return <Badge variant="outline" className="text-muted-foreground">Não</Badge>;
+                            })()}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
