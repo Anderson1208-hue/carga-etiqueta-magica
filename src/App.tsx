@@ -38,6 +38,7 @@ import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
+import ImportarOcoren from "./pages/ImportarOcoren";
 
 const queryClient = new QueryClient({
   defaultOptions: {
