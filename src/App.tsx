@@ -38,6 +38,7 @@ import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
+import ImportarOcoren from "./pages/ImportarOcoren";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -295,6 +296,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
+      <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
       <Route path="/motorista" element={<MotoristaAcesso />} />
 
       <Route path="/motorista/diagnostico" element={<MotoristaDiagnostico />} />

@@ -30,6 +30,7 @@ import {
   Building2,
   Plug,
   Contact,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -226,6 +227,10 @@ export function Sidebar() {
                 <NavItem
                   item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
                   isActive={location.pathname === "/integracoes/ibac"}
+                />
+                <NavItem
+                  item={{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }}
+                  isActive={location.pathname === "/integracoes/ocoren"}
                 />
               </>
             )}
