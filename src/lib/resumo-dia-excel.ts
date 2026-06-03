@@ -127,7 +127,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
   // ===== Sheet 2: Totais por veículo =====
   const totRows: (string | number)[][] = [];
-  totRows.push(["Data", "Placa", "Motorista", "Código", "NFs", "Caixas", "Peso (kg)", "M³"]);
+  totRows.push(["Placa", "Motorista", "Código", "NFs", "Caixas", "Peso (kg)", "M³"]);
   let tNfs = 0, tCx = 0, tPeso = 0, tVol = 0;
   data.veiculos.forEach((v) => {
     const nNfs = v.nfs.length;
@@ -135,7 +135,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     const nPeso = v.nfs.reduce((s, nf) => s + Number(nf.peso_bruto || 0), 0);
     const nVol = v.nfs.reduce((s, nf) => s + Number(nf.volume_m3 || 0), 0);
     totRows.push([
-      dataFormatada,
       v.placa,
       v.motorista || "",
       v.accessCode || "",
@@ -147,12 +146,12 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     tNfs += nNfs; tCx += nCx; tPeso += nPeso; tVol += nVol;
   });
   totRows.push([
-    "", "", "TOTAL", "",
+    "", "TOTAL", "",
     tNfs, tCx, Number(tPeso.toFixed(2)), Number(tVol.toFixed(3)),
   ]);
   const wsTot = XLSX.utils.aoa_to_sheet(totRows);
   wsTot["!cols"] = [
-    { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 12 },
+    { wch: 10 }, { wch: 28 }, { wch: 12 },
     { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
   XLSX.utils.book_append_sheet(wb, wsTot, "Totais por Veículo");
