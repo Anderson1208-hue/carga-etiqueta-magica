@@ -14,8 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, FileSpreadsheet } from "lucide-react";
+import { Download, Loader2, FileSpreadsheet, Upload, CheckCircle2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { parseOcoren, type OcorenRecord } from "@/lib/ocoren-parser";
 
 interface PendenteRow {
   nf_id: string;
@@ -45,6 +46,9 @@ export default function RelatorioPendentesBaixa() {
   const [busca, setBusca] = useState("");
   const [rows, setRows] = useState<PendenteRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [ocorenRecords, setOcorenRecords] = useState<OcorenRecord[] | null>(null);
+  const [ocorenFileName, setOcorenFileName] = useState<string>("");
+  const [somenteOcoren, setSomenteOcoren] = useState(false);
 
   async function carregar() {
     setLoading(true);
@@ -165,10 +169,36 @@ export default function RelatorioPendentesBaixa() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mapa OCOREN: chave = `${cnpj14}|${numeroNf sem zeros}` -> data ISO
+  const ocorenMap = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!ocorenRecords) return m;
+    for (const r of ocorenRecords) {
+      m.set(`${r.cnpj}|${r.numeroNf}`, r.dataIso);
+    }
+    return m;
+  }, [ocorenRecords]);
+
+  function ocorenKey(r: PendenteRow): string | null {
+    const cnpj = (r.cnpj_emitente || "").replace(/\D/g, "");
+    const nf = String(parseInt(r.numero_nf, 10) || 0);
+    if (!cnpj || !nf) return null;
+    return `${cnpj}|${nf}`;
+  }
+
+  function hasOcoren(r: PendenteRow): string | null {
+    const k = ocorenKey(r);
+    return k ? ocorenMap.get(k) ?? null : null;
+  }
+
   const rowsFiltradas = useMemo(() => {
     const term = busca.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((r) => {
+    let base = rows;
+    if (somenteOcoren && ocorenRecords) {
+      base = base.filter((r) => hasOcoren(r) !== null);
+    }
+    if (!term) return base;
+    return base.filter((r) => {
       const hay = [
         r.numero_nf,
         r.razao_social_emitente,
@@ -183,7 +213,39 @@ export default function RelatorioPendentesBaixa() {
         .toLowerCase();
       return hay.includes(term);
     });
-  }, [rows, busca]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, busca, somenteOcoren, ocorenMap]);
+
+  const totalComOcoren = useMemo(() => {
+    if (!ocorenRecords) return 0;
+    return rows.filter((r) => hasOcoren(r) !== null).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, ocorenMap]);
+
+  async function onOcorenFile(file: File) {
+    try {
+      const text = await file.text();
+      const recs = parseOcoren(text);
+      setOcorenRecords(recs);
+      setOcorenFileName(file.name);
+      toast({
+        title: "OCOREN carregado",
+        description: `${recs.length} ocorrência(s) de entrega no arquivo.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao ler OCOREN",
+        description: err?.message || "Arquivo inválido",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function limparOcoren() {
+    setOcorenRecords(null);
+    setOcorenFileName("");
+    setSomenteOcoren(false);
+  }
 
   function exportarCsv() {
     const headers = [
@@ -197,9 +259,12 @@ export default function RelatorioPendentesBaixa() {
       "Data Carga",
       "Dias em Aberto",
       "Status Entrega",
+      "OCOREN",
+      "Data OCOREN",
     ];
-    const lines = rowsFiltradas.map((r) =>
-      [
+    const lines = rowsFiltradas.map((r) => {
+      const oc = hasOcoren(r);
+      return [
         r.numero_nf,
         r.razao_social_emitente ?? "",
         r.cnpj_emitente ?? "",
@@ -210,10 +275,12 @@ export default function RelatorioPendentesBaixa() {
         r.data_carga ?? "",
         r.dias_aberto,
         r.status_entrega ?? "",
+        oc ? "Sim" : (ocorenRecords ? "Não" : ""),
+        oc ? new Date(oc).toLocaleString("pt-BR") : "",
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(";")
-    );
+        .join(";");
+    });
     const csv = [headers.join(";"), ...lines].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -262,6 +329,56 @@ export default function RelatorioPendentesBaixa() {
         </Card>
 
         <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Cruzar com arquivo OCOREN (opcional)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                type="file"
+                accept=".txt,text/plain"
+                className="max-w-xs"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onOcorenFile(f);
+                  e.target.value = "";
+                }}
+              />
+              {ocorenRecords && (
+                <>
+                  <Badge variant="secondary" className="gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    {ocorenFileName} — {ocorenRecords.length} ocorrência(s)
+                  </Badge>
+                  <Badge variant="outline">
+                    {totalComOcoren} de {rows.length} pendentes constam no OCOREN
+                  </Badge>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={somenteOcoren}
+                      onChange={(e) => setSomenteOcoren(e.target.checked)}
+                    />
+                    Mostrar somente as do OCOREN
+                  </label>
+                  <Button size="sm" variant="ghost" onClick={limparOcoren}>
+                    <X className="w-3 h-3 mr-1" /> Limpar
+                  </Button>
+                </>
+              )}
+              {!ocorenRecords && (
+                <p className="text-xs text-muted-foreground">
+                  Selecione um arquivo OCOREN (.txt) para destacar quais NFs pendentes já têm ocorrência de entrega.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardContent className="pt-4">
             {loading ? (
               <div className="flex justify-center py-10">
@@ -288,6 +405,7 @@ export default function RelatorioPendentesBaixa() {
                         <TableHead>Data Carga</TableHead>
                         <TableHead>Dias Aberto</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>OCOREN</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -324,6 +442,21 @@ export default function RelatorioPendentesBaixa() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs">{r.status_entrega || "—"}</TableCell>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {(() => {
+                              const oc = hasOcoren(r);
+                              if (!ocorenRecords) return <span className="text-muted-foreground">—</span>;
+                              if (oc) {
+                                return (
+                                  <Badge variant="default" className="gap-1 bg-emerald-600 hover:bg-emerald-600">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {new Date(oc).toLocaleDateString("pt-BR")}
+                                  </Badge>
+                                );
+                              }
+                              return <Badge variant="outline" className="text-muted-foreground">Não</Badge>;
+                            })()}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
