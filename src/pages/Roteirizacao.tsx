@@ -2407,20 +2407,36 @@ export default function Roteirizacao() {
                         {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}
                       </span>
                       <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 ml-auto"
-                        disabled={generatingResumoDiaDate === dateStr}
-                        onClick={() => handleGerarResumoDia(dateStr, veics)}
-                      >
-                        {generatingResumoDiaDate === dateStr ? (
-                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5 mr-1" />
-                        )}
-                        Resumo do Dia
-                      </Button>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          disabled={generatingResumoDiaDate === dateStr}
+                          onClick={() => handleGerarResumoDia(dateStr, veics, "pdf")}
+                        >
+                          {generatingResumoDiaDate === dateStr && generatingResumoDiaFormat === "pdf" ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <FileText className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Resumo do Dia (PDF)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          disabled={generatingResumoDiaDate === dateStr}
+                          onClick={() => handleGerarResumoDia(dateStr, veics, "xlsx")}
+                        >
+                          {generatingResumoDiaDate === dateStr && generatingResumoDiaFormat === "xlsx" ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Excel
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       {veics.map((v: any) => (
