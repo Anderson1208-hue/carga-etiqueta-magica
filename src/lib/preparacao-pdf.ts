@@ -21,6 +21,7 @@ interface NfPrepPdf {
   carga_placa: string;
   carga_tipo_carga: string;
   numero_cte: string;
+  razao_social_emitente?: string;
 }
 
 const MARGIN = 12;
