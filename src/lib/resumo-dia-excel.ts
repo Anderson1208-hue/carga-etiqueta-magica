@@ -89,6 +89,8 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
           nf.razao_social_emitente || "",
           nf.numero_nf,
           cteStr,
+          (nf as any).reentrega ? "SIM" : "",
+          (nf as any).reentrega_observacao || "",
           cx,
           Number(Number(nf.peso_bruto || 0).toFixed(2)),
           Number(Number(nf.volume_m3 || 0).toFixed(3)),
@@ -101,7 +103,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
     rows.push([
       "", v.placa, `Subtotal ${v.placa}`, "", "",
       "", "", "", "", "",
-      `${vNfs} NFs`, "",
+      `${vNfs} NFs`, "", "", "",
       vCx,
       Number(vPeso.toFixed(2)),
       Number(vVol.toFixed(3)),
@@ -113,7 +115,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   rows.push([
     "", "", "TOTAL GERAL", "", "",
     "", "", "", "", "",
-    `${gNfs} NFs`, "",
+    `${gNfs} NFs`, "", "", "",
     gCx,
     Number(gPeso.toFixed(2)),
     Number(gVol.toFixed(3)),
@@ -123,7 +125,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   ws["!cols"] = [
     { wch: 12 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
     { wch: 36 }, { wch: 36 }, { wch: 20 }, { wch: 20 }, { wch: 32 },
-    { wch: 12 }, { wch: 14 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
+    { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 36 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
   XLSX.utils.book_append_sheet(wb, ws, "Detalhado");
 
