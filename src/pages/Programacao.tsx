@@ -123,6 +123,7 @@ export default function Programacao() {
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
         peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
+        razao_social_emitente,
         itens_nf(q_com)
       `;
 
