@@ -24,6 +24,8 @@ interface VeiculoResumoData {
     itens_nf: { q_com: number }[];
     ctes: { numero_cte: string }[];
     ordem_entrega?: number;
+    reentrega?: boolean;
+    reentrega_observacao?: string;
   }[];
 }
 
@@ -119,13 +121,32 @@ export async function generateResumoVeiculoPDF(data: VeiculoResumoData): Promise
       const cteStr = nf.ctes.length > 0 ? `  CT-e ${nf.ctes.map(c => c.numero_cte).join(", ")}` : "";
       const embStr = nf.razao_social_emitente ? `  •  Emb: ${truncate(nf.razao_social_emitente, 32)}` : "";
 
-      doc.setTextColor(30, 30, 30);
       doc.setFont("helvetica", "normal");
-      doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 4, y + 3);
+      if (nf.reentrega) {
+        doc.setTextColor(200, 30, 30);
+        doc.setFont("helvetica", "bold");
+        doc.text("REENTREGA  ", M + 4, y + 3);
+        const offX = doc.getTextWidth("REENTREGA  ");
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 30, 30);
+        doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 4 + offX, y + 3);
+      } else {
+        doc.setTextColor(30, 30, 30);
+        doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 4, y + 3);
+      }
 
       const detail = `${cx} cx   ${Number(nf.peso_bruto || 0).toFixed(1)} kg   ${Number(nf.volume_m3 || 0).toFixed(2)} m³`;
+      doc.setTextColor(30, 30, 30);
       doc.text(detail, PW - M - doc.getTextWidth(detail), y + 3);
       y += 4.5;
+      if (nf.reentrega && nf.reentrega_observacao) {
+        doc.setFontSize(6);
+        doc.setTextColor(140, 40, 40);
+        doc.text(`Obs: ${truncate(nf.reentrega_observacao, 110)}`, M + 8, y + 2.5);
+        doc.setFontSize(6.5);
+        doc.setTextColor(30, 30, 30);
+        y += 3.8;
+      }
     }
     y += 2;
   }

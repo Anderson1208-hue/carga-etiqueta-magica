@@ -1286,9 +1286,17 @@ export default function Roteirizacao() {
           .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
         let ctesMap: Record<string, any[]> = {};
+        const reentregaMap = new Map<string, string>();
         if (nfIds.length > 0) {
           const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
+          const { data: agds } = await supabase
+            .from("agendamentos")
+            .select("nf_id, observacao")
+            .in("nf_id", nfIds)
+            .eq("status", "REENTREGA")
+            .limit(2000);
+          (agds || []).forEach((a: any) => reentregaMap.set(a.nf_id, a.observacao || ""));
         }
         // Ordem de entrega por CNPJ (rota consolidada prioritária)
         const cargaIdsDia = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean)));
@@ -1316,6 +1324,8 @@ export default function Roteirizacao() {
             itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
             ordem_entrega: ordemPorCnpjDia.get(cnpjKey),
+            reentrega: reentregaMap.has(vnf.nf_id),
+            reentrega_observacao: reentregaMap.get(vnf.nf_id) || undefined,
           };
         });
         veiculosData.push({
@@ -1385,6 +1395,19 @@ export default function Roteirizacao() {
         : new Map<string, number>();
       const totalEntregasResumo = new Set(ordemPorCnpjResumo.keys()).size;
 
+      // Buscar NFs marcadas como REENTREGA
+      const nfIdsResumo = nfsData.map((v: any) => v.nf_id).filter(Boolean);
+      const reentregaMapResumo = new Map<string, string>();
+      if (nfIdsResumo.length > 0) {
+        const { data: agdsR } = await supabase
+          .from("agendamentos")
+          .select("nf_id, observacao")
+          .in("nf_id", nfIdsResumo)
+          .eq("status", "REENTREGA")
+          .limit(2000);
+        (agdsR || []).forEach((a: any) => reentregaMapResumo.set(a.nf_id, a.observacao || ""));
+      }
+
       const nfs = nfsData.map((vnf: any) => {
         const nf = vnf.notas_fiscais;
         const cnpjKey = (nf.cnpj_destinatario || "").replace(/\D/g, "");
@@ -1399,6 +1422,8 @@ export default function Roteirizacao() {
           itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
           ordem_entrega: ordemPorCnpjResumo.get(cnpjKey),
+          reentrega: reentregaMapResumo.has(vnf.nf_id),
+          reentrega_observacao: reentregaMapResumo.get(vnf.nf_id) || undefined,
         };
       });
       const blob = await generateResumoVeiculoPDF({
