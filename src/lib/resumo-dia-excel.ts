@@ -85,6 +85,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
         const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
         const cteStr = nf.ctes.map((c) => c.numero_cte).join(", ");
         rows.push([
+          fmtDataNf((nf as any).data_emissao),
           v.placa,
           v.motorista || "",
           v.accessCode || "",
