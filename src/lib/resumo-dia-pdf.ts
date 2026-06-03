@@ -19,6 +19,7 @@ export interface VeiculoDiaData {
     dest_cep: string;
     cnpj_destinatario: string;
     razao_social_emitente?: string;
+    data_emissao?: string | null;
     peso_bruto: number;
     volume_m3: number;
     itens_nf: { q_com: number }[];

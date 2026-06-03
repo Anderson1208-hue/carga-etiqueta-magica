@@ -1,6 +1,16 @@
 import * as XLSX from "xlsx";
+import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import type { ResumoDiaData, VeiculoDiaData } from "./resumo-dia-pdf";
+
+function fmtDataNf(s?: string | null): string {
+  if (!s) return "";
+  try {
+    const d = new Date(s.length <= 10 ? `${s}T00:00:00` : s);
+    if (isNaN(d.getTime())) return "";
+    return format(d, "dd/MM/yyyy");
+  } catch { return ""; }
+}
 
 function agruparEntregas(v: VeiculoDiaData) {
   const entregas = new Map<string, {
@@ -37,12 +47,12 @@ function agruparEntregas(v: VeiculoDiaData) {
 }
 
 export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
-  void data;
   const wb = XLSX.utils.book_new();
 
   // ===== Sheet 1: Detalhado (uma linha por NF) =====
   const rows: (string | number)[][] = [];
   rows.push([
+    "Data NF",
     "Placa",
     "Motorista",
     "Código Acesso",
@@ -74,6 +84,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
         const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
         const cteStr = nf.ctes.map((c) => c.numero_cte).join(", ");
         rows.push([
+          fmtDataNf((nf as any).data_emissao),
           v.placa,
           v.motorista || "",
           v.accessCode || "",
@@ -96,7 +107,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
     // Subtotal veículo
     rows.push([
-      v.placa, `Subtotal ${v.placa}`, "", "",
+      "", v.placa, `Subtotal ${v.placa}`, "", "",
       "", "", "", "", "",
       `${vNfs} NFs`, "", "",
       vCx,
@@ -108,7 +119,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
   });
 
   rows.push([
-    "", "TOTAL GERAL", "", "",
+    "", "", "TOTAL GERAL", "", "",
     "", "", "", "", "",
     `${gNfs} NFs`, "", "",
     gCx,
@@ -118,7 +129,7 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws["!cols"] = [
-    { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
+    { wch: 12 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 8 },
     { wch: 36 }, { wch: 36 }, { wch: 20 }, { wch: 20 }, { wch: 32 },
     { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
   ];
