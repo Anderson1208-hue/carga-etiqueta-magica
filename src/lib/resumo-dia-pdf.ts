@@ -101,7 +101,7 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
   doc.text("TOTAIS DO DIA", M + 3, y + 5);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
-  const linha1 = `${data.veiculos.length} veículos  |  ${gEntregas} entregas  |  ${gNfs} NFs  |  ${gCx} caixas`;
+  const linha1 = `${data.veiculos.length} veículos  |  ${gNfs} NFs  |  ${gCx} caixas`;
   const linha2 = `${gPeso.toFixed(1)} kg  |  ${gVol.toFixed(2)} m³`;
   doc.text(linha1, M + 3, y + 9.5);
   doc.text(linha2, M + 3, y + 12.8);
