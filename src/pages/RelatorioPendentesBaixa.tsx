@@ -259,9 +259,12 @@ export default function RelatorioPendentesBaixa() {
       "Data Carga",
       "Dias em Aberto",
       "Status Entrega",
+      "OCOREN",
+      "Data OCOREN",
     ];
-    const lines = rowsFiltradas.map((r) =>
-      [
+    const lines = rowsFiltradas.map((r) => {
+      const oc = hasOcoren(r);
+      return [
         r.numero_nf,
         r.razao_social_emitente ?? "",
         r.cnpj_emitente ?? "",
@@ -272,10 +275,12 @@ export default function RelatorioPendentesBaixa() {
         r.data_carga ?? "",
         r.dias_aberto,
         r.status_entrega ?? "",
+        oc ? "Sim" : (ocorenRecords ? "Não" : ""),
+        oc ? new Date(oc).toLocaleString("pt-BR") : "",
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(";")
-    );
+        .join(";");
+    });
     const csv = [headers.join(";"), ...lines].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
