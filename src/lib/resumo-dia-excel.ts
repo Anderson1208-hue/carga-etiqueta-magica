@@ -47,7 +47,6 @@ function agruparEntregas(v: VeiculoDiaData) {
 }
 
 export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
-  void data;
   const wb = XLSX.utils.book_new();
 
   // ===== Sheet 1: Detalhado (uma linha por NF) =====
