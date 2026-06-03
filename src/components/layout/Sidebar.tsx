@@ -210,10 +210,6 @@ export function Sidebar() {
             groupActive={relatoriosActive}
           />
           <div className="pt-2 space-y-0.5">
-            <NavItem
-              item={{ name: "Conciliação", href: "/conciliacao", icon: FileSpreadsheet }}
-              isActive={location.pathname === "/conciliacao"}
-            />
             {isAdmin && (
               <>
                 <NavItem
