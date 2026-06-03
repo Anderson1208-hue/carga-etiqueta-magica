@@ -48,6 +48,7 @@ import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
+import { generateResumoDiaExcel } from "@/lib/resumo-dia-excel";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
