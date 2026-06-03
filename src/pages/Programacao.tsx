@@ -1103,6 +1103,14 @@ export default function Programacao() {
                                           NFs: {nfsEntrega.map((n) => n.numero_nf).join(", ")}
                                         </span>
                                       </div>
+                                      {(() => {
+                                        const embs = Array.from(new Set(nfsEntrega.map((n) => n.razao_social_emitente).filter(Boolean)));
+                                        return embs.length > 0 ? (
+                                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                                            <span className="font-medium">Embarcador:</span> {embs.join(", ")}
+                                          </div>
+                                        ) : null;
+                                      })()}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
                                       <span>{totalCaixasEntrega} cx</span>
