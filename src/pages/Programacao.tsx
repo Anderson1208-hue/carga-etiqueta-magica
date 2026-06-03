@@ -270,6 +270,7 @@ export default function Programacao() {
             carga_data: carga?.data || "",
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
+            razao_social_emitente: (nf as any).razao_social_emitente || "",
             tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
           };
