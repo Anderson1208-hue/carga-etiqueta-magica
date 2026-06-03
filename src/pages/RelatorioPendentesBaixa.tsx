@@ -169,10 +169,36 @@ export default function RelatorioPendentesBaixa() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Mapa OCOREN: chave = `${cnpj14}|${numeroNf sem zeros}` -> data ISO
+  const ocorenMap = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!ocorenRecords) return m;
+    for (const r of ocorenRecords) {
+      m.set(`${r.cnpj}|${r.numeroNf}`, r.dataIso);
+    }
+    return m;
+  }, [ocorenRecords]);
+
+  function ocorenKey(r: PendenteRow): string | null {
+    const cnpj = (r.cnpj_emitente || "").replace(/\D/g, "");
+    const nf = String(parseInt(r.numero_nf, 10) || 0);
+    if (!cnpj || !nf) return null;
+    return `${cnpj}|${nf}`;
+  }
+
+  function hasOcoren(r: PendenteRow): string | null {
+    const k = ocorenKey(r);
+    return k ? ocorenMap.get(k) ?? null : null;
+  }
+
   const rowsFiltradas = useMemo(() => {
     const term = busca.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((r) => {
+    let base = rows;
+    if (somenteOcoren && ocorenRecords) {
+      base = base.filter((r) => hasOcoren(r) !== null);
+    }
+    if (!term) return base;
+    return base.filter((r) => {
       const hay = [
         r.numero_nf,
         r.razao_social_emitente,
@@ -187,7 +213,39 @@ export default function RelatorioPendentesBaixa() {
         .toLowerCase();
       return hay.includes(term);
     });
-  }, [rows, busca]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, busca, somenteOcoren, ocorenMap]);
+
+  const totalComOcoren = useMemo(() => {
+    if (!ocorenRecords) return 0;
+    return rows.filter((r) => hasOcoren(r) !== null).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, ocorenMap]);
+
+  async function onOcorenFile(file: File) {
+    try {
+      const text = await file.text();
+      const recs = parseOcoren(text);
+      setOcorenRecords(recs);
+      setOcorenFileName(file.name);
+      toast({
+        title: "OCOREN carregado",
+        description: `${recs.length} ocorrência(s) de entrega no arquivo.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Erro ao ler OCOREN",
+        description: err?.message || "Arquivo inválido",
+        variant: "destructive",
+      });
+    }
+  }
+
+  function limparOcoren() {
+    setOcorenRecords(null);
+    setOcorenFileName("");
+    setSomenteOcoren(false);
+  }
 
   function exportarCsv() {
     const headers = [
