@@ -1326,14 +1326,20 @@ export default function Roteirizacao() {
           totalEntregasRota: totalRotaDia || undefined,
         });
       }
-      const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
-      downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
+      if (formato === "xlsx") {
+        const blob = generateResumoDiaExcel({ data: dateStr, veiculos: veiculosData });
+        downloadBlob(blob, `resumo_dia_${dateStr}.xlsx`);
+      } else {
+        const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
+        downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
+      }
       toast({ title: "Resumo do dia gerado", description: `${veics.length} veículo(s)` });
     } catch (err) {
-      console.error("Error generating resumo dia PDF:", err);
+      console.error("Error generating resumo dia:", err);
       toast({ title: "Erro", description: "Erro ao gerar resumo do dia", variant: "destructive" });
     } finally {
       setGeneratingResumoDiaDate(null);
+      setGeneratingResumoDiaFormat(null);
     }
   }
 
