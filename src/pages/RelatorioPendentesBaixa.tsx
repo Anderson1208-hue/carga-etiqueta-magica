@@ -405,6 +405,7 @@ export default function RelatorioPendentesBaixa() {
                         <TableHead>Data Carga</TableHead>
                         <TableHead>Dias Aberto</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>OCOREN</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
