@@ -75,7 +75,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
         const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com)), 0);
         const cteStr = nf.ctes.map((c) => c.numero_cte).join(", ");
         rows.push([
-          dataFormatada,
           v.placa,
           v.motorista || "",
           v.accessCode || "",
@@ -88,7 +87,6 @@ export function generateResumoDiaExcel(data: ResumoDiaData): Blob {
           nf.numero_nf,
           cteStr,
           (nf as any).reentrega ? "SIM" : "",
-          (nf as any).reentrega_observacao || "",
           cx,
           Number(Number(nf.peso_bruto || 0).toFixed(2)),
           Number(Number(nf.volume_m3 || 0).toFixed(3)),
