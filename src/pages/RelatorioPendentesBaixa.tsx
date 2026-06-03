@@ -14,8 +14,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, FileSpreadsheet } from "lucide-react";
+import { Download, Loader2, FileSpreadsheet, Upload, CheckCircle2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { parseOcoren, type OcorenRecord } from "@/lib/ocoren-parser";
 
 interface PendenteRow {
   nf_id: string;
