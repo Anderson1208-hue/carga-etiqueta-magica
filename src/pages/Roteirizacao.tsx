@@ -48,6 +48,7 @@ import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
+import { generateResumoDiaExcel } from "@/lib/resumo-dia-excel";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
@@ -64,7 +65,7 @@ import {
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2 } from "lucide-react";
+import { Settings2, FileSpreadsheet } from "lucide-react";
 
 interface Carga {
   id: string;
@@ -1267,9 +1268,11 @@ export default function Roteirizacao() {
   const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
   const [generatingResumoPdfId, setGeneratingResumoPdfId] = useState<string | null>(null);
   const [generatingResumoDiaDate, setGeneratingResumoDiaDate] = useState<string | null>(null);
+  const [generatingResumoDiaFormat, setGeneratingResumoDiaFormat] = useState<"pdf" | "xlsx" | null>(null);
 
-  async function handleGerarResumoDia(dateStr: string, veics: any[]) {
+  async function handleGerarResumoDia(dateStr: string, veics: any[], formato: "pdf" | "xlsx" = "pdf") {
     setGeneratingResumoDiaDate(dateStr);
+    setGeneratingResumoDiaFormat(formato);
     try {
       const veiculosData: VeiculoDiaData[] = [];
       for (const veiculo of veics) {
@@ -1323,14 +1326,20 @@ export default function Roteirizacao() {
           totalEntregasRota: totalRotaDia || undefined,
         });
       }
-      const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
-      downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
+      if (formato === "xlsx") {
+        const blob = generateResumoDiaExcel({ data: dateStr, veiculos: veiculosData });
+        downloadBlob(blob, `resumo_dia_${dateStr}.xlsx`);
+      } else {
+        const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
+        downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
+      }
       toast({ title: "Resumo do dia gerado", description: `${veics.length} veículo(s)` });
     } catch (err) {
-      console.error("Error generating resumo dia PDF:", err);
+      console.error("Error generating resumo dia:", err);
       toast({ title: "Erro", description: "Erro ao gerar resumo do dia", variant: "destructive" });
     } finally {
       setGeneratingResumoDiaDate(null);
+      setGeneratingResumoDiaFormat(null);
     }
   }
 
@@ -2398,20 +2407,36 @@ export default function Roteirizacao() {
                         {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}
                       </span>
                       <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 ml-auto"
-                        disabled={generatingResumoDiaDate === dateStr}
-                        onClick={() => handleGerarResumoDia(dateStr, veics)}
-                      >
-                        {generatingResumoDiaDate === dateStr ? (
-                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                        ) : (
-                          <FileText className="w-3.5 h-3.5 mr-1" />
-                        )}
-                        Resumo do Dia
-                      </Button>
+                      <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          disabled={generatingResumoDiaDate === dateStr}
+                          onClick={() => handleGerarResumoDia(dateStr, veics, "pdf")}
+                        >
+                          {generatingResumoDiaDate === dateStr && generatingResumoDiaFormat === "pdf" ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <FileText className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Resumo do Dia (PDF)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          disabled={generatingResumoDiaDate === dateStr}
+                          onClick={() => handleGerarResumoDia(dateStr, veics, "xlsx")}
+                        >
+                          {generatingResumoDiaDate === dateStr && generatingResumoDiaFormat === "xlsx" ? (
+                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
+                          )}
+                          Excel
+                        </Button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       {veics.map((v: any) => (
