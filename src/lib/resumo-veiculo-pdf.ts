@@ -24,6 +24,8 @@ interface VeiculoResumoData {
     itens_nf: { q_com: number }[];
     ctes: { numero_cte: string }[];
     ordem_entrega?: number;
+    reentrega?: boolean;
+    reentrega_observacao?: string;
   }[];
 }
 
