@@ -67,6 +67,7 @@ interface NfDisponivel {
   carga_data: string;
   carga_tipo_carga: string;
   numero_cte: string;
+  razao_social_emitente: string;
   tem_agendamento: boolean;
   data_agendamento: string | null;
   
