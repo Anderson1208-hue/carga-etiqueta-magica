@@ -139,9 +139,11 @@ export function gerarPreparacaoPdf(nfs: NfPrepPdf[], mrLabel: string) {
     const addrTrunc = addrLine.length > 90 ? addrLine.substring(0, 87) + "..." : addrLine;
     doc.text(`📍 ${addrTrunc}`, MARGIN + 4, y + 12.5);
 
-    // NFs list
-    const nfsLine = `NFs: ${nfNums}`;
-    const nfsTrunc = nfsLine.length > 95 ? nfsLine.substring(0, 92) + "..." : nfsLine;
+    // NFs list (com embarcadores únicos)
+    const embarcadoresUnicos = Array.from(new Set(nfsEntrega.map((n) => n.razao_social_emitente).filter(Boolean))) as string[];
+    const embStr = embarcadoresUnicos.length > 0 ? `  •  Emb: ${embarcadoresUnicos.join(", ")}` : "";
+    const nfsLine = `NFs: ${nfNums}${embStr}`;
+    const nfsTrunc = nfsLine.length > 110 ? nfsLine.substring(0, 107) + "..." : nfsLine;
     doc.text(nfsTrunc, MARGIN + 4, y + 17);
 
     // Totals on right
