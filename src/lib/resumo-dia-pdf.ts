@@ -154,7 +154,7 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
       doc.setTextColor(30, 30, 30);
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
-      doc.text(`Entrega ${ordemNum} de ${veiculosCalc[vi].totalRota} — ${truncate(group.razaoSocial, 50)}`, M + 2, y + 4.3);
+      doc.text(`Entrega ${ordemNum} — ${truncate(group.razaoSocial, 60)}`, M + 2, y + 4.3);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(6.2);
       const summary = `${group.nfs.length} NFs`;
