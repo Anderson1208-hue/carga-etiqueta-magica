@@ -1268,9 +1268,11 @@ export default function Roteirizacao() {
   const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
   const [generatingResumoPdfId, setGeneratingResumoPdfId] = useState<string | null>(null);
   const [generatingResumoDiaDate, setGeneratingResumoDiaDate] = useState<string | null>(null);
+  const [generatingResumoDiaFormat, setGeneratingResumoDiaFormat] = useState<"pdf" | "xlsx" | null>(null);
 
-  async function handleGerarResumoDia(dateStr: string, veics: any[]) {
+  async function handleGerarResumoDia(dateStr: string, veics: any[], formato: "pdf" | "xlsx" = "pdf") {
     setGeneratingResumoDiaDate(dateStr);
+    setGeneratingResumoDiaFormat(formato);
     try {
       const veiculosData: VeiculoDiaData[] = [];
       for (const veiculo of veics) {
