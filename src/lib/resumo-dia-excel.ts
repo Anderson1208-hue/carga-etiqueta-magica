@@ -1,6 +1,16 @@
 import * as XLSX from "xlsx";
+import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import type { ResumoDiaData, VeiculoDiaData } from "./resumo-dia-pdf";
+
+function fmtDataNf(s?: string | null): string {
+  if (!s) return "";
+  try {
+    const d = new Date(s.length <= 10 ? `${s}T00:00:00` : s);
+    if (isNaN(d.getTime())) return "";
+    return format(d, "dd/MM/yyyy");
+  } catch { return ""; }
+}
 
 function agruparEntregas(v: VeiculoDiaData) {
   const entregas = new Map<string, {
