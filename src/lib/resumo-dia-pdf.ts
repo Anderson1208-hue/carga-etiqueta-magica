@@ -177,12 +177,31 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
         const cteStr = nf.ctes.length > 0 ? `  CT-e ${nf.ctes.map((c) => c.numero_cte).join(", ")}` : "";
         const embStr = nf.razao_social_emitente ? `  •  Emb: ${truncate(nf.razao_social_emitente, 38)}` : "";
 
-        doc.setTextColor(30, 30, 30);
         doc.setFont("helvetica", "normal");
-        doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 6, y + 3);
+        if (nf.reentrega) {
+          doc.setTextColor(200, 30, 30);
+          doc.setFont("helvetica", "bold");
+          doc.text("REENTREGA  ", M + 6, y + 3);
+          doc.setFont("helvetica", "normal");
+          const offX = doc.getTextWidth("REENTREGA  ");
+          doc.setTextColor(30, 30, 30);
+          doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 6 + offX, y + 3);
+        } else {
+          doc.setTextColor(30, 30, 30);
+          doc.text(`NF ${nf.numero_nf}${cteStr}${embStr}`, M + 6, y + 3);
+        }
         const detail = `${cx} cx   ${Number(nf.peso_bruto || 0).toFixed(1)} kg   ${Number(nf.volume_m3 || 0).toFixed(2)} m³`;
+        doc.setTextColor(30, 30, 30);
         doc.text(detail, PW - M - doc.getTextWidth(detail) - 2, y + 3);
         y += 4.2;
+        if (nf.reentrega && nf.reentrega_observacao) {
+          doc.setFontSize(5.8);
+          doc.setTextColor(140, 40, 40);
+          doc.text(`Obs: ${truncate(nf.reentrega_observacao, 130)}`, M + 10, y + 2.5);
+          doc.setFontSize(6.2);
+          doc.setTextColor(30, 30, 30);
+          y += 3.5;
+        }
       }
       y += 2;
     }
