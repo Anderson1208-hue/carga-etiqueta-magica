@@ -27,7 +27,7 @@ import MonitoramentoRotas from "./pages/MonitoramentoRotas";
 import TorreControle from "./pages/TorreControle";
 import Operadores from "./pages/Operadores";
 import AuditoriaLog from "./pages/AuditoriaLog";
-import Conciliacao from "./pages/Conciliacao";
+
 import RelatorioBaixas from "./pages/RelatorioBaixas";
 import PrestacaoContas from "./pages/PrestacaoContas";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
@@ -264,14 +264,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AuditoriaLog />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/conciliacao"
-        element={
-          <ProtectedRoute>
-            <Conciliacao />
           </ProtectedRoute>
         }
       />
