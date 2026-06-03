@@ -277,6 +277,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/relatorios/pendentes-baixa"
+        element={
+          <ProtectedRoute>
+            <RelatorioPendentesBaixa />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/prestacao-contas"
         element={
           <ProtectedRoute>
