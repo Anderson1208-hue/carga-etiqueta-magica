@@ -101,6 +101,63 @@ run_android_gradle_release() {
   fi
 }
 
+# Garante existência do Gradle Wrapper (gradlew/gradlew.bat + gradle/wrapper/*).
+# Se faltar, tenta regenerar via `gradle wrapper` (gradle global) ou orienta o dev.
+assert_gradle_wrapper() {
+  local need_regen=0
+  for f in android/gradlew android/gradlew.bat \
+           android/gradle/wrapper/gradle-wrapper.jar \
+           android/gradle/wrapper/gradle-wrapper.properties; do
+    if [ ! -f "$f" ]; then
+      echo "[wrapper] faltando: $f"
+      need_regen=1
+    fi
+  done
+  [ "$need_regen" -eq 0 ] && return 0
+
+  echo ""
+  echo "==> Gradle Wrapper ausente em android/. Tentando regenerar..."
+
+  # Opção A: gradle instalado globalmente
+  if command -v gradle >/dev/null 2>&1; then
+    ( cd android && gradle wrapper --gradle-version 8.7 --distribution-type all )
+    chmod +x android/gradlew 2>/dev/null || true
+    echo "==> Wrapper regenerado via 'gradle wrapper'."
+    return 0
+  fi
+
+  # Opção B: recriar plataforma Android inteira (preserva manifest customizado? NÃO).
+  cat <<'EOF'
+
+ERRO: gradlew/gradlew.bat não existe e 'gradle' não está no PATH.
+
+Conserte de UMA das duas formas (faça apenas UMA vez):
+
+  [A] Instalar Gradle global e regenerar wrapper (recomendado):
+      Windows:   choco install gradle    (ou baixar de https://gradle.org/install/)
+      macOS:     brew install gradle
+      Linux:     sdk install gradle 8.7
+
+      Depois:
+          cd android
+          gradle wrapper --gradle-version 8.7 --distribution-type all
+          cd ..
+          git add android/gradlew android/gradlew.bat android/gradle/wrapper
+          # commit + push para nunca mais faltar
+
+  [B] Recriar a pasta android/ do zero via Capacitor (CUIDADO: perde
+      edições manuais no AndroidManifest.xml e build.gradle):
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+          ./scripts/setup-android-signing.sh     # reaplica signing config
+          # reaplique manualmente as permissões do AndroidManifest.xml
+
+Depois de [A] ou [B], rode novamente este script.
+EOF
+  exit 1
+}
+
 assert_android_background_gps_ready() {
   local manifest="android/app/src/main/AndroidManifest.xml"
   if [ ! -f "$manifest" ]; then
