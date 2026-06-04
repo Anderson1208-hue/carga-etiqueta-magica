@@ -22,7 +22,7 @@ bump_version_code
 echo "==> 2/6 Build do React (vite) — VITE_BUILD_ENV=homolog"
 VITE_BUILD_ENV=homolog npm run build
 
-echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (server.url=lovable.app)"
+echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (embutido, sem server.url)"
 CAP_ENV=homolog npx cap sync android
 
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
