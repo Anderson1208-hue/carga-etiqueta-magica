@@ -44,7 +44,7 @@ verify_signature "$APK_PATH"
 
 SIZE=$(du -h "$APK_PATH" | cut -f1)
 STAMP=$(date +%Y%m%d-%H%M)
-OUT="android/app/build/outputs/apk/release/motorista-homolog-${STAMP}.apk"
+OUT="android/app/build/outputs/apk/release/orkestria-driver-homolog-${STAMP}.apk"
 cp "$APK_PATH" "$OUT"
 
 echo ""

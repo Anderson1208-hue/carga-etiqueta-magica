@@ -10,9 +10,9 @@ Um único backend Lovable Cloud (Supabase). Três variações de APK que diferem
 
 | Ambiente | `CAP_ENV` | `VITE_BUILD_ENV` | applicationId | Frontend carregado de | Badge |
 |----------|-----------|------------------|---------------|-----------------------|-------|
-| DEV      | `dev` (default) | `dev`     | `com.expressoebenezer.motorista.homolog` | sandbox `lovableproject.com` (hot-reload) | vermelho |
-| HOMOLOG  | `homolog` | `homolog` | `com.expressoebenezer.motorista.homolog` | URL publicada `carga-etiqueta-magica.lovable.app` | âmbar |
-| PROD     | `prod`    | `prod`    | `com.expressoebenezer.motorista`         | `/dist` embutido (`capacitor://localhost`) | verde |
+| DEV      | `dev` (default) | `dev`     | `com.orkestria.driver.homolog` | sandbox `lovableproject.com` (hot-reload) | vermelho |
+| HOMOLOG  | `homolog` | `homolog` | `com.orkestria.driver.homolog` | URL publicada `carga-etiqueta-magica.lovable.app` | âmbar |
+| PROD     | `prod`    | `prod`    | `com.orkestria.driver`         | `/dist` embutido (`capacitor://localhost`) | verde |
 
 PROD e HOMOLOG têm `applicationId` distintos → podem ser instalados lado a lado no mesmo celular sem conflito de assinatura/atualização. `appId` é definido em `capacitor.config.ts` via `APP_ID_BY_ENV` e propagado para `android/app/build.gradle` pelo `cap sync`.
 
