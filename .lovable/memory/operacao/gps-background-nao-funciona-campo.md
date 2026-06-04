@@ -47,3 +47,16 @@ A Torre vê automaticamente no `AlertasPanel` (lista genérica de alertas).
   programática, instruído no wizard.
 - AndroidManifest continua fora do controle Lovable. Conferir manualmente
   que tem `ACCESS_BACKGROUND_LOCATION` e `FOREGROUND_SERVICE_LOCATION`.
+
+## Diagnóstico após 10+ APKs (04/06/2026)
+Não gerar outro APK sem separar captura/envio/gravação/exibição.
+
+Evidências de banco:
+- `posicoes_gps` recebeu posições recentes; então endpoint e gravação funcionam quando o app envia.
+- `processar-gps` atualiza `monitoramento_rotas.ultima_lat`, `ultima_lng`, `ultima_atualizacao` usando service role; não é bloqueio de RLS.
+- Gaps grandes entre posições e poucos heartbeats indicam perda antes do backend: captura/callback JS/fila em background.
+
+Correções/decisões:
+- Torre de Controle não deve filtrar somente `created_at >= hoje`; rotas ativas antigas com GPS novo precisam aparecer.
+- Build script deve bloquear Manifest sem `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, `CAMERA`.
+- Se o problema persistir com Manifest válido e APK PROD, a causa estrutural é dependência da WebView/JS no `@capacitor-community/background-geolocation`; recomendação: migrar para plugin com envio nativo persistente ou módulo Android nativo que envie direto ao backend.

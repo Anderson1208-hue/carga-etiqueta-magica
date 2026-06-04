@@ -32,6 +32,10 @@ import type { MonitoramentoRota } from "@/components/monitoramento/types";
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 
+type TorreRotaRow = MonitoramentoRota & { created_at: string };
+type VeiculoBaixadoRow = { id: string };
+type AlertaCountRow = { monitoramento_rota_id: string | null };
+
 export default function TorreControle() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
@@ -41,17 +45,22 @@ export default function TorreControle() {
     try {
       const inicioHoje = new Date();
       inicioHoje.setHours(0, 0, 0, 0);
-      const rotasAll = await fetchAllPages<any>((from, to) =>
+      const rotasAll = await fetchAllPages<TorreRotaRow>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .gte("created_at", inicioHoje.toISOString())
           .order("created_at", { ascending: false })
           .range(from, to)
       );
+      const inicioHojeIso = inicioHoje.toISOString();
+      const rotasVisiveis = rotasAll.filter((r) =>
+        r.status === "ativa" ||
+        r.created_at >= inicioHojeIso ||
+        (r.ultima_atualizacao && r.ultima_atualizacao >= inicioHojeIso)
+      );
 
       // Exclui rotas de veículos que já tiveram baixa na prestação de contas
-      const veiculoIds = Array.from(new Set(rotasAll.map((r: any) => r.veiculo_id).filter(Boolean)));
+      const veiculoIds = Array.from(new Set(rotasVisiveis.map((r) => r.veiculo_id).filter(Boolean)));
       let baixados = new Set<string>();
       if (veiculoIds.length > 0) {
         const { data: veics } = await supabase
@@ -59,12 +68,12 @@ export default function TorreControle() {
           .select("id, prestacao_contas_em")
           .in("id", veiculoIds)
           .not("prestacao_contas_em", "is", null);
-        baixados = new Set((veics || []).map((v: any) => v.id));
+        baixados = new Set(((veics || []) as VeiculoBaixadoRow[]).map((v) => v.id));
       }
-      const rotasFiltradas = rotasAll.filter((r: any) => !baixados.has(r.veiculo_id));
+      const rotasFiltradas = rotasVisiveis.filter((r) => !baixados.has(r.veiculo_id));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc por created_at)
       const seenVeic = new Set<string>();
-      const rotasDedup = rotasFiltradas.filter((r: any) => {
+      const rotasDedup = rotasFiltradas.filter((r) => {
         const key = normalizePlate(r.placa) || r.veiculo_id;
         if (!key) return true;
         if (seenVeic.has(key)) return false;
@@ -74,7 +83,7 @@ export default function TorreControle() {
       setRotas(rotasDedup);
 
       // Load alert counts per route (paginado)
-      const alertas = await fetchAllPages<any>((from, to) =>
+      const alertas = await fetchAllPages<AlertaCountRow>((from, to) =>
         supabase
           .from("alertas_monitoramento")
           .select("monitoramento_rota_id")
@@ -84,7 +93,8 @@ export default function TorreControle() {
       );
 
       const counts: Record<string, number> = {};
-      (alertas || []).forEach((a: any) => {
+      (alertas || []).forEach((a) => {
+        if (!a.monitoramento_rota_id) return;
         counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
       });
       setAlertasCount(counts);

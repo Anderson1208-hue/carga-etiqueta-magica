@@ -119,11 +119,13 @@ assert_android_background_gps_ready() {
   }
 
   check_manifest_item "android.permission.ACCESS_FINE_LOCATION" "ACCESS_FINE_LOCATION"
+  check_manifest_item "android.permission.ACCESS_COARSE_LOCATION" "ACCESS_COARSE_LOCATION"
   check_manifest_item "android.permission.ACCESS_BACKGROUND_LOCATION" "ACCESS_BACKGROUND_LOCATION"
   check_manifest_item "android.permission.FOREGROUND_SERVICE" "FOREGROUND_SERVICE"
   check_manifest_item "android.permission.FOREGROUND_SERVICE_LOCATION" "FOREGROUND_SERVICE_LOCATION"
   check_manifest_item "android.permission.POST_NOTIFICATIONS" "POST_NOTIFICATIONS"
   check_manifest_item "android.permission.WAKE_LOCK" "WAKE_LOCK"
+  check_manifest_item "android.permission.CAMERA" "CAMERA"
 
   if [ "$missing" -ne 0 ]; then
     echo ""
