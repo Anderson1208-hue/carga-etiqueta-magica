@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Gera o APK de HOMOLOGAÇÃO assinado.
-# APK aponta para a URL publicada do Lovable — qualquer "Update" via Publish
-# reflete imediatamente sem precisar regerar binário.
-#
+# RODA EMBUTIDO (capacitor://localhost) — NÃO depende de lovable.app / auth-bridge.
+# Diferença para PROD: badge âmbar + VITE_BUILD_ENV=homolog + applicationId
+# .homolog (coexiste com PROD no mesmo aparelho). Atualizar exige novo APK.
 # Pré-requisito (UMA VEZ): ./scripts/setup-android-signing.sh
 set -euo pipefail
 
@@ -22,7 +22,7 @@ bump_version_code
 echo "==> 2/6 Build do React (vite) — VITE_BUILD_ENV=homolog"
 VITE_BUILD_ENV=homolog npm run build
 
-echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (server.url=lovable.app)"
+echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (embutido, sem server.url)"
 CAP_ENV=homolog npx cap sync android
 
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
@@ -52,4 +52,4 @@ echo "==> 6/6 OK"
 echo "APK HOMOLOG: $OUT  ($SIZE)"
 echo ""
 echo "Distribua APENAS para o time de homologação. Badge âmbar 'HOMOLOG'."
-echo "Atualizações via Publish do Lovable refletem automaticamente — sem reinstalar."
+echo "APK embutido — atualizar exige gerar novo APK (igual PROD)."

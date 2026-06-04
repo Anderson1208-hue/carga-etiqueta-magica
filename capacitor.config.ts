@@ -24,10 +24,10 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
     url: 'https://2b66d97b-1a6e-498c-96c4-89ff683a59a4.lovableproject.com?forceHideBadge=true',
     cleartext: true,
   },
-  homolog: {
-    url: 'https://carga-etiqueta-magica.lovable.app?forceHideBadge=true',
-    cleartext: false,
-  },
+  // HOMOLOG agora roda EMBUTIDO (igual PROD). Nunca aponta para lovable.app
+  // — APKs de motorista não podem depender de auth Lovable / lovable.dev/login.
+  // Diferença HOMOLOG vs PROD = badge + VITE_BUILD_ENV + applicationId apenas.
+  homolog: undefined,
   prod: undefined,
 };
 

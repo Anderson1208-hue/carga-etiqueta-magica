@@ -10,21 +10,27 @@ Um único backend Lovable Cloud (Supabase). Três variações de APK que diferem
 
 | Ambiente | `CAP_ENV` | `VITE_BUILD_ENV` | applicationId | Frontend carregado de | Badge |
 |----------|-----------|------------------|---------------|-----------------------|-------|
-| DEV      | `dev` (default) | `dev`     | `com.orkestria.driver.homolog` | sandbox `lovableproject.com` (hot-reload) | vermelho |
-| HOMOLOG  | `homolog` | `homolog` | `com.orkestria.driver.homolog` | URL publicada `carga-etiqueta-magica.lovable.app` | âmbar |
+| DEV      | `dev` (default) | `dev`     | `com.orkestria.driver.homolog` | sandbox `lovableproject.com` (hot-reload, só `npx cap run`) | vermelho |
+| HOMOLOG  | `homolog` | `homolog` | `com.orkestria.driver.homolog` | `/dist` embutido (`capacitor://localhost`) | âmbar |
 | PROD     | `prod`    | `prod`    | `com.orkestria.driver`         | `/dist` embutido (`capacitor://localhost`) | verde |
 
-PROD e HOMOLOG têm `applicationId` distintos → podem ser instalados lado a lado no mesmo celular sem conflito de assinatura/atualização. `appId` é definido em `capacitor.config.ts` via `APP_ID_BY_ENV` e propagado para `android/app/build.gradle` pelo `cap sync`.
+**REGRA CRÍTICA:** APKs distribuídos (HOMOLOG e PROD) NUNCA podem ter `server.url`
+apontando para `lovable.app` / `lovableproject.com`. Isso abre `lovable.dev/login`
+no celular e quebra o fluxo do motorista (que entra por código de 6 chars em
+`/motorista`, sem auth Lovable). `server.url` só é permitido em DEV via
+`npx cap run android` na máquina do dev.
+
+PROD e HOMOLOG têm `applicationId` distintos → coexistem no mesmo aparelho.
 
 ## Arquivos chave
-- `capacitor.config.ts` — lê `process.env.CAP_ENV`, mapa `SERVER_BY_ENV` com 3 entradas. PROD omite `server`.
-- `src/components/mobile/BuildModeBadge.tsx` — lê `import.meta.env.VITE_BUILD_ENV` (fonte primária) com fallback por hostname.
-- `src/vite-env.d.ts` — declara `VITE_BUILD_ENV: "dev" | "homolog" | "prod"`.
-- `scripts/build-apk-release.sh` — `VITE_BUILD_ENV=prod npm run build && CAP_ENV=prod npx cap sync android && assembleRelease`. Copia para `motorista-prod-YYYYMMDD-HHMM.apk`.
-- `scripts/build-apk-homolog.sh` — equivalente com `homolog`. Saída `motorista-homolog-…apk`.
+- `capacitor.config.ts` — `SERVER_BY_ENV`: só `dev` tem url; `homolog` e `prod` = `undefined`.
+- `src/components/mobile/BuildModeBadge.tsx` — lê `VITE_BUILD_ENV`.
+- `scripts/build-apk-release.sh` — PROD embutido.
+- `scripts/build-apk-homolog.sh` — HOMOLOG embutido (mesma mecânica do PROD, só muda badge/appId).
 
-## Vantagem do HOMOLOG
-APK aponta para a URL publicada do Lovable. Cada `Publish → Update` no editor reflete imediatamente no APK instalado, **sem regerar binário**. O time valida mudanças num celular real antes de você gerar o PROD embedded final.
+## Diferença HOMOLOG vs PROD
+Apenas badge âmbar + `VITE_BUILD_ENV=homolog` + `applicationId .homolog`. Ambos
+embutidos. Atualizar HOMOLOG exige gerar novo APK (não há mais hot-update via Publish).
 
 ## Como usar (na máquina do dev)
 ```bash
