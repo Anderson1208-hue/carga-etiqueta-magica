@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Gera o APK de HOMOLOGAÇÃO assinado.
-# APK aponta para a URL publicada do Lovable — qualquer "Update" via Publish
-# reflete imediatamente sem precisar regerar binário.
-#
+# RODA EMBUTIDO (capacitor://localhost) — NÃO depende de lovable.app / auth-bridge.
+# Diferença para PROD: badge âmbar + VITE_BUILD_ENV=homolog + applicationId
+# .homolog (coexiste com PROD no mesmo aparelho). Atualizar exige novo APK.
 # Pré-requisito (UMA VEZ): ./scripts/setup-android-signing.sh
 set -euo pipefail
 
