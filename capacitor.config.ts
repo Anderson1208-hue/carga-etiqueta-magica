@@ -34,16 +34,19 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
 // applicationId por ambiente — permite PROD e HOMOLOG coexistirem no mesmo
 // celular sem um sobrescrever o outro. DEV usa o mesmo id do HOMOLOG (mesmo
 // app, hot-reload apenas muda a fonte do frontend).
+// applicationId Orkestria (SaaS multi-tenant). Cada ambiente tem id próprio
+// para coexistirem no mesmo celular. A licença Transistorsoft (quando
+// adquirida) será emitida para com.orkestria.driver (PROD).
 const APP_ID_BY_ENV: Record<string, string> = {
-  dev:     'com.expressoebenezer.motorista.homolog',
-  homolog: 'com.expressoebenezer.motorista.homolog',
-  prod:    'com.expressoebenezer.motorista',
+  dev:     'com.orkestria.driver.homolog',
+  homolog: 'com.orkestria.driver.homolog',
+  prod:    'com.orkestria.driver',
 };
 
 const APP_NAME_BY_ENV: Record<string, string> = {
-  dev:     'Motorista DEV',
-  homolog: 'Motorista HOMOLOG',
-  prod:    'Motorista',
+  dev:     'Orkestria Driver DEV',
+  homolog: 'Orkestria Driver HOMOLOG',
+  prod:    'Orkestria Driver',
 };
 
 const server = SERVER_BY_ENV[env];
