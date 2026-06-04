@@ -45,13 +45,18 @@ export default function TorreControle() {
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .gte("created_at", inicioHoje.toISOString())
           .order("created_at", { ascending: false })
           .range(from, to)
       );
+      const inicioHojeIso = inicioHoje.toISOString();
+      const rotasVisiveis = rotasAll.filter((r: any) =>
+        r.status === "ativa" ||
+        r.created_at >= inicioHojeIso ||
+        (r.ultima_atualizacao && r.ultima_atualizacao >= inicioHojeIso)
+      );
 
       // Exclui rotas de veículos que já tiveram baixa na prestação de contas
-      const veiculoIds = Array.from(new Set(rotasAll.map((r: any) => r.veiculo_id).filter(Boolean)));
+      const veiculoIds = Array.from(new Set(rotasVisiveis.map((r: any) => r.veiculo_id).filter(Boolean)));
       let baixados = new Set<string>();
       if (veiculoIds.length > 0) {
         const { data: veics } = await supabase
@@ -61,7 +66,7 @@ export default function TorreControle() {
           .not("prestacao_contas_em", "is", null);
         baixados = new Set((veics || []).map((v: any) => v.id));
       }
-      const rotasFiltradas = rotasAll.filter((r: any) => !baixados.has(r.veiculo_id));
+      const rotasFiltradas = rotasVisiveis.filter((r: any) => !baixados.has(r.veiculo_id));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc por created_at)
       const seenVeic = new Set<string>();
       const rotasDedup = rotasFiltradas.filter((r: any) => {
