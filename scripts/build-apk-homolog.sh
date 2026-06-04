@@ -29,6 +29,7 @@ echo "==> 3.5/6 Validando permissões nativas de GPS background"
 assert_android_background_gps_ready
 
 echo "==> 4/6 Gerando APK release"
+assert_gradle_wrapper
 run_android_gradle_release
 
 echo "==> 5/6 Garantindo assinatura"
