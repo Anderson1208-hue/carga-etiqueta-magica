@@ -453,12 +453,30 @@ export default function MonitoramentoRotas() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Monitoramento de Rotas</h1>
             <p className="text-muted-foreground">Acompanhamento em tempo real das entregas</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={dataSelecionada}
+                onChange={(e) => setDataSelecionada(e.target.value || todayISO())}
+                className="h-8 w-[150px] border-0 p-0 focus-visible:ring-0"
+              />
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setDataSelecionada(todayISO())}>
+                Hoje
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+              <Switch id="mostrar-antigas" checked={mostrarAntigas} onCheckedChange={setMostrarAntigas} />
+              <Label htmlFor="mostrar-antigas" className="text-xs cursor-pointer">
+                Incluir rotas antigas em aberto
+              </Label>
+            </div>
             <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
               <Truck className="w-4 h-4 mr-1" /> Iniciar Monitoramento
             </Button>
