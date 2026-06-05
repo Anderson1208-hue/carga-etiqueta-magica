@@ -53,27 +53,21 @@ export default function TorreControle() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
 
-  const loadRotas = useCallback(async () => {
+  const loadRotas = useCallback(async (dataFiltro: string) => {
     try {
-      const inicioHoje = new Date();
-      inicioHoje.setHours(0, 0, 0, 0);
       const rotasAll = await fetchAllPages<TorreRotaRow>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
+          .eq("data", dataFiltro)
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      const inicioHojeIso = inicioHoje.toISOString();
-      const rotasVisiveis = rotasAll.filter((r) =>
-        r.status === "ativa" ||
-        r.created_at >= inicioHojeIso ||
-        (r.ultima_atualizacao && r.ultima_atualizacao >= inicioHojeIso)
-      );
 
       // Exclui rotas de veículos que já tiveram baixa na prestação de contas
-      const veiculoIds = Array.from(new Set(rotasVisiveis.map((r) => r.veiculo_id).filter(Boolean)));
+      const veiculoIds = Array.from(new Set(rotasAll.map((r) => r.veiculo_id).filter(Boolean)));
       let baixados = new Set<string>();
       if (veiculoIds.length > 0) {
         const { data: veics } = await supabase
@@ -83,7 +77,7 @@ export default function TorreControle() {
           .not("prestacao_contas_em", "is", null);
         baixados = new Set(((veics || []) as VeiculoBaixadoRow[]).map((v) => v.id));
       }
-      const rotasFiltradas = rotasVisiveis.filter((r) => !baixados.has(r.veiculo_id));
+      const rotasFiltradas = rotasAll.filter((r) => !baixados.has(r.veiculo_id));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc por created_at)
       const seenVeic = new Set<string>();
       const rotasDedup = rotasFiltradas.filter((r) => {
@@ -95,23 +89,27 @@ export default function TorreControle() {
       });
       setRotas(rotasDedup);
 
-      // Load alert counts per route (paginado)
-      const alertas = await fetchAllPages<AlertaCountRow>((from, to) =>
-        supabase
-          .from("alertas_monitoramento")
-          .select("monitoramento_rota_id")
-          .eq("lido", false)
-          .order("created_at", { ascending: false })
-          .range(from, to)
-      );
-
-      const counts: Record<string, number> = {};
-      (alertas || []).forEach((a) => {
-        if (!a.monitoramento_rota_id) return;
-        counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
-      });
-      setAlertasCount(counts);
-
+      // Alertas apenas das rotas exibidas
+      const rotaIds = rotasDedup.map((r) => r.id);
+      if (rotaIds.length === 0) {
+        setAlertasCount({});
+      } else {
+        const alertas = await fetchAllPages<AlertaCountRow>((from, to) =>
+          supabase
+            .from("alertas_monitoramento")
+            .select("monitoramento_rota_id")
+            .eq("lido", false)
+            .in("monitoramento_rota_id", rotaIds)
+            .order("created_at", { ascending: false })
+            .range(from, to)
+        );
+        const counts: Record<string, number> = {};
+        (alertas || []).forEach((a) => {
+          if (!a.monitoramento_rota_id) return;
+          counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
+        });
+        setAlertasCount(counts);
+      }
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
@@ -120,7 +118,8 @@ export default function TorreControle() {
   }, []);
 
   useEffect(() => {
-    loadRotas();
+    setLoading(true);
+    loadRotas(dataSelecionada);
 
     // Realtime updates for routes and vehicle accountability changes
     const channel = supabase
@@ -129,22 +128,23 @@ export default function TorreControle() {
         event: "*",
         schema: "public",
         table: "monitoramento_rotas",
-      }, () => loadRotas())
+      }, () => loadRotas(dataSelecionada))
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
         table: "veiculos",
-      }, () => loadRotas())
+      }, () => loadRotas(dataSelecionada))
       .subscribe();
 
     // Auto-refresh a cada 60s como fallback
-    const interval = setInterval(() => loadRotas(), 60000);
+    const interval = setInterval(() => loadRotas(dataSelecionada), 60000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [loadRotas]);
+  }, [loadRotas, dataSelecionada]);
+
 
   function formatDateTime(iso: string | null) {
     if (!iso) return "—";
