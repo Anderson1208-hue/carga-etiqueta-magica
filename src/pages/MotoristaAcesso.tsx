@@ -13,7 +13,7 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
-import { ValidacaoGpsBackground, VALIDATION_KEY, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
+import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { Capacitor } from "@capacitor/core";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
@@ -95,34 +95,23 @@ export default function MotoristaAcesso() {
 
   // Quando o motorista loga no APK e o GPS ainda não foi validado,
   // abre o wizard automaticamente. No web (sem Capacitor) já vem true.
+  //
+  // IMPORTANTE: NÃO consultar navigator.permissions.query({name:"geolocation"})
+  // aqui. Na WebView do Android essa API reporta a permissão da própria
+  // WebView (separada da permissão concedida ao plugin nativo
+  // background-geolocation). Mesmo com "Permitir o tempo todo" ativo no
+  // sistema, a query costuma retornar "prompt", o que fazia o código apagar
+  // a chave de validação e reabrir o wizard logo após o motorista passar
+  // no teste — exatamente o loop relatado em campo.
+  // Confiamos somente no teste comportamental persistido por 14 dias.
   useEffect(() => {
     if (!veiculo) return;
     if (!Capacitor.isNativePlatform()) return;
-    let cancelled = false;
-    async function validarPermissaoReal() {
-      try {
-        const status = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
-        if (cancelled) return;
-        if (status && status.state !== "granted") {
-          localStorage.removeItem(VALIDATION_KEY);
-          setNativeGpsPermissionReady(false);
-          setGpsValidated(false);
-          setShowValidacao(true);
-          return;
-        }
-        if (status?.state === "granted") {
-          setNativeGpsPermissionReady(true);
-        }
-      } catch {
-        // Se o Android/WebView não informar, confia apenas na validação comportamental.
-        setNativeGpsPermissionReady(gpsValidated);
-      }
-      if (!cancelled && !gpsValidated) setShowValidacao(true);
+    if (gpsValidated) {
+      setNativeGpsPermissionReady(true);
+      return;
     }
-    validarPermissaoReal();
-    return () => {
-      cancelled = true;
-    };
+    setShowValidacao(true);
   }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
