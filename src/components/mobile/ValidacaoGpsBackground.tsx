@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
+import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
+import type { Location, Subscription } from "@transistorsoft/capacitor-background-geolocation";
+import { AuthorizationStatus, DesiredAccuracy } from "@transistorsoft/background-geolocation-types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CheckCircle2, Lock, MapPin, Settings, XCircle } from "lucide-react";
+import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
 
 /**
  * Wizard de validação ativa do GPS em background do APK Motorista.
@@ -20,15 +24,6 @@ import { AlertTriangle, CheckCircle2, Lock, MapPin, Settings, XCircle } from "lu
  * Fluxo: Intro -> Abrir Configurações -> Teste 90s tela bloqueada -> OK/Falha.
  * Persiste sucesso em localStorage por 14 dias (chave bg_gps_validated_v2_at).
  */
-
-interface BgLocation { latitude: number; longitude: number; accuracy: number; time: number | null; }
-interface BgWatcherOptions { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number; }
-interface BackgroundGeolocationPlugin {
-  addWatcher(opts: BgWatcherOptions, cb: (loc: BgLocation | null, err?: { code: string; message: string }) => void): Promise<string>;
-  removeWatcher(opts: { id: string }): Promise<void>;
-  openSettings(): Promise<void>;
-}
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
 export const VALIDATION_KEY = "bg_gps_validated_v2_at";
 export const VALIDATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -66,11 +61,19 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
   const [permError, setPermError] = useState<string | null>(null);
   const [screenLockedAtLeastOnce, setScreenLockedAtLeastOnce] = useState(false);
 
-  const watcherIdRef = useRef<string | null>(null);
+  const subscriptionsRef = useRef<Subscription[]>([]);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHiddenRef = useRef(false);
   const bgCallbacksRef = useRef(0);
   const screenLockedRef = useRef(false);
+
+  function countBackgroundPoint(_location?: Location) {
+    setCallbacks((c) => c + 1);
+    if (isHiddenRef.current) {
+      bgCallbacksRef.current += 1;
+      setBgCallbacks((c) => c + 1);
+    }
+  }
 
   useEffect(() => {
     if (!open) {
@@ -110,33 +113,36 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     setStep("test");
 
     try {
-      const id = await BackgroundGeolocation.addWatcher(
-        {
-          backgroundTitle: "Teste de GPS em segundo plano",
-          backgroundMessage: "Bloqueie a tela e aguarde 90 segundos",
-          requestPermissions: true,
-          stale: false,
+      await ensureTransistorGpsReady(0);
+      await BackgroundGeolocation.setConfig({
+        geolocation: {
           distanceFilter: 0,
+          locationUpdateInterval: 15_000,
+          fastestLocationUpdateInterval: 5_000,
+          allowIdenticalLocations: true,
         },
-        (loc, err) => {
-          if (err) {
-            if (err.code === "NOT_AUTHORIZED") {
-              setPermError("Permissão negada. Toque em 'Abrir configurações' e selecione 'Permitir o tempo todo'.");
-              stopTest("fail");
-            }
-            return;
-          }
-          if (!loc) return;
-          setCallbacks((c) => c + 1);
-          if (isHiddenRef.current) {
-            bgCallbacksRef.current += 1;
-            setBgCallbacks((c) => c + 1);
-          }
-        }
-      );
-      watcherIdRef.current = id;
-    } catch {
-      setPermError("Não foi possível iniciar o teste. Verifique a permissão de localização.");
+        app: { heartbeatInterval: 30 },
+      });
+
+      const status = await BackgroundGeolocation.requestPermission();
+      if (status !== AuthorizationStatus.Always) {
+        setPermError('Permissão ainda não está em "Permitir o tempo todo". Abra as configurações do app e ajuste Localização.');
+        stopTest("fail");
+        return;
+      }
+
+      subscriptionsRef.current = [
+        BackgroundGeolocation.onLocation(countBackgroundPoint, () => {
+          setPermError("Erro ao receber localização nativa. Verifique GPS e permissões.");
+        }),
+        BackgroundGeolocation.onHeartbeat(() => countBackgroundPoint()),
+      ];
+
+      await BackgroundGeolocation.start();
+      await BackgroundGeolocation.changePace(true).catch(() => {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPermError(`Não foi possível iniciar o teste: ${msg}`);
       stopTest("fail");
       return;
     }
@@ -155,10 +161,11 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
 
   async function stopTest(_finalStep: Step) {
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-    if (watcherIdRef.current) {
-      try { await BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current }); } catch { /* ignore */ }
-      watcherIdRef.current = null;
+    for (const sub of subscriptionsRef.current) {
+      try { sub.remove(); } catch { /* ignore */ }
     }
+    subscriptionsRef.current = [];
+    try { await BackgroundGeolocation.stop(); } catch { /* ignore */ }
     setStep(_finalStep);
   }
 
@@ -184,7 +191,10 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
 
   useEffect(() => () => {
     if (tickRef.current) clearInterval(tickRef.current);
-    if (watcherIdRef.current) BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current }).catch(() => {});
+    for (const sub of subscriptionsRef.current) {
+      try { sub.remove(); } catch { /* ignore */ }
+    }
+    BackgroundGeolocation.stop().catch(() => {});
   }, []);
 
   if (!open) return null;
@@ -254,7 +264,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
               variant="outline"
               className="w-full"
               size="lg"
-              onClick={() => BackgroundGeolocation.openSettings().catch(() => setPermError("Não foi possível abrir as configurações."))}
+              onClick={() => BackgroundGeolocation.requestPermission().catch(() => setPermError("Não foi possível abrir as permissões de localização."))}
             >
               <Settings className="w-4 h-4 mr-2" />
               Abrir configurações
