@@ -61,11 +61,19 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
   const [permError, setPermError] = useState<string | null>(null);
   const [screenLockedAtLeastOnce, setScreenLockedAtLeastOnce] = useState(false);
 
-  const watcherIdRef = useRef<string | null>(null);
+  const subscriptionsRef = useRef<Subscription[]>([]);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isHiddenRef = useRef(false);
   const bgCallbacksRef = useRef(0);
   const screenLockedRef = useRef(false);
+
+  function countBackgroundPoint(_location?: Location) {
+    setCallbacks((c) => c + 1);
+    if (isHiddenRef.current) {
+      bgCallbacksRef.current += 1;
+      setBgCallbacks((c) => c + 1);
+    }
+  }
 
   useEffect(() => {
     if (!open) {
@@ -105,33 +113,36 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     setStep("test");
 
     try {
-      const id = await BackgroundGeolocation.addWatcher(
-        {
-          backgroundTitle: "Teste de GPS em segundo plano",
-          backgroundMessage: "Bloqueie a tela e aguarde 90 segundos",
-          requestPermissions: true,
-          stale: false,
+      await ensureTransistorGpsReady(0);
+      await BackgroundGeolocation.setConfig({
+        geolocation: {
           distanceFilter: 0,
+          locationUpdateInterval: 15_000,
+          fastestLocationUpdateInterval: 5_000,
+          allowIdenticalLocations: true,
         },
-        (loc, err) => {
-          if (err) {
-            if (err.code === "NOT_AUTHORIZED") {
-              setPermError("Permissão negada. Toque em 'Abrir configurações' e selecione 'Permitir o tempo todo'.");
-              stopTest("fail");
-            }
-            return;
-          }
-          if (!loc) return;
-          setCallbacks((c) => c + 1);
-          if (isHiddenRef.current) {
-            bgCallbacksRef.current += 1;
-            setBgCallbacks((c) => c + 1);
-          }
-        }
-      );
-      watcherIdRef.current = id;
-    } catch {
-      setPermError("Não foi possível iniciar o teste. Verifique a permissão de localização.");
+        app: { heartbeatInterval: 30 },
+      });
+
+      const status = await BackgroundGeolocation.requestPermission();
+      if (status !== AuthorizationStatus.Always) {
+        setPermError('Permissão ainda não está em "Permitir o tempo todo". Abra as configurações do app e ajuste Localização.');
+        stopTest("fail");
+        return;
+      }
+
+      subscriptionsRef.current = [
+        BackgroundGeolocation.onLocation(countBackgroundPoint, () => {
+          setPermError("Erro ao receber localização nativa. Verifique GPS e permissões.");
+        }),
+        BackgroundGeolocation.onHeartbeat(() => countBackgroundPoint()),
+      ];
+
+      await BackgroundGeolocation.start();
+      await BackgroundGeolocation.changePace(true).catch(() => {});
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPermError(`Não foi possível iniciar o teste: ${msg}`);
       stopTest("fail");
       return;
     }
@@ -150,10 +161,11 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
 
   async function stopTest(_finalStep: Step) {
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
-    if (watcherIdRef.current) {
-      try { await BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current }); } catch { /* ignore */ }
-      watcherIdRef.current = null;
+    for (const sub of subscriptionsRef.current) {
+      try { sub.remove(); } catch { /* ignore */ }
     }
+    subscriptionsRef.current = [];
+    try { await BackgroundGeolocation.stop(); } catch { /* ignore */ }
     setStep(_finalStep);
   }
 
@@ -179,7 +191,10 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
 
   useEffect(() => () => {
     if (tickRef.current) clearInterval(tickRef.current);
-    if (watcherIdRef.current) BackgroundGeolocation.removeWatcher({ id: watcherIdRef.current }).catch(() => {});
+    for (const sub of subscriptionsRef.current) {
+      try { sub.remove(); } catch { /* ignore */ }
+    }
+    BackgroundGeolocation.stop().catch(() => {});
   }, []);
 
   if (!open) return null;
