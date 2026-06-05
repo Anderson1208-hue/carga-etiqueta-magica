@@ -280,7 +280,7 @@ export default function MonitoramentoRotas() {
         });
       }
       setShowIniciar(false);
-      loadRotas();
+      loadRotas(dataSelecionada, mostrarAntigas);
     } finally {
       setIniciandoRota(false);
     }
@@ -333,7 +333,7 @@ export default function MonitoramentoRotas() {
       });
     }
     setShowIniciar(false);
-    loadRotas();
+    loadRotas(dataSelecionada, mostrarAntigas);
     setIniciandoRota(false);
   }
 
@@ -391,7 +391,7 @@ export default function MonitoramentoRotas() {
 
   // --- Effects ---
   useEffect(() => {
-    loadRotas();
+    loadRotas(dataSelecionada, mostrarAntigas);
     loadConfig();
   }, [loadRotas, loadConfig]);
 
@@ -462,7 +462,7 @@ export default function MonitoramentoRotas() {
             <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
               <Truck className="w-4 h-4 mr-1" /> Iniciar Monitoramento
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { loadRotas(); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
+            <Button variant="outline" size="sm" onClick={() => { loadRotas(dataSelecionada, mostrarAntigas); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
               <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowConfig(true)}>
