@@ -78,50 +78,43 @@ async function ensurePluginReady(distanceFilter: number): Promise<void> {
 
   readyPromise = (async () => {
     await BackgroundGeolocation.ready({
-      // Precisão & filtros
-      desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
-      distanceFilter,
-      stationaryRadius: 25,
-
-      // Comportamento de Foreground Service
-      foregroundService: true,
-      notification: {
-        title: "Orkestria Driver — Rastreamento ativo",
-        text: "Sua rota está em andamento",
-        sticky: true,
-        priority: BackgroundGeolocation.NOTIFICATION_PRIORITY_DEFAULT,
-        smallIcon: "ic_stat_notify",
-      },
-
-      // Sobrevida do serviço
-      stopOnTerminate: false,
-      startOnBoot: true,
-      enableHeadless: true,
-
-      // Permissões — o plugin solicita Foreground + Background quando start() é chamado
-      locationAuthorizationRequest: "Always",
-      backgroundPermissionRationale: {
-        title: "Permitir o tempo todo",
-        message:
-          "Para registrar sua rota mesmo com a tela bloqueada, marque \"Permitir o tempo todo\" nas configurações.",
-        positiveAction: "Abrir Configurações",
-        negativeAction: "Cancelar",
-      },
-
-      // NÃO usamos o uploader HTTP do plugin — controlamos via fila IndexedDB
-      // para garantir dedup, retry exponencial e batching já existentes.
-      autoSync: false,
-      batchSync: false,
-
-      // Debug / logs (verboso em dev/homolog; reduzir em prod)
-      debug: import.meta.env.VITE_BUILD_ENV !== "prod",
-      logLevel:
-        import.meta.env.VITE_BUILD_ENV === "prod"
-          ? BackgroundGeolocation.LOG_LEVEL_ERROR
-          : BackgroundGeolocation.LOG_LEVEL_VERBOSE,
-
-      // Não auto-iniciar — start() é chamado pelo hook quando rota está ativa.
       reset: true,
+      geolocation: {
+        desiredAccuracy: DesiredAccuracy.High,
+        distanceFilter,
+        stationaryRadius: 25,
+        locationAuthorizationRequest: "Always",
+      },
+      app: {
+        stopOnTerminate: false,
+        startOnBoot: true,
+        enableHeadless: true,
+        notification: {
+          title: "Orkestria Driver — Rastreamento ativo",
+          text: "Sua rota está em andamento",
+          sticky: true,
+          priority: NotificationPriority.Default,
+          smallIcon: "ic_stat_notify",
+        },
+        backgroundPermissionRationale: {
+          title: "Permitir o tempo todo",
+          message:
+            'Para registrar sua rota mesmo com a tela bloqueada, marque "Permitir o tempo todo" nas configurações.',
+          positiveAction: "Abrir Configurações",
+          negativeAction: "Cancelar",
+        },
+      },
+      // NÃO usamos o uploader HTTP do plugin — controlamos via fila IndexedDB
+      // (dedup, retry exponencial e batching já existentes).
+      http: {
+        autoSync: false,
+        batchSync: false,
+      },
+      logger: {
+        debug: import.meta.env.VITE_BUILD_ENV !== "prod",
+        logLevel:
+          import.meta.env.VITE_BUILD_ENV === "prod" ? LogLevel.Error : LogLevel.Verbose,
+      },
     });
     pluginReady = true;
   })();
