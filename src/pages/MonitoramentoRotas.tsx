@@ -71,15 +71,20 @@ export default function MonitoramentoRotas() {
   const [iniciandoRota, setIniciandoRota] = useState(false);
 
   // --- Data loading (unchanged logic) ---
-  const loadRotas = useCallback(async () => {
+  const loadRotas = useCallback(async (dataFiltro: string, incluirAntigas: boolean) => {
     try {
-      const data = await fetchAllPages<any>((from, to) =>
-        supabase
-          .from("monitoramento_rotas")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .range(from, to)
-      );
+      let query = supabase
+        .from("monitoramento_rotas")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!incluirAntigas) {
+        // Apenas rotas da data selecionada
+        query = query.eq("data", dataFiltro);
+      } else {
+        // Data selecionada + rotas anteriores ainda abertas (não finalizadas)
+        query = query.lte("data", dataFiltro);
+      }
+      const data = await fetchAllPages<any>((from, to) => query.range(from, to));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc).
       const seen = new Set<string>();
       const dedup = data.filter((r: any) => {
