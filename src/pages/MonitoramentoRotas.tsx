@@ -393,7 +393,7 @@ export default function MonitoramentoRotas() {
   useEffect(() => {
     loadRotas(dataSelecionada, mostrarAntigas);
     loadConfig();
-  }, [loadRotas, loadConfig]);
+  }, [loadRotas, loadConfig, dataSelecionada, mostrarAntigas]);
 
   useEffect(() => {
     if (!selectedRota) return;
