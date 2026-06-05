@@ -5,7 +5,16 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Truck, RefreshCw, Settings, Loader2, Eye } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Truck, RefreshCw, Settings, Loader2, Eye, CalendarDays } from "lucide-react";
+
+const todayISO = () => {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+};
 
 import type {
   MonitoramentoRota,
@@ -35,6 +44,8 @@ export default function MonitoramentoRotas() {
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
+  const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
+  const [mostrarAntigas, setMostrarAntigas] = useState(false);
 
   const [showConfig, setShowConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -60,15 +71,20 @@ export default function MonitoramentoRotas() {
   const [iniciandoRota, setIniciandoRota] = useState(false);
 
   // --- Data loading (unchanged logic) ---
-  const loadRotas = useCallback(async () => {
+  const loadRotas = useCallback(async (dataFiltro: string, incluirAntigas: boolean) => {
     try {
-      const data = await fetchAllPages<any>((from, to) =>
-        supabase
-          .from("monitoramento_rotas")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .range(from, to)
-      );
+      let query = supabase
+        .from("monitoramento_rotas")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!incluirAntigas) {
+        // Apenas rotas da data selecionada
+        query = query.eq("data", dataFiltro);
+      } else {
+        // Data selecionada + rotas anteriores ainda abertas (não finalizadas)
+        query = query.lte("data", dataFiltro);
+      }
+      const data = await fetchAllPages<any>((from, to) => query.range(from, to));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc).
       const seen = new Set<string>();
       const dedup = data.filter((r: any) => {
@@ -264,7 +280,7 @@ export default function MonitoramentoRotas() {
         });
       }
       setShowIniciar(false);
-      loadRotas();
+      loadRotas(dataSelecionada, mostrarAntigas);
     } finally {
       setIniciandoRota(false);
     }
@@ -317,7 +333,7 @@ export default function MonitoramentoRotas() {
       });
     }
     setShowIniciar(false);
-    loadRotas();
+    loadRotas(dataSelecionada, mostrarAntigas);
     setIniciandoRota(false);
   }
 
@@ -375,9 +391,9 @@ export default function MonitoramentoRotas() {
 
   // --- Effects ---
   useEffect(() => {
-    loadRotas();
+    loadRotas(dataSelecionada, mostrarAntigas);
     loadConfig();
-  }, [loadRotas, loadConfig]);
+  }, [loadRotas, loadConfig, dataSelecionada, mostrarAntigas]);
 
   useEffect(() => {
     if (!selectedRota) return;
@@ -437,16 +453,34 @@ export default function MonitoramentoRotas() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Monitoramento de Rotas</h1>
             <p className="text-muted-foreground">Acompanhamento em tempo real das entregas</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              <Input
+                type="date"
+                value={dataSelecionada}
+                onChange={(e) => setDataSelecionada(e.target.value || todayISO())}
+                className="h-8 w-[150px] border-0 p-0 focus-visible:ring-0"
+              />
+              <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setDataSelecionada(todayISO())}>
+                Hoje
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+              <Switch id="mostrar-antigas" checked={mostrarAntigas} onCheckedChange={setMostrarAntigas} />
+              <Label htmlFor="mostrar-antigas" className="text-xs cursor-pointer">
+                Incluir rotas antigas em aberto
+              </Label>
+            </div>
             <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
               <Truck className="w-4 h-4 mr-1" /> Iniciar Monitoramento
             </Button>
-            <Button variant="outline" size="sm" onClick={() => { loadRotas(); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
+            <Button variant="outline" size="sm" onClick={() => { loadRotas(dataSelecionada, mostrarAntigas); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
               <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowConfig(true)}>
