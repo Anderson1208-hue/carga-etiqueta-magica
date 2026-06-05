@@ -50,6 +50,8 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@supabase/supabase-js": "^2.93.3",
         "@tanstack/react-query": "^5.83.0",
+        "@transistorsoft/capacitor-background-fetch": "^8.1.3",
+        "@transistorsoft/capacitor-background-geolocation": "^9.1.1",
         "@types/leaflet": "^1.9.21",
         "@types/qrcode": "^1.5.6",
         "@yudiel/react-qr-scanner": "^2.5.1",
@@ -468,6 +470,14 @@
     "@testing-library/react": ["@testing-library/react@16.3.2", "", { "dependencies": { "@babel/runtime": "^7.12.5" }, "peerDependencies": { "@types/react": "^18.0.0 || ^19.0.0", "@types/react-dom": "^18.0.0 || ^19.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" } }, "sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
+
+    "@transistorsoft/background-fetch-types": ["@transistorsoft/background-fetch-types@1.0.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/background-fetch-types/-/background-fetch-types-1.0.0.tgz", {}, "sha512-dfkUpAps8cVvtJlOCM8BmVAgcboyz0pg0GtfwsWnnezG2KbvV9nrt/z0s8Ksk3stEW0dSX59XMqUAF7/48OR5w=="],
+
+    "@transistorsoft/background-geolocation-types": ["@transistorsoft/background-geolocation-types@5.1.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/background-geolocation-types/-/background-geolocation-types-5.1.1.tgz", {}, "sha512-ygzz169W6rs+HoRan0PIWaRgAnzPo4gkhPleYcsnmYEAk050+hpokKiAWAlLbXP89vHsGruhfw87d9kPTsakEQ=="],
+
+    "@transistorsoft/capacitor-background-fetch": ["@transistorsoft/capacitor-background-fetch@8.1.3", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/capacitor-background-fetch/-/capacitor-background-fetch-8.1.3.tgz", { "dependencies": { "@transistorsoft/background-fetch-types": "^1.0.0" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-LxDDc8KGP88iMDd184oNRcQAmvQD0X66rY7EMcQk2s8BGfkPHnKwRW+abYY2jNWi+Rm/AVyBi66L9wygBtwWJQ=="],
+
+    "@transistorsoft/capacitor-background-geolocation": ["@transistorsoft/capacitor-background-geolocation@9.1.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/capacitor-background-geolocation/-/capacitor-background-geolocation-9.1.1.tgz", { "dependencies": { "@transistorsoft/background-geolocation-types": "^5.1.0", "tslib": "^2.8.1" }, "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-gTDLvJU4IfL//SwYzm2zjmMb/DtXvTvYEF2O1xR6JU8hsZO/OIqt6SYxOVtHtF+dJTPXw/FSjJkimgsQsU+Aew=="],
 
     "@types/chai": ["@types/chai@5.2.3", "", { "dependencies": { "@types/deep-eql": "*", "assertion-error": "^2.0.1" } }, "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA=="],
 
