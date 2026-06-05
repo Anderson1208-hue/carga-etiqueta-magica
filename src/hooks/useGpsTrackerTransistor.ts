@@ -10,6 +10,7 @@ import {
   DesiredAccuracy,
   LogLevel,
   NotificationPriority,
+  PersistMode,
 } from "@transistorsoft/background-geolocation-types";
 import { enqueue, pendingCount } from "@/lib/gpsQueue";
 import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
@@ -74,9 +75,18 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 // Estado global do plugin: ele deve ser .ready() uma única vez por processo.
 let pluginReady = false;
 let readyPromise: Promise<void> | null = null;
+let currentDistanceFilter: number | null = null;
 
-async function ensurePluginReady(distanceFilter: number): Promise<void> {
-  if (pluginReady) return;
+export async function ensureTransistorGpsReady(distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros): Promise<void> {
+  if (pluginReady) {
+    if (currentDistanceFilter !== distanceFilter) {
+      await BackgroundGeolocation.setConfig({
+        geolocation: { distanceFilter },
+      });
+      currentDistanceFilter = distanceFilter;
+    }
+    return;
+  }
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
@@ -113,6 +123,11 @@ async function ensurePluginReady(distanceFilter: number): Promise<void> {
         autoSync: false,
         batchSync: false,
       },
+      persistence: {
+        persistMode: PersistMode.All,
+        maxDaysToPersist: 1,
+        maxRecordsToPersist: 1000,
+      },
       logger: {
         debug: import.meta.env.VITE_BUILD_ENV !== "prod",
         logLevel:
@@ -120,6 +135,7 @@ async function ensurePluginReady(distanceFilter: number): Promise<void> {
       },
     });
     pluginReady = true;
+    currentDistanceFilter = distanceFilter;
   })();
 
   return readyPromise;
@@ -199,7 +215,7 @@ export function useGpsTrackerTransistor({
     async function startTracking() {
       if (startedRef.current) return;
       try {
-        await ensurePluginReady(cfg.distance_filter_metros);
+        await ensureTransistorGpsReady(cfg.distance_filter_metros);
         if (cancelled) return;
 
         // Listeners
