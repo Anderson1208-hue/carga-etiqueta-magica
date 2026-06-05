@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
-import BackgroundGeolocation, {
+import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
+import type {
   Location,
   MotionChangeEvent,
   ProviderChangeEvent,
+} from "@transistorsoft/capacitor-background-geolocation";
+import {
   DesiredAccuracy,
   LogLevel,
   NotificationPriority,
-} from "@transistorsoft/capacitor-background-geolocation";
+} from "@transistorsoft/background-geolocation-types";
 import { enqueue, pendingCount } from "@/lib/gpsQueue";
 import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
 
