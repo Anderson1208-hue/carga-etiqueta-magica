@@ -6,6 +6,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -24,10 +26,23 @@ import {
   RefreshCw,
   Truck,
   Bell,
+  CalendarDays,
 } from "lucide-react";
 import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import type { MonitoramentoRota } from "@/components/monitoramento/types";
+
+const normalizePlate = (placa?: string | null) =>
+  (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+const todayISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
+
 
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
