@@ -4,6 +4,9 @@ import BackgroundGeolocation, {
   Location,
   MotionChangeEvent,
   ProviderChangeEvent,
+  DesiredAccuracy,
+  LogLevel,
+  NotificationPriority,
 } from "@transistorsoft/capacitor-background-geolocation";
 import { enqueue, pendingCount } from "@/lib/gpsQueue";
 import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
