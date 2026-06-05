@@ -6,6 +6,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -24,6 +26,7 @@ import {
   RefreshCw,
   Truck,
   Bell,
+  CalendarDays,
 } from "lucide-react";
 import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
@@ -31,6 +34,16 @@ import type { MonitoramentoRota } from "@/components/monitoramento/types";
 
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
+const todayISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
+
+
 
 type TorreRotaRow = MonitoramentoRota & { created_at: string };
 type VeiculoBaixadoRow = { id: string };
@@ -40,27 +53,21 @@ export default function TorreControle() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
 
-  const loadRotas = useCallback(async () => {
+  const loadRotas = useCallback(async (dataFiltro: string) => {
     try {
-      const inicioHoje = new Date();
-      inicioHoje.setHours(0, 0, 0, 0);
       const rotasAll = await fetchAllPages<TorreRotaRow>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
+          .eq("data", dataFiltro)
           .order("created_at", { ascending: false })
           .range(from, to)
       );
-      const inicioHojeIso = inicioHoje.toISOString();
-      const rotasVisiveis = rotasAll.filter((r) =>
-        r.status === "ativa" ||
-        r.created_at >= inicioHojeIso ||
-        (r.ultima_atualizacao && r.ultima_atualizacao >= inicioHojeIso)
-      );
 
       // Exclui rotas de veículos que já tiveram baixa na prestação de contas
-      const veiculoIds = Array.from(new Set(rotasVisiveis.map((r) => r.veiculo_id).filter(Boolean)));
+      const veiculoIds = Array.from(new Set(rotasAll.map((r) => r.veiculo_id).filter(Boolean)));
       let baixados = new Set<string>();
       if (veiculoIds.length > 0) {
         const { data: veics } = await supabase
@@ -70,7 +77,7 @@ export default function TorreControle() {
           .not("prestacao_contas_em", "is", null);
         baixados = new Set(((veics || []) as VeiculoBaixadoRow[]).map((v) => v.id));
       }
-      const rotasFiltradas = rotasVisiveis.filter((r) => !baixados.has(r.veiculo_id));
+      const rotasFiltradas = rotasAll.filter((r) => !baixados.has(r.veiculo_id));
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc por created_at)
       const seenVeic = new Set<string>();
       const rotasDedup = rotasFiltradas.filter((r) => {
@@ -82,23 +89,27 @@ export default function TorreControle() {
       });
       setRotas(rotasDedup);
 
-      // Load alert counts per route (paginado)
-      const alertas = await fetchAllPages<AlertaCountRow>((from, to) =>
-        supabase
-          .from("alertas_monitoramento")
-          .select("monitoramento_rota_id")
-          .eq("lido", false)
-          .order("created_at", { ascending: false })
-          .range(from, to)
-      );
-
-      const counts: Record<string, number> = {};
-      (alertas || []).forEach((a) => {
-        if (!a.monitoramento_rota_id) return;
-        counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
-      });
-      setAlertasCount(counts);
-
+      // Alertas apenas das rotas exibidas
+      const rotaIds = rotasDedup.map((r) => r.id);
+      if (rotaIds.length === 0) {
+        setAlertasCount({});
+      } else {
+        const alertas = await fetchAllPages<AlertaCountRow>((from, to) =>
+          supabase
+            .from("alertas_monitoramento")
+            .select("monitoramento_rota_id")
+            .eq("lido", false)
+            .in("monitoramento_rota_id", rotaIds)
+            .order("created_at", { ascending: false })
+            .range(from, to)
+        );
+        const counts: Record<string, number> = {};
+        (alertas || []).forEach((a) => {
+          if (!a.monitoramento_rota_id) return;
+          counts[a.monitoramento_rota_id] = (counts[a.monitoramento_rota_id] || 0) + 1;
+        });
+        setAlertasCount(counts);
+      }
     } catch (err) {
       console.error("Erro ao carregar rotas:", err);
     } finally {
@@ -107,7 +118,8 @@ export default function TorreControle() {
   }, []);
 
   useEffect(() => {
-    loadRotas();
+    setLoading(true);
+    loadRotas(dataSelecionada);
 
     // Realtime updates for routes and vehicle accountability changes
     const channel = supabase
@@ -116,22 +128,23 @@ export default function TorreControle() {
         event: "*",
         schema: "public",
         table: "monitoramento_rotas",
-      }, () => loadRotas())
+      }, () => loadRotas(dataSelecionada))
       .on("postgres_changes", {
         event: "UPDATE",
         schema: "public",
         table: "veiculos",
-      }, () => loadRotas())
+      }, () => loadRotas(dataSelecionada))
       .subscribe();
 
     // Auto-refresh a cada 60s como fallback
-    const interval = setInterval(() => loadRotas(), 60000);
+    const interval = setInterval(() => loadRotas(dataSelecionada), 60000);
 
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [loadRotas]);
+  }, [loadRotas, dataSelecionada]);
+
 
   function formatDateTime(iso: string | null) {
     if (!iso) return "—";
@@ -169,13 +182,30 @@ export default function TorreControle() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Torre de Controle</h1>
-            <p className="text-muted-foreground">Visão geral de todos os veículos em operação</p>
+            <p className="text-muted-foreground">Veículos em operação na data selecionada</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={loadRotas}>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col">
+              <Label htmlFor="torre-data" className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <CalendarDays className="w-3 h-3" /> Data da operação
+              </Label>
+              <Input
+                id="torre-data"
+                type="date"
+                value={dataSelecionada}
+                onChange={(e) => setDataSelecionada(e.target.value || todayISO())}
+                className="h-9 w-[170px]"
+              />
+            </div>
+            {dataSelecionada !== todayISO() && (
+              <Button variant="outline" size="sm" onClick={() => setDataSelecionada(todayISO())}>
+                Hoje
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => loadRotas(dataSelecionada)}>
               <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
             </Button>
             <Link to="/monitoramento-rotas">
@@ -185,6 +215,7 @@ export default function TorreControle() {
             </Link>
           </div>
         </div>
+
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
