@@ -44,8 +44,6 @@ const todayISO = () => {
 };
 
 
-const normalizePlate = (placa?: string | null) =>
-  (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 
 type TorreRotaRow = MonitoramentoRota & { created_at: string };
 type VeiculoBaixadoRow = { id: string };
