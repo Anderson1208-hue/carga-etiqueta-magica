@@ -13,7 +13,7 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
-import { ValidacaoGpsBackground, VALIDATION_KEY, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
+import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { Capacitor } from "@capacitor/core";
 import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
