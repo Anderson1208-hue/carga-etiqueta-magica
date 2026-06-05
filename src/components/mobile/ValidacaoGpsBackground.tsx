@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
+import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
+import type { Location, Subscription } from "@transistorsoft/capacitor-background-geolocation";
+import { AuthorizationStatus, DesiredAccuracy } from "@transistorsoft/background-geolocation-types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CheckCircle2, Lock, MapPin, Settings, XCircle } from "lucide-react";
+import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
 
 /**
  * Wizard de validação ativa do GPS em background do APK Motorista.
@@ -20,15 +24,6 @@ import { AlertTriangle, CheckCircle2, Lock, MapPin, Settings, XCircle } from "lu
  * Fluxo: Intro -> Abrir Configurações -> Teste 90s tela bloqueada -> OK/Falha.
  * Persiste sucesso em localStorage por 14 dias (chave bg_gps_validated_v2_at).
  */
-
-interface BgLocation { latitude: number; longitude: number; accuracy: number; time: number | null; }
-interface BgWatcherOptions { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number; }
-interface BackgroundGeolocationPlugin {
-  addWatcher(opts: BgWatcherOptions, cb: (loc: BgLocation | null, err?: { code: string; message: string }) => void): Promise<string>;
-  removeWatcher(opts: { id: string }): Promise<void>;
-  openSettings(): Promise<void>;
-}
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
 export const VALIDATION_KEY = "bg_gps_validated_v2_at";
 export const VALIDATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
