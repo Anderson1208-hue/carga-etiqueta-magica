@@ -264,7 +264,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
               variant="outline"
               className="w-full"
               size="lg"
-              onClick={() => BackgroundGeolocation.openSettings().catch(() => setPermError("Não foi possível abrir as configurações."))}
+              onClick={() => BackgroundGeolocation.requestPermission().catch(() => setPermError("Não foi possível abrir as permissões de localização."))}
             >
               <Settings className="w-4 h-4 mr-2" />
               Abrir configurações
