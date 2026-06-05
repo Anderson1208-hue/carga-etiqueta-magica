@@ -182,13 +182,30 @@ export default function TorreControle() {
     <MainLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Torre de Controle</h1>
-            <p className="text-muted-foreground">Visão geral de todos os veículos em operação</p>
+            <p className="text-muted-foreground">Veículos em operação na data selecionada</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={loadRotas}>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex flex-col">
+              <Label htmlFor="torre-data" className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                <CalendarDays className="w-3 h-3" /> Data da operação
+              </Label>
+              <Input
+                id="torre-data"
+                type="date"
+                value={dataSelecionada}
+                onChange={(e) => setDataSelecionada(e.target.value || todayISO())}
+                className="h-9 w-[170px]"
+              />
+            </div>
+            {dataSelecionada !== todayISO() && (
+              <Button variant="outline" size="sm" onClick={() => setDataSelecionada(todayISO())}>
+                Hoje
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => loadRotas(dataSelecionada)}>
               <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
             </Button>
             <Link to="/monitoramento-rotas">
@@ -198,6 +215,7 @@ export default function TorreControle() {
             </Link>
           </div>
         </div>
+
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
