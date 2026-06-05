@@ -170,7 +170,10 @@ export function useGpsTrackerTransistor({
         latitude,
         longitude,
         accuracy: accuracy ?? 0,
-        timestamp: location.timestamp || new Date().toISOString(),
+        timestamp:
+          typeof location.timestamp === "string"
+            ? location.timestamp
+            : new Date(location.timestamp || Date.now()).toISOString(),
         heartbeat: false,
       });
       markEnqueue({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0 });
