@@ -80,6 +80,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
   const isHiddenRef = useRef(false);
   const bgCallbacksRef = useRef(0);
   const screenLockedRef = useRef(false);
+  const validatedRef = useRef(false);
 
   function countBackgroundPoint(_location?: Location) {
     setCallbacks((c) => c + 1);
@@ -99,6 +100,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       setScreenLockedAtLeastOnce(false);
       bgCallbacksRef.current = 0;
       screenLockedRef.current = false;
+      validatedRef.current = false;
     }
   }, [open]);
 
@@ -179,7 +181,12 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       try { sub.remove(); } catch { /* ignore */ }
     }
     subscriptionsRef.current = [];
-    try { await BackgroundGeolocation.stop(); } catch { /* ignore */ }
+    // Se o teste passou, NÃO pare o serviço: o tracker real entra logo em
+    // seguida e apenas reconfigura a rota. Parar aqui derruba o Foreground
+    // Service exatamente antes do teste com tela bloqueada.
+    if (_finalStep !== "success") {
+      try { await BackgroundGeolocation.stop(); } catch { /* ignore */ }
+    }
     setStep(_finalStep);
   }
 
@@ -192,6 +199,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       return;
     }
     if (bgCallbacksRef.current >= MIN_CALLBACKS_REQUIRED) {
+      validatedRef.current = true;
       try { localStorage.setItem(VALIDATION_KEY, String(Date.now())); } catch { /* ignore */ }
       stopTest("success");
     } else {
@@ -208,7 +216,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     for (const sub of subscriptionsRef.current) {
       try { sub.remove(); } catch { /* ignore */ }
     }
-    BackgroundGeolocation.stop().catch(() => {});
+    if (!validatedRef.current) BackgroundGeolocation.stop().catch(() => {});
   }, []);
 
   if (!open) return null;
