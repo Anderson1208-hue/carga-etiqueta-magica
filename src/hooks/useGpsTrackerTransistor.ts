@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
 import type {
+  Config,
   HttpEvent,
   Location,
   MotionChangeEvent,
@@ -90,7 +91,7 @@ let readyPromise: Promise<void> | null = null;
 let currentDistanceFilter: number | null = null;
 let currentNativeRouteId: string | null = null;
 
-function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFilter: number) {
+function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFilter: number): Config {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -202,7 +203,6 @@ export function useGpsTrackerTransistor({
   const rotaIdRef = useRef<string | null>(monitoramentoRotaId);
   const paradasCoordsRef = useRef<{ lat: number; lng: number }[]>(paradasCoords ?? []);
   const raioAproxRef = useRef<number>(cfg.raio_aproximacao_metros);
-  const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const startedRef = useRef<boolean>(false);
 
   useEffect(() => { rotaIdRef.current = monitoramentoRotaId; }, [monitoramentoRotaId]);
@@ -213,7 +213,7 @@ export function useGpsTrackerTransistor({
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modoCritico, setModoCritico] = useState(false);
-  const [pendingQueue, setPendingQueue] = useState(0);
+  const [pendingQueue] = useState(0);
 
   const checkModoCritico = useCallback((lat: number, lng: number): boolean => {
     const coords = paradasCoordsRef.current;
@@ -224,48 +224,39 @@ export function useGpsTrackerTransistor({
 
   const handleLocation = useCallback(async (location: Location) => {
     const { latitude, longitude, accuracy } = location.coords;
-    lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
     setLastPosition({ lat: latitude, lng: longitude });
 
     const critico = checkModoCritico(latitude, longitude);
     setModoCritico(critico);
 
-    const rotaId = rotaIdRef.current;
-    if (!rotaId) return; // serviço vivo, mas sem rota → não enfileira
-
-    try {
-      await enqueue({
-        monitoramento_rota_id: rotaId,
-        latitude,
-        longitude,
-        accuracy: accuracy ?? 0,
-        timestamp:
-          typeof location.timestamp === "string"
-            ? location.timestamp
-            : new Date(location.timestamp || Date.now()).toISOString(),
-        heartbeat: false,
-      });
-      markEnqueue({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0 });
-      setPendingQueue(await pendingCount());
-      setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[GPS Transistor] enqueue falhou", err);
-      markError(msg);
-    }
+    // Apenas telemetria local para diagnóstico. O envio real agora é NATIVO
+    // pelo HTTP service do Transistorsoft, sem depender da WebView acordada.
+    if (rotaIdRef.current) markEnqueue({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0 });
+    setError(null);
   }, [checkModoCritico]);
+
+  const handleHttp = useCallback((event: HttpEvent) => {
+    if (event.success && event.status >= 200 && event.status < 300) {
+      markSent(1);
+      setError(null);
+      return;
+    }
+    const msg = `HTTP nativo GPS falhou (${event.status}): ${event.responseText || "sem resposta"}`;
+    console.warn("[GPS Transistor]", msg);
+    markError(msg);
+    setError(msg);
+  }, []);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     let cancelled = false;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     const subscriptions: Array<{ remove: () => void }> = [];
 
     async function startTracking() {
       if (startedRef.current) return;
       try {
-        await ensureTransistorGpsReady(cfg.distance_filter_metros);
+        await ensureTransistorGpsReady(cfg.distance_filter_metros, monitoramentoRotaId);
         if (cancelled) return;
 
         // Listeners
@@ -291,6 +282,9 @@ export function useGpsTrackerTransistor({
           console.info("[GPS Transistor] motionChange", event.isMoving);
         });
         subscriptions.push(subMotion);
+
+        const subHttp = BackgroundGeolocation.onHttp(handleHttp);
+        subscriptions.push(subHttp);
 
         const state = await BackgroundGeolocation.start();
         if (cancelled) {
@@ -325,36 +319,15 @@ export function useGpsTrackerTransistor({
 
     if (enabled) {
       startTracking();
-
-      // Heartbeat de aplicação: a cada 30s enfileira última posição como heartbeat.
-      heartbeatTimer = setInterval(async () => {
-        const last = lastPositionRef.current;
-        const rotaId = rotaIdRef.current;
-        if (!last || !rotaId) return;
-        try {
-          await enqueue({
-            monitoramento_rota_id: rotaId,
-            latitude: last.lat,
-            longitude: last.lng,
-            accuracy: last.accuracy,
-            timestamp: new Date().toISOString(),
-            heartbeat: true,
-          });
-          setPendingQueue(await pendingCount());
-        } catch (err) {
-          console.warn("[GPS Transistor] heartbeat enqueue falhou", err);
-        }
-      }, HEARTBEAT_MS);
     } else {
       stopTracking();
     }
 
     return () => {
       cancelled = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
       stopTracking();
     };
-  }, [enabled, handleLocation, cfg.distance_filter_metros]);
+  }, [enabled, handleLocation, handleHttp, cfg.distance_filter_metros, monitoramentoRotaId]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
