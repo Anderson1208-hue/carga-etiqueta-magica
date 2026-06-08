@@ -1519,6 +1519,7 @@ export type Database = {
           longitude: number
           monitoramento_rota_id: string
           registrado_em: string
+          source: string
         }
         Insert: {
           accuracy?: number | null
@@ -1529,6 +1530,7 @@ export type Database = {
           longitude: number
           monitoramento_rota_id: string
           registrado_em?: string
+          source?: string
         }
         Update: {
           accuracy?: number | null
@@ -1539,6 +1541,7 @@ export type Database = {
           longitude?: number
           monitoramento_rota_id?: string
           registrado_em?: string
+          source?: string
         }
         Relationships: [
           {
