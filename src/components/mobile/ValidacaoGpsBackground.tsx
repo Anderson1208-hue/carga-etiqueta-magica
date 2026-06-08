@@ -2,12 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
 import type { Location, Subscription } from "@transistorsoft/capacitor-background-geolocation";
-import { AuthorizationStatus, DesiredAccuracy } from "@transistorsoft/background-geolocation-types";
+import { AuthorizationStatus } from "@transistorsoft/background-geolocation-types";
+import { NativeSettings, AndroidSettings, IOSSettings } from "capacitor-native-settings";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, CheckCircle2, Lock, MapPin, Settings, XCircle } from "lucide-react";
 import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
+
+async function openAppDetailsSettings(): Promise<void> {
+  // 1) Tenta a tela "Detalhes do app" (onde fica Permissões → Localização)
+  try {
+    await NativeSettings.open({
+      optionAndroid: AndroidSettings.ApplicationDetails,
+      optionIOS: IOSSettings.App,
+    });
+    return;
+  } catch { /* tenta fallback */ }
+  // 2) Fallback: pedido nativo de permissão de localização do plugin
+  try { await BackgroundGeolocation.requestPermission(); } catch { /* ignore */ }
+}
 
 /**
  * Wizard de validação ativa do GPS em background do APK Motorista.
@@ -264,7 +278,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
               variant="outline"
               className="w-full"
               size="lg"
-              onClick={() => BackgroundGeolocation.requestPermission().catch(() => setPermError("Não foi possível abrir as permissões de localização."))}
+              onClick={() => openAppDetailsSettings().catch(() => setPermError("Não foi possível abrir as configurações do app. Abra manualmente: Ajustes → Apps → Orkestria Driver → Permissões → Localização."))}
             >
               <Settings className="w-4 h-4 mr-2" />
               Abrir configurações
