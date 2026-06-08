@@ -291,6 +291,11 @@ export default function MotoristaDiagnostico() {
       `User-Agent: ${navigator.userAgent}`,
       `Online: ${online}`,
       `Permissão GPS: ${perm}`,
+      `provider.status: ${tele.nativeProviderStatus ?? "—"} (${tele.nativeProviderStatusText ?? "—"})`,
+      `provider.enabled/gps/network: ${tele.nativeProviderEnabled ?? "—"}/${tele.nativeProviderGps ?? "—"}/${tele.nativeProviderNetwork ?? "—"}`,
+      `requestPermission(): ${tele.nativeRequestPermissionStatus ?? "—"} (${tele.nativeRequestPermissionText ?? "—"}) erro=${tele.nativeRequestPermissionError ?? "—"}`,
+      `ready(): ${fmtTime(tele.nativeReadyAt)} enabled=${tele.nativeReadyEnabled ?? "—"} erro=${tele.nativeReadyError ?? "—"}`,
+      `backgroundPermissionRationale: ${tele.nativeBackgroundPermissionRationale ?? "—"}`,
       `Driver ativo: ${tele.activeDriver ?? (isNative ? "desconhecido" : "web")}`,
       `Rota nativa: ${tele.nativeRouteId ?? diagRotaId ?? "—"}`,
       `BackgroundGeolocation.start(): chamado=${fmtTime(tele.nativeStartCalledAt)} sucesso=${fmtTime(tele.nativeStartSucceededAt)}`,
@@ -466,6 +471,8 @@ export default function MotoristaDiagnostico() {
       : "Nativo — aguardando start"
     : "Web (navigator.geolocation)";
   const fsActive = tele.nativeForegroundServiceActive === true;
+  const authorizationAlways = tele.nativeProviderStatus === AuthorizationStatus.Always;
+  const trackerDisplay = fsActive ? "ATIVO" : diagRotaId ? "Sem serviço" : "Inativo";
 
   return (
     <div className="min-h-screen bg-background pb-8">
