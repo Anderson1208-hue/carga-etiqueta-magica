@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, markSent, markError, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { readTelemetry, markSent, markError, markNativeState, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
@@ -107,6 +107,9 @@ export default function MotoristaDiagnostico() {
   const [posLoading, setPosLoading] = useState(false);
   const [queue, setQueue] = useState<number>(0);
   const [tele, setTele] = useState<GpsTelemetry>(readTelemetry());
+  const [nativeStateError, setNativeStateError] = useState<string | null>(null);
+  const [lastDbSource, setLastDbSource] = useState<string | null>(null);
+  const [lastDbPointAt, setLastDbPointAt] = useState<number | null>(null);
   const [wakeSupported] = useState<boolean>(typeof navigator !== "undefined" && "wakeLock" in navigator);
   const [tick, setTick] = useState(0);
 
@@ -174,8 +177,19 @@ export default function MotoristaDiagnostico() {
       try {
         const provider = await BackgroundGeolocation.getProviderState();
         setPerm(permFromNativeStatus(provider.status));
+        const state = await BackgroundGeolocation.getState();
+        const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+          pendingLocations,
+        });
+        setNativeStateError(null);
       } catch {
         setPerm("unknown");
+        setNativeStateError("Não foi possível ler o estado nativo do Transistorsoft");
       }
     } else if ("permissions" in navigator) {
       try {
@@ -185,6 +199,23 @@ export default function MotoristaDiagnostico() {
         setPerm(p.state === "granted" ? "granted" : p.state === "denied" ? "denied" : "prompt");
       } catch {
         setPerm("unknown");
+      }
+    }
+    if (diagRotaId) {
+      try {
+        const { data } = await supabase
+          .from("posicoes_gps")
+          .select("source, registrado_em")
+          .eq("monitoramento_rota_id", diagRotaId)
+          .order("registrado_em", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setLastDbSource((data as { source?: string } | null)?.source ?? null);
+        const ts = (data as { registrado_em?: string } | null)?.registrado_em;
+        setLastDbPointAt(ts ? new Date(ts).getTime() : null);
+      } catch {
+        setLastDbSource(null);
+        setLastDbPointAt(null);
       }
     }
   }, [isNative]);
