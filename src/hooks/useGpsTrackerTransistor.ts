@@ -41,12 +41,11 @@ import {
  * - Sobrevive a app encerrado pelo SO (stopOnTerminate=false, startOnBoot=true).
  * - Foreground Service nativo com notificação persistente já gerenciado pelo plugin.
  *
- * Estratégia (Fase 1 — debug, sem licença release):
+ * Estratégia:
  * - Posições do plugin → HTTP NATIVO do Transistorsoft → processar-gps.
  *   Isto evita depender de callbacks JS/IndexedDB da WebView com tela bloqueada.
- * - Sem licença: builds debug funcionam plenamente; release exibe aviso
- *   ("BackgroundGeolocation is for evaluation purposes only") mas continua
- *   coletando — suficiente para validar tela bloqueada antes de comprar.
+ * - Builds Android release precisam de licença Transistorsoft no Manifest.
+ *   Sem licença, use APK debug apenas para validação técnica.
  */
 
 interface GpsConfig {
