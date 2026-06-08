@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, markSent, markError, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import { readTelemetry, markSent, markError, markNativeState, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
@@ -107,6 +107,9 @@ export default function MotoristaDiagnostico() {
   const [posLoading, setPosLoading] = useState(false);
   const [queue, setQueue] = useState<number>(0);
   const [tele, setTele] = useState<GpsTelemetry>(readTelemetry());
+  const [nativeStateError, setNativeStateError] = useState<string | null>(null);
+  const [lastDbSource, setLastDbSource] = useState<string | null>(null);
+  const [lastDbPointAt, setLastDbPointAt] = useState<number | null>(null);
   const [wakeSupported] = useState<boolean>(typeof navigator !== "undefined" && "wakeLock" in navigator);
   const [tick, setTick] = useState(0);
 
@@ -140,8 +143,12 @@ export default function MotoristaDiagnostico() {
         if (!error && !data?.error && data?.monitoramento_rota_id) {
           try { localStorage.setItem("motorista-last-rota-id", data.monitoramento_rota_id); } catch { /* ignore */ }
           setDiagRotaId(data.monitoramento_rota_id);
+          setLastDbSource(data.ultimo_gps_source ?? null);
+          setLastDbPointAt(data.ultimo_gps_registrado_em ? new Date(data.ultimo_gps_registrado_em).getTime() : null);
         } else {
           setDiagRotaId(null);
+          setLastDbSource(null);
+          setLastDbPointAt(null);
         }
       } catch {
         /* ignore — tenta de novo no próximo tick */
@@ -174,8 +181,19 @@ export default function MotoristaDiagnostico() {
       try {
         const provider = await BackgroundGeolocation.getProviderState();
         setPerm(permFromNativeStatus(provider.status));
+        const state = await BackgroundGeolocation.getState();
+        const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+          pendingLocations,
+        });
+        setNativeStateError(null);
       } catch {
         setPerm("unknown");
+        setNativeStateError("Não foi possível ler o estado nativo do Transistorsoft");
       }
     } else if ("permissions" in navigator) {
       try {
@@ -187,7 +205,24 @@ export default function MotoristaDiagnostico() {
         setPerm("unknown");
       }
     }
-  }, [isNative]);
+    if (diagRotaId) {
+      try {
+        const { data } = await supabase
+          .from("posicoes_gps")
+          .select("source, registrado_em")
+          .eq("monitoramento_rota_id", diagRotaId)
+          .order("registrado_em", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setLastDbSource((data as { source?: string } | null)?.source ?? null);
+        const ts = (data as { registrado_em?: string } | null)?.registrado_em;
+        setLastDbPointAt(ts ? new Date(ts).getTime() : null);
+      } catch {
+        setLastDbSource(null);
+        setLastDbPointAt(null);
+      }
+    }
+  }, [isNative, diagRotaId]);
 
   const captureGps = useCallback(() => {
     if (!navigator.geolocation) {
@@ -240,6 +275,19 @@ export default function MotoristaDiagnostico() {
       `User-Agent: ${navigator.userAgent}`,
       `Online: ${online}`,
       `Permissão GPS: ${perm}`,
+      `Driver ativo: ${tele.activeDriver ?? (isNative ? "desconhecido" : "web")}`,
+      `Rota nativa: ${tele.nativeRouteId ?? diagRotaId ?? "—"}`,
+      `BackgroundGeolocation.start(): chamado=${fmtTime(tele.nativeStartCalledAt)} sucesso=${fmtTime(tele.nativeStartSucceededAt)}`,
+      `state.enabled: ${tele.nativeStateEnabled ?? "—"}`,
+      `state.isMoving: ${tele.nativeStateIsMoving ?? "—"}`,
+      `trackingMode: ${tele.nativeTrackingMode ?? "—"}`,
+      `ForegroundService: ${tele.nativeForegroundServiceActive ?? "—"}`,
+      `Notificação configurada: ${tele.nativeNotificationConfigured ?? "—"}`,
+      `HTTP nativo: url=${tele.nativeHttpUrlConfigured ?? "—"} autoSync=${tele.nativeHttpAutoSync ?? "—"} source=${tele.nativeSource ?? "—"}`,
+      `Último onLocation nativo: ${fmtTime(tele.nativeLastLocationAt)} (${fmtAgo(tele.nativeLastLocationAt)})`,
+      `Último HTTP nativo: ${fmtTime(tele.nativeHttpLastAt)} status=${tele.nativeHttpLastStatus ?? "—"} ok=${tele.nativeHttpLastSuccess ?? "—"}`,
+      `Source último ponto DB: ${lastDbSource ?? "—"} (${fmtAgo(lastDbPointAt)})`,
+      `Pendentes SQLite nativo: ${tele.nativePendingLocations ?? "—"}`,
       `WakeLock suportado: ${wakeSupported}`,
       `Posição atual: ${pos ? `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)} (±${Math.round(pos.accuracy)}m)` : "—"}`,
       `Erro GPS: ${posError ?? "—"}`,
@@ -248,6 +296,7 @@ export default function MotoristaDiagnostico() {
       `Último ponto na fila: ${fmtTime(tele.lastEnqueueAt)} (${fmtAgo(tele.lastEnqueueAt)})`,
       `Último envio OK: ${fmtTime(tele.lastSentAt)} (${fmtAgo(tele.lastSentAt)}) - ${tele.lastSentCount} pts`,
       `Último erro: ${fmtTime(tele.lastErrorAt)} - ${tele.lastError ?? "—"}`,
+      `Erro estado nativo: ${nativeStateError ?? "—"}`,
     ].join("\n");
     navigator.clipboard?.writeText(lines).then(
       () => toast({ title: "Diagnóstico copiado", description: "Cole no WhatsApp do suporte." }),
@@ -340,6 +389,7 @@ export default function MotoristaDiagnostico() {
           longitude: fresh.lng,
           accuracy: fresh.accuracy,
           heartbeat: false,
+          source: "manual-diagnostic",
         },
       });
       if (gpsErr) throw new Error(`Backend: ${gpsErr.message}`);
@@ -364,8 +414,12 @@ export default function MotoristaDiagnostico() {
     }
   }
 
-  const trackerMode = isNative ? "Nativo (Foreground Service)" : "Web (navigator.geolocation)";
-  const fsActive = isNative && diagTrackerEnabled && tele.watcherStartedAt !== null;
+  const trackerMode = isNative
+    ? tele.activeDriver === "transistorsoft"
+      ? "Transistorsoft"
+      : "Nativo — aguardando start"
+    : "Web (navigator.geolocation)";
+  const fsActive = tele.nativeForegroundServiceActive === true;
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -489,6 +543,71 @@ export default function MotoristaDiagnostico() {
                     : "Rota encontrada, mas falta conceder a permissão GPS antes de iniciar o rastreador"
                   : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
+            />
+          </CardContent>
+        </Card>
+
+        {/* Transistorsoft nativo */}
+        <Card className="border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Transistorsoft
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 divide-y">
+            <StatusRow
+              label="Driver ativo"
+              value={tele.activeDriver ?? "—"}
+              ok={tele.activeDriver === "transistorsoft" ? true : isNative ? false : null}
+              hint={tele.driverActivatedAt ? fmtTime(tele.driverActivatedAt) : undefined}
+            />
+            <StatusRow
+              label="BackgroundGeolocation.start()"
+              value={tele.nativeStartCalledAt ? fmtAgo(tele.nativeStartCalledAt) : "não chamado"}
+              ok={tele.nativeStartSucceededAt ? true : tele.nativeStartCalledAt ? null : false}
+              hint={tele.nativeStartSucceededAt ? `Sucesso: ${fmtTime(tele.nativeStartSucceededAt)}` : undefined}
+            />
+            <StatusRow
+              label="state.enabled"
+              value={tele.nativeStateEnabled === null ? "—" : String(tele.nativeStateEnabled)}
+              ok={tele.nativeStateEnabled}
+              hint={tele.nativeStateLastAt ? `Lido: ${fmtAgo(tele.nativeStateLastAt)}` : nativeStateError ?? undefined}
+            />
+            <StatusRow
+              label="Foreground Service"
+              value={fsActive ? "Ativo" : "Inativo"}
+              ok={fsActive}
+              hint={tele.nativeNotificationConfigured ? "Notificação persistente configurada" : "Notificação não confirmada no state"}
+            />
+            <StatusRow
+              label="onLocation nativo"
+              value={fmtAgo(tele.nativeLastLocationAt)}
+              ok={tele.nativeLastLocationAt && Date.now() - tele.nativeLastLocationAt < 5 * 60_000 ? true : tele.nativeLastLocationAt ? null : false}
+              hint={tele.nativeLastLocationPos ? `${tele.nativeLastLocationPos.lat.toFixed(5)}, ${tele.nativeLastLocationPos.lng.toFixed(5)} ±${Math.round(tele.nativeLastLocationPos.accuracy)}m` : "Nenhum callback nativo ainda"}
+            />
+            <StatusRow
+              label="HTTP nativo configurado"
+              value={tele.nativeHttpUrlConfigured ? `autoSync ${tele.nativeHttpAutoSync ? "ON" : "OFF"}` : "não"}
+              ok={tele.nativeHttpUrlConfigured === true && tele.nativeHttpAutoSync === true}
+              hint={`source esperado: ${tele.nativeSource ?? "—"}`}
+            />
+            <StatusRow
+              label="Último HTTP nativo"
+              value={tele.nativeHttpLastAt ? `${fmtAgo(tele.nativeHttpLastAt)} • ${tele.nativeHttpLastStatus ?? "—"}` : "—"}
+              ok={tele.nativeHttpLastSuccess === null ? null : tele.nativeHttpLastSuccess}
+              hint={tele.nativeHttpLastResponse ?? undefined}
+            />
+            <StatusRow
+              label="Source do último ponto"
+              value={lastDbSource ?? "—"}
+              ok={lastDbSource === "transistor-native-http" ? true : lastDbSource ? null : false}
+              hint={lastDbPointAt ? fmtTime(lastDbPointAt) : "Sem ponto no banco para esta rota"}
+            />
+            <StatusRow
+              label="Fila nativa SQLite"
+              value={tele.nativePendingLocations === null ? "—" : String(tele.nativePendingLocations)}
+              ok={tele.nativePendingLocations === null ? null : tele.nativePendingLocations < 10}
             />
           </CardContent>
         </Card>

@@ -15,7 +15,17 @@ import {
   NotificationPriority,
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
-import { markEnqueue, markError, markSent, markWatcherStart } from "@/lib/gpsTelemetry";
+import {
+  markEnqueue,
+  markError,
+  markNativeDriver,
+  markNativeHttp,
+  markNativeLocation,
+  markNativeStartCalled,
+  markNativeState,
+  markSent,
+  markWatcherStart,
+} from "@/lib/gpsTelemetry";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation.
@@ -51,6 +61,8 @@ const DEFAULT_CONFIG: GpsConfig = {
   batch_max_posicoes: 5,
   raio_aproximacao_metros: 500,
 };
+
+const NATIVE_SOURCE = "transistor-native-http";
 
 const NATIVE_LOCATION_TEMPLATE = JSON.stringify({
   latitude: "<%= latitude %>",
@@ -146,7 +158,7 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
           },
           params: {
             monitoramento_rota_id: monitoramentoRotaId,
-            source: "transistor-native-http",
+            source: NATIVE_SOURCE,
           },
         }
       : {
@@ -166,12 +178,24 @@ export async function ensureTransistorGpsReady(
   distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
   monitoramentoRotaId: string | null = null
 ): Promise<void> {
+  const markConfig = () => {
+    const cfg = buildNativeUploadConfig(monitoramentoRotaId, distanceFilter);
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: monitoramentoRotaId ? NATIVE_SOURCE : null,
+      httpUrlConfigured: Boolean(cfg.http?.url),
+      httpAutoSync: cfg.http?.autoSync ?? null,
+      notificationConfigured: Boolean(cfg.app?.notification),
+    });
+  };
+
   if (pluginReady) {
     if (currentDistanceFilter !== distanceFilter || currentNativeRouteId !== monitoramentoRotaId) {
       await BackgroundGeolocation.setConfig(buildNativeUploadConfig(monitoramentoRotaId, distanceFilter));
       currentDistanceFilter = distanceFilter;
       currentNativeRouteId = monitoramentoRotaId;
     }
+    markConfig();
     return;
   }
   if (readyPromise) return readyPromise;
@@ -189,6 +213,7 @@ export async function ensureTransistorGpsReady(
     pluginReady = true;
     currentDistanceFilter = distanceFilter;
     currentNativeRouteId = monitoramentoRotaId;
+    markConfig();
   })();
 
   return readyPromise;
@@ -227,6 +252,7 @@ export function useGpsTrackerTransistor({
   const handleLocation = useCallback(async (location: Location) => {
     const { latitude, longitude, accuracy } = location.coords;
     setLastPosition({ lat: latitude, lng: longitude });
+    markNativeLocation({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0, event: location.event ?? null });
 
     const critico = checkModoCritico(latitude, longitude);
     setModoCritico(critico);
@@ -238,6 +264,7 @@ export function useGpsTrackerTransistor({
   }, [checkModoCritico]);
 
   const handleHttp = useCallback((event: HttpEvent) => {
+    markNativeHttp(event);
     if (event.success && event.status >= 200 && event.status < 300) {
       markSent(1);
       setError(null);
@@ -288,7 +315,17 @@ export function useGpsTrackerTransistor({
         const subHttp = BackgroundGeolocation.onHttp(handleHttp);
         subscriptions.push(subHttp);
 
+        markNativeStartCalled();
         const state = await BackgroundGeolocation.start();
+        await BackgroundGeolocation.changePace(true).catch(() => {});
+        const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+          pendingLocations,
+        });
         if (cancelled) {
           await BackgroundGeolocation.stop().catch(() => {});
           return;
@@ -307,7 +344,13 @@ export function useGpsTrackerTransistor({
 
     async function stopTracking() {
       try {
-        await BackgroundGeolocation.stop();
+        const state = await BackgroundGeolocation.stop();
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+        });
       } catch (err) {
         console.warn("[GPS Transistor] stop falhou", err);
       }

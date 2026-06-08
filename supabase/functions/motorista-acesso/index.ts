@@ -242,6 +242,18 @@ Deno.serve(async (req) => {
       rotaAtiva = rotaAtivaPorPlaca;
     }
 
+    let ultimoGps: { source: string | null; registrado_em: string | null } | null = null;
+    if (rotaAtiva?.id) {
+      const { data: posicao } = await supabase
+        .from("posicoes_gps")
+        .select("source, registrado_em")
+        .eq("monitoramento_rota_id", rotaAtiva.id)
+        .order("registrado_em", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      ultimoGps = posicao ?? null;
+    }
+
     return new Response(
       JSON.stringify({
         veiculo: {
@@ -253,6 +265,8 @@ Deno.serve(async (req) => {
         },
         nfs: nfsComStatus,
         monitoramento_rota_id: rotaAtiva?.id ?? null,
+        ultimo_gps_source: ultimoGps?.source ?? null,
+        ultimo_gps_registrado_em: ultimoGps?.registrado_em ?? null,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
