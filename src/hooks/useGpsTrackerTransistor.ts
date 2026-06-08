@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
 import type {
   Config,
@@ -40,12 +41,11 @@ import {
  * - Sobrevive a app encerrado pelo SO (stopOnTerminate=false, startOnBoot=true).
  * - Foreground Service nativo com notificação persistente já gerenciado pelo plugin.
  *
- * Estratégia (Fase 1 — debug, sem licença release):
+ * Estratégia:
  * - Posições do plugin → HTTP NATIVO do Transistorsoft → processar-gps.
  *   Isto evita depender de callbacks JS/IndexedDB da WebView com tela bloqueada.
- * - Sem licença: builds debug funcionam plenamente; release exibe aviso
- *   ("BackgroundGeolocation is for evaluation purposes only") mas continua
- *   coletando — suficiente para validar tela bloqueada antes de comprar.
+ * - Builds Android release precisam de licença Transistorsoft no Manifest.
+ *   Sem licença, use APK debug apenas para validação técnica.
  */
 
 interface GpsConfig {
@@ -67,20 +67,26 @@ const DEFAULT_CONFIG: GpsConfig = {
 };
 
 const NATIVE_SOURCE = "transistor-native-http";
+const NATIVE_LOCATION_INTERVAL_MS = 30_000;
+const NATIVE_FASTEST_INTERVAL_MS = 10_000;
 
-const NATIVE_LOCATION_TEMPLATE = JSON.stringify({
-  latitude: "<%= latitude %>",
-  longitude: "<%= longitude %>",
-  accuracy: "<%= accuracy %>",
-  timestamp: "<%= timestamp %>",
-  heartbeat: false,
-  battery: "<%= battery.level %>",
-  event: "<%= event %>",
-})
-  .replace('"<%= latitude %>"', "<%= latitude %>")
-  .replace('"<%= longitude %>"', "<%= longitude %>")
-  .replace('"<%= accuracy %>"', "<%= accuracy %>")
-  .replace('"<%= battery.level %>"', "<%= battery.level %>");
+function buildNativeLocationTemplate(monitoramentoRotaId: string | null): string {
+  return JSON.stringify({
+    monitoramento_rota_id: monitoramentoRotaId,
+    source: NATIVE_SOURCE,
+    latitude: "<%= latitude %>",
+    longitude: "<%= longitude %>",
+    accuracy: "<%= accuracy %>",
+    timestamp: "<%= timestamp %>",
+    heartbeat: false,
+    battery: "<%= battery.level %>",
+    event: "<%= event %>",
+  })
+    .replace('"<%= latitude %>"', "<%= latitude %>")
+    .replace('"<%= longitude %>"', "<%= longitude %>")
+    .replace('"<%= accuracy %>"', "<%= accuracy %>")
+    .replace('"<%= battery.level %>"', "<%= battery.level %>");
+}
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -110,18 +116,23 @@ let currentNativeRouteId: string | null = null;
 function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFilter: number): Config {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const effectiveDistanceFilter = 0;
 
   return {
     geolocation: {
       desiredAccuracy: DesiredAccuracy.High,
-      distanceFilter,
-      stationaryRadius: 25,
+      // Android ignora locationUpdateInterval quando distanceFilter > 0.
+      // Para a Torre receber pontos mesmo parado / tela bloqueada, usamos
+      // amostragem por tempo e deixamos o HTTP nativo enviar direto.
+      distanceFilter: effectiveDistanceFilter,
+      stationaryRadius: 10,
       locationAuthorizationRequest: "Always" as const,
-      locationUpdateInterval: 30_000,
-      fastestLocationUpdateInterval: 10_000,
+      locationUpdateInterval: NATIVE_LOCATION_INTERVAL_MS,
+      fastestLocationUpdateInterval: NATIVE_FASTEST_INTERVAL_MS,
       allowIdenticalLocations: true,
       pausesLocationUpdatesAutomatically: false,
       disableStopDetection: true,
+      disableElasticity: true,
     },
     activity: {
       disableStopDetection: true,
@@ -131,12 +142,17 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
       heartbeatInterval: 60,
       stopOnTerminate: false,
       startOnBoot: true,
-      enableHeadless: true,
+      // O envio em background deve ser 100% nativo via HttpConfig.
+      // Headless JS não é necessário para gravar/enviar localização e não
+      // pode ser ponto único de falha quando a WebView dorme.
+      enableHeadless: false,
       notification: {
         title: "Orkestria Driver — Rastreamento ativo",
         text: "Sua rota está em andamento",
         sticky: true,
-        priority: NotificationPriority.Default,
+        priority: NotificationPriority.High,
+        channelName: "Rastreamento GPS",
+        channelId: "orkestria_gps_tracking",
         smallIcon: "ic_stat_notify",
       },
       backgroundPermissionRationale: {
@@ -160,10 +176,6 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
             Authorization: `Bearer ${supabaseKey}`,
             apikey: supabaseKey,
           },
-          params: {
-            monitoramento_rota_id: monitoramentoRotaId,
-            source: NATIVE_SOURCE,
-          },
         }
       : {
           autoSync: false,
@@ -173,7 +185,7 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
       persistMode: PersistMode.All,
       maxDaysToPersist: 3,
       maxRecordsToPersist: 5000,
-      locationTemplate: NATIVE_LOCATION_TEMPLATE,
+      locationTemplate: buildNativeLocationTemplate(monitoramentoRotaId),
     },
   };
 }
@@ -229,6 +241,30 @@ export async function ensureTransistorGpsReady(
   })();
 
   return readyPromise;
+}
+
+async function forceNativePosition(reason: string): Promise<Location | null> {
+  try {
+    const location = await BackgroundGeolocation.getCurrentPosition({
+      samples: 1,
+      desiredAccuracy: DesiredAccuracy.High,
+      timeout: 30,
+      maximumAge: 0,
+      persist: true,
+    });
+    markNativeLocation({
+      lat: location.coords.latitude,
+      lng: location.coords.longitude,
+      accuracy: location.coords.accuracy ?? 0,
+      event: location.event ?? reason,
+    });
+    return location;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[GPS Transistor] ${reason} getCurrentPosition falhou`, err);
+    markError(msg);
+    return null;
+  }
 }
 
 export function useGpsTrackerTransistor({
@@ -293,6 +329,7 @@ export function useGpsTrackerTransistor({
 
     let cancelled = false;
     const subscriptions: Array<{ remove: () => void }> = [];
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
     async function startTracking() {
       if (startedRef.current) return;
@@ -341,19 +378,9 @@ export function useGpsTrackerTransistor({
         // no heartbeat; com `persist: true`, o próprio serviço nativo salva e envia
         // via HTTP, sem depender da WebView acordada.
         const subHeartbeat = BackgroundGeolocation.onHeartbeat(() => {
-          void BackgroundGeolocation.getCurrentPosition({
-            samples: 1,
-            desiredAccuracy: DesiredAccuracy.High,
-            timeout: 30,
-            maximumAge: 0,
-            persist: true,
-          })
-            .then(handleLocation)
-            .catch((err) => {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.warn("[GPS Transistor] heartbeat getCurrentPosition falhou", err);
-              markError(msg);
-            });
+          void forceNativePosition("heartbeat").then((location) => {
+            if (location) void handleLocation(location);
+          });
         });
         subscriptions.push(subHeartbeat);
 
@@ -363,6 +390,29 @@ export function useGpsTrackerTransistor({
         markNativeStartCalled();
         const state = await BackgroundGeolocation.start();
         await BackgroundGeolocation.changePace(true).catch(() => {});
+        await forceNativePosition("startup").then((location) => {
+          if (location) void handleLocation(location);
+        });
+        heartbeatTimer = setInterval(() => {
+          void forceNativePosition("foreground-timer").then((location) => {
+            if (location) void handleLocation(location);
+          });
+        }, 60_000);
+        const appStateSub = await App.addListener("appStateChange", ({ isActive }) => {
+          if (!isActive) {
+            void BackgroundGeolocation.sync().catch(() => {});
+            void forceNativePosition("app-background").then((location) => {
+              if (location) void handleLocation(location);
+            });
+            return;
+          }
+          void BackgroundGeolocation.changePace(true).catch(() => {});
+          void BackgroundGeolocation.sync().catch(() => {});
+          void forceNativePosition("app-foreground").then((location) => {
+            if (location) void handleLocation(location);
+          });
+        });
+        subscriptions.push(appStateSub);
         const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
         markNativeState({
           enabled: state.enabled,
@@ -401,6 +451,10 @@ export function useGpsTrackerTransistor({
       }
       for (const s of subscriptions) {
         try { s.remove(); } catch { /* ignore */ }
+      }
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
       }
       startedRef.current = false;
       setTracking(false);

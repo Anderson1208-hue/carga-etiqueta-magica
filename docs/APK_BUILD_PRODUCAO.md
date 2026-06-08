@@ -117,6 +117,16 @@ Edite `android/app/src/main/AndroidManifest.xml` e adicione dentro de `<manifest
 
 > **Push (FCM):** o plugin `@capacitor/push-notifications` exige `google-services.json` em `android/app/`. Sem esse arquivo o app compila e roda normal — só não recebe push remoto. Crie projeto no Firebase Console quando quiser ativar.
 
+Ainda no `AndroidManifest.xml`, dentro de `<application>`, adicione a licença Android do Transistorsoft gerada para o `applicationId` do APK (`com.orkestria.driver` em produção):
+
+```xml
+<meta-data
+    android:name="com.transistorsoft.locationmanager.license"
+    android:value="SUA_LICENCA_ANDROID_TRANSISTORSOFT" />
+```
+
+Sem essa licença, o plugin funciona apenas em APK debug; APK release pode abrir o app, mas o rastreamento nativo em background não é confiável.
+
 ---
 
 ## 5. Ícone e Splash Screen
