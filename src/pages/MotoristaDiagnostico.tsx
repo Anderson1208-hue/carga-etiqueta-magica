@@ -610,7 +610,7 @@ export default function MotoristaDiagnostico() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => BackgroundGeolocation.openSettings().catch(() => {})}
+                onClick={() => openAppSettings().catch(() => {})}
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Abrir Configurações do app
