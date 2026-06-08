@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
+import { NativeSettings, AndroidSettings, IOSSettings } from "capacitor-native-settings";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,12 +27,6 @@ import { AlertTriangle, BatteryCharging, Bell, MapPin, Settings } from "lucide-r
  * Persistência: marca confirmação no localStorage ("oem_onboarding_v1").
  * O wizard volta a aparecer se o motorista limpar dados ou em novo APK.
  */
-
-interface BackgroundGeolocationPlugin {
-  openSettings(): Promise<void>;
-}
-const BackgroundGeolocation =
-  registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
 
 const STORAGE_KEY = "oem_onboarding_v1";
 
@@ -104,7 +99,10 @@ export function PermissoesOnboarding({
   const allChecked = confirmLocation && confirmNotifications && confirmBattery;
 
   function handleOpenSettings() {
-    BackgroundGeolocation.openSettings().catch(() => {
+    NativeSettings.open({
+      optionAndroid: AndroidSettings.ApplicationDetails,
+      optionIOS: IOSSettings.App,
+    }).catch(() => {
       console.warn("[PermissoesOnboarding] openSettings indisponível");
     });
   }
