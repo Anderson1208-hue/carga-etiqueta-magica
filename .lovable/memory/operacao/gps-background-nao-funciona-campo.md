@@ -60,3 +60,10 @@ Correções/decisões:
 - Torre de Controle não deve filtrar somente `created_at >= hoje`; rotas ativas antigas com GPS novo precisam aparecer.
 - Build script deve bloquear Manifest sem `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, `CAMERA`.
 - Se o problema persistir com Manifest válido e APK PROD, a causa estrutural é dependência da WebView/JS no `@capacitor-community/background-geolocation`; recomendação: migrar para plugin com envio nativo persistente ou módulo Android nativo que envie direto ao backend.
+
+## Decisão de parada após ciclo de APKs (08/06/2026)
+Não continuar gerando APKs por tentativa. O único caminho aceitável é teste controlado:
+- APK DEBUG para validar Transistorsoft sem licença; APK release sem licença não é critério.
+- Confirmar em banco `source='transistor-native-http'` durante tela bloqueada.
+- Se `transistor-native-http` não continuar chegando bloqueado em debug com `state.enabled=true`, parar a abordagem JS/Capacitor e migrar para módulo Android nativo/Kotlin com ForegroundService + HTTP direto.
+- Correção aplicada: `ValidacaoGpsBackground` não pode chamar `BackgroundGeolocation.stop()` após sucesso, pois isso derruba o Foreground Service antes do rastreamento real.
