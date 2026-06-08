@@ -9,6 +9,7 @@ import type {
   ProviderChangeEvent,
 } from "@transistorsoft/capacitor-background-geolocation";
 import {
+  AuthorizationStatus,
   DesiredAccuracy,
   HttpMethod,
   LogLevel,
@@ -16,11 +17,14 @@ import {
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
 import {
+  authorizationStatusText,
   markEnqueue,
   markError,
   markNativeDriver,
   markNativeHttp,
   markNativeLocation,
+  markNativeProvider,
+  markNativeReady,
   markNativeStartCalled,
   markNativeState,
   markSent,
