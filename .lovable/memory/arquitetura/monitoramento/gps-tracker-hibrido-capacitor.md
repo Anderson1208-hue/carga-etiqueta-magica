@@ -19,7 +19,7 @@ type: feature
 ## Regras
 - Mesma assinatura nos 4 hooks: `{ monitoramentoRotaId, enabled, paradasCoords?, config? }`.
 - Mesma edge function: `processar-gps` (zero mudança no backend).
-- Plugin Transistorsoft NÃO usa o uploader HTTP próprio — `http.autoSync=false` e `http.batchSync=false`. Posições entram em `src/lib/gpsQueue.ts` (IndexedDB) e são drenadas por `useGpsQueueWorker` (mesmo fluxo do driver anterior — preserva dedup, retry exponencial e batching).
+- Plugin Transistorsoft usa uploader HTTP NATIVO (`http.autoSync=true`, `batchSync=false`) direto para `processar-gps`. Não depender de callback JS/IndexedDB para envio em background: WebView/JS pode pausar com tela bloqueada, mesmo com o serviço nativo coletando. `gpsQueue` fica para web/community/fallback e para drenar resíduos antigos.
 - Plugin Transistorsoft config: `app.stopOnTerminate=false`, `app.startOnBoot=true`, `app.enableHeadless=true`, `geolocation.locationAuthorizationRequest='Always'`, `notification.sticky=true`.
 - Para o APK funcionar (qualquer driver): `AndroidManifest.xml` precisa de `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED` (para startOnBoot do Transistorsoft).
 - Build Android: `npm run build && npx cap sync android` antes de rodar/gerar APK.
