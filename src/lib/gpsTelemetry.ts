@@ -16,6 +16,27 @@ export interface GpsTelemetry {
   lastError: string | null;
   watcherStartedAt: number | null;
   watcherRestarts: number;
+  activeDriver: string | null;
+  driverActivatedAt: number | null;
+  nativeRouteId: string | null;
+  nativeSource: string | null;
+  nativeHttpUrlConfigured: boolean | null;
+  nativeHttpAutoSync: boolean | null;
+  nativeHttpLastStatus: number | null;
+  nativeHttpLastSuccess: boolean | null;
+  nativeHttpLastAt: number | null;
+  nativeHttpLastResponse: string | null;
+  nativeStateEnabled: boolean | null;
+  nativeStateIsMoving: boolean | null;
+  nativeTrackingMode: string | number | null;
+  nativeStateLastAt: number | null;
+  nativeStartCalledAt: number | null;
+  nativeStartSucceededAt: number | null;
+  nativeForegroundServiceActive: boolean | null;
+  nativeNotificationConfigured: boolean | null;
+  nativeLastLocationAt: number | null;
+  nativeLastLocationPos: { lat: number; lng: number; accuracy: number; event?: string | null } | null;
+  nativePendingLocations: number | null;
 }
 
 const EMPTY: GpsTelemetry = {
@@ -27,6 +48,27 @@ const EMPTY: GpsTelemetry = {
   lastError: null,
   watcherStartedAt: null,
   watcherRestarts: 0,
+  activeDriver: null,
+  driverActivatedAt: null,
+  nativeRouteId: null,
+  nativeSource: null,
+  nativeHttpUrlConfigured: null,
+  nativeHttpAutoSync: null,
+  nativeHttpLastStatus: null,
+  nativeHttpLastSuccess: null,
+  nativeHttpLastAt: null,
+  nativeHttpLastResponse: null,
+  nativeStateEnabled: null,
+  nativeStateIsMoving: null,
+  nativeTrackingMode: null,
+  nativeStateLastAt: null,
+  nativeStartCalledAt: null,
+  nativeStartSucceededAt: null,
+  nativeForegroundServiceActive: null,
+  nativeNotificationConfigured: null,
+  nativeLastLocationAt: null,
+  nativeLastLocationPos: null,
+  nativePendingLocations: null,
 };
 
 export function readTelemetry(): GpsTelemetry {
@@ -65,6 +107,60 @@ export function markWatcherStart() {
   write({
     watcherStartedAt: Date.now(),
     watcherRestarts: cur.watcherStartedAt ? cur.watcherRestarts + 1 : 0,
+  });
+}
+
+export function markNativeDriver(patch: {
+  routeId?: string | null;
+  source?: string | null;
+  httpUrlConfigured?: boolean | null;
+  httpAutoSync?: boolean | null;
+  notificationConfigured?: boolean | null;
+}) {
+  write({
+    activeDriver: "transistorsoft",
+    driverActivatedAt: Date.now(),
+    nativeRouteId: patch.routeId ?? null,
+    nativeSource: patch.source ?? null,
+    nativeHttpUrlConfigured: patch.httpUrlConfigured ?? null,
+    nativeHttpAutoSync: patch.httpAutoSync ?? null,
+    nativeNotificationConfigured: patch.notificationConfigured ?? null,
+  });
+}
+
+export function markNativeStartCalled() {
+  write({ nativeStartCalledAt: Date.now() });
+}
+
+export function markNativeState(state: {
+  enabled?: boolean;
+  isMoving?: boolean;
+  trackingMode?: string | number;
+  notificationConfigured?: boolean | null;
+  pendingLocations?: number | null;
+}) {
+  write({
+    nativeStateEnabled: state.enabled ?? null,
+    nativeStateIsMoving: state.isMoving ?? null,
+    nativeTrackingMode: state.trackingMode ?? null,
+    nativeStateLastAt: Date.now(),
+    nativeStartSucceededAt: state.enabled ? Date.now() : readTelemetry().nativeStartSucceededAt,
+    nativeForegroundServiceActive: state.enabled ?? null,
+    nativeNotificationConfigured: state.notificationConfigured ?? readTelemetry().nativeNotificationConfigured,
+    nativePendingLocations: state.pendingLocations ?? readTelemetry().nativePendingLocations,
+  });
+}
+
+export function markNativeLocation(pos: { lat: number; lng: number; accuracy: number; event?: string | null }) {
+  write({ nativeLastLocationAt: Date.now(), nativeLastLocationPos: pos });
+}
+
+export function markNativeHttp(event: { status?: number; success?: boolean; responseText?: string | null }) {
+  write({
+    nativeHttpLastAt: Date.now(),
+    nativeHttpLastStatus: event.status ?? null,
+    nativeHttpLastSuccess: event.success ?? null,
+    nativeHttpLastResponse: (event.responseText ?? "").slice(0, 200) || null,
   });
 }
 
