@@ -143,8 +143,12 @@ export default function MotoristaDiagnostico() {
         if (!error && !data?.error && data?.monitoramento_rota_id) {
           try { localStorage.setItem("motorista-last-rota-id", data.monitoramento_rota_id); } catch { /* ignore */ }
           setDiagRotaId(data.monitoramento_rota_id);
+          setLastDbSource(data.ultimo_gps_source ?? null);
+          setLastDbPointAt(data.ultimo_gps_registrado_em ? new Date(data.ultimo_gps_registrado_em).getTime() : null);
         } else {
           setDiagRotaId(null);
+          setLastDbSource(null);
+          setLastDbPointAt(null);
         }
       } catch {
         /* ignore — tenta de novo no próximo tick */
@@ -218,7 +222,7 @@ export default function MotoristaDiagnostico() {
         setLastDbPointAt(null);
       }
     }
-  }, [isNative]);
+  }, [isNative, diagRotaId]);
 
   const captureGps = useCallback(() => {
     if (!navigator.geolocation) {
