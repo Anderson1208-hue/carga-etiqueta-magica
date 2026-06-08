@@ -11,10 +11,22 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, markSent, markError, markNativeState, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import {
+  authorizationStatusText,
+  readTelemetry,
+  markSent,
+  markError,
+  markNativeProvider,
+  markNativeReady,
+  markNativeRequestPermission,
+  markNativeState,
+  resetTelemetry,
+  type GpsTelemetry,
+} from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
 import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import {
   ArrowLeft,
