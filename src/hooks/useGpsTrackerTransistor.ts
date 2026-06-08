@@ -244,6 +244,30 @@ export async function ensureTransistorGpsReady(
   return readyPromise;
 }
 
+async function forceNativePosition(reason: string): Promise<Location | null> {
+  try {
+    const location = await BackgroundGeolocation.getCurrentPosition({
+      samples: 1,
+      desiredAccuracy: DesiredAccuracy.High,
+      timeout: 30,
+      maximumAge: 0,
+      persist: true,
+    });
+    markNativeLocation({
+      lat: location.coords.latitude,
+      lng: location.coords.longitude,
+      accuracy: location.coords.accuracy ?? 0,
+      event: location.event ?? reason,
+    });
+    return location;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[GPS Transistor] ${reason} getCurrentPosition falhou`, err);
+    markError(msg);
+    return null;
+  }
+}
+
 export function useGpsTrackerTransistor({
   monitoramentoRotaId,
   enabled,
@@ -306,6 +330,7 @@ export function useGpsTrackerTransistor({
 
     let cancelled = false;
     const subscriptions: Array<{ remove: () => void }> = [];
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
     async function startTracking() {
       if (startedRef.current) return;
@@ -354,19 +379,9 @@ export function useGpsTrackerTransistor({
         // no heartbeat; com `persist: true`, o próprio serviço nativo salva e envia
         // via HTTP, sem depender da WebView acordada.
         const subHeartbeat = BackgroundGeolocation.onHeartbeat(() => {
-          void BackgroundGeolocation.getCurrentPosition({
-            samples: 1,
-            desiredAccuracy: DesiredAccuracy.High,
-            timeout: 30,
-            maximumAge: 0,
-            persist: true,
-          })
-            .then(handleLocation)
-            .catch((err) => {
-              const msg = err instanceof Error ? err.message : String(err);
-              console.warn("[GPS Transistor] heartbeat getCurrentPosition falhou", err);
-              markError(msg);
-            });
+          void forceNativePosition("heartbeat").then((location) => {
+            if (location) void handleLocation(location);
+          });
         });
         subscriptions.push(subHeartbeat);
 
@@ -376,6 +391,29 @@ export function useGpsTrackerTransistor({
         markNativeStartCalled();
         const state = await BackgroundGeolocation.start();
         await BackgroundGeolocation.changePace(true).catch(() => {});
+        await forceNativePosition("startup").then((location) => {
+          if (location) void handleLocation(location);
+        });
+        heartbeatTimer = setInterval(() => {
+          void forceNativePosition("foreground-timer").then((location) => {
+            if (location) void handleLocation(location);
+          });
+        }, 60_000);
+        const appStateSub = await App.addListener("appStateChange", ({ isActive }) => {
+          if (!isActive) {
+            void BackgroundGeolocation.sync().catch(() => {});
+            void forceNativePosition("app-background").then((location) => {
+              if (location) void handleLocation(location);
+            });
+            return;
+          }
+          void BackgroundGeolocation.changePace(true).catch(() => {});
+          void BackgroundGeolocation.sync().catch(() => {});
+          void forceNativePosition("app-foreground").then((location) => {
+            if (location) void handleLocation(location);
+          });
+        });
+        subscriptions.push(appStateSub);
         const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
         markNativeState({
           enabled: state.enabled,
@@ -414,6 +452,10 @@ export function useGpsTrackerTransistor({
       }
       for (const s of subscriptions) {
         try { s.remove(); } catch { /* ignore */ }
+      }
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
       }
       startedRef.current = false;
       setTracking(false);
