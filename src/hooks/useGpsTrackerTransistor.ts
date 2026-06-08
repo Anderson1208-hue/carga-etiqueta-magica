@@ -2,18 +2,20 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
 import type {
+  Config,
+  HttpEvent,
   Location,
   MotionChangeEvent,
   ProviderChangeEvent,
 } from "@transistorsoft/capacitor-background-geolocation";
 import {
   DesiredAccuracy,
+  HttpMethod,
   LogLevel,
   NotificationPriority,
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
-import { enqueue, pendingCount } from "@/lib/gpsQueue";
-import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
+import { markEnqueue, markError, markSent, markWatcherStart } from "@/lib/gpsTelemetry";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation.
@@ -25,9 +27,8 @@ import { markEnqueue, markError, markWatcherStart } from "@/lib/gpsTelemetry";
  * - Foreground Service nativo com notificação persistente já gerenciado pelo plugin.
  *
  * Estratégia (Fase 1 — debug, sem licença release):
- * - Posições do plugin → entram na fila (IndexedDB) → useGpsQueueWorker drena.
- * - Heartbeat a cada 30s (a própria Transistorsoft já faz heartbeat nativo,
- *   mas mantemos um heartbeat de aplicação para que a Torre veja "vivo" mesmo parado).
+ * - Posições do plugin → HTTP NATIVO do Transistorsoft → processar-gps.
+ *   Isto evita depender de callbacks JS/IndexedDB da WebView com tela bloqueada.
  * - Sem licença: builds debug funcionam plenamente; release exibe aviso
  *   ("BackgroundGeolocation is for evaluation purposes only") mas continua
  *   coletando — suficiente para validar tela bloqueada antes de comprar.
@@ -51,7 +52,19 @@ const DEFAULT_CONFIG: GpsConfig = {
   raio_aproximacao_metros: 500,
 };
 
-const HEARTBEAT_MS = 30_000;
+const NATIVE_LOCATION_TEMPLATE = JSON.stringify({
+  latitude: "<%= latitude %>",
+  longitude: "<%= longitude %>",
+  accuracy: "<%= accuracy %>",
+  timestamp: "<%= timestamp %>",
+  heartbeat: false,
+  battery: "<%= battery.level %>",
+  event: "<%= event %>",
+})
+  .replace('"<%= latitude %>"', "<%= latitude %>")
+  .replace('"<%= longitude %>"', "<%= longitude %>")
+  .replace('"<%= accuracy %>"', "<%= accuracy %>")
+  .replace('"<%= battery.level %>"', "<%= battery.level %>");
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -76,14 +89,86 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
 let pluginReady = false;
 let readyPromise: Promise<void> | null = null;
 let currentDistanceFilter: number | null = null;
+let currentNativeRouteId: string | null = null;
 
-export async function ensureTransistorGpsReady(distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros): Promise<void> {
+function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFilter: number): Config {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  return {
+    geolocation: {
+      desiredAccuracy: DesiredAccuracy.High,
+      distanceFilter,
+      stationaryRadius: 25,
+      locationAuthorizationRequest: "Always" as const,
+      locationUpdateInterval: 30_000,
+      fastestLocationUpdateInterval: 10_000,
+      allowIdenticalLocations: true,
+      pausesLocationUpdatesAutomatically: false,
+      disableStopDetection: true,
+    },
+    activity: {
+      disableStopDetection: true,
+      stopOnStationary: false,
+    },
+    app: {
+      heartbeatInterval: 60,
+      stopOnTerminate: false,
+      startOnBoot: true,
+      enableHeadless: true,
+      notification: {
+        title: "Orkestria Driver — Rastreamento ativo",
+        text: "Sua rota está em andamento",
+        sticky: true,
+        priority: NotificationPriority.Default,
+        smallIcon: "ic_stat_notify",
+      },
+      backgroundPermissionRationale: {
+        title: "Permitir o tempo todo",
+        message:
+          'Para registrar sua rota mesmo com a tela bloqueada, marque "Permitir o tempo todo" nas configurações.',
+        positiveAction: "Abrir Configurações",
+        negativeAction: "Cancelar",
+      },
+    },
+    http: monitoramentoRotaId
+      ? {
+          url: `${supabaseUrl}/functions/v1/processar-gps`,
+          method: HttpMethod.Post,
+          autoSync: true,
+          batchSync: false,
+          rootProperty: ".",
+          timeout: 30_000,
+          headers: {
+            Authorization: `Bearer ${supabaseKey}`,
+            apikey: supabaseKey,
+          },
+          params: {
+            monitoramento_rota_id: monitoramentoRotaId,
+          },
+        }
+      : {
+          autoSync: false,
+          batchSync: false,
+        },
+    persistence: {
+      persistMode: PersistMode.All,
+      maxDaysToPersist: 3,
+      maxRecordsToPersist: 5000,
+      locationTemplate: NATIVE_LOCATION_TEMPLATE,
+    },
+  };
+}
+
+export async function ensureTransistorGpsReady(
+  distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
+  monitoramentoRotaId: string | null = null
+): Promise<void> {
   if (pluginReady) {
-    if (currentDistanceFilter !== distanceFilter) {
-      await BackgroundGeolocation.setConfig({
-        geolocation: { distanceFilter },
-      });
+    if (currentDistanceFilter !== distanceFilter || currentNativeRouteId !== monitoramentoRotaId) {
+      await BackgroundGeolocation.setConfig(buildNativeUploadConfig(monitoramentoRotaId, distanceFilter));
       currentDistanceFilter = distanceFilter;
+      currentNativeRouteId = monitoramentoRotaId;
     }
     return;
   }
@@ -92,42 +177,7 @@ export async function ensureTransistorGpsReady(distanceFilter: number = DEFAULT_
   readyPromise = (async () => {
     await BackgroundGeolocation.ready({
       reset: true,
-      geolocation: {
-        desiredAccuracy: DesiredAccuracy.High,
-        distanceFilter,
-        stationaryRadius: 25,
-        locationAuthorizationRequest: "Always",
-      },
-      app: {
-        stopOnTerminate: false,
-        startOnBoot: true,
-        enableHeadless: true,
-        notification: {
-          title: "Orkestria Driver — Rastreamento ativo",
-          text: "Sua rota está em andamento",
-          sticky: true,
-          priority: NotificationPriority.Default,
-          smallIcon: "ic_stat_notify",
-        },
-        backgroundPermissionRationale: {
-          title: "Permitir o tempo todo",
-          message:
-            'Para registrar sua rota mesmo com a tela bloqueada, marque "Permitir o tempo todo" nas configurações.',
-          positiveAction: "Abrir Configurações",
-          negativeAction: "Cancelar",
-        },
-      },
-      // NÃO usamos o uploader HTTP do plugin — controlamos via fila IndexedDB
-      // (dedup, retry exponencial e batching já existentes).
-      http: {
-        autoSync: false,
-        batchSync: false,
-      },
-      persistence: {
-        persistMode: PersistMode.All,
-        maxDaysToPersist: 1,
-        maxRecordsToPersist: 1000,
-      },
+      ...buildNativeUploadConfig(monitoramentoRotaId, distanceFilter),
       logger: {
         debug: import.meta.env.VITE_BUILD_ENV !== "prod",
         logLevel:
@@ -136,6 +186,7 @@ export async function ensureTransistorGpsReady(distanceFilter: number = DEFAULT_
     });
     pluginReady = true;
     currentDistanceFilter = distanceFilter;
+    currentNativeRouteId = monitoramentoRotaId;
   })();
 
   return readyPromise;
@@ -152,7 +203,6 @@ export function useGpsTrackerTransistor({
   const rotaIdRef = useRef<string | null>(monitoramentoRotaId);
   const paradasCoordsRef = useRef<{ lat: number; lng: number }[]>(paradasCoords ?? []);
   const raioAproxRef = useRef<number>(cfg.raio_aproximacao_metros);
-  const lastPositionRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
   const startedRef = useRef<boolean>(false);
 
   useEffect(() => { rotaIdRef.current = monitoramentoRotaId; }, [monitoramentoRotaId]);
@@ -163,7 +213,7 @@ export function useGpsTrackerTransistor({
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modoCritico, setModoCritico] = useState(false);
-  const [pendingQueue, setPendingQueue] = useState(0);
+  const [pendingQueue] = useState(0);
 
   const checkModoCritico = useCallback((lat: number, lng: number): boolean => {
     const coords = paradasCoordsRef.current;
@@ -174,48 +224,39 @@ export function useGpsTrackerTransistor({
 
   const handleLocation = useCallback(async (location: Location) => {
     const { latitude, longitude, accuracy } = location.coords;
-    lastPositionRef.current = { lat: latitude, lng: longitude, accuracy };
     setLastPosition({ lat: latitude, lng: longitude });
 
     const critico = checkModoCritico(latitude, longitude);
     setModoCritico(critico);
 
-    const rotaId = rotaIdRef.current;
-    if (!rotaId) return; // serviço vivo, mas sem rota → não enfileira
-
-    try {
-      await enqueue({
-        monitoramento_rota_id: rotaId,
-        latitude,
-        longitude,
-        accuracy: accuracy ?? 0,
-        timestamp:
-          typeof location.timestamp === "string"
-            ? location.timestamp
-            : new Date(location.timestamp || Date.now()).toISOString(),
-        heartbeat: false,
-      });
-      markEnqueue({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0 });
-      setPendingQueue(await pendingCount());
-      setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[GPS Transistor] enqueue falhou", err);
-      markError(msg);
-    }
+    // Apenas telemetria local para diagnóstico. O envio real agora é NATIVO
+    // pelo HTTP service do Transistorsoft, sem depender da WebView acordada.
+    if (rotaIdRef.current) markEnqueue({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0 });
+    setError(null);
   }, [checkModoCritico]);
+
+  const handleHttp = useCallback((event: HttpEvent) => {
+    if (event.success && event.status >= 200 && event.status < 300) {
+      markSent(1);
+      setError(null);
+      return;
+    }
+    const msg = `HTTP nativo GPS falhou (${event.status}): ${event.responseText || "sem resposta"}`;
+    console.warn("[GPS Transistor]", msg);
+    markError(msg);
+    setError(msg);
+  }, []);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     let cancelled = false;
-    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     const subscriptions: Array<{ remove: () => void }> = [];
 
     async function startTracking() {
       if (startedRef.current) return;
       try {
-        await ensureTransistorGpsReady(cfg.distance_filter_metros);
+        await ensureTransistorGpsReady(cfg.distance_filter_metros, monitoramentoRotaId);
         if (cancelled) return;
 
         // Listeners
@@ -241,6 +282,9 @@ export function useGpsTrackerTransistor({
           console.info("[GPS Transistor] motionChange", event.isMoving);
         });
         subscriptions.push(subMotion);
+
+        const subHttp = BackgroundGeolocation.onHttp(handleHttp);
+        subscriptions.push(subHttp);
 
         const state = await BackgroundGeolocation.start();
         if (cancelled) {
@@ -275,36 +319,15 @@ export function useGpsTrackerTransistor({
 
     if (enabled) {
       startTracking();
-
-      // Heartbeat de aplicação: a cada 30s enfileira última posição como heartbeat.
-      heartbeatTimer = setInterval(async () => {
-        const last = lastPositionRef.current;
-        const rotaId = rotaIdRef.current;
-        if (!last || !rotaId) return;
-        try {
-          await enqueue({
-            monitoramento_rota_id: rotaId,
-            latitude: last.lat,
-            longitude: last.lng,
-            accuracy: last.accuracy,
-            timestamp: new Date().toISOString(),
-            heartbeat: true,
-          });
-          setPendingQueue(await pendingCount());
-        } catch (err) {
-          console.warn("[GPS Transistor] heartbeat enqueue falhou", err);
-        }
-      }, HEARTBEAT_MS);
     } else {
       stopTracking();
     }
 
     return () => {
       cancelled = true;
-      if (heartbeatTimer) clearInterval(heartbeatTimer);
       stopTracking();
     };
-  }, [enabled, handleLocation, cfg.distance_filter_metros]);
+  }, [enabled, handleLocation, handleHttp, cfg.distance_filter_metros, monitoramentoRotaId]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
