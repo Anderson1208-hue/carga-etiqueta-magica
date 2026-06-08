@@ -178,12 +178,24 @@ export async function ensureTransistorGpsReady(
   distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
   monitoramentoRotaId: string | null = null
 ): Promise<void> {
+  const markConfig = () => {
+    const cfg = buildNativeUploadConfig(monitoramentoRotaId, distanceFilter);
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: monitoramentoRotaId ? NATIVE_SOURCE : null,
+      httpUrlConfigured: Boolean(cfg.http?.url),
+      httpAutoSync: cfg.http?.autoSync ?? null,
+      notificationConfigured: Boolean(cfg.app?.notification),
+    });
+  };
+
   if (pluginReady) {
     if (currentDistanceFilter !== distanceFilter || currentNativeRouteId !== monitoramentoRotaId) {
       await BackgroundGeolocation.setConfig(buildNativeUploadConfig(monitoramentoRotaId, distanceFilter));
       currentDistanceFilter = distanceFilter;
       currentNativeRouteId = monitoramentoRotaId;
     }
+    markConfig();
     return;
   }
   if (readyPromise) return readyPromise;
@@ -201,6 +213,7 @@ export async function ensureTransistorGpsReady(
     pluginReady = true;
     currentDistanceFilter = distanceFilter;
     currentNativeRouteId = monitoramentoRotaId;
+    markConfig();
   })();
 
   return readyPromise;
