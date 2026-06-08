@@ -336,6 +336,27 @@ export function useGpsTrackerTransistor({
         });
         subscriptions.push(subMotion);
 
+        // Quando o motorista fica parado com a tela bloqueada, o SDK pode emitir
+        // apenas heartbeat sem gravar uma posição nova. Pedimos uma posição real
+        // no heartbeat; com `persist: true`, o próprio serviço nativo salva e envia
+        // via HTTP, sem depender da WebView acordada.
+        const subHeartbeat = BackgroundGeolocation.onHeartbeat(() => {
+          void BackgroundGeolocation.getCurrentPosition({
+            samples: 1,
+            desiredAccuracy: DesiredAccuracy.High,
+            timeout: 30,
+            maximumAge: 0,
+            persist: true,
+          })
+            .then(handleLocation)
+            .catch((err) => {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.warn("[GPS Transistor] heartbeat getCurrentPosition falhou", err);
+              markError(msg);
+            });
+        });
+        subscriptions.push(subHeartbeat);
+
         const subHttp = BackgroundGeolocation.onHttp(handleHttp);
         subscriptions.push(subHttp);
 
