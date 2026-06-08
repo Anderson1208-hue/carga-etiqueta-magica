@@ -37,6 +37,21 @@ export interface GpsTelemetry {
   nativeLastLocationAt: number | null;
   nativeLastLocationPos: { lat: number; lng: number; accuracy: number; event?: string | null } | null;
   nativePendingLocations: number | null;
+  nativeProviderStatus: number | null;
+  nativeProviderStatusText: string | null;
+  nativeProviderEnabled: boolean | null;
+  nativeProviderGps: boolean | null;
+  nativeProviderNetwork: boolean | null;
+  nativeProviderAccuracyAuthorization: number | null;
+  nativeProviderLastAt: number | null;
+  nativeReadyAt: number | null;
+  nativeReadyEnabled: boolean | null;
+  nativeReadyError: string | null;
+  nativeRequestPermissionAt: number | null;
+  nativeRequestPermissionStatus: number | null;
+  nativeRequestPermissionText: string | null;
+  nativeRequestPermissionError: string | null;
+  nativeBackgroundPermissionRationale: string | null;
 }
 
 const EMPTY: GpsTelemetry = {
@@ -69,6 +84,21 @@ const EMPTY: GpsTelemetry = {
   nativeLastLocationAt: null,
   nativeLastLocationPos: null,
   nativePendingLocations: null,
+  nativeProviderStatus: null,
+  nativeProviderStatusText: null,
+  nativeProviderEnabled: null,
+  nativeProviderGps: null,
+  nativeProviderNetwork: null,
+  nativeProviderAccuracyAuthorization: null,
+  nativeProviderLastAt: null,
+  nativeReadyAt: null,
+  nativeReadyEnabled: null,
+  nativeReadyError: null,
+  nativeRequestPermissionAt: null,
+  nativeRequestPermissionStatus: null,
+  nativeRequestPermissionText: null,
+  nativeRequestPermissionError: null,
+  nativeBackgroundPermissionRationale: null,
 };
 
 export function readTelemetry(): GpsTelemetry {
