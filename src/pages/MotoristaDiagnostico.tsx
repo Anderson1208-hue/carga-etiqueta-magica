@@ -540,10 +540,12 @@ export default function MotoristaDiagnostico() {
           <CardContent className="pt-0 divide-y">
             <StatusRow
               label="Permissão de localização"
-              value={perm}
-              ok={perm === "granted" ? true : perm === "denied" ? false : null}
+              value={`${perm}${tele.nativeProviderStatus !== null ? ` (${tele.nativeProviderStatus})` : ""}`}
+              ok={authorizationAlways ? true : perm === "denied" ? false : null}
               hint={
-                perm === "denied"
+                authorizationAlways
+                  ? "Autorização nativa Always confirmada pelo provider"
+                  : perm === "denied"
                   ? "Abra Configurações → Apps → Permissões → Localização → Permitir o tempo todo"
                   : perm === "prompt"
                   ? "Captura local pode funcionar, mas o rastreador ainda não recebeu permissão nativa"
@@ -587,13 +589,13 @@ export default function MotoristaDiagnostico() {
             />
             <StatusRow
               label="Rastreamento desta tela"
-              value={diagRotaId ? "ATIVO" : "Inativo"}
-              ok={!!diagRotaId}
+              value={trackerDisplay}
+              ok={fsActive ? true : diagRotaId ? false : null}
               hint={
                 diagRotaId
-                  ? diagTrackerEnabled
-                    ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
-                    : "Rota encontrada, aguardando inicialização do rastreador"
+                  ? fsActive
+                    ? `Foreground Service ativo para a rota ${diagRotaId.slice(0, 8)}…`
+                    : "Rota encontrada, mas o serviço nativo ainda não iniciou"
                   : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
             />
