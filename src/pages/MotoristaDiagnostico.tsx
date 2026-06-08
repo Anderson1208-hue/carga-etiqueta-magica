@@ -195,6 +195,7 @@ export default function MotoristaDiagnostico() {
     if (isNative) {
       try {
         const provider = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(provider);
         setPerm(permFromNativeStatus(provider.status));
         const state = await BackgroundGeolocation.getState();
         const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
