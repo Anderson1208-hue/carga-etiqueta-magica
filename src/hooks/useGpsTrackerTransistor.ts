@@ -140,11 +140,13 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
           rootProperty: ".",
           timeout: 30_000,
           headers: {
+            "Content-Type": "application/json",
             Authorization: `Bearer ${supabaseKey}`,
             apikey: supabaseKey,
           },
           params: {
             monitoramento_rota_id: monitoramentoRotaId,
+            source: "transistor-native-http",
           },
         }
       : {

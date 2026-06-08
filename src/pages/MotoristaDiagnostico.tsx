@@ -1,15 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Capacitor, registerPlugin } from "@capacitor/core";
-
-interface BgLocation { latitude: number; longitude: number; accuracy: number; time: number | null; }
-interface BgWatcherOptions { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number; }
-interface BackgroundGeolocationPlugin {
-  addWatcher(opts: BgWatcherOptions, cb: (loc: BgLocation | null, err?: { code: string; message: string }) => void): Promise<string>;
-  removeWatcher(opts: { id: string }): Promise<void>;
-  openSettings(): Promise<void>;
-}
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
+import { Capacitor } from "@capacitor/core";
+import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
+import { AuthorizationStatus } from "@transistorsoft/background-geolocation-types";
+import { NativeSettings, AndroidSettings, IOSSettings } from "capacitor-native-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +35,22 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type PermState = "granted" | "denied" | "prompt" | "unknown";
+type PermState = "granted" | "while_in_use" | "denied" | "prompt" | "unknown";
+
+function permFromNativeStatus(status: number | undefined): PermState {
+  if (status === AuthorizationStatus.Always) return "granted";
+  if (status === AuthorizationStatus.WhenInUse) return "while_in_use";
+  if (status === AuthorizationStatus.Denied || status === AuthorizationStatus.Restricted) return "denied";
+  if (status === AuthorizationStatus.NotDetermined) return "prompt";
+  return "unknown";
+}
+
+async function openAppSettings(): Promise<void> {
+  await NativeSettings.open({
+    optionAndroid: AndroidSettings.ApplicationDetails,
+    optionIOS: IOSSettings.App,
+  });
+}
 
 const RESTAR_ALTO = 50;
 
@@ -161,17 +170,24 @@ export default function MotoristaDiagnostico() {
     } catch {
       setQueue(-1);
     }
-    if ("permissions" in navigator) {
+    if (isNative) {
+      try {
+        const provider = await BackgroundGeolocation.getProviderState();
+        setPerm(permFromNativeStatus(provider.status));
+      } catch {
+        setPerm("unknown");
+      }
+    } else if ("permissions" in navigator) {
       try {
         const p = await (navigator.permissions as Permissions).query({
           name: "geolocation" as PermissionName,
         });
-        setPerm(p.state as PermState);
+        setPerm(p.state === "granted" ? "granted" : p.state === "denied" ? "denied" : "prompt");
       } catch {
         setPerm("unknown");
       }
     }
-  }, []);
+  }, [isNative]);
 
   const captureGps = useCallback(() => {
     if (!navigator.geolocation) {
@@ -256,53 +272,22 @@ export default function MotoristaDiagnostico() {
     setPermLoading(true);
     try {
       if (isNative) {
-        // Dispara o diálogo nativo do Android via plugin (requestPermissions:true).
-        // Mantém o watcher por ~3s só para forçar o sistema a registrar a permissão,
-        // depois remove para não deixar serviço rodando sem rota.
-        let watcherId: string | null = null;
-        const got = await new Promise<PermState>((resolve) => {
-          const timeout = setTimeout(() => resolve("unknown"), 30_000);
-          BackgroundGeolocation.addWatcher(
-            {
-              backgroundTitle: "Solicitando permissão",
-              backgroundMessage: "Toque em Permitir na próxima tela",
-              requestPermissions: true,
-              stale: false,
-              distanceFilter: 0,
-            },
-            (loc, err) => {
-              if (err) {
-                clearTimeout(timeout);
-                if (err.code === "NOT_AUTHORIZED") resolve("denied");
-                else resolve("unknown");
-                return;
-              }
-              if (loc) {
-                clearTimeout(timeout);
-                resolve("granted");
-              }
-            }
-          )
-            .then((id) => { watcherId = id; })
-            .catch(() => { clearTimeout(timeout); resolve("unknown"); });
-        });
-
-        // limpa watcher temporário
-        if (watcherId) {
-          BackgroundGeolocation.removeWatcher({ id: watcherId }).catch(() => {});
-        }
+        const got = permFromNativeStatus(await BackgroundGeolocation.requestPermission());
 
         await refreshAll();
 
         if (got === "granted") {
-          toast({ title: "Permissão concedida ✓", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+          toast({ title: "Permissão concedida ✓", description: "Localização liberada o tempo todo." });
+        } else if (got === "while_in_use") {
+          toast({ title: "Permissão parcial", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+          openAppSettings().catch(() => {});
         } else if (got === "denied") {
           toast({
             title: "Permissão negada",
             description: "Abra as Configurações do app e libere a localização manualmente.",
             variant: "destructive",
           });
-          BackgroundGeolocation.openSettings().catch(() => {});
+          openAppSettings().catch(() => {});
         } else {
           toast({ title: "Sem resposta", description: "Tente novamente ou abra as configurações.", variant: "destructive" });
         }
@@ -625,7 +610,7 @@ export default function MotoristaDiagnostico() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => BackgroundGeolocation.openSettings().catch(() => {})}
+                onClick={() => openAppSettings().catch(() => {})}
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Abrir Configurações do app
