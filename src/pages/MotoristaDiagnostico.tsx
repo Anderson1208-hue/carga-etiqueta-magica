@@ -164,7 +164,10 @@ export default function MotoristaDiagnostico() {
 
   const isNative = Capacitor.isNativePlatform();
   const platform = Capacitor.getPlatform();
-  const diagTrackerEnabled = !!diagRotaId && (!isNative || perm === "granted");
+  // Não bloquear o start por `perm === "prompt"`: em Android/WebView esse status
+  // pode ficar desatualizado mesmo após o usuário liberar "Permitir o tempo todo".
+  // O diagnóstico precisa tentar iniciar o plugin e mostrar o erro real do start/state.
+  const diagTrackerEnabled = !!diagRotaId;
 
   useGpsTrackerHybrid({ monitoramentoRotaId: diagRotaId, enabled: diagTrackerEnabled });
   useGpsQueueWorker(diagTrackerEnabled);
@@ -540,7 +543,7 @@ export default function MotoristaDiagnostico() {
                 diagRotaId
                   ? diagTrackerEnabled
                     ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
-                    : "Rota encontrada, mas falta conceder a permissão GPS antes de iniciar o rastreador"
+                    : "Rota encontrada, aguardando inicialização do rastreador"
                   : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
             />
