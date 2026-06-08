@@ -9,6 +9,7 @@ import type {
   ProviderChangeEvent,
 } from "@transistorsoft/capacitor-background-geolocation";
 import {
+  AuthorizationStatus,
   DesiredAccuracy,
   HttpMethod,
   LogLevel,
@@ -16,11 +17,14 @@ import {
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
 import {
+  authorizationStatusText,
   markEnqueue,
   markError,
   markNativeDriver,
   markNativeHttp,
   markNativeLocation,
+  markNativeProvider,
+  markNativeReady,
   markNativeStartCalled,
   markNativeState,
   markSent,
@@ -186,6 +190,7 @@ export async function ensureTransistorGpsReady(
       httpUrlConfigured: Boolean(cfg.http?.url),
       httpAutoSync: cfg.http?.autoSync ?? null,
       notificationConfigured: Boolean(cfg.app?.notification),
+      backgroundPermissionRationale: cfg.app?.backgroundPermissionRationale?.message ?? null,
     });
   };
 
@@ -201,15 +206,22 @@ export async function ensureTransistorGpsReady(
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
-    await BackgroundGeolocation.ready({
-      reset: true,
-      ...buildNativeUploadConfig(monitoramentoRotaId, distanceFilter),
-      logger: {
-        debug: import.meta.env.VITE_BUILD_ENV !== "prod",
-        logLevel:
-          import.meta.env.VITE_BUILD_ENV === "prod" ? LogLevel.Error : LogLevel.Verbose,
-      },
-    });
+    try {
+      const state = await BackgroundGeolocation.ready({
+        reset: true,
+        ...buildNativeUploadConfig(monitoramentoRotaId, distanceFilter),
+        logger: {
+          debug: import.meta.env.VITE_BUILD_ENV !== "prod",
+          logLevel:
+            import.meta.env.VITE_BUILD_ENV === "prod" ? LogLevel.Error : LogLevel.Verbose,
+        },
+      });
+      markNativeReady({ enabled: state.enabled });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markNativeReady({ error: msg });
+      throw err;
+    }
     pluginReady = true;
     currentDistanceFilter = distanceFilter;
     currentNativeRouteId = monitoramentoRotaId;
@@ -288,6 +300,17 @@ export function useGpsTrackerTransistor({
         await ensureTransistorGpsReady(cfg.distance_filter_metros, monitoramentoRotaId);
         if (cancelled) return;
 
+        const provider = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(provider);
+        if (provider.status !== AuthorizationStatus.Always) {
+          const msg = `Autorização nativa insuficiente: ${authorizationStatusText(provider.status)} (${provider.status}). Necessário: Always (3).`;
+          console.warn("[GPS Transistor]", msg, provider);
+          markError(msg);
+          setError(msg);
+          setTracking(false);
+          return;
+        }
+
         // Listeners
         const subLoc = BackgroundGeolocation.onLocation(
           handleLocation,
@@ -302,6 +325,7 @@ export function useGpsTrackerTransistor({
 
         const subProv = BackgroundGeolocation.onProviderChange((event: ProviderChangeEvent) => {
           console.info("[GPS Transistor] providerChange", event);
+          markNativeProvider(event);
           if (!event.enabled) setError("GPS desligado no aparelho");
           else setError(null);
         });

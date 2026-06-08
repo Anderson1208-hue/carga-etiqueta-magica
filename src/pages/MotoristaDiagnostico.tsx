@@ -11,10 +11,22 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
 import { pendingCount } from "@/lib/gpsQueue";
-import { readTelemetry, markSent, markError, markNativeState, resetTelemetry, type GpsTelemetry } from "@/lib/gpsTelemetry";
+import {
+  authorizationStatusText,
+  readTelemetry,
+  markSent,
+  markError,
+  markNativeProvider,
+  markNativeReady,
+  markNativeRequestPermission,
+  markNativeState,
+  resetTelemetry,
+  type GpsTelemetry,
+} from "@/lib/gpsTelemetry";
 import { VALIDATION_KEY } from "@/components/mobile/ValidacaoGpsBackground";
 import { supabase } from "@/integrations/supabase/client";
 import { useGpsTrackerHybrid } from "@/hooks/useGpsTrackerHybrid";
+import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
 import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import {
   ArrowLeft,
@@ -183,6 +195,7 @@ export default function MotoristaDiagnostico() {
     if (isNative) {
       try {
         const provider = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(provider);
         setPerm(permFromNativeStatus(provider.status));
         const state = await BackgroundGeolocation.getState();
         const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
@@ -278,6 +291,11 @@ export default function MotoristaDiagnostico() {
       `User-Agent: ${navigator.userAgent}`,
       `Online: ${online}`,
       `Permissão GPS: ${perm}`,
+      `provider.status: ${tele.nativeProviderStatus ?? "—"} (${tele.nativeProviderStatusText ?? "—"})`,
+      `provider.enabled/gps/network: ${tele.nativeProviderEnabled ?? "—"}/${tele.nativeProviderGps ?? "—"}/${tele.nativeProviderNetwork ?? "—"}`,
+      `requestPermission(): ${tele.nativeRequestPermissionStatus ?? "—"} (${tele.nativeRequestPermissionText ?? "—"}) erro=${tele.nativeRequestPermissionError ?? "—"}`,
+      `ready(): ${fmtTime(tele.nativeReadyAt)} enabled=${tele.nativeReadyEnabled ?? "—"} erro=${tele.nativeReadyError ?? "—"}`,
+      `backgroundPermissionRationale: ${tele.nativeBackgroundPermissionRationale ?? "—"}`,
       `Driver ativo: ${tele.activeDriver ?? (isNative ? "desconhecido" : "web")}`,
       `Rota nativa: ${tele.nativeRouteId ?? diagRotaId ?? "—"}`,
       `BackgroundGeolocation.start(): chamado=${fmtTime(tele.nativeStartCalledAt)} sucesso=${fmtTime(tele.nativeStartSucceededAt)}`,
@@ -324,24 +342,49 @@ export default function MotoristaDiagnostico() {
     setPermLoading(true);
     try {
       if (isNative) {
-        const got = permFromNativeStatus(await BackgroundGeolocation.requestPermission());
+        try {
+          await ensureTransistorGpsReady(50, diagRotaId);
+          const state = await BackgroundGeolocation.getState();
+          markNativeReady({ enabled: state.enabled });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          markNativeReady({ error: msg });
+          throw new Error(`ready() falhou: ${msg}`);
+        }
+
+        const before = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(before);
+
+        let status: number;
+        try {
+          status = await BackgroundGeolocation.requestPermission();
+          markNativeRequestPermission({ status });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          markNativeRequestPermission({ error: msg });
+          throw new Error(`requestPermission() falhou: ${msg}`);
+        }
+
+        const after = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(after);
+        const got = permFromNativeStatus(after.status ?? status);
 
         await refreshAll();
 
         if (got === "granted") {
-          toast({ title: "Permissão concedida ✓", description: "Localização liberada o tempo todo." });
+          toast({ title: "Permissão concedida ✓", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.` });
         } else if (got === "while_in_use") {
-          toast({ title: "Permissão parcial", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+          toast({ title: "Permissão parcial", description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra Configurações → Localização.` });
           openAppSettings().catch(() => {});
         } else if (got === "denied") {
           toast({
             title: "Permissão negada",
-            description: "Abra as Configurações do app e libere a localização manualmente.",
+            description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra as Configurações do app.`,
             variant: "destructive",
           });
           openAppSettings().catch(() => {});
         } else {
-          toast({ title: "Sem resposta", description: "Tente novamente ou abra as configurações.", variant: "destructive" });
+          toast({ title: "Sem autorização nativa", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.`, variant: "destructive" });
         }
       } else {
         // Web: getCurrentPosition já dispara o prompt do navegador
@@ -358,6 +401,11 @@ export default function MotoristaDiagnostico() {
         });
         await refreshAll();
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markError(msg);
+      setTele(readTelemetry());
+      toast({ title: "Falha na permissão nativa", description: msg, variant: "destructive" });
     } finally {
       setPermLoading(false);
     }
@@ -423,6 +471,8 @@ export default function MotoristaDiagnostico() {
       : "Nativo — aguardando start"
     : "Web (navigator.geolocation)";
   const fsActive = tele.nativeForegroundServiceActive === true;
+  const authorizationAlways = tele.nativeProviderStatus === AuthorizationStatus.Always;
+  const trackerDisplay = fsActive ? "ATIVO" : diagRotaId ? "Sem serviço" : "Inativo";
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -490,10 +540,12 @@ export default function MotoristaDiagnostico() {
           <CardContent className="pt-0 divide-y">
             <StatusRow
               label="Permissão de localização"
-              value={perm}
-              ok={perm === "granted" ? true : perm === "denied" ? false : null}
+              value={`${perm}${tele.nativeProviderStatus !== null ? ` (${tele.nativeProviderStatus})` : ""}`}
+              ok={authorizationAlways ? true : perm === "denied" ? false : null}
               hint={
-                perm === "denied"
+                authorizationAlways
+                  ? "Autorização nativa Always confirmada pelo provider"
+                  : perm === "denied"
                   ? "Abra Configurações → Apps → Permissões → Localização → Permitir o tempo todo"
                   : perm === "prompt"
                   ? "Captura local pode funcionar, mas o rastreador ainda não recebeu permissão nativa"
@@ -537,13 +589,13 @@ export default function MotoristaDiagnostico() {
             />
             <StatusRow
               label="Rastreamento desta tela"
-              value={diagRotaId ? "ATIVO" : "Inativo"}
-              ok={!!diagRotaId}
+              value={trackerDisplay}
+              ok={fsActive ? true : diagRotaId ? false : null}
               hint={
                 diagRotaId
-                  ? diagTrackerEnabled
-                    ? `Enviando GPS para a rota ${diagRotaId.slice(0, 8)}… enquanto esta tela ficar aberta`
-                    : "Rota encontrada, aguardando inicialização do rastreador"
+                  ? fsActive
+                    ? `Foreground Service ativo para a rota ${diagRotaId.slice(0, 8)}…`
+                    : "Rota encontrada, mas o serviço nativo ainda não iniciou"
                   : "Sem código/rota ativa: captura posição, mas não traduz no mapa"
               }
             />

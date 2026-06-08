@@ -37,6 +37,21 @@ export interface GpsTelemetry {
   nativeLastLocationAt: number | null;
   nativeLastLocationPos: { lat: number; lng: number; accuracy: number; event?: string | null } | null;
   nativePendingLocations: number | null;
+  nativeProviderStatus: number | null;
+  nativeProviderStatusText: string | null;
+  nativeProviderEnabled: boolean | null;
+  nativeProviderGps: boolean | null;
+  nativeProviderNetwork: boolean | null;
+  nativeProviderAccuracyAuthorization: number | null;
+  nativeProviderLastAt: number | null;
+  nativeReadyAt: number | null;
+  nativeReadyEnabled: boolean | null;
+  nativeReadyError: string | null;
+  nativeRequestPermissionAt: number | null;
+  nativeRequestPermissionStatus: number | null;
+  nativeRequestPermissionText: string | null;
+  nativeRequestPermissionError: string | null;
+  nativeBackgroundPermissionRationale: string | null;
 }
 
 const EMPTY: GpsTelemetry = {
@@ -69,6 +84,21 @@ const EMPTY: GpsTelemetry = {
   nativeLastLocationAt: null,
   nativeLastLocationPos: null,
   nativePendingLocations: null,
+  nativeProviderStatus: null,
+  nativeProviderStatusText: null,
+  nativeProviderEnabled: null,
+  nativeProviderGps: null,
+  nativeProviderNetwork: null,
+  nativeProviderAccuracyAuthorization: null,
+  nativeProviderLastAt: null,
+  nativeReadyAt: null,
+  nativeReadyEnabled: null,
+  nativeReadyError: null,
+  nativeRequestPermissionAt: null,
+  nativeRequestPermissionStatus: null,
+  nativeRequestPermissionText: null,
+  nativeRequestPermissionError: null,
+  nativeBackgroundPermissionRationale: null,
 };
 
 export function readTelemetry(): GpsTelemetry {
@@ -116,6 +146,7 @@ export function markNativeDriver(patch: {
   httpUrlConfigured?: boolean | null;
   httpAutoSync?: boolean | null;
   notificationConfigured?: boolean | null;
+  backgroundPermissionRationale?: string | null;
 }) {
   write({
     activeDriver: "transistorsoft",
@@ -125,6 +156,51 @@ export function markNativeDriver(patch: {
     nativeHttpUrlConfigured: patch.httpUrlConfigured ?? null,
     nativeHttpAutoSync: patch.httpAutoSync ?? null,
     nativeNotificationConfigured: patch.notificationConfigured ?? null,
+    nativeBackgroundPermissionRationale: patch.backgroundPermissionRationale ?? null,
+  });
+}
+
+export function authorizationStatusText(status: number | null | undefined): string {
+  if (status === 3) return "Always";
+  if (status === 4) return "WhenInUse";
+  if (status === 2) return "Denied";
+  if (status === 1) return "Restricted";
+  if (status === 0) return "NotDetermined";
+  return "Unknown";
+}
+
+export function markNativeProvider(provider: {
+  status?: number;
+  enabled?: boolean;
+  gps?: boolean;
+  network?: boolean;
+  accuracyAuthorization?: number;
+}) {
+  write({
+    nativeProviderStatus: provider.status ?? null,
+    nativeProviderStatusText: authorizationStatusText(provider.status),
+    nativeProviderEnabled: provider.enabled ?? null,
+    nativeProviderGps: provider.gps ?? null,
+    nativeProviderNetwork: provider.network ?? null,
+    nativeProviderAccuracyAuthorization: provider.accuracyAuthorization ?? null,
+    nativeProviderLastAt: Date.now(),
+  });
+}
+
+export function markNativeReady(result: { enabled?: boolean | null; error?: string | null }) {
+  write({
+    nativeReadyAt: Date.now(),
+    nativeReadyEnabled: result.enabled ?? null,
+    nativeReadyError: result.error ?? null,
+  });
+}
+
+export function markNativeRequestPermission(result: { status?: number | null; error?: string | null }) {
+  write({
+    nativeRequestPermissionAt: Date.now(),
+    nativeRequestPermissionStatus: result.status ?? null,
+    nativeRequestPermissionText: authorizationStatusText(result.status),
+    nativeRequestPermissionError: result.error ?? null,
   });
 }
 
