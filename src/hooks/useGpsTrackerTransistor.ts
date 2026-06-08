@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
 import type {
   Config,
@@ -67,20 +68,26 @@ const DEFAULT_CONFIG: GpsConfig = {
 };
 
 const NATIVE_SOURCE = "transistor-native-http";
+const NATIVE_LOCATION_INTERVAL_MS = 30_000;
+const NATIVE_FASTEST_INTERVAL_MS = 10_000;
 
-const NATIVE_LOCATION_TEMPLATE = JSON.stringify({
-  latitude: "<%= latitude %>",
-  longitude: "<%= longitude %>",
-  accuracy: "<%= accuracy %>",
-  timestamp: "<%= timestamp %>",
-  heartbeat: false,
-  battery: "<%= battery.level %>",
-  event: "<%= event %>",
-})
-  .replace('"<%= latitude %>"', "<%= latitude %>")
-  .replace('"<%= longitude %>"', "<%= longitude %>")
-  .replace('"<%= accuracy %>"', "<%= accuracy %>")
-  .replace('"<%= battery.level %>"', "<%= battery.level %>");
+function buildNativeLocationTemplate(monitoramentoRotaId: string | null): string {
+  return JSON.stringify({
+    monitoramento_rota_id: monitoramentoRotaId,
+    source: NATIVE_SOURCE,
+    latitude: "<%= latitude %>",
+    longitude: "<%= longitude %>",
+    accuracy: "<%= accuracy %>",
+    timestamp: "<%= timestamp %>",
+    heartbeat: false,
+    battery: "<%= battery.level %>",
+    event: "<%= event %>",
+  })
+    .replace('"<%= latitude %>"', "<%= latitude %>")
+    .replace('"<%= longitude %>"', "<%= longitude %>")
+    .replace('"<%= accuracy %>"', "<%= accuracy %>")
+    .replace('"<%= battery.level %>"', "<%= battery.level %>");
+}
 
 interface UseGpsTrackerOptions {
   monitoramentoRotaId: string | null;
@@ -110,18 +117,23 @@ let currentNativeRouteId: string | null = null;
 function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFilter: number): Config {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const effectiveDistanceFilter = 0;
 
   return {
     geolocation: {
       desiredAccuracy: DesiredAccuracy.High,
-      distanceFilter,
-      stationaryRadius: 25,
+      // Android ignora locationUpdateInterval quando distanceFilter > 0.
+      // Para a Torre receber pontos mesmo parado / tela bloqueada, usamos
+      // amostragem por tempo e deixamos o HTTP nativo enviar direto.
+      distanceFilter: effectiveDistanceFilter,
+      stationaryRadius: 10,
       locationAuthorizationRequest: "Always" as const,
-      locationUpdateInterval: 30_000,
-      fastestLocationUpdateInterval: 10_000,
+      locationUpdateInterval: NATIVE_LOCATION_INTERVAL_MS,
+      fastestLocationUpdateInterval: NATIVE_FASTEST_INTERVAL_MS,
       allowIdenticalLocations: true,
       pausesLocationUpdatesAutomatically: false,
       disableStopDetection: true,
+      disableElasticity: true,
     },
     activity: {
       disableStopDetection: true,
@@ -131,12 +143,17 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
       heartbeatInterval: 60,
       stopOnTerminate: false,
       startOnBoot: true,
-      enableHeadless: true,
+      // O envio em background deve ser 100% nativo via HttpConfig.
+      // Headless JS não é necessário para gravar/enviar localização e não
+      // pode ser ponto único de falha quando a WebView dorme.
+      enableHeadless: false,
       notification: {
         title: "Orkestria Driver — Rastreamento ativo",
         text: "Sua rota está em andamento",
         sticky: true,
-        priority: NotificationPriority.Default,
+        priority: NotificationPriority.High,
+        channelName: "Rastreamento GPS",
+        channelId: "orkestria_gps_tracking",
         smallIcon: "ic_stat_notify",
       },
       backgroundPermissionRationale: {
@@ -160,10 +177,6 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
             Authorization: `Bearer ${supabaseKey}`,
             apikey: supabaseKey,
           },
-          params: {
-            monitoramento_rota_id: monitoramentoRotaId,
-            source: NATIVE_SOURCE,
-          },
         }
       : {
           autoSync: false,
@@ -173,7 +186,7 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
       persistMode: PersistMode.All,
       maxDaysToPersist: 3,
       maxRecordsToPersist: 5000,
-      locationTemplate: NATIVE_LOCATION_TEMPLATE,
+      locationTemplate: buildNativeLocationTemplate(monitoramentoRotaId),
     },
   };
 }
