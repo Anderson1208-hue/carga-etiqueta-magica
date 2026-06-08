@@ -547,6 +547,71 @@ export default function MotoristaDiagnostico() {
           </CardContent>
         </Card>
 
+        {/* Transistorsoft nativo */}
+        <Card className="border-primary/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Transistorsoft
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 divide-y">
+            <StatusRow
+              label="Driver ativo"
+              value={tele.activeDriver ?? "—"}
+              ok={tele.activeDriver === "transistorsoft" ? true : isNative ? false : null}
+              hint={tele.driverActivatedAt ? fmtTime(tele.driverActivatedAt) : undefined}
+            />
+            <StatusRow
+              label="BackgroundGeolocation.start()"
+              value={tele.nativeStartCalledAt ? fmtAgo(tele.nativeStartCalledAt) : "não chamado"}
+              ok={tele.nativeStartSucceededAt ? true : tele.nativeStartCalledAt ? null : false}
+              hint={tele.nativeStartSucceededAt ? `Sucesso: ${fmtTime(tele.nativeStartSucceededAt)}` : undefined}
+            />
+            <StatusRow
+              label="state.enabled"
+              value={tele.nativeStateEnabled === null ? "—" : String(tele.nativeStateEnabled)}
+              ok={tele.nativeStateEnabled}
+              hint={tele.nativeStateLastAt ? `Lido: ${fmtAgo(tele.nativeStateLastAt)}` : nativeStateError ?? undefined}
+            />
+            <StatusRow
+              label="Foreground Service"
+              value={fsActive ? "Ativo" : "Inativo"}
+              ok={fsActive}
+              hint={tele.nativeNotificationConfigured ? "Notificação persistente configurada" : "Notificação não confirmada no state"}
+            />
+            <StatusRow
+              label="onLocation nativo"
+              value={fmtAgo(tele.nativeLastLocationAt)}
+              ok={tele.nativeLastLocationAt && Date.now() - tele.nativeLastLocationAt < 5 * 60_000 ? true : tele.nativeLastLocationAt ? null : false}
+              hint={tele.nativeLastLocationPos ? `${tele.nativeLastLocationPos.lat.toFixed(5)}, ${tele.nativeLastLocationPos.lng.toFixed(5)} ±${Math.round(tele.nativeLastLocationPos.accuracy)}m` : "Nenhum callback nativo ainda"}
+            />
+            <StatusRow
+              label="HTTP nativo configurado"
+              value={tele.nativeHttpUrlConfigured ? `autoSync ${tele.nativeHttpAutoSync ? "ON" : "OFF"}` : "não"}
+              ok={tele.nativeHttpUrlConfigured === true && tele.nativeHttpAutoSync === true}
+              hint={`source esperado: ${tele.nativeSource ?? "—"}`}
+            />
+            <StatusRow
+              label="Último HTTP nativo"
+              value={tele.nativeHttpLastAt ? `${fmtAgo(tele.nativeHttpLastAt)} • ${tele.nativeHttpLastStatus ?? "—"}` : "—"}
+              ok={tele.nativeHttpLastSuccess === null ? null : tele.nativeHttpLastSuccess}
+              hint={tele.nativeHttpLastResponse ?? undefined}
+            />
+            <StatusRow
+              label="Source do último ponto"
+              value={lastDbSource ?? "—"}
+              ok={lastDbSource === "transistor-native-http" ? true : lastDbSource ? null : false}
+              hint={lastDbPointAt ? fmtTime(lastDbPointAt) : "Sem ponto no banco para esta rota"}
+            />
+            <StatusRow
+              label="Fila nativa SQLite"
+              value={tele.nativePendingLocations === null ? "—" : String(tele.nativePendingLocations)}
+              ok={tele.nativePendingLocations === null ? null : tele.nativePendingLocations < 10}
+            />
+          </CardContent>
+        </Card>
+
         {/* Posição atual */}
         <Card>
           <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
