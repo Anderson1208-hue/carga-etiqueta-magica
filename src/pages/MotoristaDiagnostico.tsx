@@ -1,15 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Capacitor, registerPlugin } from "@capacitor/core";
-
-interface BgLocation { latitude: number; longitude: number; accuracy: number; time: number | null; }
-interface BgWatcherOptions { backgroundMessage?: string; backgroundTitle?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number; }
-interface BackgroundGeolocationPlugin {
-  addWatcher(opts: BgWatcherOptions, cb: (loc: BgLocation | null, err?: { code: string; message: string }) => void): Promise<string>;
-  removeWatcher(opts: { id: string }): Promise<void>;
-  openSettings(): Promise<void>;
-}
-const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>("BackgroundGeolocation");
+import { Capacitor } from "@capacitor/core";
+import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
+import { AuthorizationStatus } from "@transistorsoft/background-geolocation-types";
+import { NativeSettings, AndroidSettings, IOSSettings } from "capacitor-native-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +35,22 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type PermState = "granted" | "denied" | "prompt" | "unknown";
+type PermState = "granted" | "while_in_use" | "denied" | "prompt" | "unknown";
+
+function permFromNativeStatus(status: number | undefined): PermState {
+  if (status === AuthorizationStatus.Always) return "granted";
+  if (status === AuthorizationStatus.WhenInUse) return "while_in_use";
+  if (status === AuthorizationStatus.Denied || status === AuthorizationStatus.Restricted) return "denied";
+  if (status === AuthorizationStatus.NotDetermined) return "prompt";
+  return "unknown";
+}
+
+async function openAppSettings(): Promise<void> {
+  await NativeSettings.open({
+    optionAndroid: AndroidSettings.ApplicationDetails,
+    optionIOS: IOSSettings.App,
+  });
+}
 
 const RESTAR_ALTO = 50;
 
