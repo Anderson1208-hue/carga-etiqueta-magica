@@ -190,6 +190,7 @@ export async function ensureTransistorGpsReady(
       httpUrlConfigured: Boolean(cfg.http?.url),
       httpAutoSync: cfg.http?.autoSync ?? null,
       notificationConfigured: Boolean(cfg.app?.notification),
+      backgroundPermissionRationale: cfg.app?.backgroundPermissionRationale?.message ?? null,
     });
   };
 
@@ -205,15 +206,22 @@ export async function ensureTransistorGpsReady(
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
-    await BackgroundGeolocation.ready({
-      reset: true,
-      ...buildNativeUploadConfig(monitoramentoRotaId, distanceFilter),
-      logger: {
-        debug: import.meta.env.VITE_BUILD_ENV !== "prod",
-        logLevel:
-          import.meta.env.VITE_BUILD_ENV === "prod" ? LogLevel.Error : LogLevel.Verbose,
-      },
-    });
+    try {
+      const state = await BackgroundGeolocation.ready({
+        reset: true,
+        ...buildNativeUploadConfig(monitoramentoRotaId, distanceFilter),
+        logger: {
+          debug: import.meta.env.VITE_BUILD_ENV !== "prod",
+          logLevel:
+            import.meta.env.VITE_BUILD_ENV === "prod" ? LogLevel.Error : LogLevel.Verbose,
+        },
+      });
+      markNativeReady({ enabled: state.enabled });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markNativeReady({ error: msg });
+      throw err;
+    }
     pluginReady = true;
     currentDistanceFilter = distanceFilter;
     currentNativeRouteId = monitoramentoRotaId;
