@@ -252,6 +252,7 @@ export function useGpsTrackerTransistor({
   const handleLocation = useCallback(async (location: Location) => {
     const { latitude, longitude, accuracy } = location.coords;
     setLastPosition({ lat: latitude, lng: longitude });
+    markNativeLocation({ lat: latitude, lng: longitude, accuracy: accuracy ?? 0, event: location.event ?? null });
 
     const critico = checkModoCritico(latitude, longitude);
     setModoCritico(critico);
@@ -263,6 +264,7 @@ export function useGpsTrackerTransistor({
   }, [checkModoCritico]);
 
   const handleHttp = useCallback((event: HttpEvent) => {
+    markNativeHttp(event);
     if (event.success && event.status >= 200 && event.status < 300) {
       markSent(1);
       setError(null);
@@ -313,7 +315,17 @@ export function useGpsTrackerTransistor({
         const subHttp = BackgroundGeolocation.onHttp(handleHttp);
         subscriptions.push(subHttp);
 
+        markNativeStartCalled();
         const state = await BackgroundGeolocation.start();
+        await BackgroundGeolocation.changePace(true).catch(() => {});
+        const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+          pendingLocations,
+        });
         if (cancelled) {
           await BackgroundGeolocation.stop().catch(() => {});
           return;
