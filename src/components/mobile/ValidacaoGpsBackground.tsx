@@ -278,7 +278,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
               variant="outline"
               className="w-full"
               size="lg"
-              onClick={() => BackgroundGeolocation.requestPermission().catch(() => setPermError("Não foi possível abrir as permissões de localização."))}
+              onClick={() => openAppDetailsSettings().catch(() => setPermError("Não foi possível abrir as configurações do app. Abra manualmente: Ajustes → Apps → Orkestria Driver → Permissões → Localização."))}
             >
               <Settings className="w-4 h-4 mr-2" />
               Abrir configurações
