@@ -389,6 +389,7 @@ export default function MotoristaDiagnostico() {
           longitude: fresh.lng,
           accuracy: fresh.accuracy,
           heartbeat: false,
+          source: "manual-diagnostic",
         },
       });
       if (gpsErr) throw new Error(`Backend: ${gpsErr.message}`);
@@ -413,8 +414,12 @@ export default function MotoristaDiagnostico() {
     }
   }
 
-  const trackerMode = isNative ? "Nativo (Foreground Service)" : "Web (navigator.geolocation)";
-  const fsActive = isNative && diagTrackerEnabled && tele.watcherStartedAt !== null;
+  const trackerMode = isNative
+    ? tele.activeDriver === "transistorsoft"
+      ? "Transistorsoft"
+      : "Nativo — aguardando start"
+    : "Web (navigator.geolocation)";
+  const fsActive = tele.nativeForegroundServiceActive === true;
 
   return (
     <div className="min-h-screen bg-background pb-8">
