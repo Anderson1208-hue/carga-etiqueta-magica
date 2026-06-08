@@ -344,7 +344,13 @@ export function useGpsTrackerTransistor({
 
     async function stopTracking() {
       try {
-        await BackgroundGeolocation.stop();
+        const state = await BackgroundGeolocation.stop();
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: Boolean(state.app?.notification),
+        });
       } catch (err) {
         console.warn("[GPS Transistor] stop falhou", err);
       }
