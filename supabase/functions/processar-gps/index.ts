@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
       accuracy,
       batch,
       heartbeat: heartbeatFlag,
+      source = "legacy-js",
     } = body;
 
     if (!monitoramento_rota_id || (latitude == null && (!batch || batch.length === 0))) {
@@ -75,6 +76,7 @@ Deno.serve(async (req) => {
         registrado_em: ts,
         client_ts: ts,
         heartbeat: !!p.heartbeat,
+        source,
       };
     });
 
