@@ -15,7 +15,17 @@ import {
   NotificationPriority,
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
-import { markEnqueue, markError, markSent, markWatcherStart } from "@/lib/gpsTelemetry";
+import {
+  markEnqueue,
+  markError,
+  markNativeDriver,
+  markNativeHttp,
+  markNativeLocation,
+  markNativeStartCalled,
+  markNativeState,
+  markSent,
+  markWatcherStart,
+} from "@/lib/gpsTelemetry";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation.
@@ -51,6 +61,8 @@ const DEFAULT_CONFIG: GpsConfig = {
   batch_max_posicoes: 5,
   raio_aproximacao_metros: 500,
 };
+
+const NATIVE_SOURCE = "transistor-native-http";
 
 const NATIVE_LOCATION_TEMPLATE = JSON.stringify({
   latitude: "<%= latitude %>",
@@ -146,7 +158,7 @@ function buildNativeUploadConfig(monitoramentoRotaId: string | null, distanceFil
           },
           params: {
             monitoramento_rota_id: monitoramentoRotaId,
-            source: "transistor-native-http",
+            source: NATIVE_SOURCE,
           },
         }
       : {
