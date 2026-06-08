@@ -337,24 +337,49 @@ export default function MotoristaDiagnostico() {
     setPermLoading(true);
     try {
       if (isNative) {
-        const got = permFromNativeStatus(await BackgroundGeolocation.requestPermission());
+        try {
+          await ensureTransistorGpsReady(50, diagRotaId);
+          const state = await BackgroundGeolocation.getState();
+          markNativeReady({ enabled: state.enabled });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          markNativeReady({ error: msg });
+          throw new Error(`ready() falhou: ${msg}`);
+        }
+
+        const before = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(before);
+
+        let status: number;
+        try {
+          status = await BackgroundGeolocation.requestPermission();
+          markNativeRequestPermission({ status });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          markNativeRequestPermission({ error: msg });
+          throw new Error(`requestPermission() falhou: ${msg}`);
+        }
+
+        const after = await BackgroundGeolocation.getProviderState();
+        markNativeProvider(after);
+        const got = permFromNativeStatus(after.status ?? status);
 
         await refreshAll();
 
         if (got === "granted") {
-          toast({ title: "Permissão concedida ✓", description: "Localização liberada o tempo todo." });
+          toast({ title: "Permissão concedida ✓", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.` });
         } else if (got === "while_in_use") {
-          toast({ title: "Permissão parcial", description: "Agora abra Configurações → Localização e marque 'Permitir o tempo todo'." });
+          toast({ title: "Permissão parcial", description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra Configurações → Localização.` });
           openAppSettings().catch(() => {});
         } else if (got === "denied") {
           toast({
             title: "Permissão negada",
-            description: "Abra as Configurações do app e libere a localização manualmente.",
+            description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra as Configurações do app.`,
             variant: "destructive",
           });
           openAppSettings().catch(() => {});
         } else {
-          toast({ title: "Sem resposta", description: "Tente novamente ou abra as configurações.", variant: "destructive" });
+          toast({ title: "Sem autorização nativa", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.`, variant: "destructive" });
         }
       } else {
         // Web: getCurrentPosition já dispara o prompt do navegador
@@ -371,6 +396,11 @@ export default function MotoristaDiagnostico() {
         });
         await refreshAll();
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markError(msg);
+      setTele(readTelemetry());
+      toast({ title: "Falha na permissão nativa", description: msg, variant: "destructive" });
     } finally {
       setPermLoading(false);
     }
