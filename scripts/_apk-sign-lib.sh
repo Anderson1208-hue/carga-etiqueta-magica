@@ -183,11 +183,13 @@ assert_android_background_gps_ready() {
   check_manifest_item "android.permission.POST_NOTIFICATIONS" "POST_NOTIFICATIONS"
   check_manifest_item "android.permission.WAKE_LOCK" "WAKE_LOCK"
   check_manifest_item "android.permission.CAMERA" "CAMERA"
+  check_manifest_item "com.transistorsoft.locationmanager.license" "licença Android Transistorsoft"
 
   if [ "$missing" -ne 0 ]; then
     echo ""
     echo "Build bloqueado: esse APK iria falhar em GPS com tela bloqueada."
-    echo "Adicione as permissões acima dentro de <manifest>, antes de <application>."
+    echo "Adicione as permissões acima dentro de <manifest>, antes de <application>,"
+    echo "e a licença Transistorsoft dentro de <application> como <meta-data>."
     echo "Referência: docs/APK_BUILD_PRODUCAO.md seção 'Permissões obrigatórias no AndroidManifest'."
     exit 1
   fi
