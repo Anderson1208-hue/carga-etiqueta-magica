@@ -398,32 +398,7 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
-      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId && gpsValidated} />
-      <ValidacaoGpsBackground
-        open={showValidacao}
-        onValidated={() => { setGpsValidated(true); setNativeGpsPermissionReady(true); setShowValidacao(false); }}
-        onCancel={() => {
-          setShowValidacao(false);
-          setVeiculo(null);
-          setNfs([]);
-          setMonitoramentoRotaId(null);
-          setCode("");
-        }}
-      />
-      {/* Banner quando GPS ainda não foi validado neste APK */}
-      {Capacitor.isNativePlatform() && veiculo && !gpsValidated && !showValidacao && (
-        <div className="bg-warning/15 border-b border-warning/30 p-3">
-          <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm">
-              <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
-              <span>GPS de background não validado — rastreamento desativado.</span>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => setShowValidacao(true)}>
-              <ShieldCheck className="w-3 h-3 mr-1" /> Validar
-            </Button>
-          </div>
-        </div>
-      )}
+      <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
         <div className="flex items-center justify-between max-w-lg mx-auto">
