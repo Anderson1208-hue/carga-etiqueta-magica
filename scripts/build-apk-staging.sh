@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Gera o APK de HOMOLOGAÇÃO assinado.
+# Gera o APK de STAGING assinado.
 # RODA EMBUTIDO (capacitor://localhost) — NÃO depende de lovable.app / auth-bridge.
-# Diferença para PROD: badge âmbar + VITE_BUILD_ENV=homolog + applicationId
-# .homolog (coexiste com PROD no mesmo aparelho). Atualizar exige novo APK.
+# Diferença para PROD: badge âmbar + VITE_BUILD_ENV=staging + applicationId
+# .staging (coexiste com PROD no mesmo aparelho). Atualizar exige novo APK.
+# Sufixo `.staging` é oficialmente aceito pela mesma licença Transistorsoft
+# emitida para com.orkestria.driver (PROD).
 # Pré-requisito (UMA VEZ): ./scripts/setup-android-signing.sh
 set -euo pipefail
 
@@ -19,11 +21,11 @@ fi
 echo "==> 1/6 Bump versionCode"
 bump_version_code
 
-echo "==> 2/6 Build do React (vite) — VITE_BUILD_ENV=homolog"
-VITE_BUILD_ENV=homolog npm run build
+echo "==> 2/6 Build do React (vite) — VITE_BUILD_ENV=staging"
+VITE_BUILD_ENV=staging npm run build
 
-echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (embutido, sem server.url)"
-CAP_ENV=homolog npx cap sync android
+echo "==> 3/6 Sincronizando Capacitor em modo STAGING (embutido, sem server.url)"
+CAP_ENV=staging npx cap sync android
 
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
 assert_android_background_gps_ready
@@ -45,12 +47,12 @@ verify_signature "$APK_PATH"
 
 SIZE=$(du -h "$APK_PATH" | cut -f1)
 STAMP=$(date +%Y%m%d-%H%M)
-OUT="android/app/build/outputs/apk/release/orkestria-driver-homolog-${STAMP}.apk"
+OUT="android/app/build/outputs/apk/release/orkestria-driver-staging-${STAMP}.apk"
 cp "$APK_PATH" "$OUT"
 
 echo ""
 echo "==> 6/6 OK"
-echo "APK HOMOLOG: $OUT  ($SIZE)"
+echo "APK STAGING: $OUT  ($SIZE)"
 echo ""
-echo "Distribua APENAS para o time de homologação. Badge âmbar 'HOMOLOG'."
+echo "Distribua APENAS para o time de homologação. Badge âmbar 'STAGING'."
 echo "APK embutido — atualizar exige gerar novo APK (igual PROD)."

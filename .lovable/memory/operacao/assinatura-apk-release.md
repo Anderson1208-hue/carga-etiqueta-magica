@@ -19,8 +19,8 @@ Esse script é idempotente. Ele:
 
 ## Build de release (toda vez que for distribuir)
 ```bash
-./scripts/build-apk-release.sh   # PROD  -> motorista-prod-YYYYMMDD-HHMM.apk
-./scripts/build-apk-homolog.sh   # HOMOLOG -> motorista-homolog-…apk
+./scripts/build-apk-release.sh   # PROD    -> orkestria-driver-prod-YYYYMMDD-HHMM.apk
+./scripts/build-apk-staging.sh   # STAGING -> orkestria-driver-staging-…apk
 ```
 Ambos executam:
 - `bump_version_code` (incrementa o inteiro do versionCode em `android/app/build.gradle` — Android exige > anterior para reconhecer atualização).
@@ -37,7 +37,7 @@ O Capacitor entrega `android/app/build.gradle` SEM `signingConfigs.release`. Sem
 2. `_apk-sign-lib.sh::sign_if_needed` assina via apksigner se por qualquer motivo o gradle vier limpo (após `cap sync` agressivo, troca de máquina, etc.).
 
 ## Garantia de "atualização sem conflito de assinatura"
-- Mesma keystore release usada em todo build (PROD e HOMOLOG compartilham).
+- Mesma keystore release usada em todo build (PROD e STAGING compartilham).
 - `versionCode` sempre incrementado automaticamente.
 - `versionName` (visível ao usuário) é editado manualmente em `android/app/build.gradle` quando o dev quiser mudar de "1.0.x" para "1.1.0" etc.
 
@@ -45,4 +45,4 @@ O Capacitor entrega `android/app/build.gradle` SEM `signingConfigs.release`. Sem
 - `scripts/setup-android-signing.sh` — setup único, interativo (pede senha).
 - `scripts/_apk-sign-lib.sh` — funções compartilhadas (`bump_version_code`, `sign_if_needed`, `verify_signature`).
 - `scripts/build-apk-release.sh` — pipeline PROD.
-- `scripts/build-apk-homolog.sh` — pipeline HOMOLOG.
+- `scripts/build-apk-staging.sh` — pipeline STAGING.
