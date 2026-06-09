@@ -189,8 +189,7 @@ assert_android_background_gps_ready() {
   if [ "$missing" -ne 0 ]; then
     echo ""
     echo "Build bloqueado: esse APK iria falhar em GPS com tela bloqueada."
-    echo "Adicione as permissões acima dentro de <manifest>, antes de <application>,"
-    echo "e a licença Transistorsoft dentro de <application> como <meta-data>."
+    echo "Adicione as permissões acima dentro de <manifest>, antes de <application>."
     echo "Referência: docs/APK_BUILD_PRODUCAO.md seção 'Permissões obrigatórias no AndroidManifest'."
     exit 1
   fi
