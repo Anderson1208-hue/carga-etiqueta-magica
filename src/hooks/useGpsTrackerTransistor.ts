@@ -442,18 +442,20 @@ export function useGpsTrackerTransistor({
       // Ao reabrir o APK, a tela começa sem rota carregada (`enabled=false`),
       // mas o serviço nativo pode estar vivo por `stopOnTerminate=false`.
       // Chamar stop() nesse estado mata justamente o rastreamento persistente.
-      if (!startedRef.current) return;
+      const shouldStopNative = startedRef.current;
 
-      try {
-        const state = await BackgroundGeolocation.stop();
-        markNativeState({
-          enabled: state.enabled,
-          isMoving: state.isMoving,
-          trackingMode: state.trackingMode,
-          notificationConfigured: Boolean(state.app?.notification),
-        });
-      } catch (err) {
-        console.warn("[GPS Transistor] stop falhou", err);
+      if (shouldStopNative) {
+        try {
+          const state = await BackgroundGeolocation.stop();
+          markNativeState({
+            enabled: state.enabled,
+            isMoving: state.isMoving,
+            trackingMode: state.trackingMode,
+            notificationConfigured: Boolean(state.app?.notification),
+          });
+        } catch (err) {
+          console.warn("[GPS Transistor] stop falhou", err);
+        }
       }
       for (const s of subscriptions) {
         try { s.remove(); } catch { /* ignore */ }
