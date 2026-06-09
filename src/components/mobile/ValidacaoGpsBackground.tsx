@@ -181,12 +181,9 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
       try { sub.remove(); } catch { /* ignore */ }
     }
     subscriptionsRef.current = [];
-    // Se o teste passou, NÃO pare o serviço: o tracker real entra logo em
-    // seguida e apenas reconfigura a rota. Parar aqui derruba o Foreground
-    // Service exatamente antes do teste com tela bloqueada.
-    if (_finalStep !== "success") {
-      try { await BackgroundGeolocation.stop(); } catch { /* ignore */ }
-    }
+    // NÃO pare o serviço aqui. Este wizard usa o mesmo serviço nativo do
+    // rastreamento real; parar após falha/sucesso pode derrubar o Foreground
+    // Service e mascarar justamente o teste de continuidade em background.
     setStep(_finalStep);
   }
 
@@ -216,7 +213,7 @@ export function ValidacaoGpsBackground({ open, onValidated, onCancel }: Props) {
     for (const sub of subscriptionsRef.current) {
       try { sub.remove(); } catch { /* ignore */ }
     }
-    if (!validatedRef.current) BackgroundGeolocation.stop().catch(() => {});
+    // Não parar o serviço no unmount: o tracker real assume/reconfigura em seguida.
   }, []);
 
   if (!open) return null;
