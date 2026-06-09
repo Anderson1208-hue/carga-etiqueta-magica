@@ -17,6 +17,7 @@ import {
   NotificationPriority,
   PersistMode,
 } from "@transistorsoft/background-geolocation-types";
+import { enqueue, pendingCount } from "@/lib/gpsQueue";
 import {
   authorizationStatusText,
   markEnqueue,
@@ -288,7 +289,7 @@ export function useGpsTrackerTransistor({
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modoCritico, setModoCritico] = useState(false);
-  const [pendingQueue] = useState(0);
+  const [pendingQueue, setPendingQueue] = useState(0);
 
   const checkModoCritico = useCallback((lat: number, lng: number): boolean => {
     const coords = paradasCoordsRef.current;
@@ -322,6 +323,44 @@ export function useGpsTrackerTransistor({
     console.warn("[GPS Transistor]", msg);
     markError(msg);
     setError(msg);
+  }, []);
+
+  const enqueueForegroundFallback = useCallback((reason: string) => {
+    if (!navigator.geolocation) return;
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const rotaId = rotaIdRef.current;
+        if (!rotaId) return;
+
+        const { latitude, longitude, accuracy } = pos.coords;
+        setLastPosition({ lat: latitude, lng: longitude });
+        try {
+          await enqueue({
+            monitoramento_rota_id: rotaId,
+            latitude,
+            longitude,
+            accuracy,
+            timestamp: new Date(pos.timestamp || Date.now()).toISOString(),
+            heartbeat: reason !== "foreground-startup",
+          });
+          markEnqueue({ lat: latitude, lng: longitude, accuracy });
+          setPendingQueue(await pendingCount());
+          setError(null);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn("[GPS Transistor] fallback foreground falhou", err);
+          markError(msg);
+        }
+      },
+      (err) => {
+        const msg = err.message || "GPS sem retorno no fallback foreground";
+        console.warn("[GPS Transistor] fallback geolocation falhou", err);
+        markError(msg);
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 }
+    );
   }, []);
 
   useEffect(() => {
