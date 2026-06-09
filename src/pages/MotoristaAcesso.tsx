@@ -13,10 +13,8 @@ import { useGpsQueueWorker } from "@/hooks/useGpsQueueWorker";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { PermissoesOnboarding } from "@/components/mobile/PermissoesOnboarding";
-import { ValidacaoGpsBackground, isBackgroundGpsValidated } from "@/components/mobile/ValidacaoGpsBackground";
 import { BuildModeBadge } from "@/components/mobile/BuildModeBadge";
-import { Capacitor } from "@capacitor/core";
-import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity, ShieldCheck } from "lucide-react";
+import { Truck, FileText, MapPin, Loader2, Package, CheckCircle2, AlertTriangle, Clock, XCircle, RotateCcw, Navigation, Camera, X, Activity } from "lucide-react";
 
 interface NfMotorista {
   id: string;
@@ -74,13 +72,7 @@ export default function MotoristaAcesso() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
-  // Gate de validação do GPS background (APK nativo).
-  // No web sempre passa direto — `isBackgroundGpsValidated` retorna true fora de Capacitor.
-  const [gpsValidated, setGpsValidated] = useState<boolean>(() => isBackgroundGpsValidated());
-  const [nativeGpsPermissionReady, setNativeGpsPermissionReady] = useState<boolean>(() => !Capacitor.isNativePlatform());
-  const [showValidacao, setShowValidacao] = useState(false);
-
-  const gpsTrackerEnabled = !!veiculo && (!Capacitor.isNativePlatform() || (gpsValidated && nativeGpsPermissionReady));
+  const gpsTrackerEnabled = !!veiculo;
 
   // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
   // No APK, só ativa após a validação comportamental passar. Com permissão ainda
@@ -92,27 +84,6 @@ export default function MotoristaAcesso() {
   useGpsQueueWorker(gpsTrackerEnabled);
   useWakeLock(!!veiculo);
   useLockPortrait();
-
-  // Quando o motorista loga no APK e o GPS ainda não foi validado,
-  // abre o wizard automaticamente. No web (sem Capacitor) já vem true.
-  //
-  // IMPORTANTE: NÃO consultar navigator.permissions.query({name:"geolocation"})
-  // aqui. Na WebView do Android essa API reporta a permissão da própria
-  // WebView (separada da permissão concedida ao plugin nativo
-  // background-geolocation). Mesmo com "Permitir o tempo todo" ativo no
-  // sistema, a query costuma retornar "prompt", o que fazia o código apagar
-  // a chave de validação e reabrir o wizard logo após o motorista passar
-  // no teste — exatamente o loop relatado em campo.
-  // Confiamos somente no teste comportamental persistido por 14 dias.
-  useEffect(() => {
-    if (!veiculo) return;
-    if (!Capacitor.isNativePlatform()) return;
-    if (gpsValidated) {
-      setNativeGpsPermissionReady(true);
-      return;
-    }
-    setShowValidacao(true);
-  }, [veiculo, gpsValidated]);
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
   // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
