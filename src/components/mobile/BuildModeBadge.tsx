@@ -4,35 +4,35 @@ import { Capacitor } from "@capacitor/core";
  * Chip visual que identifica o ambiente em execução.
  *
  * Fonte primária: VITE_BUILD_ENV injetado no build do React
- *   (dev | homolog | prod). Setado pelos scripts de build do APK.
+ *   (dev | staging | prod). Setado pelos scripts de build do APK.
  *
  * Fallback (quando VITE_BUILD_ENV não existe — ex.: dev local): inferimos
  * pelo hostname.
- *   - sandbox lovableproject.com / *.lovable.app → DEV/HOMOLOG
+ *   - sandbox lovableproject.com / *.lovable.app → DEV/STAGING
  *   - capacitor://localhost (APK embedded)       → PROD
  *   - navegador comum                            → WEB
  */
-type Env = "DEV" | "HOMOLOG" | "PROD" | "WEB";
+type Env = "DEV" | "STAGING" | "PROD" | "WEB";
 
 function detectEnv(): Env {
   const declared = (import.meta.env.VITE_BUILD_ENV || "").toString().toLowerCase();
   const isNative = Capacitor.isNativePlatform();
 
   if (declared === "prod") return "PROD";
-  if (declared === "homolog") return "HOMOLOG";
+  if (declared === "staging") return "STAGING";
   if (declared === "dev") return "DEV";
 
   // Fallback por inferência
   if (!isNative) return "WEB";
   const host = typeof window !== "undefined" ? window.location.hostname : "";
   if (host.endsWith("lovableproject.com")) return "DEV";
-  if (host.endsWith("lovable.app")) return "HOMOLOG";
+  if (host.endsWith("lovable.app")) return "STAGING";
   return "PROD";
 }
 
 const STYLE: Record<Env, string> = {
   DEV: "bg-red-600 text-white",
-  HOMOLOG: "bg-amber-500 text-white",
+  STAGING: "bg-amber-500 text-white",
   PROD: "bg-green-600 text-white",
   WEB: "bg-blue-600 text-white",
 };

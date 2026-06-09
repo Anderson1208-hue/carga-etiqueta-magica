@@ -6,10 +6,9 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * DEV     (CAP_ENV=dev | default): aponta para o sandbox Lovable (hot-reload).
  *         Use no dia a dia de desenvolvimento. Precisa de internet para abrir.
  *
- * HOMOLOG (CAP_ENV=homolog): aponta para a URL publicada Lovable
- *         (carga-etiqueta-magica.lovable.app). O APK busca o frontend
- *         publicado — útil para validar uma versão "candidata" sem precisar
- *         gerar APK embedded a cada teste. Backend é o mesmo do PROD.
+ * STAGING (CAP_ENV=staging): APK embutido (capacitor://localhost), igual PROD,
+ *         só muda badge + VITE_BUILD_ENV + applicationId. Sufixo `.staging` é
+ *         oficialmente aceito pela mesma licença Transistorsoft do PROD.
  *
  * PROD    (CAP_ENV=prod): omite `server.url`. APK roda /dist embutido
  *         (capacitor://localhost). Funciona offline. Único modo distribuído
@@ -24,28 +23,28 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
     url: 'https://2b66d97b-1a6e-498c-96c4-89ff683a59a4.lovableproject.com?forceHideBadge=true',
     cleartext: true,
   },
-  // HOMOLOG agora roda EMBUTIDO (igual PROD). Nunca aponta para lovable.app
+  // STAGING roda EMBUTIDO (igual PROD). Nunca aponta para lovable.app
   // — APKs de motorista não podem depender de auth Lovable / lovable.dev/login.
-  // Diferença HOMOLOG vs PROD = badge + VITE_BUILD_ENV + applicationId apenas.
-  homolog: undefined,
+  // Diferença STAGING vs PROD = badge + VITE_BUILD_ENV + applicationId apenas.
+  staging: undefined,
   prod: undefined,
 };
 
-// applicationId por ambiente — permite PROD e HOMOLOG coexistirem no mesmo
-// celular sem um sobrescrever o outro. DEV usa o mesmo id do HOMOLOG (mesmo
+// applicationId por ambiente — permite PROD e STAGING coexistirem no mesmo
+// celular sem um sobrescrever o outro. DEV usa o mesmo id do STAGING (mesmo
 // app, hot-reload apenas muda a fonte do frontend).
-// applicationId Orkestria (SaaS multi-tenant). Cada ambiente tem id próprio
-// para coexistirem no mesmo celular. A licença Transistorsoft (quando
-// adquirida) será emitida para com.orkestria.driver (PROD).
+// applicationId Orkestria (SaaS multi-tenant). Sufixo `.staging` é aceito
+// oficialmente pela licença Transistorsoft emitida para com.orkestria.driver
+// (PROD) — não exige licença separada.
 const APP_ID_BY_ENV: Record<string, string> = {
-  dev:     'com.orkestria.driver.homolog',
-  homolog: 'com.orkestria.driver.homolog',
+  dev:     'com.orkestria.driver.staging',
+  staging: 'com.orkestria.driver.staging',
   prod:    'com.orkestria.driver',
 };
 
 const APP_NAME_BY_ENV: Record<string, string> = {
   dev:     'Orkestria Driver DEV',
-  homolog: 'Orkestria Driver HOMOLOG',
+  staging: 'Orkestria Driver STAGING',
   prod:    'Orkestria Driver',
 };
 
