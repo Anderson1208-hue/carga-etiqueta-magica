@@ -45,7 +45,7 @@ export default function MonitoramentoRotas() {
   const [loading, setLoading] = useState(true);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
-  const [mostrarAntigas, setMostrarAntigas] = useState(false);
+  const [mostrarAntigas, setMostrarAntigas] = useState(true);
 
   const [showConfig, setShowConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
