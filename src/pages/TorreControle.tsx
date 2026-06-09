@@ -61,7 +61,7 @@ export default function TorreControle() {
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .eq("data", dataFiltro)
+          .or(`data.eq.${dataFiltro},status.eq.ativa`)
           .order("created_at", { ascending: false })
           .range(from, to)
       );
