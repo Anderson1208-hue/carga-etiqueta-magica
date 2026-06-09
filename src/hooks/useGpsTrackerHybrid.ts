@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { useGpsTracker } from "./useGpsTracker";
-import { useGpsTrackerTransistor } from "./useGpsTrackerTransistor";
+import { useGpsTrackerNative } from "./useGpsTrackerNative";
 
 /**
  * Seletor automático de tracker GPS:
@@ -9,9 +9,8 @@ import { useGpsTrackerTransistor } from "./useGpsTrackerTransistor";
  * - Em ambiente web (navegador / PWA) → usa o tracker web atual
  *   (navigator.geolocation), que requer aba/app em primeiro plano.
  *
- * No nativo usamos somente @transistorsoft/capacitor-background-geolocation.
- * Importante: não manter o plugin community instalado, pois ambos registram o
- * mesmo nome nativo ("BackgroundGeolocation") e o APK pode cair no driver antigo.
+ * No nativo usamos @capacitor-community/background-geolocation, o mesmo driver
+ * do APK anexado que estava atualizando a Torre continuamente.
  *
  * Mesma assinatura para todos os caminhos. Drop-in replacement de useGpsTracker.
  */
@@ -36,7 +35,7 @@ export function useGpsTrackerHybrid(options: UseGpsTrackerOptions) {
 
   // IMPORTANTE: TODOS os hooks são chamados sempre (regra dos hooks).
   // Cada um internamente faz no-op quando `enabled` é false ou plataforma errada.
-  const transistor = useGpsTrackerTransistor({
+  const native = useGpsTrackerNative({
     ...options,
     enabled: isNative && options.enabled,
   });
@@ -45,6 +44,6 @@ export function useGpsTrackerHybrid(options: UseGpsTrackerOptions) {
     enabled: !isNative && options.enabled,
   });
 
-  if (isNative) return transistor;
+  if (isNative) return native;
   return web;
 }
