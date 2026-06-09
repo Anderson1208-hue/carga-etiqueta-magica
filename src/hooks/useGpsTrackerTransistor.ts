@@ -369,6 +369,7 @@ export function useGpsTrackerTransistor({
     let cancelled = false;
     const subscriptions: Array<{ remove: () => void }> = [];
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    let foregroundFallbackTimer: ReturnType<typeof setInterval> | null = null;
 
     async function startTracking() {
       if (startedRef.current) return;
@@ -510,6 +511,10 @@ export function useGpsTrackerTransistor({
 
     if (enabled) {
       startTracking();
+      enqueueForegroundFallback("foreground-startup");
+      foregroundFallbackTimer = setInterval(() => {
+        enqueueForegroundFallback("foreground-continuity");
+      }, 60_000);
     } else {
       stopTracking();
     }
