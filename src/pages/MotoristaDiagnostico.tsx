@@ -1,8 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import BackgroundGeolocation from "@transistorsoft/capacitor-background-geolocation";
-import { AuthorizationStatus } from "@transistorsoft/background-geolocation-types";
 import { NativeSettings, AndroidSettings, IOSSettings } from "capacitor-native-settings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +46,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 type PermState = "granted" | "while_in_use" | "denied" | "prompt" | "unknown";
+
+const AuthorizationStatus = {
+  NotDetermined: 0,
+  Restricted: 1,
+  Denied: 2,
+  Always: 3,
+  WhenInUse: 4,
+} as const;
 
 function permFromNativeStatus(status: number | undefined): PermState {
   if (status === AuthorizationStatus.Always) return "granted";
