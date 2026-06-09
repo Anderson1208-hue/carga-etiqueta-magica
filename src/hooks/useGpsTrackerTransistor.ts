@@ -233,6 +233,8 @@ export async function ensureTransistorGpsReady(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       markNativeReady({ error: msg });
+      readyPromise = null;
+      pluginReady = false;
       throw err;
     }
     pluginReady = true;
@@ -362,6 +364,16 @@ export function useGpsTrackerTransistor({
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 10_000 }
     );
   }, []);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !enabled || !pluginReady) return;
+    void ensureTransistorGpsReady(cfg.distance_filter_metros, monitoramentoRotaId).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn("[GPS Transistor] reconfiguração falhou", err);
+      markError(msg);
+      setError(msg);
+    });
+  }, [enabled, cfg.distance_filter_metros, monitoramentoRotaId]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -527,7 +539,7 @@ export function useGpsTrackerTransistor({
       cancelled = true;
       stopTracking();
     };
-  }, [enabled, handleLocation, handleHttp, enqueueForegroundFallback, cfg.distance_filter_metros, monitoramentoRotaId]);
+  }, [enabled, handleLocation, handleHttp, enqueueForegroundFallback, cfg.distance_filter_metros]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
