@@ -438,6 +438,12 @@ export function useGpsTrackerTransistor({
     }
 
     async function stopTracking() {
+      // Não pare um serviço que esta instância do hook não iniciou.
+      // Ao reabrir o APK, a tela começa sem rota carregada (`enabled=false`),
+      // mas o serviço nativo pode estar vivo por `stopOnTerminate=false`.
+      // Chamar stop() nesse estado mata justamente o rastreamento persistente.
+      if (!startedRef.current) return;
+
       try {
         const state = await BackgroundGeolocation.stop();
         markNativeState({
