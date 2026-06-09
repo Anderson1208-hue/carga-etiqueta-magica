@@ -30,10 +30,23 @@ bump_version_code() {
   echo "==> versionCode bump: $current -> $next"
 }
 
+# Valida que um diretório candidato é um JDK real (tem bin/java[.exe] E bin/javac[.exe]).
+# Usa -f para arquivos .exe porque em /mnt/c (WSL/Git Bash) o bit de execução
+# normalmente não está setado, fazendo -x retornar falso e o auto-detect cair
+# em diretórios stub como C:\jbr vazio.
+_jdk_is_valid() {
+  local d="$1"
+  [ -z "$d" ] && return 1
+  if [ -f "$d/bin/java.exe" ] && [ -f "$d/bin/javac.exe" ]; then return 0; fi
+  if [ -x "$d/bin/java" ]    && [ -x "$d/bin/javac" ];    then return 0; fi
+  return 1
+}
+
 # Auto-detecta JAVA_HOME no Windows (Git Bash/WSL) se não estiver setado ou inválido.
 prepare_java_home() {
   if [ -n "${JAVA_HOME:-}" ]; then
-    local jh_unix="${JAVA_HOME}"
+    local jh_unix="${JAVA_HOME%/}"
+    jh_unix="${jh_unix%\\}"
     case "$jh_unix" in
       [A-Za-z]:\\*|[A-Za-z]:/*)
         if [ -d /mnt/c ]; then
@@ -43,29 +56,39 @@ prepare_java_home() {
         fi
         ;;
     esac
-    if [ -x "$jh_unix/bin/java" ] || [ -x "$jh_unix/bin/java.exe" ]; then
+    if _jdk_is_valid "$jh_unix"; then
       export JAVA_HOME="$jh_unix"
       export PATH="$JAVA_HOME/bin:$PATH"
+      echo "[info] JAVA_HOME (do ambiente): $JAVA_HOME"
       return 0
+    else
+      echo "[warn] JAVA_HOME='$JAVA_HOME' inválido (sem bin/java+javac). Procurando alternativas..."
     fi
   fi
 
+  # Ordem importa: JDKs completos primeiro; JBR (sem javac) por último apenas como reserva.
   local candidates=(
-    "/mnt/c/jbr"
-    "/mnt/c/Program Files/Android/Android Studio/jbr"
     "/mnt/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
     "/mnt/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
     "/mnt/c/Program Files/Java/jdk-21"
     "/mnt/c/Program Files/Java/jdk-17"
-    "/c/jbr"
-    "/c/Program Files/Android/Android Studio/jbr"
     "/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"
     "/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
     "/c/Program Files/Java/jdk-21"
     "/c/Program Files/Java/jdk-17"
+    "/mnt/c/Program Files/Android/Android Studio/jbr"
+    "/c/Program Files/Android/Android Studio/jbr"
+    "/mnt/c/jbr"
+    "/c/jbr"
   )
+  # Tenta glob para Adoptium com qualquer versão patch
+  for base in "/mnt/c/Program Files/Eclipse Adoptium" "/c/Program Files/Eclipse Adoptium"; do
+    [ -d "$base" ] || continue
+    while IFS= read -r d; do candidates+=("$d"); done < <(ls -d "$base"/jdk-21* "$base"/jdk-17* 2>/dev/null | sort -r)
+  done
+
   for c in "${candidates[@]}"; do
-    if [ -x "$c/bin/java" ] || [ -x "$c/bin/java.exe" ]; then
+    if _jdk_is_valid "$c"; then
       export JAVA_HOME="$c"
       export PATH="$JAVA_HOME/bin:$PATH"
       echo "[info] JAVA_HOME auto-detectado: $JAVA_HOME"
@@ -73,7 +96,7 @@ prepare_java_home() {
     fi
   done
 
-  echo "ERRO: não encontrei Java. Instale o JBR do Android Studio ou defina JAVA_HOME."
+  echo "ERRO: não encontrei JDK válido. Instale Eclipse Adoptium JDK 17/21 ou defina JAVA_HOME corretamente."
   exit 1
 }
 
