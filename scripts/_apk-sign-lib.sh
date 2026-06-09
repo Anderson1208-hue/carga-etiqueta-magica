@@ -78,9 +78,11 @@ prepare_java_home() {
     "/c/Program Files/Java/jdk-17"
     "/mnt/c/Program Files/Android/Android Studio/jbr"
     "/c/Program Files/Android/Android Studio/jbr"
-    "/mnt/c/jbr"
-    "/c/jbr"
   )
+  # NÃO incluir /mnt/c/jbr nem /c/jbr: normalmente são stubs vazios (sem
+  # bin/javac), e ainda assim alguns ambientes têm um java.exe placeholder
+  # que faz o auto-detect cair errado. Se quiser forçar, exporte JAVA_HOME.
+
   # Tenta glob para Adoptium com qualquer versão patch
   for base in "/mnt/c/Program Files/Eclipse Adoptium" "/c/Program Files/Eclipse Adoptium"; do
     [ -d "$base" ] || continue
