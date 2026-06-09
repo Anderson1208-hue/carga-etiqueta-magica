@@ -36,14 +36,19 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
 // applicationId Orkestria (SaaS multi-tenant). Sufixo `.staging` é aceito
 // oficialmente pela licença Transistorsoft emitida para com.orkestria.driver
 // (PROD) — não exige licença separada.
+// HOMOLOG = ambiente estável que reproduz exatamente o APK que funcionou em campo
+// (MOTORISTA-homolog-assinado.apk, driver @capacitor-community/background-geolocation).
+// Coexiste com PROD e STAGING no mesmo aparelho.
 const APP_ID_BY_ENV: Record<string, string> = {
-  dev:     'com.orkestria.driver.staging',
+  dev:     'com.orkestria.driver.homolog',
+  homolog: 'com.orkestria.driver.homolog',
   staging: 'com.orkestria.driver.staging',
   prod:    'com.orkestria.driver',
 };
 
 const APP_NAME_BY_ENV: Record<string, string> = {
   dev:     'Orkestria Driver DEV',
+  homolog: 'Orkestria Driver HOMOLOG',
   staging: 'Orkestria Driver STAGING',
   prod:    'Orkestria Driver',
 };
