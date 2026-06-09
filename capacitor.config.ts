@@ -23,10 +23,10 @@ const SERVER_BY_ENV: Record<string, { url: string; cleartext: boolean } | undefi
     url: 'https://2b66d97b-1a6e-498c-96c4-89ff683a59a4.lovableproject.com?forceHideBadge=true',
     cleartext: true,
   },
-  // STAGING roda EMBUTIDO (igual PROD). Nunca aponta para lovable.app
+  // STAGING/HOMOLOG rodam EMBUTIDOS (igual PROD). Nunca apontam para lovable.app
   // — APKs de motorista não podem depender de auth Lovable / lovable.dev/login.
-  // Diferença STAGING vs PROD = badge + VITE_BUILD_ENV + applicationId apenas.
   staging: undefined,
+  homolog: undefined,
   prod: undefined,
 };
 
