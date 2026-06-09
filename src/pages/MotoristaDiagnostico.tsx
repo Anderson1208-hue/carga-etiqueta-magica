@@ -198,31 +198,13 @@ export default function MotoristaDiagnostico() {
     } catch {
       setQueue(-1);
     }
-    if (isNative) {
-      try {
-        const provider = await BackgroundGeolocation.getProviderState();
-        markNativeProvider(provider);
-        setPerm(permFromNativeStatus(provider.status));
-        const state = await BackgroundGeolocation.getState();
-        const pendingLocations = await BackgroundGeolocation.getCount().catch(() => null);
-        markNativeState({
-          enabled: state.enabled,
-          isMoving: state.isMoving,
-          trackingMode: state.trackingMode,
-          notificationConfigured: Boolean(state.app?.notification),
-          pendingLocations,
-        });
-        setNativeStateError(null);
-      } catch {
-        setPerm("unknown");
-        setNativeStateError("Não foi possível ler o estado nativo do Transistorsoft");
-      }
-    } else if ("permissions" in navigator) {
+    if ("permissions" in navigator) {
       try {
         const p = await (navigator.permissions as Permissions).query({
           name: "geolocation" as PermissionName,
         });
         setPerm(p.state === "granted" ? "granted" : p.state === "denied" ? "denied" : "prompt");
+        setNativeStateError(null);
       } catch {
         setPerm("unknown");
       }
@@ -347,66 +329,20 @@ export default function MotoristaDiagnostico() {
   async function solicitarPermissaoLocalizacao() {
     setPermLoading(true);
     try {
-      if (isNative) {
-        try {
-          await ensureTransistorGpsReady(50, diagRotaId);
-          const state = await BackgroundGeolocation.getState();
-          markNativeReady({ enabled: state.enabled });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          markNativeReady({ error: msg });
-          throw new Error(`ready() falhou: ${msg}`);
-        }
-
-        const before = await BackgroundGeolocation.getProviderState();
-        markNativeProvider(before);
-
-        let status: number;
-        try {
-          status = await BackgroundGeolocation.requestPermission();
-          markNativeRequestPermission({ status });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          markNativeRequestPermission({ error: msg });
-          throw new Error(`requestPermission() falhou: ${msg}`);
-        }
-
-        const after = await BackgroundGeolocation.getProviderState();
-        markNativeProvider(after);
-        const got = permFromNativeStatus(after.status ?? status);
-
-        await refreshAll();
-
-        if (got === "granted") {
-          toast({ title: "Permissão concedida ✓", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.` });
-        } else if (got === "while_in_use") {
-          toast({ title: "Permissão parcial", description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra Configurações → Localização.` });
-          openAppSettings().catch(() => {});
-        } else if (got === "denied") {
-          toast({
-            title: "Permissão negada",
-            description: `Status ${after.status}: ${authorizationStatusText(after.status)}. Abra as Configurações do app.`,
-            variant: "destructive",
-          });
-          openAppSettings().catch(() => {});
-        } else {
-          toast({ title: "Sem autorização nativa", description: `Status ${after.status}: ${authorizationStatusText(after.status)}.`, variant: "destructive" });
-        }
-      } else {
-        // Web: getCurrentPosition já dispara o prompt do navegador
-        await new Promise<void>((resolve) => {
-          if (!navigator.geolocation) return resolve();
-          navigator.geolocation.getCurrentPosition(
-            (p) => {
-              setPos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
-              resolve();
-            },
-            () => resolve(),
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-          );
-        });
-        await refreshAll();
-      }
+      await new Promise<void>((resolve) => {
+        if (!navigator.geolocation) return resolve();
+        navigator.geolocation.getCurrentPosition(
+          (p) => {
+            setPos({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy });
+            resolve();
+          },
+          () => resolve(),
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+      if (isNative) openAppSettings().catch(() => {});
+      await refreshAll();
+      toast({ title: "Permissão solicitada", description: "Confira Localização nas configurações do app." });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       markError(msg);
