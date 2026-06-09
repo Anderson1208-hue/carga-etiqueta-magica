@@ -504,6 +504,10 @@ export function useGpsTrackerTransistor({
         clearInterval(heartbeatTimer);
         heartbeatTimer = null;
       }
+      if (foregroundFallbackTimer) {
+        clearInterval(foregroundFallbackTimer);
+        foregroundFallbackTimer = null;
+      }
       startedRef.current = false;
       setTracking(false);
       setModoCritico(false);
@@ -523,7 +527,7 @@ export function useGpsTrackerTransistor({
       cancelled = true;
       stopTracking();
     };
-  }, [enabled, handleLocation, handleHttp, cfg.distance_filter_metros, monitoramentoRotaId]);
+  }, [enabled, handleLocation, handleHttp, enqueueForegroundFallback, cfg.distance_filter_metros, monitoramentoRotaId]);
 
   return { tracking, lastPosition, error, modoCritico, pendingQueue };
 }
