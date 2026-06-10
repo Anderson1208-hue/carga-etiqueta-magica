@@ -121,6 +121,7 @@ export default function ConsultaNF() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [canhotoUrl, setCanhotoUrl] = useState<string | null>(null);
   const [loadingCanhoto, setLoadingCanhoto] = useState(false);
+  const [historicoNf, setHistoricoNf] = useState<{ id: string; numero: string } | null>(null);
 
   async function carregarCanhoto(path: string) {
     setLoadingCanhoto(true);
