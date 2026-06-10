@@ -54,6 +54,19 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
   { value: "outros", label: "Outros", icon: <AlertTriangle className="w-5 h-5" />, color: "text-muted-foreground" },
 ];
 
+/**
+ * Subcomponente isolado que monta os hooks de GPS background.
+ * Só é renderizado DEPOIS do código de 6 dígitos validado.
+ * Se algum hook nativo falhar (plugin, licença, permissão), o ErrorBoundary
+ * de rota mantém a tela do motorista renderizada — o app não fecha.
+ */
+function VeiculoGpsBackground({ monitoramentoRotaId }: { monitoramentoRotaId: string | null }) {
+  useGpsTrackerHybrid({ monitoramentoRotaId, enabled: true });
+  useGpsQueueWorker(true);
+  useWakeLock(true);
+  return null;
+}
+
 export default function MotoristaAcesso() {
   const { toast } = useToast();
   const [code, setCode] = useState("");
@@ -72,17 +85,9 @@ export default function MotoristaAcesso() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
-  const gpsTrackerEnabled = !!veiculo;
-
-  // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // No APK, só ativa após a validação comportamental passar. Com permissão ainda
-  // em "prompt", iniciar watcher derruba o app em alguns Androids por loop de FS.
-  useGpsTrackerHybrid({
-    monitoramentoRotaId,
-    enabled: gpsTrackerEnabled,
-  });
-  useGpsQueueWorker(gpsTrackerEnabled);
-  useWakeLock(!!veiculo);
+  // GPS / wake-lock SÓ depois do código de 6 dígitos validado (veiculo != null).
+  // Antes disso nenhum hook nativo é montado — assim, qualquer falha do plugin
+  // (licença Transistorsoft, permissões, FS) NÃO derruba a tela de acesso.
   useLockPortrait();
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
@@ -398,6 +403,7 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
+      <VeiculoGpsBackground monitoramentoRotaId={monitoramentoRotaId} />
       <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
