@@ -103,8 +103,12 @@ function renderDetalhe(ev: NfEvento) {
     case "recusa":
     case "reentrega":
       return `${p.ocorrencia || ""}${p.recebedor_nome ? ` · ${p.recebedor_nome}` : ""}`;
-    case "cte_vinculado":
-      return `${p.tipo_documento || "CT-e"} ${p.numero_cte || ""} · ${p.razao_social || ""}`;
+    case "cte_vinculado": {
+      const base = `${p.tipo_documento || "CT-e"} ${p.numero_cte || ""} · ${p.razao_social || ""}`;
+      return p.data_emissao
+        ? base
+        : `${base} · ⚠ CT-e sem data de emissão — exibindo data de importação no sistema`;
+    }
     case "chegada_cd":
       return p.origem === "manual" ? "Registro manual" : "Detectada na conferência";
     default:

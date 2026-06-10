@@ -219,6 +219,7 @@ export function ImportarCteDialog({
             valor_frete: valorRateado,
             tipo_documento: "CTE",
             identificador_interno: null,
+            data_emissao: cte.dataEmissao,
           });
           totalLinhas++;
         }
