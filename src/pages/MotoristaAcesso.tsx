@@ -54,6 +54,19 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
   { value: "outros", label: "Outros", icon: <AlertTriangle className="w-5 h-5" />, color: "text-muted-foreground" },
 ];
 
+/**
+ * Subcomponente isolado que monta os hooks de GPS background.
+ * Só é renderizado DEPOIS do código de 6 dígitos validado.
+ * Se algum hook nativo falhar (plugin, licença, permissão), o ErrorBoundary
+ * de rota mantém a tela do motorista renderizada — o app não fecha.
+ */
+function VeiculoGpsBackground({ monitoramentoRotaId }: { monitoramentoRotaId: string | null }) {
+  useGpsTrackerHybrid({ monitoramentoRotaId, enabled: true });
+  useGpsQueueWorker(true);
+  useWakeLock(true);
+  return null;
+}
+
 export default function MotoristaAcesso() {
   const { toast } = useToast();
   const [code, setCode] = useState("");
