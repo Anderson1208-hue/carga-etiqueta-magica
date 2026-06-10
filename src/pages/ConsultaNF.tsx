@@ -24,7 +24,9 @@ import {
   Truck,
   FileText,
   Download,
+  History,
 } from "lucide-react";
+import { HistoricoNFDialog } from "@/components/consulta/HistoricoNFDialog";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
