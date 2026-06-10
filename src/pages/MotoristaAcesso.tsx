@@ -403,6 +403,7 @@ export default function MotoristaAcesso() {
   // Vehicle + NFs view
   return (
     <div className="min-h-screen bg-background">
+      <VeiculoGpsBackground monitoramentoRotaId={monitoramentoRotaId} />
       <PermissoesOnboarding active={!!veiculo && !!monitoramentoRotaId} />
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-4">
