@@ -56,7 +56,7 @@ const TIPO_META: Record<
 > = {
   nf_emitida: { label: "NF emitida pelo embarcador", icon: FileText, color: "bg-slate-500" },
   nf_incluida: { label: "NF importada no sistema", icon: FileInput, color: "bg-slate-600" },
-  cte_vinculado: { label: "CT-e / Minuta vinculado", icon: ReceiptText, color: "bg-indigo-500" },
+  cte_vinculado: { label: "Saída do embarcador", icon: ReceiptText, color: "bg-indigo-500" },
   chegada_cd: { label: "Chegada no CD-RJ", icon: Warehouse, color: "bg-amber-600" },
   conferencia_interna: { label: "Conferência interna (galpão)", icon: PackageCheck, color: "bg-cyan-600" },
   enderecada: { label: "Endereçada no CD", icon: MapPin, color: "bg-cyan-700" },
@@ -89,7 +89,8 @@ function renderDetalhe(ev: NfEvento) {
     case "enderecada":
       return `Posição: ${p.posicao}${p.principal ? " (principal)" : ""}`;
     case "expedicao_veiculo":
-      return `Placa ${p.placa || "—"}${p.motorista ? ` · ${p.motorista}` : ""}`;
+      return `Placa ${p.placa || "—"}${p.motorista ? ` · ${p.motorista}` : ""}${p.origem_data === "roteirizacao" ? " · data da roteirização" : ""}`;
+
     case "conferencia_interna":
     case "conferencia_externa":
       return `Etiqueta ${p.seq}/${p.total} · ${p.c_prod || ""}`;
