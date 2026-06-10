@@ -72,17 +72,9 @@ export default function MotoristaAcesso() {
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
 
-  const gpsTrackerEnabled = !!veiculo;
-
-  // Rastreamento GPS em segundo plano (Foreground Service no APK / navigator no web).
-  // No APK, só ativa após a validação comportamental passar. Com permissão ainda
-  // em "prompt", iniciar watcher derruba o app em alguns Androids por loop de FS.
-  useGpsTrackerHybrid({
-    monitoramentoRotaId,
-    enabled: gpsTrackerEnabled,
-  });
-  useGpsQueueWorker(gpsTrackerEnabled);
-  useWakeLock(!!veiculo);
+  // GPS / wake-lock SÓ depois do código de 6 dígitos validado (veiculo != null).
+  // Antes disso nenhum hook nativo é montado — assim, qualquer falha do plugin
+  // (licença Transistorsoft, permissões, FS) NÃO derruba a tela de acesso.
   useLockPortrait();
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
