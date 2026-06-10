@@ -89,7 +89,8 @@ function renderDetalhe(ev: NfEvento) {
     case "enderecada":
       return `Posição: ${p.posicao}${p.principal ? " (principal)" : ""}`;
     case "expedicao_veiculo":
-      return `Placa ${p.placa || "—"}${p.motorista ? ` · ${p.motorista}` : ""}`;
+      return `Placa ${p.placa || "—"}${p.motorista ? ` · ${p.motorista}` : ""}${p.origem_data === "roteirizacao" ? " · data da roteirização" : ""}`;
+
     case "conferencia_interna":
     case "conferencia_externa":
       return `Etiqueta ${p.seq}/${p.total} · ${p.c_prod || ""}`;
