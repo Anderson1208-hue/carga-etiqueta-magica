@@ -1,135 +1,77 @@
-# Plano: Evolução para WMS Completo
+## Objetivo
+Implementar histórico completo de cada NF na Consulta de NF, com captura automática da chegada ao CD-RJ e event store unificado (`nf_eventos`) para servir de base a KPIs futuros.
 
-Transformar o sistema atual (WMS leve baseado em NF) em um WMS de mercado, em **7 fases incrementais**. Cada fase entrega valor isolado e pode ir pra produção sem depender da próxima.
+## Etapa 0 — Botão "Histórico" na Consulta de NF
+- Adicionar coluna de ação "Histórico" em cada linha de `ConsultaNF.tsx`.
+- Criar `src/components/consulta/HistoricoNFDialog.tsx` (Dialog full-height) com timeline vertical (ícone + título + ator + timestamp + detalhe).
+- Hook `src/hooks/useHistoricoNF.ts` que, por NF, lê em paralelo:
+  - `notas_fiscais` (inclusão no sistema)
+  - `agendamentos`
+  - `nf_enderecamento`
+  - `veiculo_nfs` + `veiculos` (expedição)
+  - `etiquetas` (conferência interna/externa, divergência)
+  - `monitoramento_paradas` (chegada cliente)
+  - `baixas_entrega` (entrega/recusa/reentrega)
+  - `ctes` (CT-e/Minuta vinculada)
+- Sem leitura de `audit_log`.
+- Ordena por timestamp ASC. Mostra ator (operador / motorista) quando disponível.
 
----
+## Etapa 1 — Chegada no CD-RJ
+- Trigger automático: ao inserir a 1ª etiqueta com `status='conferido_interno'` para uma NF, registra evento `chegada_cd` (fallback).
+- Botão manual "Registrar chegada no CD" no Dialog de Histórico para quando ainda não houver bip — apenas admin/operador ativo. Idempotente (não duplica).
+- Evento aparece automaticamente na timeline.
 
-## Fase 1 — Cadastros Mestres (Embarcador + Destinatário)
+## Etapa 2 — Tabela `nf_eventos` + triggers retroativos
+Schema (migration única, com GRANT + RLS):
 
-**Objetivo:** sair da dependência da NF como fonte única. Ter cliente cadastrado antes de receber a primeira nota.
-
-- Tabela `embarcadores`: CNPJ, razão social, nome fantasia, contato, SLA padrão (h), tabela de frete vinculada, centro de custo, observações operacionais, ativo.
-- Tabela `destinatarios`: CNPJ/CPF, razão social, múltiplos endereços (tabela filha `destinatario_enderecos`), janela de entrega (dias semana + hora início/fim), restrições (altura veículo, agendamento obrigatório, exige escolta, etc), documentos exigidos no canhoto.
-- Tela CRUD para ambos com busca, filtros, importação CSV.
-- **Vínculo automático**: ao importar XML, casar `cnpj_emitente` → embarcador e `cnpj_destinatario` → destinatário. Se não existir, criar rascunho pra revisão.
-- Auto-preencher janela de entrega e restrições no agendamento/roteirização.
-
----
-
-## Fase 2 — Cadastro de Produto com Paletização
-
-**Objetivo:** habilitar cubagem real, paletização e endereçamento por SKU. Sem isso o WMS continua "chutando" volume.
-
-- Tabela `produtos`: código interno (SKU), `c_prod` do embarcador, EAN-13, DUN-14, descrição, embarcador_id, NCM, unidade base.
-- **Dados físicos da caixa**: altura, largura, profundidade (cm), peso bruto, peso líquido (kg), volume m³ calculado.
-- **Paletização**: caixas por lastro, lastros por pallet, total caixas por pallet, tipo de pallet (PBR/Chep/descartável), altura máxima empilhamento.
-- **Atributos logísticos**: curva ABC, temperatura (seco/refrigerado/congelado), fragilidade, perecível (sim/não), validade controlada, lote controlado.
-- Tela CRUD + importação Excel + foto do produto.
-- **Vínculo automático**: cruzar `itens_nf.c_prod` + `cnpj_emitente` com `produtos`. Quando bater, usar volume/peso reais ao invés do estimado.
-- Recalcular `calculateBoxes` opcionalmente usando paletização real (mantém regra atual como fallback).
-
----
-
-## Fase 3 — Estrutura de Armazém (Endereçamento Hierárquico)
-
-**Objetivo:** transformar `nf_enderecamento` (texto livre) em estrutura real de WMS.
-
-- Tabelas: `armazens`, `ruas`, `colunas`, `niveis`, `posicoes`.
-- Cada `posicao` tem: código (ex `A-01-03-B`), tipo (picking/pulmão/bloqueada/avaria), capacidade (pallets ou caixas), peso máx, altura máx, restrições (temperatura, embarcador exclusivo), status (livre/ocupada/bloqueada).
-- Mapa visual 2D do armazém por rua.
-- Migração: converter posições atuais (texto) em posições estruturadas.
-- API de **sugestão de posição** baseada em curva ABC + peso + temperatura.
-
----
-
-## Fase 4 — Recebimento (ASN + Putaway Dirigido)
-
-**Objetivo:** processo formal de entrada da mercadoria no CD.
-
-- Tabela `recebimentos`: nf_id, status (agendado/em conferência/conferido/divergente), conferente, hora início/fim.
-- Tela mobile de conferência cega ou declarada (config por embarcador): bipa EAN/DUN → confirma quantidade.
-- Registro de divergências (falta/sobra/avaria) com foto.
-- **Putaway dirigido**: após conferir, sistema sugere posição (Fase 3) e mobile guia operador até a posição. Confirma com bipa da posição.
-- Cross-docking: marca NF como "não estoca" → vai direto pra expedição.
-
----
-
-## Fase 5 — Picking Dirigido (Onda de Separação)
-
-**Objetivo:** separar cargas com produtividade e zero erro, usando endereço.
-
-- Tabela `ondas_separacao`: agrupa cargas/rotas pra separação simultânea.
-- Estratégias: por pedido, por onda (consolidado), por zona.
-- Tela mobile guia separador na sequência ótima de posições (caminho mínimo).
-- Bipa posição + bipa produto + confirma quantidade.
-- **Reposição automática**: quando posição de picking fica abaixo do mínimo, gera tarefa de reposição do pulmão.
-- Integra com etiquetas atuais (etiqueta sai já com posição de origem).
-
----
-
-## Fase 6 — Inventário Rotativo
-
-**Objetivo:** acuracidade contínua sem parar operação.
-
-- Tabela `inventarios` + `inventario_contagens`.
-- Geração automática de tarefas por curva ABC (A semanal, B quinzenal, C mensal).
-- Tela mobile: bipa posição → conta → confirma. 2ª contagem cega se divergir.
-- Ajuste com motivo + aprovação supervisor.
-- Dashboard de acuracidade por rua/curva/operador.
-
----
-
-## Fase 7 — KPIs / BI Operacional
-
-**Objetivo:** dashboard executivo com indicadores de mercado.
-
-- **OTIF** (On Time In Full) por embarcador e período
-- **Acuracidade de inventário** %
-- **Produtividade** caixas/hora por operador (recebimento, picking, conferência)
-- **Ocupação de armazém** % por rua/zona
-- **SLA de entrega** vs janela contratada
-- **Taxa de divergência** recebimento / picking / canhoto
-- **Tempo médio** de putaway, picking, conferência, carregamento
-- Filtros: período, embarcador, operador, curva.
-- Export Excel/PDF.
-
----
-
-## Fora de escopo (futuro)
-
-- Faturamento logístico (tabela de preços por embarcador, fatura mensal de armazenagem + movimentação + entrega)
-- Logística reversa (devolução, troca)
-- EDI/integrações com marketplace e transportadoras externas
-- Picking por voz / pick-to-light (hardware específico)
-
----
-
-## Ordem sugerida de execução
-
-```text
-Fase 1 (Cadastros)  ──┐
-Fase 2 (Produto)    ──┼─► destrava cubagem real
-Fase 3 (Endereço)   ──┘
-        │
-        ▼
-Fase 4 (Recebimento + Putaway)
-        │
-        ▼
-Fase 5 (Picking dirigido)
-        │
-        ▼
-Fase 6 (Inventário)
-        │
-        ▼
-Fase 7 (KPIs)
+```sql
+CREATE TABLE public.nf_eventos (
+  id uuid PK default gen_random_uuid(),
+  nf_id uuid NOT NULL REFERENCES notas_fiscais(id) ON DELETE CASCADE,
+  tipo text NOT NULL,            -- ver lista abaixo
+  ocorrido_em timestamptz NOT NULL default now(),
+  ator_id uuid REFERENCES auth.users(id),
+  ator_nome text,
+  payload jsonb NOT NULL default '{}',
+  origem text NOT NULL,          -- 'trigger' | 'manual' | 'backfill'
+  dedupe_key text UNIQUE,        -- evita duplicar evento da mesma fonte
+  created_at timestamptz default now()
+);
+CREATE INDEX ON public.nf_eventos (nf_id, ocorrido_em);
+CREATE INDEX ON public.nf_eventos (tipo);
 ```
 
-**Estimativa por fase:** ~80–150 créditos cada (Fase 1 e 2 são as menores; Fase 4 e 5 as maiores por envolverem mobile + workflow).
+Tipos: `nf_emitida`, `nf_incluida`, `agendada`, `enderecada`, `expedicao_veiculo`, `conferencia_interna`, `conferencia_externa`, `divergencia`, `chegada_cd`, `inicio_rota`, `chegada_cliente`, `entrega`, `recusa`, `reentrega`, `cte_vinculado`.
 
----
+Triggers (todos `SECURITY DEFINER`, populam `nf_eventos`):
+- `tg_nfev_nf_incluida` (AFTER INSERT notas_fiscais) → `nf_emitida` (data_emissao) + `nf_incluida` (created_at).
+- `tg_nfev_agendamento` (AFTER INSERT/UPDATE agendamentos)
+- `tg_nfev_enderecamento` (AFTER INSERT nf_enderecamento)
+- `tg_nfev_veiculo_nf` (AFTER INSERT veiculo_nfs) → `expedicao_veiculo`
+- `tg_nfev_etiqueta` (AFTER UPDATE etiquetas) → `conferencia_interna`, `conferencia_externa`, `divergencia`, e `chegada_cd` na 1ª `conferido_interno` da NF
+- `tg_nfev_parada` (AFTER UPDATE monitoramento_paradas) → `chegada_cliente`
+- `tg_nfev_baixa` (AFTER INSERT baixas_entrega) → `entrega`/`recusa`/`reentrega`
+- `tg_nfev_cte` (AFTER INSERT ctes, casado por chave/numero) → `cte_vinculado`
 
-## Decisões pendentes pra você
+`dedupe_key` exemplos: `agendamento:{agendamento_id}:{status}:{data}`, `etiqueta:{etiqueta_id}:{status}`, `chegada_cd:{nf_id}`, `baixa:{baixa_id}`.
 
-1. **Começar por qual fase?** Recomendo Fase 1 (Embarcador + Destinatário) — é a base e é a mais rápida.
-2. **Migração dos dados atuais?** Auto-criar embarcador/destinatário/produto a partir das NFs já importadas, ou começar do zero?
-3. **Multi-embarcador no mesmo CD?** Vai operar mais de um cliente no mesmo armazém (3PL real) ou é monoempresa?
+Função `public.registrar_chegada_cd_manual(p_nf_id uuid)` (SECURITY DEFINER, exige `is_active_operator()`) → insere `chegada_cd` se ainda não existir.
+
+Backfill (idempotente, parte da migration): popula `nf_eventos` a partir das tabelas existentes usando os mesmos `dedupe_key`. ON CONFLICT DO NOTHING.
+
+## Etapa 3 — Hook lê de `nf_eventos`
+Após Etapa 2, `useHistoricoNF` passa a ler 1 query: `select * from nf_eventos where nf_id=$1 order by ocorrido_em`. Mantém formatador de cada `tipo` para renderizar título/ícone.
+
+## Detalhes técnicos
+- RLS `nf_eventos`: SELECT para admin + operador ativo (mesma regra de `notas_fiscais`); INSERT só via trigger/RPC (sem policy de insert para `authenticated`); `service_role` ALL.
+- Performance: a tabela cresce, mas leitura é sempre por `nf_id` (índice). Sem impacto na Consulta de NF (carrega só ao abrir o Dialog).
+- Não tocar em: `calculateBoxes`, fluxo de conferência 2 etapas, `cargas.status`, parser XML Pandurata/Bauducco.
+- Sem alterações em mobile, agendamento, roteirização, GPS, baixa, scanner.
+
+## Ordem de execução
+1. Migration: cria `nf_eventos` + triggers + RPC + backfill.
+2. Após migration aprovada e tipos regenerados: cria `useHistoricoNF`, `HistoricoNFDialog`, botão na `ConsultaNF`.
+3. Botão "Registrar chegada no CD" dentro do Dialog usa a RPC.
+
+## Memória a salvar ao final
+`mem://funcionalidades/historico-nf-eventos` — descrevendo a tabela `nf_eventos`, dedupe_key, lista de triggers e que a Consulta de NF consome via Dialog.

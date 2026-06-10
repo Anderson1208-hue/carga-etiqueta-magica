@@ -24,7 +24,9 @@ import {
   Truck,
   FileText,
   Download,
+  History,
 } from "lucide-react";
+import { HistoricoNFDialog } from "@/components/consulta/HistoricoNFDialog";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
@@ -119,6 +121,7 @@ export default function ConsultaNF() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [canhotoUrl, setCanhotoUrl] = useState<string | null>(null);
   const [loadingCanhoto, setLoadingCanhoto] = useState(false);
+  const [historicoNf, setHistoricoNf] = useState<{ id: string; numero: string } | null>(null);
 
   async function carregarCanhoto(path: string) {
     setLoadingCanhoto(true);
@@ -315,6 +318,14 @@ export default function ConsultaNF() {
                 NF {selectedNf.numero_nf}
               </CardTitle>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHistoricoNf({ id: selectedNf.id, numero: selectedNf.numero_nf })}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  Histórico
+                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -667,9 +678,19 @@ export default function ConsultaNF() {
                           <TableCell className="text-right">{Number(nf.peso_bruto || 0).toFixed(1)}</TableCell>
                           <TableCell className="text-right">{Number(nf.volume_m3 || 0).toFixed(3)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Search className="w-3 h-3" />
-                            </Button>
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoNf({ id: nf.id, numero: nf.numero_nf })}
+                              >
+                                <History className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="sm" title="Ver detalhes" onClick={() => setSelectedNf(nf)}>
+                                <Search className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -680,6 +701,13 @@ export default function ConsultaNF() {
             </CardContent>
           </Card>
         )}
+
+        <HistoricoNFDialog
+          open={!!historicoNf}
+          onOpenChange={(v) => !v && setHistoricoNf(null)}
+          nfId={historicoNf?.id || null}
+          numeroNf={historicoNf?.numero}
+        />
       </div>
     </MainLayout>
   );

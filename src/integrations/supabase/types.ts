@@ -1420,6 +1420,53 @@ export type Database = {
         }
         Relationships: []
       }
+      nf_eventos: {
+        Row: {
+          ator_id: string | null
+          ator_nome: string | null
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          nf_id: string
+          ocorrido_em: string
+          origem: string
+          payload: Json
+          tipo: string
+        }
+        Insert: {
+          ator_id?: string | null
+          ator_nome?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          nf_id: string
+          ocorrido_em?: string
+          origem?: string
+          payload?: Json
+          tipo: string
+        }
+        Update: {
+          ator_id?: string | null
+          ator_nome?: string | null
+          created_at?: string
+          dedupe_key?: string | null
+          id?: string
+          nf_id?: string
+          ocorrido_em?: string
+          origem?: string
+          payload?: Json
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nf_eventos_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notas_fiscais: {
         Row: {
           carga_id: string
@@ -2056,6 +2103,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      fn_nfev_actor: {
+        Args: never
+        Returns: {
+          ator_id: string
+          ator_nome: string
+        }[]
+      }
+      fn_nfev_insert: {
+        Args: {
+          p_ator_id: string
+          p_ator_nome: string
+          p_dedupe_key: string
+          p_nf_id: string
+          p_ocorrido_em: string
+          p_origem: string
+          p_payload: Json
+          p_tipo: string
+        }
+        Returns: undefined
+      }
       get_cargas_com_contagens: {
         Args: never
         Returns: {
@@ -2092,6 +2159,10 @@ export type Database = {
           p_offset?: number
           p_user_id?: string
         }
+        Returns: Json
+      }
+      registrar_chegada_cd_manual: {
+        Args: { p_nf_id: string; p_observacao?: string }
         Returns: Json
       }
     }
