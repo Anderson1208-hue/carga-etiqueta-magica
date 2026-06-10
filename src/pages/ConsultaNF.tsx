@@ -678,9 +678,19 @@ export default function ConsultaNF() {
                           <TableCell className="text-right">{Number(nf.peso_bruto || 0).toFixed(1)}</TableCell>
                           <TableCell className="text-right">{Number(nf.volume_m3 || 0).toFixed(3)}</TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm">
-                              <Search className="w-3 h-3" />
-                            </Button>
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Ver histórico"
+                                onClick={() => setHistoricoNf({ id: nf.id, numero: nf.numero_nf })}
+                              >
+                                <History className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button variant="ghost" size="sm" title="Ver detalhes" onClick={() => setSelectedNf(nf)}>
+                                <Search className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -691,6 +701,13 @@ export default function ConsultaNF() {
             </CardContent>
           </Card>
         )}
+
+        <HistoricoNFDialog
+          open={!!historicoNf}
+          onOpenChange={(v) => !v && setHistoricoNf(null)}
+          nfId={historicoNf?.id || null}
+          numeroNf={historicoNf?.numero}
+        />
       </div>
     </MainLayout>
   );
