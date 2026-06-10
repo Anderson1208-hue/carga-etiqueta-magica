@@ -319,6 +319,14 @@ export default function ConsultaNF() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHistoricoNf({ id: selectedNf.id, numero: selectedNf.numero_nf })}
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  Histórico
+                </Button>
+                <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => handleGerarPdf(selectedNf)}
