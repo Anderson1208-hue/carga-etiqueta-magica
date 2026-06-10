@@ -9,6 +9,7 @@ export interface CTeParsed {
   chavesNfReferenciadas: string[]; // todas as NFs do CT-e
   valorFrete: number;
   volumeM3: number;
+  dataEmissao: string | null; // <ide><dhEmi> (YYYY-MM-DD)
 }
 
 export function parseCTeXML(xmlString: string): CTeParsed {
@@ -51,6 +52,10 @@ export function parseCTeXML(xmlString: string): CTeParsed {
   // Extract CT-e number
   const nCT = xmlDoc.querySelector("ide nCT, nCT");
   const numeroCte = nCT?.textContent || "";
+
+  // Extract emission date: <ide><dhEmi> (v3/v4) ou <dEmi> (legado)
+  const dhEmi = xmlDoc.querySelector("ide dhEmi, dhEmi, ide dEmi, dEmi");
+  const dataEmissao = dhEmi?.textContent ? dhEmi.textContent.split("T")[0] : null;
 
   if (!numeroCte) {
     throw new Error("Número do CT-e não encontrado");
@@ -129,5 +134,6 @@ export function parseCTeXML(xmlString: string): CTeParsed {
     chavesNfReferenciadas,
     valorFrete,
     volumeM3,
+    dataEmissao,
   };
 }
