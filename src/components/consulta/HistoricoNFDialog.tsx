@@ -192,7 +192,7 @@ export function HistoricoNFDialog({ nfId, numeroNf, open, onOpenChange }: Props)
           )}
         </div>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
