@@ -56,7 +56,7 @@ const TIPO_META: Record<
 > = {
   nf_emitida: { label: "NF emitida pelo embarcador", icon: FileText, color: "bg-slate-500" },
   nf_incluida: { label: "NF importada no sistema", icon: FileInput, color: "bg-slate-600" },
-  cte_vinculado: { label: "CT-e / Minuta vinculado", icon: ReceiptText, color: "bg-indigo-500" },
+  cte_vinculado: { label: "Saída do embarcador", icon: ReceiptText, color: "bg-indigo-500" },
   chegada_cd: { label: "Chegada no CD-RJ", icon: Warehouse, color: "bg-amber-600" },
   conferencia_interna: { label: "Conferência interna (galpão)", icon: PackageCheck, color: "bg-cyan-600" },
   enderecada: { label: "Endereçada no CD", icon: MapPin, color: "bg-cyan-700" },
