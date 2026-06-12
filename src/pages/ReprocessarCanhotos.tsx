@@ -130,6 +130,66 @@ export default function ReprocessarCanhotos() {
     }
   }
 
+  async function gerarRelatorio() {
+    const tt = toast.loading("Gerando relatório…");
+    try {
+      const { data, error } = await supabase
+        .from("baixas_entrega")
+        .select("id, registrado_em, foto_path, validacao_status_v1, validacao_score_v1, validacao_problemas_v1, validacao_em_v1, validacao_status, validacao_score, validacao_problemas, validacao_em, notas_fiscais:nf_id(numero_nf, dest_razao_social)")
+        .not("validacao_status_v1", "is", null)
+        .order("registrado_em", { ascending: false });
+      if (error) throw error;
+      const rows = data ?? [];
+      const headers = [
+        "id_baixa","numero_nf","destinatario","registrado_em",
+        "status_antes","score_antes","problemas_antes","avaliado_em_antes",
+        "status_depois","score_depois","problemas_depois","avaliado_em_depois",
+        "mudou_status","foto_path",
+      ];
+      const esc = (v: any) => {
+        if (v == null) return "";
+        const s = String(v).replace(/"/g, '""');
+        return /[",;\n]/.test(s) ? `"${s}"` : s;
+      };
+      const linhas = rows.map((r: any) => {
+        const probAntes = (r.validacao_problemas_v1?.lista ?? []).join(" | ");
+        const probDepois = (r.validacao_problemas?.lista ?? []).join(" | ");
+        const mudou = r.validacao_status && r.validacao_status_v1 && r.validacao_status !== r.validacao_status_v1 ? "SIM" : "NAO";
+        return [
+          r.id, r.notas_fiscais?.numero_nf ?? "", r.notas_fiscais?.dest_razao_social ?? "", r.registrado_em ?? "",
+          r.validacao_status_v1 ?? "", r.validacao_score_v1 ?? "", probAntes, r.validacao_em_v1 ?? "",
+          r.validacao_status ?? "", r.validacao_score ?? "", probDepois, r.validacao_em ?? "",
+          mudou, r.foto_path ?? "",
+        ].map(esc).join(";");
+      });
+
+      // Resumo no topo
+      const cont = (arr: any[], campo: string, val: string) => arr.filter((r: any) => r[campo] === val).length;
+      const resumo = [
+        `Relatorio comparativo validacao de canhotos`,
+        `Gerado em;${new Date().toISOString()}`,
+        `Total avaliados;${rows.length}`,
+        `;Antes;Depois`,
+        `OK;${cont(rows,"validacao_status_v1","ok")};${cont(rows,"validacao_status","ok")}`,
+        `Alerta;${cont(rows,"validacao_status_v1","alerta")};${cont(rows,"validacao_status","alerta")}`,
+        `Ruim;${cont(rows,"validacao_status_v1","ruim")};${cont(rows,"validacao_status","ruim")}`,
+        `Mudaram de status;${rows.filter((r:any)=>r.validacao_status && r.validacao_status_v1 && r.validacao_status!==r.validacao_status_v1).length}`,
+        ``,
+      ];
+      const csv = "\uFEFF" + resumo.join("\n") + headers.join(";") + "\n" + linhas.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio-canhotos-antes-depois-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Relatório gerado (${rows.length} canhotos)`, { id: tt });
+    } catch (e: any) {
+      toast.error(`Erro: ${e.message ?? e}`, { id: tt });
+    }
+  }
+
   const totalSnapshot = stats?.total ?? 0;
   const reprocessadas = stats?.reprocessadas ?? 0;
   const restantes = Math.max(0, totalSnapshot - reprocessadas);
