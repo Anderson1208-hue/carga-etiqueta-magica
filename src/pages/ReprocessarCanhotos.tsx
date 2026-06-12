@@ -184,6 +184,20 @@ export default function ReprocessarCanhotos() {
 
         <Card>
           <CardHeader className="pb-3">
+            <CardTitle className="text-base">Avaliação geral — antes vs depois</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ResumoBloco titulo="Antes (critério antigo)" totais={totaisAntes} />
+              <ResumoBloco titulo="Depois (critério novo)" totais={totaisDepois} destaque />
+            </div>
+          </CardContent>
+        </Card>
+
+
+
+        <Card>
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Matriz: antes (linhas) × depois (colunas)</CardTitle>
           </CardHeader>
           <CardContent>
