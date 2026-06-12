@@ -869,6 +869,7 @@ export default function Agendamento() {
                       <TableHead>Emitente CT-e</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Agenda</TableHead>
+                      <TableHead className="min-w-[220px]">Ocorrência (Cacau)</TableHead>
                       <TableHead>Observação</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Criado em</TableHead>
@@ -887,6 +888,25 @@ export default function Agendamento() {
                           {ag.data_agendamento
                             ? format(new Date(ag.data_agendamento + "T12:00:00"), "dd/MM/yyyy")
                             : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={ag.ocorrencia ?? "__none__"}
+                            onValueChange={(v) => updateOcorrencia(ag, v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Sem ocorrência</SelectItem>
+                              {OCORRENCIA_OPTIONS.map(o => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  <span className="font-mono text-xs text-muted-foreground mr-2">{o.codigo}</span>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">{ag.observacao || "—"}</TableCell>
                         <TableCell><TipoCargaBadge tipoCarga={ag.tipo_carga} /></TableCell>
