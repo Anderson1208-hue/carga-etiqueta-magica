@@ -301,6 +301,42 @@ export default function ReprocessarCanhotos() {
   );
 }
 
+function ResumoBloco({ titulo, totais, destaque }: { titulo: string; totais: Record<string, number>; destaque?: boolean }) {
+  const total = (totais.ok ?? 0) + (totais.alerta ?? 0) + (totais.ruim ?? 0);
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  const linhas: { key: Status; label: string; cls: string }[] = [
+    { key: "ok", label: "OK", cls: "text-green-700" },
+    { key: "alerta", label: "Alerta", cls: "text-amber-700" },
+    { key: "ruim", label: "Ruim", cls: "text-red-700" },
+  ];
+  return (
+    <div className={`rounded-lg border p-4 ${destaque ? "border-primary/40 bg-primary/5" : "bg-muted/30"}`}>
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="font-semibold text-sm">{titulo}</h3>
+        <span className="text-xs text-muted-foreground">{total} canhotos</span>
+      </div>
+      <div className="space-y-2">
+        {linhas.map((l) => (
+          <div key={l.key} className="flex items-center gap-3">
+            <span className={`w-16 text-sm font-medium ${l.cls}`}>{l.label}</span>
+            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={`h-full ${l.key === "ok" ? "bg-green-500" : l.key === "alerta" ? "bg-amber-500" : "bg-red-500"}`}
+                style={{ width: `${pct(totais[l.key] ?? 0)}%` }}
+              />
+            </div>
+            <span className="w-20 text-right text-sm tabular-nums">
+              {totais[l.key] ?? 0} <span className="text-xs text-muted-foreground">({pct(totais[l.key] ?? 0)}%)</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
+
 function FotoLink({ path }: { path: string }) {
   const [url, setUrl] = useState<string | null>(null);
   async function abrir() {
