@@ -47,14 +47,9 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   const isPandur = /pandur(?:ata)?/i.test(fornecedor);
   const volNodes = getElementsByLocalName(xmlDoc, ["vol", "volume", "volumes"]);
 
-  // Pandurata: <nVol> é usado como cubagem APENAS quando vem como decimal
-  // (ex: 3.918, 39.935). Se vier inteiro (1120, 300), é a quantidade de
-  // caixas padrão da NF-e e NÃO deve virar m³.
-  const tryPandurNVol = (raw: string | null | undefined): number => {
-    const value = parseVolumeNumber(raw);
-    if (value <= 0) return 0;
-    return Number.isInteger(value) ? 0 : value;
-  };
+  // Pandurata: <vol><nVol> SEMPRE é a cubagem m³ no layout da Pandurata,
+  // independente do valor ser inteiro ou decimal. Confirmado pelo cliente:
+  // a posição no XML é sempre a mesma.
 
   // Detecta Pandurata também via <marca>/<xMarca> dentro de <vol>
   let isPandurataXml = isPandur;
@@ -70,12 +65,10 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   }
 
   if (isPandurataXml) {
-    // Pandurata: só aceita <nVol> DECIMAL como m³. Inteiro = caixas → ignora.
-    // NUNCA cair no fallback de texto: ele captura "M3" de descrição de item
-    // e pega número errado adiante (ex: nVol=216 acaba virando volume=216).
+    // Pandurata: <vol><nVol> SEMPRE é m³ (cubagem). Posição fixa no layout.
     const nVolNodes = getElementsByLocalName(xmlDoc, ["nvol"]);
     for (const nVolNode of nVolNodes) {
-      const value = tryPandurNVol(nVolNode?.textContent);
+      const value = parseVolumeNumber(nVolNode?.textContent);
       if (value > 0) return value;
     }
     return 0;
