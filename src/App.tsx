@@ -31,6 +31,7 @@ import AuditoriaLog from "./pages/AuditoriaLog";
 import RelatorioBaixas from "./pages/RelatorioBaixas";
 import RelatorioPendentesBaixa from "./pages/RelatorioPendentesBaixa";
 import PrestacaoContas from "./pages/PrestacaoContas";
+import ReprocessarCanhotos from "./pages/ReprocessarCanhotos";
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
 import NotFound from "./pages/NotFound";
@@ -289,6 +290,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <PrestacaoContas />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reprocessar-canhotos"
+        element={
+          <ProtectedRoute>
+            <ReprocessarCanhotos />
           </ProtectedRoute>
         }
       />
