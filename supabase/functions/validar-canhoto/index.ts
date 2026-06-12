@@ -21,45 +21,38 @@ type ValidacaoResult = {
 };
 
 const SYSTEM_PROMPT = `Você é um auditor RIGOROSO de comprovantes de entrega (canhotos de nota fiscal) no Brasil.
-Analise a imagem e avalie a QUALIDADE do canhoto como prova de entrega. Seja CRÍTICO: na dúvida, penalize.
+Analise a imagem e avalie se o canhoto serve como PROVA DE ENTREGA válida.
 
-Critérios (cada um vale até 25 pontos, total 100):
-1. ASSINATURA visível do recebedor (rabisco, traço, nome manuscrito).
-2. CARIMBO ou identificação da empresa recebedora (CNPJ, razão social, carimbo).
-3. NITIDEZ da foto (não borrada, não tremida, iluminação adequada, não muito escura).
-4. LEGIBILIDADE E INTEGRIDADE DOS DADOS — TODOS os campos a seguir devem estar VISÍVEIS, LEGÍVEIS e NÃO CORTADOS pelas bordas da foto:
-   a) NÚMERO DA NF (rotulado "Nº", "NOTA FISCAL Nº", "NF-e Nº", etc.)
-   b) DATA do recebimento/emissão
-   c) NOME/IDENTIFICAÇÃO do recebedor
-   d) Demais campos do canhoto (RG, CPF, hora)
-   Pontuação do critério 4:
-   - 25 pts: todos os campos acima visíveis e legíveis
-   - 15 pts: 1 campo cortado/ilegível
-   - 8 pts: 2 campos cortados/ilegíveis
-   - 0 pts: número da NF OU data cortado/ilegível, OU 3+ campos faltando, OU canhoto cortado pela borda da foto
+REGRAS DE REPROVAÇÃO AUTOMÁTICA — se QUALQUER uma for atingida, status OBRIGATORIAMENTE "ruim" e score no máximo 30:
+1. NÚMERO DA NF ausente, cortado pela borda da foto ou ilegível.
+2. DATA do recebimento/emissão ausente, cortada pela borda da foto ou ilegível.
+3. SEM ASSINATURA visível do recebedor (sem rabisco, sem traço, sem nome manuscrito). Carimbo sozinho NÃO substitui assinatura.
+4. NITIDEZ da foto abaixo de 50% (borrada, tremida, muito escura, fora de foco, dedo na lente, ou imagem que não é um canhoto).
+5. Canhoto cortado pelas bordas da foto — qualquer lateral faltando.
 
-REGRAS DE CORTE (aplicar SEMPRE no critério 4):
-- Se QUALQUER lateral do canhoto está cortada pela foto (texto sumindo na borda) → máximo 8 pts no critério 4.
-- Se a DATA não aparece ou está ilegível → máximo 10 pts no critério 4.
-- Se o NÚMERO DA NF está cortado/parcialmente visível/ilegível → máximo 5 pts no critério 4.
+Justificativa: um canhoto sem número da NF, sem data, sem assinatura ou ilegível não tem valor como comprovante.
 
-Classifique status:
-- "ok" se score >= 75 E nenhum campo crítico (data, número NF) cortado
-- "alerta" se score entre 50 e 74, OU se data/NF cortadas mesmo com score alto
-- "ruim" se score < 50
+Se NENHUMA regra de reprovação for atingida, calcule o score (total 100):
+1. ENQUADRAMENTO COMPLETO do canhoto, sem cortes — até 30 pts.
+2. NÚMERO DA NF visível e legível — até 25 pts.
+3. DATA visível e legível — até 20 pts.
+4. ASSINATURA do recebedor (carimbo adicional bonifica) — até 15 pts.
+5. NITIDEZ geral (foco, iluminação, contraste) — até 10 pts.
 
-IMPORTANTE: se data OU número da NF estiverem cortados/ilegíveis, o status NUNCA pode ser "ok" — rebaixe para "alerta" no mínimo, mesmo que outros critérios estejam perfeitos.
+Classificação final:
+- "ok": score >= 75 E nenhuma regra de reprovação atingida.
+- "alerta": score entre 50 e 74, sem regra de reprovação.
+- "ruim": qualquer regra de reprovação atingida, OU score < 50.
 
 ADICIONALMENTE: leia o número da Nota Fiscal impresso no canhoto (6 a 9 dígitos). Retorne em "numero_nf_detectado" SOMENTE os dígitos (sem pontos, zeros à esquerda removidos). Se não conseguir ler com confiança, retorne null.
 
-Liste problemas concretos encontrados, sendo ESPECÍFICO sobre o que está cortado/faltando. Exemplos:
-- "Data do recebimento não visível"
+Liste problemas concretos encontrados, sendo ESPECÍFICO. Exemplos:
 - "Número da NF cortado pela borda direita"
-- "Lateral esquerda do canhoto cortada na foto"
-- "Nome do recebedor ilegível"
-- "Sem assinatura visível"
-
-Se a imagem NÃO parece um canhoto (foto aleatória, paisagem, dedo na lente), classifique como ruim com problema "Imagem não parece um canhoto".
+- "Data do recebimento não visível"
+- "Sem assinatura do recebedor"
+- "Foto borrada — nitidez insuficiente"
+- "Canhoto cortado: lateral esquerda fora da foto"
+- "Imagem não parece um canhoto"
 
 Responda APENAS em JSON com este formato exato:
 {"score": <0-100>, "status": "ok"|"alerta"|"ruim", "problemas": ["..."], "observacoes": "uma frase curta", "numero_nf_detectado": "<digitos>" | null}`;
@@ -109,6 +102,8 @@ async function validarComIA(imageUrl: string): Promise<ValidacaoResult> {
   let status: ValidacaoResult["status"] = "ruim";
   if (score >= 75) status = "ok";
   else if (score >= 50) status = "alerta";
+  // Respeita reprovação explícita da IA mesmo que o score esteja alto (regra de reprovação automática)
+  if (parsed.status === "ruim") status = "ruim";
 
   let nfDet: string | null = null;
   if (parsed.numero_nf_detectado != null) {
