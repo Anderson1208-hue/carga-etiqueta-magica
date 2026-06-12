@@ -28,8 +28,6 @@ export default function ReprocessarCanhotos() {
   const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ["reprocessar-canhotos-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("listar_audit_log" as any, {}).select; // placeholder; vamos usar SQL
-      // Não temos RPC; usamos múltiplas queries
       const total = await supabase.from("baixas_entrega").select("id", { count: "exact", head: true })
         .not("foto_path", "is", null).not("validacao_em_v1", "is", null);
       const reproc = await supabase.from("baixas_entrega").select("id", { count: "exact", head: true })
@@ -42,6 +40,7 @@ export default function ReprocessarCanhotos() {
     },
     refetchInterval: rodando ? 3000 : false,
   });
+
 
   const { data: matriz } = useQuery({
     queryKey: ["reprocessar-canhotos-matriz"],
