@@ -82,6 +82,7 @@ interface AgendamentoRecord {
   status: string;
   data_agendamento: string | null;
   observacao: string | null;
+  ocorrencia: string | null;
   created_at: string;
   numero_nf?: string;
   dest_razao_social?: string | null;
@@ -98,6 +99,25 @@ const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.Rea
   { value: "REENTREGA", label: "Reentrega", icon: <RotateCcw className="w-4 h-4" />, color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", requiresDate: true },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];
+
+// Ocorrências enviadas à Cacau (de-para IBAC). Exibidas no select da linha do Agendamento.
+const OCORRENCIA_OPTIONS: { value: string; label: string; codigo: string }[] = [
+  { value: "agendamento", label: "Entrega agendada", codigo: "91" },
+  { value: "carga_aceita", label: "Carga aceita pela transportadora", codigo: "222" },
+  { value: "inicio_rota", label: "Motorista iniciou a rota", codigo: "229" },
+  { value: "chegada_cliente", label: "Chegada no cliente", codigo: "245" },
+  { value: "entrega_realizada", label: "Entrega realizada com canhoto", codigo: "1" },
+  { value: "reentrega", label: "Reentrega solicitada", codigo: "19" },
+  { value: "avaria", label: "Avaria", codigo: "79" },
+  { value: "recusa_entrega", label: "Recusa de entrega", codigo: "3" },
+  { value: "devolucao", label: "Devolução", codigo: "101" },
+  { value: "extravio_roubo", label: "Extravio ou Roubo", codigo: "14" },
+];
+
+function ocorrenciaLabel(value: string | null | undefined) {
+  if (!value) return null;
+  return OCORRENCIA_OPTIONS.find(o => o.value === value)?.label ?? value;
+}
 
 function statusBadge(status: string) {
   const opt = STATUS_OPTIONS.find(s => s.value === status);
