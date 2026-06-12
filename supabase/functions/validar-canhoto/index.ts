@@ -102,6 +102,8 @@ async function validarComIA(imageUrl: string): Promise<ValidacaoResult> {
   let status: ValidacaoResult["status"] = "ruim";
   if (score >= 75) status = "ok";
   else if (score >= 50) status = "alerta";
+  // Respeita reprovação explícita da IA mesmo que o score esteja alto (regra de reprovação automática)
+  if (parsed.status === "ruim") status = "ruim";
 
   let nfDet: string | null = null;
   if (parsed.numero_nf_detectado != null) {
