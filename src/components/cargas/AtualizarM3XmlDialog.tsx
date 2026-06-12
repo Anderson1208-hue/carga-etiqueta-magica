@@ -26,6 +26,8 @@ interface Resultado {
   naoEncontradas: number;
   erros: number;
   detalhesNaoEncontradas: string[];
+  detalhesSemM3: string[];
+  detalhesErros: string[];
 }
 
 function normalizeAccessKey(value: string) {
@@ -53,6 +55,8 @@ export function AtualizarM3XmlDialog({
       naoEncontradas: 0,
       erros: 0,
       detalhesNaoEncontradas: [],
+      detalhesSemM3: [],
+      detalhesErros: [],
     };
 
     // Carrega chaves da carga atual para validar pertencimento
@@ -71,8 +75,12 @@ export function AtualizarM3XmlDialog({
       return;
     }
 
+    const nfsDaCarga = nfsCarga || [];
     const chavesValidas = new Map(
-      (nfsCarga || []).map((n) => [normalizeAccessKey(n.chave_acesso), n])
+      nfsDaCarga.map((n) => [normalizeAccessKey(n.chave_acesso), n])
+    );
+    const nfsPorNumero = new Map(
+      nfsDaCarga.map((n) => [normalizeAccessKey(n.numero_nf), n])
     );
 
     for (const file of Array.from(files)) {
@@ -95,14 +103,19 @@ export function AtualizarM3XmlDialog({
 
         if (!parsed.volumeM3 || parsed.volumeM3 <= 0) {
           r.semM3++;
+          if (r.detalhesSemM3.length < 5) {
+            r.detalhesSemM3.push(`NF ${parsed.numeroNf || "sem número"}`);
+          }
           continue;
         }
 
-        const nfRef = chavesValidas.get(chaveNormalizada);
+        const nfRef =
+          chavesValidas.get(chaveNormalizada) ??
+          nfsPorNumero.get(normalizeAccessKey(parsed.numeroNf));
         if (!nfRef) {
           r.naoEncontradas++;
           if (r.detalhesNaoEncontradas.length < 5) {
-            r.detalhesNaoEncontradas.push(`NF ${parsed.numeroNf}`);
+            r.detalhesNaoEncontradas.push(`NF ${parsed.numeroNf || "sem número"}`);
           }
           continue;
         }
@@ -114,11 +127,19 @@ export function AtualizarM3XmlDialog({
 
         if (errUpd) {
           r.erros++;
+          if (r.detalhesErros.length < 5) {
+            r.detalhesErros.push(`NF ${parsed.numeroNf || nfRef.numero_nf}`);
+          }
         } else {
           r.atualizadas++;
         }
-      } catch {
+      } catch (error) {
         r.erros++;
+        if (r.detalhesErros.length < 5) {
+          r.detalhesErros.push(
+            `${file.name}: ${error instanceof Error ? error.message : "erro desconhecido"}`
+          );
+        }
       }
     }
 

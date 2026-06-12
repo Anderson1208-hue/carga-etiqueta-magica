@@ -49,4 +49,22 @@ describe("parseNFeVolumeXML", () => {
     expect(parsed.chaveAcesso).toBe("31260270940994008277550200007228751489934707");
     expect(parsed.volumeM3).toBeCloseTo(3.918, 3);
   });
+
+  it("aceita nVol inteiro como m³ quando o XML é Pandurata", () => {
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+      <nfeProc>
+        <NFe>
+          <infNFe Id="NFe31260570940994008277550200007423491029660213">
+            <ide><nNF>742349</nNF></ide>
+            <emit><xNome>Pandurata Alimentos Ltda</xNome></emit>
+            <transp><vol><marca>PANDUR</marca><nVol>216</nVol></vol></transp>
+          </infNFe>
+        </NFe>
+      </nfeProc>`;
+
+    const parsed = parseNFeVolumeXML(xml);
+
+    expect(parsed.numeroNf).toBe("742349");
+    expect(parsed.volumeM3).toBe(216);
+  });
 });
