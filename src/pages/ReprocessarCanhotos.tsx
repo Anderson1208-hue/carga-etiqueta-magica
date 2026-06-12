@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, Play, RefreshCw, ImageIcon } from "lucide-react";
+import { Loader2, Play, RefreshCw, ImageIcon, Download } from "lucide-react";
 
 type Status = "ok" | "alerta" | "ruim";
 const STATUSES: Status[] = ["ok", "alerta", "ruim"];
