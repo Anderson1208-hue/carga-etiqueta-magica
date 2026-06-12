@@ -1,7 +1,7 @@
 // Reprocessa em lote a validação de canhotos com o critério novo.
-// Cada chamada processa até `limit` baixas que ainda têm validacao_em <= validacao_em_v1
-// (ou seja, não foram reavaliadas após o snapshot).
-// Chama a edge function `validar-canhoto` para cada uma, com pequeno delay.
+// Pega N baixas com foto + v1 preservada, ordenadas por validacao_em ASC
+// (as não reavaliadas vêm primeiro). Após reavaliação, validacao_em vira "now"
+// e elas vão pro fim da fila no próximo lote.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 
 const corsHeaders = {
@@ -24,22 +24,20 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // Busca baixas com foto que ainda não foram reavaliadas no critério novo.
-    // Critério "pendente": validacao_em_v1 existe (foi avaliada antes) e
-    // validacao_em IS NULL OR validacao_em <= validacao_em_v1
-    const { data: pendentes, error: errSel } = await supabase
+    // Busca baixas com foto e v1 preservada, mais antigas primeiro (não reavaliadas têm validacao_em == v1)
+    const { data: candidatas, error: errSel } = await supabase
       .from("baixas_entrega")
       .select("id, validacao_em, validacao_em_v1")
       .not("foto_path", "is", null)
       .not("validacao_em_v1", "is", null)
-      .or("validacao_em.is.null,validacao_em.lte.validacao_em_v1")
-      .order("registrado_em", { ascending: true })
+      .order("validacao_em", { ascending: true, nullsFirst: true })
       .limit(limit);
 
     if (errSel) throw errSel;
 
-    const lote = (pendentes ?? []).filter((b) =>
-      !b.validacao_em || (b.validacao_em_v1 && new Date(b.validacao_em) <= new Date(b.validacao_em_v1)),
+    // Filtra client-side: pendente = validacao_em ausente OU igual/anterior ao snapshot v1
+    const lote = (candidatas ?? []).filter((b) =>
+      !b.validacao_em || (b.validacao_em_v1 && new Date(b.validacao_em).getTime() <= new Date(b.validacao_em_v1).getTime()),
     );
 
     let ok = 0;
@@ -69,20 +67,12 @@ Deno.serve(async (req) => {
       await sleep(delayMs);
     }
 
-    // Quantas ainda faltam após este lote?
-    const { count: restantes } = await supabase
-      .from("baixas_entrega")
-      .select("id", { count: "exact", head: true })
-      .not("foto_path", "is", null)
-      .not("validacao_em_v1", "is", null)
-      .or("validacao_em.is.null,validacao_em.lte.validacao_em_v1");
-
     return new Response(
       JSON.stringify({
         processadas: lote.length,
         ok,
         falhas,
-        restantes: restantes ?? 0,
+        restantes_no_lote: lote.length,
         erros: erros.slice(0, 10),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
