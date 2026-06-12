@@ -1,0 +1,1 @@
+UPDATE public.notas_fiscais SET volume_m3 = 2.46 WHERE chave_acesso = '31260570940994008277550200007423491029660213';
