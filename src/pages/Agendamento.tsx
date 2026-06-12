@@ -562,6 +562,32 @@ export default function Agendamento() {
     }
   }
 
+  async function updateOcorrencia(ag: AgendamentoRecord, valor: string) {
+    const novo = valor === "__none__" ? null : valor;
+    if ((ag.ocorrencia ?? null) === novo) return;
+    // Otimista
+    setAgendamentos(prev => prev.map(a => a.id === ag.id ? { ...a, ocorrencia: novo } : a));
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ ocorrencia: novo })
+        .eq("id", ag.id);
+      if (error) throw error;
+      const label = novo ? ocorrenciaLabel(novo) : "removida";
+      toast({
+        title: novo ? "Ocorrência registrada" : "Ocorrência removida",
+        description: novo
+          ? `NF ${ag.numero_nf}: ${label} — enviada para a Cacau.`
+          : `NF ${ag.numero_nf}: ocorrência removida.`,
+      });
+    } catch (err: any) {
+      console.error(err);
+      // Reverte em caso de erro
+      setAgendamentos(prev => prev.map(a => a.id === ag.id ? { ...a, ocorrencia: ag.ocorrencia } : a));
+      toast({ title: "Erro", description: err.message ?? "Falha ao salvar ocorrência", variant: "destructive" });
+    }
+  }
+
   const [generatingResumo, setGeneratingResumo] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
