@@ -469,6 +469,10 @@ export default function IntegracaoIbac() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="canhotos">
+            <IbacCanhotosPanel />
+          </TabsContent>
+
           <TabsContent value="logs">
             <Card>
               <CardHeader><CardTitle>Últimas requisições</CardTitle></CardHeader>
