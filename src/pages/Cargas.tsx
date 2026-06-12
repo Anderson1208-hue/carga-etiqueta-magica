@@ -74,6 +74,9 @@ interface Carga {
   };
 }
 
+const formatCargaDate = (date: string) =>
+  format(new Date(`${date}T00:00:00`), "dd/MM/yyyy", { locale: ptBR });
+
 export default function Cargas() {
   const { user, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -660,7 +663,7 @@ export default function Cargas() {
                 filteredCargas.map((carga) => (
                   <TableRow key={carga.id} className={`wms-table-row ${chocolateRowClass(carga.tipo_carga)}`}>
                     <TableCell className="font-medium">
-                      {format(new Date(carga.data), "dd/MM/yyyy", { locale: ptBR })}
+                      {formatCargaDate(carga.data)}
                     </TableCell>
                     <TableCell className="font-mono">{carga.placa}</TableCell>
                     <TableCell>{carga.motorista}</TableCell>
@@ -769,7 +772,7 @@ export default function Cargas() {
                   <strong>{cargaToDelete?.placa}</strong> de{" "}
                   <strong>
                     {cargaToDelete &&
-                      format(new Date(cargaToDelete.data), "dd/MM/yyyy", { locale: ptBR })}
+                      formatCargaDate(cargaToDelete.data)}
                   </strong>
                   ?
                 </p>
