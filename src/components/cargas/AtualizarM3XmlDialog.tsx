@@ -21,6 +21,8 @@ interface Props {
 }
 
 interface Resultado {
+  arquivosSelecionados: number;
+  arquivosProcessados: number;
   atualizadas: number;
   semM3: number;
   naoEncontradas: number;
@@ -49,7 +51,11 @@ export function AtualizarM3XmlDialog({
     setProcessing(true);
     setResultado(null);
 
+    const filesArray = Array.from(files);
+
     const r: Resultado = {
+      arquivosSelecionados: filesArray.length,
+      arquivosProcessados: 0,
       atualizadas: 0,
       semM3: 0,
       naoEncontradas: 0,
@@ -83,11 +89,14 @@ export function AtualizarM3XmlDialog({
       nfsDaCarga.map((n) => [normalizeAccessKey(n.numero_nf), n])
     );
 
-    for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith(".xml")) continue;
-
+    for (const file of filesArray) {
       try {
         const content = await file.text();
+        if (!content.trim()) {
+          throw new Error("arquivo vazio");
+        }
+
+        r.arquivosProcessados++;
         const parsed = parseNFeVolumeXML(content);
         const chaveNormalizada = normalizeAccessKey(parsed.chaveAcesso);
 
@@ -120,15 +129,21 @@ export function AtualizarM3XmlDialog({
           continue;
         }
 
-        const { error: errUpd } = await supabase
+        const { data: updatedRows, error: errUpd } = await supabase
           .from("notas_fiscais")
           .update({ volume_m3: parsed.volumeM3 })
-          .eq("id", nfRef.id);
+          .eq("id", nfRef.id)
+          .select("id");
 
         if (errUpd) {
           r.erros++;
           if (r.detalhesErros.length < 5) {
             r.detalhesErros.push(`NF ${parsed.numeroNf || nfRef.numero_nf}`);
+          }
+        } else if (!updatedRows || updatedRows.length === 0) {
+          r.erros++;
+          if (r.detalhesErros.length < 5) {
+            r.detalhesErros.push(`NF ${parsed.numeroNf || nfRef.numero_nf}: não atualizada`);
           }
         } else {
           r.atualizadas++;
