@@ -294,6 +294,7 @@ export default function IntegracaoIbac() {
             <TabsTrigger value="backfill">Backfill</TabsTrigger>
             <TabsTrigger value="retry">Retry</TabsTrigger>
             <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
+            <TabsTrigger value="canhotos">Canhotos</TabsTrigger>
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
 
