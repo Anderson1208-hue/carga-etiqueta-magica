@@ -189,7 +189,7 @@ export default function Agendamento() {
     try {
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("id, nf_id, status, data_agendamento, observacao, created_at")
+        .select("id, nf_id, status, data_agendamento, observacao, ocorrencia, created_at")
         .order("created_at", { ascending: false })
         .limit(200);
 
