@@ -1,56 +1,113 @@
 ## Objetivo
 
-Na tela de **Agendamento**, criar um campo **Ocorrência** (separado do status) com as **10 opções** abaixo. Ao salvar, o evento é enviado automaticamente para a fila da Cacau (IBAC) com o código já mapeado.
+Todos os dias às **23:00 (horário do servidor / UTC-3 → cron 02:00 UTC)**, enviar para a IBAC as fotos de canhoto (`baixas_entrega.foto_path`) de NFs da **Cacau Show** que ainda não foram enviadas. Eventuais correções (qualidade ruim, NF divergente) continuam tratadas manualmente na Prestação de Contas — o cron não filtra por score.
 
-No APK do motorista nada muda — continua só **Entregue** e **Reentrega**.
-
----
-
-## Lista final de ocorrências (10)
-
-| # | Ocorrência | Cód. IBAC |
-|---|---|---|
-| 1 | Entrega agendada | 91 |
-| 2 | Carga aceita pela transportadora | 222 |
-| 3 | Motorista iniciou a rota | 229 |
-| 4 | Chegada no cliente | 245 |
-| 5 | Entrega realizada com canhoto | 1 |
-| 6 | Reentrega solicitada | 19 |
-| 7 | Avaria | 79 |
-| 8 | Recusa de entrega | 3 |
-| 9 | Devolução | 101 |
-| 10 | **Extravio ou Roubo** *(novo)* | **14** |
-
-> As 9 primeiras já existem no de-para com a Cacau. A 10ª será criada nesta entrega.
-> As que hoje também são geradas por triggers automáticos (carga aceita, início rota, chegada, entrega) continuam funcionando — o select serve para o operador registrar manualmente quando precisar (correção, lançamento retroativo, força bruta).
+Padrão de mercado adotado para idempotência: **coluna de timestamp de envio** + **dedupe na fila** + **status de erro com retry** (mesmo modelo do `ibac-sync` atual).
 
 ---
 
-## Mudanças técnicas
+## 1. Schema (migration)
 
-### 1. Banco (migration)
-- `INSERT` na `ibac_de_para_eventos`: `extravio_roubo` → código **14** ("Extravio de mercadoria").
-- `ALTER TABLE agendamentos ADD COLUMN ocorrencia text` (nullable; validação no front).
-- Novo trigger `fn_ibac_capturar_ocorrencia_agendamento` em `agendamentos`: quando `ocorrencia` for preenchida (ou alterada), enfileira o evento correspondente via `fn_ibac_enqueue`, com `nf_id`, `carga_id`, `chave_acesso` e payload da NF.
+**`baixas_entrega`** — novas colunas:
+- `imagem_ibac_enviada_em timestamptz` — preenchido quando a IBAC confirma recebimento (HTTP 2xx).
+- `imagem_ibac_tentativas int default 0`
+- `imagem_ibac_ultimo_erro text`
+- `imagem_ibac_queue_id uuid` — referência à última entrada em `ibac_eventos_queue` (para auditoria).
 
-### 2. Frontend — `src/pages/Agendamento.tsx`
-- Novo `Select` "Ocorrência" na linha, com as 10 opções acima + opção "—" para limpar.
-- Persiste em `agendamentos.ocorrencia`.
-- Badge visual quando há ocorrência preenchida.
+Índice parcial para o cron varrer rápido:
+```sql
+CREATE INDEX idx_baixas_pendente_envio_imagem
+  ON baixas_entrega (registrado_em)
+  WHERE foto_path IS NOT NULL AND imagem_ibac_enviada_em IS NULL;
+```
 
-### 3. Sem mudanças
-- APK / `BaixaEntrega.tsx`: continua só Entregue/Reentrega.
-- Edge `ibac-sync`: já consome a fila.
-- Triggers automáticos existentes (carga, rota, chegada, baixa): permanecem.
+**`ibac_de_para_eventos`** — semear linha:
+- `evento_interno = 'envio_canhoto'`, `codigo_ibac = NULL`, `ativo = true`, descrição "Envio de imagem do canhoto (assíncrono, separado do evento 1)".
+> Fica sem código IBAC até a IBAC confirmar o endpoint/código. Enquanto isso, o `ibac-sync` já marca como erro "sem código mapeado" — comportamento conhecido, sem perda. Quando a IBAC responder, basta preencher o `codigo_ibac` e usar **Retry → Reprocessar**.
+
+**`cnpj_envio_canhoto_auto`** — nova tabela de configuração (substitui hardcode "Cacau"):
+- `cnpj text PK` (somente dígitos)
+- `descricao text`
+- `ativo boolean default true`
+- Seed: CNPJ raiz Cacau Show `51825331` (matching por `LIKE '51825331%'`).
+- Grants: `SELECT` para `authenticated`, `ALL` para `service_role`. RLS: admin gerencia.
 
 ---
 
-## Fora de escopo (próximos tópicos)
-- Canhoto em paisagem
-- Critério de aprovação/rejeição do canhoto + reprocesso na Prestação de Contas
-- Envio noturno em lote para a Cacau
-- Desfazer baixas das NFs específicas para reteste
+## 2. Edge function `ibac-enfileirar-canhotos` (nova)
+
+Roda **uma vez por execução** (chamada pelo cron). Não envia para a IBAC diretamente — apenas **enfileira** em `ibac_eventos_queue`. O `ibac-sync` (que já roda a cada 2 min) faz o POST real, respeitando retry/backoff/alertas existentes.
+
+Lógica:
+1. Lista CNPJs ativos em `cnpj_envio_canhoto_auto`.
+2. Busca em lotes (`limit 500`) `baixas_entrega` onde:
+   - `foto_path IS NOT NULL`
+   - `imagem_ibac_enviada_em IS NULL`
+   - `imagem_ibac_tentativas < 5` (cap de segurança; reset manual via UI)
+   - `notas_fiscais.cnpj_destinatario` casa com algum CNPJ ativo
+3. Para cada baixa:
+   - Gera **signed URL** do `comprovantes` (validade 7 dias — IBAC consome assincronamente).
+   - Monta payload com `nf_id`, `numero_nf`, `chave_acesso`, `cnpj_destinatario`, `recebedor_nome`, `registrado_em`, `validacao_status`, `foto_url`, `foto_path`.
+   - Chama `fn_ibac_enqueue('envio_canhoto', nf_id, carga_id, baixa_id, chave_acesso, payload)` — só insere se o de-para estiver ativo (já é o comportamento da função).
+   - Atualiza `baixas_entrega.imagem_ibac_queue_id = <novo id>`, incrementa `imagem_ibac_tentativas`.
+4. Retorna `{ candidatos, enfileirados, sem_destinatario_mapeado, ja_enviadas_ignoradas }`.
+
+`verify_jwt = false` (chamada via cron service-role). Usa `SERVICE_ROLE` no client.
 
 ---
 
-**Confirma para eu implementar?** Em particular: ok deixar "Extravio ou Roubo" como **uma única opção** mapeada ao código IBAC 14, ou prefere separar em duas (Extravio = 14, Roubo = 23)?
+## 3. Confirmação de envio (mudança no `ibac-sync`)
+
+No bloco que atualiza `ibac_eventos_queue` após sucesso, adicionar: se `evento_interno = 'envio_canhoto'` e `sucesso = true`, fazer:
+```sql
+UPDATE baixas_entrega
+   SET imagem_ibac_enviada_em = now(),
+       imagem_ibac_ultimo_erro = NULL
+ WHERE id = <baixa_id>;
+```
+Em erro terminal (`tentativas >= max`): gravar `imagem_ibac_ultimo_erro` na baixa para visibilidade.
+
+---
+
+## 4. Cron (pg_cron + pg_net)
+
+```sql
+SELECT cron.schedule(
+  'ibac-enfileirar-canhotos-diario',
+  '0 2 * * *',           -- 02:00 UTC = 23:00 BRT
+  $$
+  SELECT net.http_post(
+    url := 'https://<projeto>.supabase.co/functions/v1/ibac-enfileirar-canhotos',
+    headers := jsonb_build_object('Content-Type','application/json','apikey','<anon>'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+(Insertion via insert tool — não migration — por conter chave anon específica do projeto.)
+
+---
+
+## 5. UI — Painel IBAC (mínimo)
+
+Em `/integracao-ibac`, adicionar aba **Canhotos**:
+- KPIs: pendentes (foto sem envio), enviados últimos 7d, falhas com `imagem_ibac_ultimo_erro`.
+- Botão **"Disparar agora"** chama a edge function manualmente.
+- Sub-aba **CNPJs autorizados** (CRUD simples em `cnpj_envio_canhoto_auto`) — admin only.
+
+---
+
+## 6. Fora de escopo (deixar explícito)
+
+- Não muda o fluxo do **evento 1** (entrega/ocorrência continua em tempo real via `fn_ibac_capturar_baixa`).
+- Não muda a validação IA da Prestação de Contas — score continua sendo só sinal humano.
+- Endpoint/contrato exato da IBAC para imagem fica pendente do retorno deles; estrutura já suporta sem mudança de código (basta preencher `codigo_ibac` no de-para).
+
+---
+
+## Detalhes técnicos
+
+- Signed URL 7d para a IBAC ter folga em reprocesso. Bucket `comprovantes` permanece privado.
+- Cap `imagem_ibac_tentativas < 5` evita laço se a foto sumir do storage.
+- Cron 1x/dia + `ibac-sync` cada 2 min → janela máx de envio efetivo ≈ 2 min após 23h.
+- Dedupe natural pela coluna `imagem_ibac_enviada_em` (NOT NULL = nunca reenfileirar).
