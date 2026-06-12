@@ -57,6 +57,7 @@ const transporteItems = [
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
+  { name: "Reprocessar Canhotos", href: "/reprocessar-canhotos", icon: RefreshCw },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
