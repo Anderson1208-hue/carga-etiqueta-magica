@@ -421,9 +421,13 @@ export type Database = {
           status: string
           updated_at: string
           validacao_em: string | null
+          validacao_em_v1: string | null
           validacao_problemas: Json | null
+          validacao_problemas_v1: Json | null
           validacao_score: number | null
+          validacao_score_v1: number | null
           validacao_status: string | null
+          validacao_status_v1: string | null
           veiculo_id: string
         }
         Insert: {
@@ -449,9 +453,13 @@ export type Database = {
           status?: string
           updated_at?: string
           validacao_em?: string | null
+          validacao_em_v1?: string | null
           validacao_problemas?: Json | null
+          validacao_problemas_v1?: Json | null
           validacao_score?: number | null
+          validacao_score_v1?: number | null
           validacao_status?: string | null
+          validacao_status_v1?: string | null
           veiculo_id: string
         }
         Update: {
@@ -477,9 +485,13 @@ export type Database = {
           status?: string
           updated_at?: string
           validacao_em?: string | null
+          validacao_em_v1?: string | null
           validacao_problemas?: Json | null
+          validacao_problemas_v1?: Json | null
           validacao_score?: number | null
+          validacao_score_v1?: number | null
           validacao_status?: string | null
+          validacao_status_v1?: string | null
           veiculo_id?: string
         }
         Relationships: [
