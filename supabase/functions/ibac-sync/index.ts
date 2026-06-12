@@ -142,16 +142,36 @@ Deno.serve(async (req) => {
       sucesso,
     });
 
+    const novoStatus = sucesso ? "enviado" : (item.tentativas + 1 >= maxTentativas ? "erro" : "pendente");
+
     await supabase
       .from("ibac_eventos_queue")
       .update({
-        status: sucesso ? "enviado" : (item.tentativas + 1 >= maxTentativas ? "erro" : "pendente"),
+        status: novoStatus,
         tentativas: item.tentativas + 1,
         ultima_tentativa_em: new Date().toISOString(),
         enviado_em: sucesso ? new Date().toISOString() : null,
         erro_mensagem: erroMsg,
       })
       .eq("id", item.id);
+
+    // Reflete envio do canhoto em baixas_entrega
+    if (item.evento_interno === "envio_canhoto" && item.baixa_id) {
+      if (sucesso) {
+        await supabase
+          .from("baixas_entrega")
+          .update({
+            imagem_ibac_enviada_em: new Date().toISOString(),
+            imagem_ibac_ultimo_erro: null,
+          })
+          .eq("id", item.baixa_id);
+      } else if (novoStatus === "erro") {
+        await supabase
+          .from("baixas_entrega")
+          .update({ imagem_ibac_ultimo_erro: erroMsg ?? "erro desconhecido" })
+          .eq("id", item.baixa_id);
+      }
+    }
 
     resultados.push({ id: item.id, sucesso });
   }
