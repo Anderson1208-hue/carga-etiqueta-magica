@@ -65,12 +65,10 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   }
 
   if (isPandurataXml) {
-    // Pandurata: só aceita <nVol> DECIMAL como m³. Inteiro = caixas → ignora.
-    // NUNCA cair no fallback de texto: ele captura "M3" de descrição de item
-    // e pega número errado adiante (ex: nVol=216 acaba virando volume=216).
+    // Pandurata: <vol><nVol> SEMPRE é m³ (cubagem). Posição fixa no layout.
     const nVolNodes = getElementsByLocalName(xmlDoc, ["nvol"]);
     for (const nVolNode of nVolNodes) {
-      const value = tryPandurNVol(nVolNode?.textContent);
+      const value = parseVolumeNumber(nVolNode?.textContent);
       if (value > 0) return value;
     }
     return 0;
