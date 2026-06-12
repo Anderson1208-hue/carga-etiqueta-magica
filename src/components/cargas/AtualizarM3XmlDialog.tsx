@@ -215,6 +215,12 @@ export function AtualizarM3XmlDialog({
                   <AlertCircle className="w-4 h-4" />
                   <span>
                     {resultado.semM3} XML(s) sem informação de m³
+                    {resultado.detalhesSemM3.length > 0 &&
+                      ` (${resultado.detalhesSemM3.join(", ")}${
+                        resultado.semM3 > resultado.detalhesSemM3.length
+                          ? "..."
+                          : ""
+                      })`}
                   </span>
                 </div>
               )}
@@ -235,9 +241,17 @@ export function AtualizarM3XmlDialog({
                 </div>
               )}
               {resultado.erros > 0 && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{resultado.erros} erro(s) ao processar</span>
+                <div className="flex items-start gap-2 text-destructive">
+                  <AlertCircle className="w-4 h-4 mt-0.5" />
+                  <span>
+                    {resultado.erros} erro(s) ao processar
+                    {resultado.detalhesErros.length > 0 &&
+                      ` (${resultado.detalhesErros.join(", ")}${
+                        resultado.erros > resultado.detalhesErros.length
+                          ? "..."
+                          : ""
+                      })`}
+                  </span>
                 </div>
               )}
             </div>
