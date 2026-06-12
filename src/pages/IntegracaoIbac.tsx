@@ -32,6 +32,7 @@ import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
 import { IbacEventoDetalheDialog } from "@/components/ibac/IbacEventoDetalheDialog";
 import { IbacRetryPanel } from "@/components/ibac/IbacRetryPanel";
 import { ImportarDeParaDialog } from "@/components/ibac/ImportarDeParaDialog";
+import { IbacCanhotosPanel } from "@/components/ibac/IbacCanhotosPanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
