@@ -293,6 +293,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/reprocessar-canhotos"
+        element={
+          <ProtectedRoute>
+            <ReprocessarCanhotos />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
