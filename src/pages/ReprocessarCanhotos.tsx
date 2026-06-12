@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, Play, RefreshCw, ImageIcon } from "lucide-react";
+import { Loader2, Play, RefreshCw, ImageIcon, Download } from "lucide-react";
 
 type Status = "ok" | "alerta" | "ruim";
 const STATUSES: Status[] = ["ok", "alerta", "ruim"];
@@ -130,6 +130,66 @@ export default function ReprocessarCanhotos() {
     }
   }
 
+  async function gerarRelatorio() {
+    const tt = toast.loading("Gerando relatório…");
+    try {
+      const { data, error } = await supabase
+        .from("baixas_entrega")
+        .select("id, registrado_em, foto_path, validacao_status_v1, validacao_score_v1, validacao_problemas_v1, validacao_em_v1, validacao_status, validacao_score, validacao_problemas, validacao_em, notas_fiscais:nf_id(numero_nf, dest_razao_social)")
+        .not("validacao_status_v1", "is", null)
+        .order("registrado_em", { ascending: false });
+      if (error) throw error;
+      const rows = data ?? [];
+      const headers = [
+        "id_baixa","numero_nf","destinatario","registrado_em",
+        "status_antes","score_antes","problemas_antes","avaliado_em_antes",
+        "status_depois","score_depois","problemas_depois","avaliado_em_depois",
+        "mudou_status","foto_path",
+      ];
+      const esc = (v: any) => {
+        if (v == null) return "";
+        const s = String(v).replace(/"/g, '""');
+        return /[",;\n]/.test(s) ? `"${s}"` : s;
+      };
+      const linhas = rows.map((r: any) => {
+        const probAntes = (r.validacao_problemas_v1?.lista ?? []).join(" | ");
+        const probDepois = (r.validacao_problemas?.lista ?? []).join(" | ");
+        const mudou = r.validacao_status && r.validacao_status_v1 && r.validacao_status !== r.validacao_status_v1 ? "SIM" : "NAO";
+        return [
+          r.id, r.notas_fiscais?.numero_nf ?? "", r.notas_fiscais?.dest_razao_social ?? "", r.registrado_em ?? "",
+          r.validacao_status_v1 ?? "", r.validacao_score_v1 ?? "", probAntes, r.validacao_em_v1 ?? "",
+          r.validacao_status ?? "", r.validacao_score ?? "", probDepois, r.validacao_em ?? "",
+          mudou, r.foto_path ?? "",
+        ].map(esc).join(";");
+      });
+
+      // Resumo no topo
+      const cont = (arr: any[], campo: string, val: string) => arr.filter((r: any) => r[campo] === val).length;
+      const resumo = [
+        `Relatorio comparativo validacao de canhotos`,
+        `Gerado em;${new Date().toISOString()}`,
+        `Total avaliados;${rows.length}`,
+        `;Antes;Depois`,
+        `OK;${cont(rows,"validacao_status_v1","ok")};${cont(rows,"validacao_status","ok")}`,
+        `Alerta;${cont(rows,"validacao_status_v1","alerta")};${cont(rows,"validacao_status","alerta")}`,
+        `Ruim;${cont(rows,"validacao_status_v1","ruim")};${cont(rows,"validacao_status","ruim")}`,
+        `Mudaram de status;${rows.filter((r:any)=>r.validacao_status && r.validacao_status_v1 && r.validacao_status!==r.validacao_status_v1).length}`,
+        ``,
+      ];
+      const csv = "\uFEFF" + resumo.join("\n") + headers.join(";") + "\n" + linhas.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `relatorio-canhotos-antes-depois-${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Relatório gerado (${rows.length} canhotos)`, { id: tt });
+    } catch (e: any) {
+      toast.error(`Erro: ${e.message ?? e}`, { id: tt });
+    }
+  }
+
   const totalSnapshot = stats?.total ?? 0;
   const reprocessadas = stats?.reprocessadas ?? 0;
   const restantes = Math.max(0, totalSnapshot - reprocessadas);
@@ -175,6 +235,9 @@ export default function ReprocessarCanhotos() {
               <Button variant="ghost" onClick={() => { refetchStats(); qc.invalidateQueries({ queryKey: ["reprocessar-canhotos-matriz"] }); }}>
                 <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
               </Button>
+              <Button variant="secondary" onClick={gerarRelatorio} className="ml-auto">
+                <Download className="w-4 h-4 mr-2" /> Gerar relatório CSV
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               ~1 canhoto/s para respeitar rate limit do Gemini. Custo estimado: ~0,001 crédito por canhoto.
@@ -182,17 +245,6 @@ export default function ReprocessarCanhotos() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Avaliação geral — antes vs depois</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ResumoBloco titulo="Antes (critério antigo)" totais={totaisAntes} />
-              <ResumoBloco titulo="Depois (critério novo)" totais={totaisDepois} destaque />
-            </div>
-          </CardContent>
-        </Card>
 
 
 
@@ -301,39 +353,8 @@ export default function ReprocessarCanhotos() {
   );
 }
 
-function ResumoBloco({ titulo, totais, destaque }: { titulo: string; totais: Record<string, number>; destaque?: boolean }) {
-  const total = (totais.ok ?? 0) + (totais.alerta ?? 0) + (totais.ruim ?? 0);
-  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
-  const linhas: { key: Status; label: string; cls: string }[] = [
-    { key: "ok", label: "OK", cls: "text-green-700" },
-    { key: "alerta", label: "Alerta", cls: "text-amber-700" },
-    { key: "ruim", label: "Ruim", cls: "text-red-700" },
-  ];
-  return (
-    <div className={`rounded-lg border p-4 ${destaque ? "border-primary/40 bg-primary/5" : "bg-muted/30"}`}>
-      <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-semibold text-sm">{titulo}</h3>
-        <span className="text-xs text-muted-foreground">{total} canhotos</span>
-      </div>
-      <div className="space-y-2">
-        {linhas.map((l) => (
-          <div key={l.key} className="flex items-center gap-3">
-            <span className={`w-16 text-sm font-medium ${l.cls}`}>{l.label}</span>
-            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full ${l.key === "ok" ? "bg-green-500" : l.key === "alerta" ? "bg-amber-500" : "bg-red-500"}`}
-                style={{ width: `${pct(totais[l.key] ?? 0)}%` }}
-              />
-            </div>
-            <span className="w-20 text-right text-sm tabular-nums">
-              {totais[l.key] ?? 0} <span className="text-xs text-muted-foreground">({pct(totais[l.key] ?? 0)}%)</span>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+function ResumoBloco() { return null; }
+
 
 
 
