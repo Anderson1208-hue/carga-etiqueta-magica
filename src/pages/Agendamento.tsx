@@ -869,7 +869,7 @@ export default function Agendamento() {
                       <TableHead>Emitente CT-e</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Agenda</TableHead>
-                      <TableHead className="min-w-[220px]">Ocorrência (Cacau)</TableHead>
+                      <TableHead className="min-w-[220px]">Ocorrência</TableHead>
                       <TableHead>Observação</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Criado em</TableHead>
