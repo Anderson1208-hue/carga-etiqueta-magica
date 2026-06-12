@@ -82,6 +82,7 @@ interface AgendamentoRecord {
   status: string;
   data_agendamento: string | null;
   observacao: string | null;
+  ocorrencia: string | null;
   created_at: string;
   numero_nf?: string;
   dest_razao_social?: string | null;
@@ -98,6 +99,25 @@ const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.Rea
   { value: "REENTREGA", label: "Reentrega", icon: <RotateCcw className="w-4 h-4" />, color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", requiresDate: true },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];
+
+// Ocorrências enviadas à Cacau (de-para IBAC). Exibidas no select da linha do Agendamento.
+const OCORRENCIA_OPTIONS: { value: string; label: string; codigo: string }[] = [
+  { value: "agendamento", label: "Entrega agendada", codigo: "91" },
+  { value: "carga_aceita", label: "Carga aceita pela transportadora", codigo: "222" },
+  { value: "inicio_rota", label: "Motorista iniciou a rota", codigo: "229" },
+  { value: "chegada_cliente", label: "Chegada no cliente", codigo: "245" },
+  { value: "entrega_realizada", label: "Entrega realizada com canhoto", codigo: "1" },
+  { value: "reentrega", label: "Reentrega solicitada", codigo: "19" },
+  { value: "avaria", label: "Avaria", codigo: "79" },
+  { value: "recusa_entrega", label: "Recusa de entrega", codigo: "3" },
+  { value: "devolucao", label: "Devolução", codigo: "101" },
+  { value: "extravio_roubo", label: "Extravio ou Roubo", codigo: "14" },
+];
+
+function ocorrenciaLabel(value: string | null | undefined) {
+  if (!value) return null;
+  return OCORRENCIA_OPTIONS.find(o => o.value === value)?.label ?? value;
+}
 
 function statusBadge(status: string) {
   const opt = STATUS_OPTIONS.find(s => s.value === status);
@@ -169,7 +189,7 @@ export default function Agendamento() {
     try {
       const { data, error } = await supabase
         .from("agendamentos")
-        .select("id, nf_id, status, data_agendamento, observacao, created_at")
+        .select("id, nf_id, status, data_agendamento, observacao, ocorrencia, created_at")
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -542,6 +562,32 @@ export default function Agendamento() {
     }
   }
 
+  async function updateOcorrencia(ag: AgendamentoRecord, valor: string) {
+    const novo = valor === "__none__" ? null : valor;
+    if ((ag.ocorrencia ?? null) === novo) return;
+    // Otimista
+    setAgendamentos(prev => prev.map(a => a.id === ag.id ? { ...a, ocorrencia: novo } : a));
+    try {
+      const { error } = await supabase
+        .from("agendamentos")
+        .update({ ocorrencia: novo })
+        .eq("id", ag.id);
+      if (error) throw error;
+      const label = novo ? ocorrenciaLabel(novo) : "removida";
+      toast({
+        title: novo ? "Ocorrência registrada" : "Ocorrência removida",
+        description: novo
+          ? `NF ${ag.numero_nf}: ${label} — enviada para a Cacau.`
+          : `NF ${ag.numero_nf}: ocorrência removida.`,
+      });
+    } catch (err: any) {
+      console.error(err);
+      // Reverte em caso de erro
+      setAgendamentos(prev => prev.map(a => a.id === ag.id ? { ...a, ocorrencia: ag.ocorrencia } : a));
+      toast({ title: "Erro", description: err.message ?? "Falha ao salvar ocorrência", variant: "destructive" });
+    }
+  }
+
   const [generatingResumo, setGeneratingResumo] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
 
@@ -823,6 +869,7 @@ export default function Agendamento() {
                       <TableHead>Emitente CT-e</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Data Agenda</TableHead>
+                      <TableHead className="min-w-[220px]">Ocorrência (Cacau)</TableHead>
                       <TableHead>Observação</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Criado em</TableHead>
@@ -841,6 +888,25 @@ export default function Agendamento() {
                           {ag.data_agendamento
                             ? format(new Date(ag.data_agendamento + "T12:00:00"), "dd/MM/yyyy")
                             : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={ag.ocorrencia ?? "__none__"}
+                            onValueChange={(v) => updateOcorrencia(ag, v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="—" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— Sem ocorrência</SelectItem>
+                              {OCORRENCIA_OPTIONS.map(o => (
+                                <SelectItem key={o.value} value={o.value}>
+                                  <span className="font-mono text-xs text-muted-foreground mr-2">{o.codigo}</span>
+                                  {o.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">{ag.observacao || "—"}</TableCell>
                         <TableCell><TipoCargaBadge tipoCarga={ag.tipo_carga} /></TableCell>

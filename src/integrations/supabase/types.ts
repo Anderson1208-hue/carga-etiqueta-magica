@@ -22,6 +22,7 @@ export type Database = {
           id: string
           nf_id: string
           observacao: string | null
+          ocorrencia: string | null
           status: string
           updated_at: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           nf_id: string
           observacao?: string | null
+          ocorrencia?: string | null
           status?: string
           updated_at?: string
         }
@@ -42,6 +44,7 @@ export type Database = {
           id?: string
           nf_id?: string
           observacao?: string | null
+          ocorrencia?: string | null
           status?: string
           updated_at?: string
         }
