@@ -235,6 +235,9 @@ export default function ReprocessarCanhotos() {
               <Button variant="ghost" onClick={() => { refetchStats(); qc.invalidateQueries({ queryKey: ["reprocessar-canhotos-matriz"] }); }}>
                 <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
               </Button>
+              <Button variant="secondary" onClick={gerarRelatorio} className="ml-auto">
+                <Download className="w-4 h-4 mr-2" /> Gerar relatório CSV
+              </Button>
             </div>
             <p className="text-xs text-muted-foreground">
               ~1 canhoto/s para respeitar rate limit do Gemini. Custo estimado: ~0,001 crédito por canhoto.
