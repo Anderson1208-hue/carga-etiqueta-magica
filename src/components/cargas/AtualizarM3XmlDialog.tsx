@@ -218,6 +218,9 @@ export function AtualizarM3XmlDialog({
 
           {resultado && (
             <div className="space-y-2 rounded-lg border p-3 text-sm">
+              <div className="text-xs text-muted-foreground">
+                {resultado.arquivosProcessados} de {resultado.arquivosSelecionados} arquivo(s) lido(s)
+              </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-success" />
                 <span>
