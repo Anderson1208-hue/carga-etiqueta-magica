@@ -406,6 +406,10 @@ export type Database = {
           created_at: string
           foto_path: string | null
           id: string
+          imagem_ibac_enviada_em: string | null
+          imagem_ibac_queue_id: string | null
+          imagem_ibac_tentativas: number
+          imagem_ibac_ultimo_erro: string | null
           latitude: number | null
           longitude: number | null
           nf_id: string
@@ -430,6 +434,10 @@ export type Database = {
           created_at?: string
           foto_path?: string | null
           id?: string
+          imagem_ibac_enviada_em?: string | null
+          imagem_ibac_queue_id?: string | null
+          imagem_ibac_tentativas?: number
+          imagem_ibac_ultimo_erro?: string | null
           latitude?: number | null
           longitude?: number | null
           nf_id: string
@@ -454,6 +462,10 @@ export type Database = {
           created_at?: string
           foto_path?: string | null
           id?: string
+          imagem_ibac_enviada_em?: string | null
+          imagem_ibac_queue_id?: string | null
+          imagem_ibac_tentativas?: number
+          imagem_ibac_ultimo_erro?: string | null
           latitude?: number | null
           longitude?: number | null
           nf_id?: string
@@ -579,6 +591,30 @@ export type Database = {
           created_at?: string
           emitente?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      cnpj_envio_canhoto_auto: {
+        Row: {
+          ativo: boolean
+          cnpj: string
+          created_at: string
+          descricao: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj: string
+          created_at?: string
+          descricao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cnpj?: string
+          created_at?: string
+          descricao?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
