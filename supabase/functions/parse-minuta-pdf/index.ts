@@ -130,13 +130,13 @@ Deno.serve(async (req) => {
       console.error("AI Gateway error:", aiResp.status, errText);
       if (aiResp.status === 429) {
         return new Response(JSON.stringify({ error: "Limite de uso atingido. Tente novamente em instantes." }), {
-          status: 429,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (aiResp.status === 402) {
         return new Response(JSON.stringify({ error: "Créditos da IA esgotados. Recarregue para continuar." }), {
-          status: 402,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

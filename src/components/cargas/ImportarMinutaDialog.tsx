@@ -1,7 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, Upload, FileText, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +66,33 @@ function buildMinutaId(parsed: MinutaParsed): string {
   return `MIN-${cnpj}-${parsed.numeroMinuta}`;
 }
 
+const emptyManualForm = {
+  numeroMinuta: "",
+  numeroNfReferenciada: "",
+  valorFrete: "",
+  dataEmissao: "",
+  cnpjEmitente: "",
+  razaoSocialEmitente: "",
+};
+
+async function extractFunctionErrorMessage(error: unknown): Promise<string> {
+  const maybeResponse = (error as { context?: Response })?.context;
+  if (maybeResponse?.clone) {
+    try {
+      const payload = await maybeResponse.clone().json();
+      if (payload?.error) return String(payload.error);
+    } catch {
+      // Mantém fallback abaixo quando a resposta não for JSON.
+    }
+  }
+
+  const message = error instanceof Error ? error.message : "Erro ao processar";
+  if (message.includes("non-2xx")) {
+    return "Falha ao extrair via IA. Use o lançamento manual abaixo para vincular a minuta agora.";
+  }
+  return message;
+}
+
 export function ImportarMinutaDialog({
   open,
   onOpenChange,
@@ -81,13 +110,21 @@ export function ImportarMinutaDialog({
   // Mapeia chave de acesso -> {id, numero_nf} (fallback)
   const [nfsByChave, setNfsByChave] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualForm, setManualForm] = useState(emptyManualForm);
 
-  async function loadNfs() {
-    if (nfsLoaded) return;
-    const { data } = await supabase
+  async function loadNfs(): Promise<{
+    byNumero: Map<string, { id: string; numero_nf: string }>;
+    byChave: Map<string, { id: string; numero_nf: string }>;
+  }> {
+    if (nfsLoaded) return { byNumero: nfsByNumero, byChave: nfsByChave };
+    const { data, error } = await supabase
       .from("notas_fiscais")
       .select("id, chave_acesso, numero_nf")
       .eq("carga_id", cargaId);
+
+    if (error) throw error;
+
     const byNumero = new Map<string, { id: string; numero_nf: string }>();
     const byChave = new Map<string, { id: string; numero_nf: string }>();
     (data || []).forEach((nf) => {
@@ -98,14 +135,23 @@ export function ImportarMinutaDialog({
     setNfsByNumero(byNumero);
     setNfsByChave(byChave);
     setNfsLoaded(true);
+    return { byNumero, byChave };
   }
 
-  if (open && !nfsLoaded) loadNfs();
+  useEffect(() => {
+    if (open && !nfsLoaded) {
+      loadNfs().catch((error) => {
+        console.error("Erro ao carregar NFs da carga:", error);
+        toast({ variant: "destructive", title: "Erro ao carregar NFs da carga" });
+      });
+    }
+  }, [open, nfsLoaded, cargaId]);
 
   const processFiles = useCallback(
     async (files: FileList) => {
       setIsProcessing(true);
       const newFiles: ParsedMinutaFile[] = [];
+      const { byNumero, byChave } = await loadNfs();
 
       for (const file of Array.from(files)) {
         if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -122,7 +168,7 @@ export function ImportarMinutaDialog({
           const { data: resp, error } = await supabase.functions.invoke("parse-minuta-pdf", {
             body: { pdfBase64: base64, fileName: file.name },
           });
-          if (error) throw error;
+          if (error) throw new Error(await extractFunctionErrorMessage(error));
           if (resp?.error) throw new Error(resp.error);
 
           const parsed: MinutaParsed = resp.data;
@@ -147,10 +193,10 @@ export function ImportarMinutaDialog({
 
           // Casa NF: primeiro tenta por chave (se houver), depois por número
           let nfMatch = parsed.chaveNfReferenciada
-            ? nfsByChave.get(parsed.chaveNfReferenciada)
+            ? byChave.get(parsed.chaveNfReferenciada)
             : undefined;
           if (!nfMatch) {
-            nfMatch = nfsByNumero.get(normalizaNumero(parsed.numeroNfReferenciada));
+            nfMatch = byNumero.get(normalizaNumero(parsed.numeroNfReferenciada));
           }
 
           if (!nfMatch) {
@@ -171,11 +217,15 @@ export function ImportarMinutaDialog({
             nfId: nfMatch.id,
           });
         } catch (error) {
+          const message = error instanceof Error ? error.message : "Erro ao processar";
+          if (message.includes("IA") || message.includes("crédito") || message.includes("Créditos")) {
+            setShowManualEntry(true);
+          }
           newFiles.push({
             fileName: file.name,
             data: null,
             status: "error",
-            error: error instanceof Error ? error.message : "Erro ao processar",
+            error: message,
           });
         }
       }
@@ -183,7 +233,7 @@ export function ImportarMinutaDialog({
       setParsedFiles((prev) => [...prev, ...newFiles]);
       setIsProcessing(false);
     },
-    [parsedFiles, nfsByNumero, nfsByChave]
+    [parsedFiles, nfsLoaded, nfsByNumero, nfsByChave]
   );
 
   function handleRemoveFile(index: number) {
@@ -196,8 +246,57 @@ export function ImportarMinutaDialog({
       setNfsLoaded(false);
       setNfsByNumero(new Map());
       setNfsByChave(new Map());
+      setShowManualEntry(false);
+      setManualForm(emptyManualForm);
     }
     onOpenChange(openState);
+  }
+
+  async function handleManualAdd() {
+    const numeroMinuta = normalizaNumero(manualForm.numeroMinuta);
+    const numeroNf = normalizaNumero(manualForm.numeroNfReferenciada);
+    const valorFrete = Number(String(manualForm.valorFrete || "0").replace(/\./g, "").replace(",", ".")) || 0;
+
+    if (!numeroMinuta || !numeroNf) {
+      toast({ variant: "destructive", title: "Informe a minuta e a NF" });
+      return;
+    }
+
+    const { byNumero } = await loadNfs();
+    const nfMatch = byNumero.get(numeroNf);
+    if (!nfMatch) {
+      toast({ variant: "destructive", title: `NF ${numeroNf} não encontrada nesta carga` });
+      return;
+    }
+
+    const parsed: MinutaParsed = {
+      numeroMinuta,
+      chaveCte: "",
+      numeroNfReferenciada: numeroNf,
+      chaveNfReferenciada: "",
+      cnpjEmitente: normalizaNumero(manualForm.cnpjEmitente),
+      razaoSocialEmitente: manualForm.razaoSocialEmitente.trim() || "Transportadora não informada",
+      valorFrete,
+      dataEmissao: manualForm.dataEmissao,
+    };
+
+    const minutaId = buildMinutaId(parsed);
+    if (parsedFiles.some((pf) => pf.data && buildMinutaId(pf.data) === minutaId)) {
+      toast({ variant: "destructive", title: "Minuta já adicionada na lista" });
+      return;
+    }
+
+    setParsedFiles((prev) => [
+      ...prev,
+      {
+        fileName: `Manual - minuta ${numeroMinuta}`,
+        data: parsed,
+        status: "success",
+        nfNumero: nfMatch.numero_nf,
+        nfId: nfMatch.id,
+      },
+    ]);
+    setManualForm(emptyManualForm);
   }
 
   const handleDrop = useCallback(
@@ -325,6 +424,76 @@ export function ImportarMinutaDialog({
               </div>
             </label>
           </div>
+
+          {!showManualEntry ? (
+            <Button type="button" variant="outline" className="w-full" onClick={() => setShowManualEntry(true)}>
+              Lançar minuta manualmente
+            </Button>
+          ) : (
+            <div className="space-y-3 rounded-lg border border-dashed p-3">
+              <div className="text-sm font-medium text-foreground">Lançamento manual</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-minuta">Nº da minuta</Label>
+                  <Input
+                    id="manual-minuta"
+                    value={manualForm.numeroMinuta}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, numeroMinuta: e.target.value }))}
+                    placeholder="3257"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-nf">NF referenciada</Label>
+                  <Input
+                    id="manual-nf"
+                    value={manualForm.numeroNfReferenciada}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, numeroNfReferenciada: e.target.value }))}
+                    placeholder="109466"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-valor">Valor do frete</Label>
+                  <Input
+                    id="manual-valor"
+                    value={manualForm.valorFrete}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, valorFrete: e.target.value }))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-data">Data de emissão</Label>
+                  <Input
+                    id="manual-data"
+                    type="date"
+                    value={manualForm.dataEmissao}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, dataEmissao: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-cnpj">CNPJ transportadora</Label>
+                  <Input
+                    id="manual-cnpj"
+                    value={manualForm.cnpjEmitente}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, cnpjEmitente: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-razao">Transportadora</Label>
+                  <Input
+                    id="manual-razao"
+                    value={manualForm.razaoSocialEmitente}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, razaoSocialEmitente: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+              <Button type="button" variant="secondary" onClick={handleManualAdd}>
+                Adicionar minuta à lista
+              </Button>
+            </div>
+          )}
 
           {parsedFiles.length > 0 && (
             <div className="space-y-2">
