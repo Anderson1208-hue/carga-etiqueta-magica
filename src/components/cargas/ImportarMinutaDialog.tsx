@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -138,7 +138,14 @@ export function ImportarMinutaDialog({
     return { byNumero, byChave };
   }
 
-  if (open && !nfsLoaded) loadNfs();
+  useEffect(() => {
+    if (open && !nfsLoaded) {
+      loadNfs().catch((error) => {
+        console.error("Erro ao carregar NFs da carga:", error);
+        toast({ variant: "destructive", title: "Erro ao carregar NFs da carga" });
+      });
+    }
+  }, [open, nfsLoaded, cargaId]);
 
   const processFiles = useCallback(
     async (files: FileList) => {
