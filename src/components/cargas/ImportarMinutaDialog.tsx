@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, Upload, FileText, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +66,33 @@ function buildMinutaId(parsed: MinutaParsed): string {
   return `MIN-${cnpj}-${parsed.numeroMinuta}`;
 }
 
+const emptyManualForm = {
+  numeroMinuta: "",
+  numeroNfReferenciada: "",
+  valorFrete: "",
+  dataEmissao: "",
+  cnpjEmitente: "",
+  razaoSocialEmitente: "",
+};
+
+async function extractFunctionErrorMessage(error: unknown): Promise<string> {
+  const maybeResponse = (error as { context?: Response })?.context;
+  if (maybeResponse?.clone) {
+    try {
+      const payload = await maybeResponse.clone().json();
+      if (payload?.error) return String(payload.error);
+    } catch {
+      // Mantém fallback abaixo quando a resposta não for JSON.
+    }
+  }
+
+  const message = error instanceof Error ? error.message : "Erro ao processar";
+  if (message.includes("non-2xx")) {
+    return "Falha ao extrair via IA. Use o lançamento manual abaixo para vincular a minuta agora.";
+  }
+  return message;
+}
+
 export function ImportarMinutaDialog({
   open,
   onOpenChange,
@@ -81,13 +110,21 @@ export function ImportarMinutaDialog({
   // Mapeia chave de acesso -> {id, numero_nf} (fallback)
   const [nfsByChave, setNfsByChave] = useState<Map<string, { id: string; numero_nf: string }>>(new Map());
   const [nfsLoaded, setNfsLoaded] = useState(false);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualForm, setManualForm] = useState(emptyManualForm);
 
-  async function loadNfs() {
-    if (nfsLoaded) return;
-    const { data } = await supabase
+  async function loadNfs(): Promise<{
+    byNumero: Map<string, { id: string; numero_nf: string }>;
+    byChave: Map<string, { id: string; numero_nf: string }>;
+  }> {
+    if (nfsLoaded) return { byNumero: nfsByNumero, byChave: nfsByChave };
+    const { data, error } = await supabase
       .from("notas_fiscais")
       .select("id, chave_acesso, numero_nf")
       .eq("carga_id", cargaId);
+
+    if (error) throw error;
+
     const byNumero = new Map<string, { id: string; numero_nf: string }>();
     const byChave = new Map<string, { id: string; numero_nf: string }>();
     (data || []).forEach((nf) => {
@@ -98,6 +135,7 @@ export function ImportarMinutaDialog({
     setNfsByNumero(byNumero);
     setNfsByChave(byChave);
     setNfsLoaded(true);
+    return { byNumero, byChave };
   }
 
   if (open && !nfsLoaded) loadNfs();
