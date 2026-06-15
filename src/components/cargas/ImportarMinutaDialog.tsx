@@ -425,6 +425,76 @@ export function ImportarMinutaDialog({
             </label>
           </div>
 
+          {!showManualEntry ? (
+            <Button type="button" variant="outline" className="w-full" onClick={() => setShowManualEntry(true)}>
+              Lançar minuta manualmente
+            </Button>
+          ) : (
+            <div className="space-y-3 rounded-lg border border-dashed p-3">
+              <div className="text-sm font-medium text-foreground">Lançamento manual</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-minuta">Nº da minuta</Label>
+                  <Input
+                    id="manual-minuta"
+                    value={manualForm.numeroMinuta}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, numeroMinuta: e.target.value }))}
+                    placeholder="3257"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-nf">NF referenciada</Label>
+                  <Input
+                    id="manual-nf"
+                    value={manualForm.numeroNfReferenciada}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, numeroNfReferenciada: e.target.value }))}
+                    placeholder="109466"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-valor">Valor do frete</Label>
+                  <Input
+                    id="manual-valor"
+                    value={manualForm.valorFrete}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, valorFrete: e.target.value }))}
+                    placeholder="0,00"
+                    inputMode="decimal"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-data">Data de emissão</Label>
+                  <Input
+                    id="manual-data"
+                    type="date"
+                    value={manualForm.dataEmissao}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, dataEmissao: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-cnpj">CNPJ transportadora</Label>
+                  <Input
+                    id="manual-cnpj"
+                    value={manualForm.cnpjEmitente}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, cnpjEmitente: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="manual-razao">Transportadora</Label>
+                  <Input
+                    id="manual-razao"
+                    value={manualForm.razaoSocialEmitente}
+                    onChange={(e) => setManualForm((prev) => ({ ...prev, razaoSocialEmitente: e.target.value }))}
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+              <Button type="button" variant="secondary" onClick={handleManualAdd}>
+                Adicionar minuta à lista
+              </Button>
+            </div>
+          )}
+
           {parsedFiles.length > 0 && (
             <div className="space-y-2">
               <h4 className="font-medium text-sm">
