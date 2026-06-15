@@ -144,6 +144,7 @@ export function ImportarMinutaDialog({
     async (files: FileList) => {
       setIsProcessing(true);
       const newFiles: ParsedMinutaFile[] = [];
+      const { byNumero, byChave } = await loadNfs();
 
       for (const file of Array.from(files)) {
         if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -160,7 +161,7 @@ export function ImportarMinutaDialog({
           const { data: resp, error } = await supabase.functions.invoke("parse-minuta-pdf", {
             body: { pdfBase64: base64, fileName: file.name },
           });
-          if (error) throw error;
+          if (error) throw new Error(await extractFunctionErrorMessage(error));
           if (resp?.error) throw new Error(resp.error);
 
           const parsed: MinutaParsed = resp.data;
@@ -185,10 +186,10 @@ export function ImportarMinutaDialog({
 
           // Casa NF: primeiro tenta por chave (se houver), depois por número
           let nfMatch = parsed.chaveNfReferenciada
-            ? nfsByChave.get(parsed.chaveNfReferenciada)
+            ? byChave.get(parsed.chaveNfReferenciada)
             : undefined;
           if (!nfMatch) {
-            nfMatch = nfsByNumero.get(normalizaNumero(parsed.numeroNfReferenciada));
+            nfMatch = byNumero.get(normalizaNumero(parsed.numeroNfReferenciada));
           }
 
           if (!nfMatch) {
@@ -209,11 +210,15 @@ export function ImportarMinutaDialog({
             nfId: nfMatch.id,
           });
         } catch (error) {
+          const message = error instanceof Error ? error.message : "Erro ao processar";
+          if (message.includes("IA") || message.includes("crédito") || message.includes("Créditos")) {
+            setShowManualEntry(true);
+          }
           newFiles.push({
             fileName: file.name,
             data: null,
             status: "error",
-            error: error instanceof Error ? error.message : "Erro ao processar",
+            error: message,
           });
         }
       }
@@ -221,7 +226,7 @@ export function ImportarMinutaDialog({
       setParsedFiles((prev) => [...prev, ...newFiles]);
       setIsProcessing(false);
     },
-    [parsedFiles, nfsByNumero, nfsByChave]
+    [parsedFiles, nfsLoaded, nfsByNumero, nfsByChave]
   );
 
   function handleRemoveFile(index: number) {
@@ -234,8 +239,57 @@ export function ImportarMinutaDialog({
       setNfsLoaded(false);
       setNfsByNumero(new Map());
       setNfsByChave(new Map());
+      setShowManualEntry(false);
+      setManualForm(emptyManualForm);
     }
     onOpenChange(openState);
+  }
+
+  async function handleManualAdd() {
+    const numeroMinuta = normalizaNumero(manualForm.numeroMinuta);
+    const numeroNf = normalizaNumero(manualForm.numeroNfReferenciada);
+    const valorFrete = Number(String(manualForm.valorFrete || "0").replace(/\./g, "").replace(",", ".")) || 0;
+
+    if (!numeroMinuta || !numeroNf) {
+      toast({ variant: "destructive", title: "Informe a minuta e a NF" });
+      return;
+    }
+
+    const { byNumero } = await loadNfs();
+    const nfMatch = byNumero.get(numeroNf);
+    if (!nfMatch) {
+      toast({ variant: "destructive", title: `NF ${numeroNf} não encontrada nesta carga` });
+      return;
+    }
+
+    const parsed: MinutaParsed = {
+      numeroMinuta,
+      chaveCte: "",
+      numeroNfReferenciada: numeroNf,
+      chaveNfReferenciada: "",
+      cnpjEmitente: normalizaNumero(manualForm.cnpjEmitente),
+      razaoSocialEmitente: manualForm.razaoSocialEmitente.trim() || "Transportadora não informada",
+      valorFrete,
+      dataEmissao: manualForm.dataEmissao,
+    };
+
+    const minutaId = buildMinutaId(parsed);
+    if (parsedFiles.some((pf) => pf.data && buildMinutaId(pf.data) === minutaId)) {
+      toast({ variant: "destructive", title: "Minuta já adicionada na lista" });
+      return;
+    }
+
+    setParsedFiles((prev) => [
+      ...prev,
+      {
+        fileName: `Manual - minuta ${numeroMinuta}`,
+        data: parsed,
+        status: "success",
+        nfNumero: nfMatch.numero_nf,
+        nfId: nfMatch.id,
+      },
+    ]);
+    setManualForm(emptyManualForm);
   }
 
   const handleDrop = useCallback(
