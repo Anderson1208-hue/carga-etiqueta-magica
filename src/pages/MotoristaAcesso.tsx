@@ -67,9 +67,19 @@ function VeiculoGpsBackground({ monitoramentoRotaId }: { monitoramentoRotaId: st
   return null;
 }
 
+const STORAGE_CODE_KEY = "motorista-last-access-code";
+
 export default function MotoristaAcesso() {
   const { toast } = useToast();
-  const [code, setCode] = useState("");
+  // Reidrata o código já no estado inicial, para que se o Android matar a
+  // WebView durante a tela bloqueada, ao voltar não exija digitar de novo.
+  const [code, setCode] = useState(() => {
+    try {
+      return (localStorage.getItem(STORAGE_CODE_KEY) || "").toUpperCase().slice(0, 6);
+    } catch {
+      return "";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -84,6 +94,13 @@ export default function MotoristaAcesso() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [rehydrating, setRehydrating] = useState<boolean>(() => {
+    try {
+      return (localStorage.getItem(STORAGE_CODE_KEY) || "").length === 6;
+    } catch {
+      return false;
+    }
+  });
 
   // GPS / wake-lock SÓ depois do código de 6 dígitos validado (veiculo != null).
   // Antes disso nenhum hook nativo é montado — assim, qualquer falha do plugin
