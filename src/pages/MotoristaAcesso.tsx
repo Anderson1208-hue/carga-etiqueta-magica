@@ -509,6 +509,12 @@ export default function MotoristaAcesso() {
               size="sm"
               className="text-primary-foreground hover:text-primary-foreground/80"
               onClick={() => {
+                try {
+                  localStorage.removeItem(STORAGE_CODE_KEY);
+                  localStorage.removeItem("motorista-last-rota-id");
+                } catch {
+                  /* ignore */
+                }
                 setVeiculo(null);
                 setNfs([]);
                 setMonitoramentoRotaId(null);
