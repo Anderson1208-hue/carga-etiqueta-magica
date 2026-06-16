@@ -82,8 +82,11 @@ Deno.serve(async (req) => {
                 text: `Extraia os dados desta minuta de transporte (arquivo: ${fileName || "minuta.pdf"}).`,
               },
               {
-                type: "image_url",
-                image_url: { url: `data:application/pdf;base64,${pdfBase64}` },
+                type: "file",
+                file: {
+                  filename: fileName || "minuta.pdf",
+                  file_data: `data:application/pdf;base64,${pdfBase64}`,
+                },
               },
             ],
           },
