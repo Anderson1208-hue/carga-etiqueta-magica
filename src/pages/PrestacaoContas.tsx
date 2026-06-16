@@ -613,7 +613,7 @@ export default function PrestacaoContas() {
                             {baixas.map((b) => {
                               const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
                               return (
-                                <TableRow key={b.id} className="[&>*]:py-1.5 [&>*]:px-2">
+                                <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
                                   <TableCell className="font-mono text-[11px] whitespace-nowrap">{b.nf?.numero_nf || "—"}</TableCell>
                                   <TableCell className="max-w-[160px]">
                                     <p className="truncate font-medium text-xs">{b.nf?.dest_razao_social || "—"}</p>
