@@ -595,167 +595,179 @@ export default function PrestacaoContas() {
                         <p className="text-sm text-muted-foreground p-4">Nenhuma baixa registrada para este veículo.</p>
                       ) : (
                         <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-16">NF</TableHead>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Ocorrência</TableHead>
-                                <TableHead>Recebedor</TableHead>
-                                <TableHead>IA</TableHead>
-                                <TableHead>Foto</TableHead>
-                                <TableHead>GPS</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Ações</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {baixas.map((b) => {
-                                const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
-                                return (
-                                  <TableRow key={b.id} className={
-                                    b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" :
-                                    b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""
-                                  }>
-                                    <TableCell className="font-mono text-xs">{b.nf?.numero_nf || "—"}</TableCell>
-                                    <TableCell className="max-w-[200px]">
-                                      <p className="truncate font-medium text-sm">{b.nf?.dest_razao_social || "—"}</p>
-                                      <p className="text-xs text-muted-foreground truncate">{b.nf?.dest_cidade}/{b.nf?.dest_uf}</p>
-                                    </TableCell>
-                                    <TableCell><Badge variant="outline">{ocLabel}</Badge></TableCell>
-                                    <TableCell className="text-sm">{b.recebedor_nome || "—"}</TableCell>
-                                    <TableCell>
-                                      {b.validacao_status ? (
-                                        <div className="flex items-center gap-1">
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Badge variant={b.validacao_status === "ok" ? "default" : b.validacao_status === "alerta" ? "secondary" : "destructive"}>
-                                                {b.validacao_score ?? "?"}
-                                                {b.validacao_problemas?.nf_match === "divergente" && " ⚠NF"}
-                                              </Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent className="max-w-xs">
-                                              <p className="font-semibold capitalize">{b.validacao_status}</p>
-                                              {b.validacao_problemas?.nf_match === "divergente" && (
-                                                <p className="text-xs mt-1 font-semibold text-destructive">
-                                                  NF do canhoto: {b.validacao_problemas.numero_nf_detectado} ≠ esperado {b.validacao_problemas.numero_nf_esperado}
-                                                </p>
-                                              )}
-                                              {b.validacao_problemas?.lista?.length ? (
-                                                <ul className="list-disc pl-4 text-xs mt-1">
-                                                  {b.validacao_problemas.lista.map((p, i) => <li key={i}>{p}</li>)}
-                                                </ul>
-                                              ) : null}
-                                              {b.validacao_problemas?.observacoes && (
-                                                <p className="text-xs mt-1">{b.validacao_problemas.observacoes}</p>
-                                              )}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                          {b.validacao_status === "ruim" && (b.validacao_score ?? 100) < 50 && (
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                                  disabled={!!veiculoSel.prestacao_contas_em}
-                                                  onClick={() => solicitarNovaFoto(b)}
-                                                >
-                                                  <X className="w-4 h-4" />
-                                                </Button>
-                                              </TooltipTrigger>
-                                              <TooltipContent>Excluir foto e pedir nova ao motorista</TooltipContent>
-                                            </Tooltip>
-                                          )}
-                                        </div>
-                                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                                    </TableCell>
-                                    <TableCell>
-                                      {b.foto_path ? (
-                                        <div className="flex items-center gap-1">
-                                          <Button size="sm" variant="ghost" onClick={() => verFoto(b.foto_path!)}>
-                                            <ImageIcon className="w-4 h-4" />
-                                          </Button>
+                        <Table className="text-xs">
+                          <TableHeader>
+                            <TableRow className="[&>*]:py-1.5 [&>*]:px-2">
+                              <TableHead className="w-12">NF</TableHead>
+                              <TableHead>Cliente</TableHead>
+                              <TableHead>Ocorr.</TableHead>
+                              <TableHead>Recebedor</TableHead>
+                              <TableHead>IA</TableHead>
+                              <TableHead>Foto</TableHead>
+                              <TableHead>GPS</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right w-24">Ações</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {baixas.map((b) => {
+                              const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
+                              return (
+                                <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
+                                  <TableCell className="font-mono text-[11px] whitespace-nowrap">{b.nf?.numero_nf || "—"}</TableCell>
+                                  <TableCell className="max-w-[160px]">
+                                    <p className="truncate font-medium text-xs">{b.nf?.dest_razao_social || "—"}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate">{b.nf?.dest_cidade}/{b.nf?.dest_uf}</p>
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap"><Badge variant="outline" className="text-[11px] px-1 py-0 h-5">{ocLabel}</Badge></TableCell>
+                                  <TableCell className="text-xs truncate max-w-[100px]">{b.recebedor_nome || "—"}</TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {b.validacao_status ? (
+                                      <div className="flex items-center gap-1">
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Badge variant={b.validacao_status === "ok" ? "default" : b.validacao_status === "alerta" ? "secondary" : "destructive"} className="text-[11px] px-1 py-0 h-5">
+                                              {b.validacao_score ?? "?"}
+                                              {b.validacao_problemas?.nf_match === "divergente" && " ⚠NF"}
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="max-w-xs">
+                                            <p className="font-semibold capitalize">{b.validacao_status}</p>
+                                            {b.validacao_problemas?.nf_match === "divergente" && (
+                                              <p className="text-xs mt-1 font-semibold text-destructive">
+                                                NF do canhoto: {b.validacao_problemas.numero_nf_detectado} ≠ esperado {b.validacao_problemas.numero_nf_esperado}
+                                              </p>
+                                            )}
+                                            {b.validacao_problemas?.lista?.length ? (
+                                              <ul className="list-disc pl-4 text-xs mt-1">
+                                                {b.validacao_problemas.lista.map((p, i) => <li key={i}>{p}</li>)}
+                                              </ul>
+                                            ) : null}
+                                            {b.validacao_problemas?.observacoes && (
+                                              <p className="text-xs mt-1">{b.validacao_problemas.observacoes}</p>
+                                            )}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                        {b.validacao_status === "ruim" && (b.validacao_score ?? 100) < 50 && (
                                           <Tooltip>
                                             <TooltipTrigger asChild>
                                               <Button
-                                                size="sm"
+                                                size="icon"
                                                 variant="ghost"
-                                                className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                                className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
                                                 disabled={!!veiculoSel.prestacao_contas_em}
                                                 onClick={() => solicitarNovaFoto(b)}
                                               >
-                                                <X className="w-4 h-4" />
+                                                <X className="w-3.5 h-3.5" />
                                               </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>Excluir foto e pedir nova ao motorista</TooltipContent>
                                           </Tooltip>
-                                        </div>
-                                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                                    </TableCell>
-                                    <TableCell>
-                                      {b.latitude && b.longitude ? (
-                                        <a
-                                          href={`https://www.google.com/maps?q=${b.latitude},${b.longitude}`}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-primary hover:underline"
-                                        >
-                                          <MapPin className="w-4 h-4" />
-                                        </a>
-                                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                                    </TableCell>
-                                    <TableCell>
-                                      {b.conferencia_status === "ok" ? (
-                                        <Badge className="gap-1 bg-green-600 hover:bg-green-700"><CheckCircle2 className="w-3 h-3" /> OK</Badge>
-                                      ) : b.conferencia_status === "pendencia" ? (
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" /> Pendência</Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent>{b.conferencia_motivo}</TooltipContent>
-                                        </Tooltip>
-                                      ) : (
-                                        <Badge variant="outline">A conferir</Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right whitespace-nowrap">
-                                      <div className="flex gap-1 justify-end items-center">
-                                        {b.conferencia_status ? (
-                                          <Button size="sm" variant="ghost" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
-                                            Reabrir
-                                          </Button>
-                                        ) : (
-                                          <>
-                                            <Button size="sm" variant="default" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
-                                              <CheckCircle2 className="w-4 h-4 mr-1" /> OK
-                                            </Button>
-                                            <Button size="sm" variant="destructive" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
-                                              <AlertTriangle className="w-4 h-4" />
-                                            </Button>
-                                          </>
                                         )}
+                                      </div>
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {b.foto_path ? (
+                                      <div className="flex items-center gap-1">
+                                        <Button size="icon" variant="ghost" className="h-6 w-6 p-0" onClick={() => verFoto(b.foto_path!)}>
+                                          <ImageIcon className="w-3.5 h-3.5" />
+                                        </Button>
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             <Button
-                                              size="sm"
-                                              variant="outline"
-                                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                              size="icon"
+                                              variant="ghost"
+                                              className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
                                               disabled={!!veiculoSel.prestacao_contas_em}
-                                              onClick={() => desfazerBaixa(b)}
+                                              onClick={() => solicitarNovaFoto(b)}
                                             >
-                                              <Undo2 className="w-4 h-4" />
+                                              <X className="w-3.5 h-3.5" />
                                             </Button>
                                           </TooltipTrigger>
-                                          <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
+                                          <TooltipContent>Excluir foto e pedir nova ao motorista</TooltipContent>
                                         </Tooltip>
                                       </div>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {b.latitude && b.longitude ? (
+                                      <a
+                                        href={`https://www.google.com/maps?q=${b.latitude},${b.longitude}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline"
+                                      >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                      </a>
+                                    ) : <span className="text-muted-foreground">—</span>}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {b.conferencia_status === "ok" ? (
+                                      <Badge className="gap-1 bg-green-600 hover:bg-green-700 text-[11px] px-1 py-0 h-5"><CheckCircle2 className="w-3 h-3" /> OK</Badge>
+                                    ) : b.conferencia_status === "pendencia" ? (
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Badge variant="destructive" className="gap-1 text-[11px] px-1 py-0 h-5"><AlertTriangle className="w-3 h-3" /> Pend.</Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>{b.conferencia_motivo}</TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[11px] px-1 py-0 h-5">A conferir</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right whitespace-nowrap">
+                                    <div className="flex gap-0.5 justify-end items-center">
+                                      {b.conferencia_status ? (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 p-0" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => reabrirConferencia(b)}>
+                                              <Undo2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Reabrir conferência</TooltipContent>
+                                        </Tooltip>
+                                      ) : (
+                                        <>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button size="icon" variant="default" className="h-6 w-6 p-0" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => marcarConferido(b)}>
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Conferir OK</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button size="icon" variant="destructive" className="h-6 w-6 p-0" disabled={!!veiculoSel.prestacao_contas_em} onClick={() => setPendDialog({ baixa: b, motivo: "" })}>
+                                                <AlertTriangle className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Registrar pendência</TooltipContent>
+                                          </Tooltip>
+                                        </>
+                                      )}
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            size="icon"
+                                            variant="outline"
+                                            className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                            disabled={!!veiculoSel.prestacao_contas_em}
+                                            onClick={() => desfazerBaixa(b)}
+                                          >
+                                            <Undo2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
                         </div>
                       )}
                     </CardContent>
