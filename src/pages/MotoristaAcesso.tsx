@@ -67,9 +67,19 @@ function VeiculoGpsBackground({ monitoramentoRotaId }: { monitoramentoRotaId: st
   return null;
 }
 
+const STORAGE_CODE_KEY = "motorista-last-access-code";
+
 export default function MotoristaAcesso() {
   const { toast } = useToast();
-  const [code, setCode] = useState("");
+  // Reidrata o código já no estado inicial, para que se o Android matar a
+  // WebView durante a tela bloqueada, ao voltar não exija digitar de novo.
+  const [code, setCode] = useState(() => {
+    try {
+      return (localStorage.getItem(STORAGE_CODE_KEY) || "").toUpperCase().slice(0, 6);
+    } catch {
+      return "";
+    }
+  });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -84,11 +94,78 @@ export default function MotoristaAcesso() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+  const [rehydrating, setRehydrating] = useState<boolean>(() => {
+    try {
+      return (localStorage.getItem(STORAGE_CODE_KEY) || "").length === 6;
+    } catch {
+      return false;
+    }
+  });
 
   // GPS / wake-lock SÓ depois do código de 6 dígitos validado (veiculo != null).
   // Antes disso nenhum hook nativo é montado — assim, qualquer falha do plugin
   // (licença Transistorsoft, permissões, FS) NÃO derruba a tela de acesso.
   useLockPortrait();
+
+  // Reidratação automática: após bloqueio de tela / app em background, o Android
+  // pode destruir a WebView. Se temos código salvo, restauramos a sessão sem
+  // exigir que o motorista digite o código novamente.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function rehydrate() {
+      let saved = "";
+      try {
+        saved = (localStorage.getItem(STORAGE_CODE_KEY) || "").toUpperCase().slice(0, 6);
+      } catch {
+        saved = "";
+      }
+      if (saved.length !== 6) {
+        setRehydrating(false);
+        return;
+      }
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code: saved },
+        });
+        if (cancelled) return;
+        if (!fnError && !data?.error && data?.veiculo) {
+          setCode(saved);
+          setVeiculo(data.veiculo);
+          setNfs(data.nfs || []);
+          setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
+        }
+      } catch {
+        /* offline / sem rede – mantém tela atual */
+      } finally {
+        if (!cancelled) setRehydrating(false);
+      }
+    }
+
+    // Roda no mount
+    rehydrate();
+
+    // Roda quando o app volta do background (desbloqueio de tela)
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      // Só reidrata se ainda não temos veículo carregado nesta sessão
+      setVeiculo((current) => {
+        if (!current) rehydrate();
+        return current;
+      });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
   // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
@@ -346,6 +423,18 @@ export default function MotoristaAcesso() {
     return parts.join(", ") || "Endereço não informado";
   }
 
+  // Enquanto reidratamos a sessão (após bloqueio de tela), evita piscar o form.
+  if (!veiculo && rehydrating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p className="text-sm">Reconectando...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Not logged in view - just the access code form
   if (!veiculo) {
     return (
@@ -432,6 +521,12 @@ export default function MotoristaAcesso() {
               size="sm"
               className="text-primary-foreground hover:text-primary-foreground/80"
               onClick={() => {
+                try {
+                  localStorage.removeItem(STORAGE_CODE_KEY);
+                  localStorage.removeItem("motorista-last-rota-id");
+                } catch {
+                  /* ignore */
+                }
                 setVeiculo(null);
                 setNfs([]);
                 setMonitoramentoRotaId(null);
