@@ -107,6 +107,66 @@ export default function MotoristaAcesso() {
   // (licença Transistorsoft, permissões, FS) NÃO derruba a tela de acesso.
   useLockPortrait();
 
+  // Reidratação automática: após bloqueio de tela / app em background, o Android
+  // pode destruir a WebView. Se temos código salvo, restauramos a sessão sem
+  // exigir que o motorista digite o código novamente.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function rehydrate() {
+      let saved = "";
+      try {
+        saved = (localStorage.getItem(STORAGE_CODE_KEY) || "").toUpperCase().slice(0, 6);
+      } catch {
+        saved = "";
+      }
+      if (saved.length !== 6) {
+        setRehydrating(false);
+        return;
+      }
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("motorista-acesso", {
+          body: { code: saved },
+        });
+        if (cancelled) return;
+        if (!fnError && !data?.error && data?.veiculo) {
+          setCode(saved);
+          setVeiculo(data.veiculo);
+          setNfs(data.nfs || []);
+          setMonitoramentoRotaId(data.monitoramento_rota_id ?? null);
+        }
+      } catch {
+        /* offline / sem rede – mantém tela atual */
+      } finally {
+        if (!cancelled) setRehydrating(false);
+      }
+    }
+
+    // Roda no mount
+    rehydrate();
+
+    // Roda quando o app volta do background (desbloqueio de tela)
+    function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      // Só reidrata se ainda não temos veículo carregado nesta sessão
+      setVeiculo((current) => {
+        if (!current) rehydrate();
+        return current;
+      });
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
+
   // Auto-refresh: se o motorista entrou no app antes da rota ser criada na Torre,
   // o monitoramento_rota_id chega como null e o GPS nunca inicia. Aqui ficamos
   // consultando a cada 20s até a rota aparecer no backend.
