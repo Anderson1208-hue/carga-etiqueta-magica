@@ -423,6 +423,18 @@ export default function MotoristaAcesso() {
     return parts.join(", ") || "Endereço não informado";
   }
 
+  // Enquanto reidratamos a sessão (após bloqueio de tela), evita piscar o form.
+  if (!veiculo && rehydrating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p className="text-sm">Reconectando...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Not logged in view - just the access code form
   if (!veiculo) {
     return (
