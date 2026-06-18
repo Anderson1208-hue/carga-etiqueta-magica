@@ -67,6 +67,20 @@ const config: CapacitorConfig = {
     // minutos em segundo plano no Android/WebView.
     useLegacyBridge: true,
   },
+  // iOS preparado mas NÃO buildado ainda. Mesma licença Transistorsoft cobre
+  // iOS pelo mesmo bundleId (com.orkestria.driver / .staging / .homolog) sem
+  // custo adicional. Quando/se decidir lançar no iPhone:
+  //   1. npx cap add ios   (precisa de Mac + Xcode)
+  //   2. abrir Info.plist e adicionar NSLocationAlwaysAndWhenInUseUsageDescription
+  //      + NSLocationWhenInUseUsageDescription + UIBackgroundModes (location, fetch)
+  //   3. configurar conta Apple Developer (US$ 99/ano) e provisioning profile
+  // Por ora, só deixa o contentInset reservado para evitar quebra de layout em
+  // notch quando alguém rodar `npx cap run ios` no futuro.
+  ios: {
+    contentInset: 'always',
+    limitsNavigationsToAppBoundDomains: false,
+  },
+
   plugins: {
     // Em background, Android pode limitar HTTP iniciado pelo WebView após ~5min.
     // Habilita o fetch/XHR nativo do Capacitor para o worker da fila GPS continuar
