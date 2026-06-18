@@ -614,6 +614,12 @@ export default function ConsultaNF() {
                   {selectedNf.chave_acesso}
                 </p>
               </div>
+                </TabsContent>
+
+                <TabsContent value="timeline" className="mt-0">
+                  <HistoricoNFTimeline nfId={selectedNf.id} />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         )}
