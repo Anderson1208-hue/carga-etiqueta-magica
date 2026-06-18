@@ -321,14 +321,6 @@ export default function ConsultaNF() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHistoricoNf({ id: selectedNf.id, numero: selectedNf.numero_nf })}
-                >
-                  <History className="w-4 h-4 mr-2" />
-                  Histórico
-                </Button>
-                <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => handleGerarPdf(selectedNf)}
@@ -346,7 +338,18 @@ export default function ConsultaNF() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
+              <Tabs defaultValue="detalhes" className="w-full">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="detalhes">
+                    <FileText className="w-4 h-4 mr-2" /> Detalhes
+                  </TabsTrigger>
+                  <TabsTrigger value="timeline">
+                    <History className="w-4 h-4 mr-2" /> Linha do tempo
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="detalhes" className="space-y-6 mt-0">
               {/* Status & Carga */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
