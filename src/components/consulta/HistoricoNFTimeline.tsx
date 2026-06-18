@@ -183,41 +183,68 @@ export function HistoricoNFTimeline({ nfId, showActions = true }: Props) {
         </p>
       ) : (
         <ol className="relative border-l border-border ml-3 py-2 space-y-4">
-          {eventos.map((ev) => {
-            const meta = TIPO_META[ev.tipo] || {
-              label: ev.tipo,
-              icon: FileText,
-              color: "bg-muted-foreground",
-            };
-            const Icon = meta.icon;
-            return (
-              <li key={ev.id} className="ml-4">
-                <span
-                  className={`absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full ${meta.color} text-white`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                </span>
-                <div className="bg-card border rounded-md p-3 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium text-sm">{meta.label}</p>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      {fmt(ev.ocorrido_em)}
-                    </Badge>
+          {(() => {
+            // Agrupa eventos consecutivos de conferência (interna/externa) em um único item
+            const groups: Array<{ key: string; tipo: string; items: NfEvento[] }> = [];
+            for (const ev of eventos) {
+              const agrupavel = ev.tipo === "conferencia_interna" || ev.tipo === "conferencia_externa";
+              const last = groups[groups.length - 1];
+              if (agrupavel && last && last.tipo === ev.tipo) {
+                last.items.push(ev);
+              } else {
+                groups.push({ key: ev.id, tipo: ev.tipo, items: [ev] });
+              }
+            }
+
+            return groups.map((g) => {
+              const meta = TIPO_META[g.tipo] || {
+                label: g.tipo,
+                icon: FileText,
+                color: "bg-muted-foreground",
+              };
+              const Icon = meta.icon;
+              const isAgrupado = g.items.length > 1;
+              const primeiro = g.items[0];
+              const ultimo = g.items[g.items.length - 1];
+
+              return (
+                <li key={g.key} className="ml-4">
+                  <span
+                    className={`absolute -left-3 flex items-center justify-center w-6 h-6 rounded-full ${meta.color} text-white`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
+                  <div className="bg-card border rounded-md p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-sm">
+                        {meta.label}
+                        {isAgrupado && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            · {g.items.length} etiquetas
+                          </span>
+                        )}
+                      </p>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {isAgrupado
+                          ? `${fmt(primeiro.ocorrido_em)} → ${fmt(ultimo.ocorrido_em)}`
+                          : fmt(primeiro.ocorrido_em)}
+                      </Badge>
+                    </div>
+                    {!isAgrupado && renderDetalhe(primeiro) && (
+                      <p className="text-xs text-muted-foreground mt-1">{renderDetalhe(primeiro)}</p>
+                    )}
+                    {(primeiro.ator_nome || primeiro.origem === "manual" || primeiro.origem === "backfill") && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {primeiro.ator_nome ? `por ${primeiro.ator_nome}` : ""}
+                        {primeiro.origem === "manual" ? " · manual" : ""}
+                        {primeiro.origem === "backfill" ? " · histórico" : ""}
+                      </p>
+                    )}
                   </div>
-                  {renderDetalhe(ev) && (
-                    <p className="text-xs text-muted-foreground mt-1">{renderDetalhe(ev)}</p>
-                  )}
-                  {(ev.ator_nome || ev.origem === "manual" || ev.origem === "backfill") && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {ev.ator_nome ? `por ${ev.ator_nome}` : ""}
-                      {ev.origem === "manual" ? " · manual" : ""}
-                      {ev.origem === "backfill" ? " · histórico" : ""}
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
+                </li>
+              );
+            });
+          })()}
         </ol>
       )}
     </div>
