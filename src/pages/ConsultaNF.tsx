@@ -27,6 +27,8 @@ import {
   History,
 } from "lucide-react";
 import { HistoricoNFDialog } from "@/components/consulta/HistoricoNFDialog";
+import { HistoricoNFTimeline } from "@/components/consulta/HistoricoNFTimeline";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
