@@ -139,7 +139,7 @@ export async function ensureTransistorGpsReady(
     // Cast: `locationTemplate` e `extras` são keys de root da Config do
     // plugin (documentadas em transistorsoft/background-geolocation) mas
     // não estão expostas no .d.ts da versão Capacitor. Runtime aceita.
-    const state = await plugin.ready({
+    const readyConfig = {
       reset: true,
       locationTemplate:
         '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
@@ -158,9 +158,6 @@ export async function ensureTransistorGpsReady(
       },
       http: {
         url: GPS_ENDPOINT,
-        // O backend `processar-gps` espera os campos no corpo raiz.
-        // O padrão do Transistorsoft é encapsular em `{ location: ... }`,
-        // o que faz o endpoint recusar como "Dados incompletos".
         rootProperty: ".",
         autoSync: true,
         batchSync: false,
@@ -194,7 +191,9 @@ export async function ensureTransistorGpsReady(
         },
       },
       logger: { debug: false, logLevel: 3 },
-    });
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = await plugin.ready(readyConfig as any);
     markError(`[transistor] ready:ok enabled=${state.enabled} trackingMode=${state.trackingMode}`);
     markNativeReady({ enabled: state.enabled });
     markNativeState({
