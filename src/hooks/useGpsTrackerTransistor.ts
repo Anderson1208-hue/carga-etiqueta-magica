@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
+  markEnqueue,
   markNativeDriver,
   markNativeHttp,
   markNativeLocation,
@@ -11,6 +12,7 @@ import {
   markNativeState,
   markError,
 } from "@/lib/gpsTelemetry";
+import { enqueue as enqueueGpsPoint } from "@/lib/gpsQueue";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 nested config).
