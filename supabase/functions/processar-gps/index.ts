@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
     const positions: GpsPosition[] = batch && batch.length > 0
       ? batch
       : [{
-          latitude,
-          longitude,
+          latitude: latitude as number,
+          longitude: longitude as number,
           accuracy,
           timestamp: clientTs || new Date().toISOString(),
           heartbeat: !!heartbeatFlag,
