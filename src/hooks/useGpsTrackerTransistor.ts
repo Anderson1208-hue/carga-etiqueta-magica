@@ -105,6 +105,7 @@ export async function ensureTransistorGpsReady(
     return;
   }
   readyPromise = (async () => {
+    markError("[transistor] ensure:start");
     const plugin = await loadPlugin();
     if (!plugin) throw new Error("Plugin Transistorsoft indisponível");
 
@@ -116,16 +117,33 @@ export async function ensureTransistorGpsReady(
       notificationConfigured: true,
       backgroundPermissionRationale: BACKGROUND_PERMISSION_RATIONALE,
     });
+    markError("[transistor] ensure:driver-marked");
 
     try {
+      markError("[transistor] getProviderState:start (pre-ready)");
       const provider = await plugin.getProviderState();
       markNativeProvider(provider);
+      markError("[transistor] getProviderState:ok (pre-ready)");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.warn("[GPS Transistor] getProviderState antes do ready falhou:", err);
+      markError(`[transistor] getProviderState:falhou ${msg}`);
     }
 
+    // IMPORTANTE: Transistorsoft v9 NÃO tem grupo `persistence` na config.
+    // `locationTemplate` e `extras` são keys de NÍVEL RAIZ. Aninhar dentro
+    // de `persistence` faz a validação do plugin recusar `ready()` em
+    // silêncio (a promise nunca resolve em algumas builds), o que explica
+    // o travamento observado após loadPlugin:ok.
+    markError("[transistor] ready:start");
     const state = await plugin.ready({
       reset: true,
+      locationTemplate:
+        '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
+        '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+        '"accuracy":<%= accuracy %>,"heartbeat":false,' +
+        `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
+      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
       geolocation: {
         desiredAccuracy: -1, // High
         distanceFilter,
@@ -172,16 +190,9 @@ export async function ensureTransistorGpsReady(
           channelName: "Rastreamento GPS",
         },
       },
-      persistence: {
-        locationTemplate:
-          '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-          '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
-          '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-          `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
-        extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
-      },
       logger: { debug: false, logLevel: 3 },
     });
+    markError(`[transistor] ready:ok enabled=${state.enabled} trackingMode=${state.trackingMode}`);
     markNativeReady({ enabled: state.enabled });
     markNativeState({
       enabled: state.enabled,
@@ -191,15 +202,29 @@ export async function ensureTransistorGpsReady(
       pendingLocations: await plugin.getCount().catch(() => null),
     });
 
-    const status = await plugin.requestPermission();
-    markNativeRequestPermission({ status });
+    try {
+      markError("[transistor] requestPermission:start");
+      const status = await plugin.requestPermission();
+      markNativeRequestPermission({ status });
+      markError(`[transistor] requestPermission:ok status=${status}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markNativeRequestPermission({ status: null, error: msg });
+      markError(`[transistor] requestPermission:falhou ${msg}`);
+    }
 
-    const provider = await plugin.getProviderState();
-    markNativeProvider(provider);
+    try {
+      const provider = await plugin.getProviderState();
+      markNativeProvider(provider);
+      markError(`[transistor] getProviderState:ok enabled=${provider.enabled} gps=${provider.gps} status=${provider.status}`);
+    } catch (err) {
+      markError(`[transistor] getProviderState:falhou(post-ready) ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     if (monitoramentoRotaId) {
       await forceNativePosition(monitoramentoRotaId, "ready-initial-position");
     }
+    markError("[transistor] ensure:done");
   })();
 
   try {
