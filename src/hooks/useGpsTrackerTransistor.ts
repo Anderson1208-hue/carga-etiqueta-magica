@@ -234,6 +234,18 @@ export function useGpsTrackerTransistor({
     if (!Capacitor.isNativePlatform()) return;
     if (!enabled) return;
 
+    // Sinaliza imediatamente que o hook efetivamente montou com enabled=true.
+    // Sem isso, "Driver ativo: desconhecido" não distingue "efeito não rodou"
+    // de "plugin não carregou".
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: "transistor-effect-mounted",
+      httpUrlConfigured: !!GPS_ENDPOINT,
+      httpAutoSync: true,
+      notificationConfigured: true,
+      backgroundPermissionRationale: BACKGROUND_PERMISSION_RATIONALE,
+    });
+
     let cancelled = false;
 
     (async () => {
