@@ -95,6 +95,15 @@ const READY_TIMEOUT_MS = 45_000;
 
 let readyPromise: Promise<void> | null = null;
 
+function buildNativeLocationTemplate(): string {
+  return (
+    '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
+    '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+    '"accuracy":<%= accuracy %>,"heartbeat":false,' +
+    `"timestamp":"<%= timestamp %>","client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`
+  );
+}
+
 function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeout = new Promise<never>((_, reject) => {
@@ -168,23 +177,10 @@ export async function ensureTransistorGpsReady(
     // diálogo do sistema de forma determinística quando a rota ativa monta.
     await requestNativeLocationPermission(plugin, "pre-ready");
 
-    // IMPORTANTE: Transistorsoft v9 NÃO tem grupo `persistence` na config.
-    // `locationTemplate` e `extras` são keys de NÍVEL RAIZ. Aninhar dentro
-    // de `persistence` faz a validação do plugin recusar `ready()` em
-    // silêncio (a promise nunca resolve em algumas builds), o que explica
-    // o travamento observado após loadPlugin:ok.
     markError("[transistor] ready:start");
-    // Cast: `locationTemplate` e `extras` são keys de root da Config do
-    // plugin (documentadas em transistorsoft/background-geolocation) mas
-    // não estão expostas no .d.ts da versão Capacitor. Runtime aceita.
+    const locationTemplate = buildNativeLocationTemplate();
     const readyConfig = {
       reset: true,
-      locationTemplate:
-        '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-        '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
-        '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-        `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
-      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
       geolocation: {
         desiredAccuracy: -1, // High
         distanceFilter,
@@ -196,8 +192,6 @@ export async function ensureTransistorGpsReady(
         // Sem isso o plugin entra em "stationary" e para de emitir locations.
         disableStopDetection: true,
         pausesLocationUpdatesAutomatically: false,
-        preventSuspend: true,
-        isMoving: true,
       },
       http: {
         url: GPS_ENDPOINT,
@@ -215,11 +209,20 @@ export async function ensureTransistorGpsReady(
           "Content-Type": "application/json",
         },
       },
+      persistence: {
+        // v9: template e extras ficam em persistence. No APK anterior estavam
+        // no root e eram ignorados; por isso o HTTP nativo não enviava payload
+        // aceito pelo backend quando a WebView ficava em segundo plano.
+        locationTemplate,
+        extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
+        persistMode: 1,
+      },
       app: {
         stopOnTerminate: false,
         startOnBoot: true,
         enableHeadless: true,
         heartbeatInterval: 60,
+        preventSuspend: true,
         backgroundPermissionRationale: {
           title: "Localização em segundo plano",
           message: BACKGROUND_PERMISSION_RATIONALE,
@@ -283,7 +286,11 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   if (!plugin) return;
   try {
     await plugin.setConfig({
-      extras: { monitoramento_rota_id: monitoramentoRotaId },
+      persistence: {
+        locationTemplate: buildNativeLocationTemplate(),
+        extras: { monitoramento_rota_id: monitoramentoRotaId },
+        persistMode: 1,
+      },
       http: { params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE } },
     } as any);
     markNativeDriver({
