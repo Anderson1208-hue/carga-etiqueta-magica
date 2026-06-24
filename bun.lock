@@ -50,6 +50,7 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@supabase/supabase-js": "^2.93.3",
         "@tanstack/react-query": "^5.83.0",
+        "@transistorsoft/capacitor-background-geolocation": "^9.1.1",
         "@types/leaflet": "^1.9.21",
         "@types/qrcode": "^1.5.6",
         "@yudiel/react-qr-scanner": "^2.5.1",
@@ -491,6 +492,10 @@
     "@testing-library/jest-dom": ["@testing-library/jest-dom@6.9.1", "", { "dependencies": { "@adobe/css-tools": "^4.4.0", "aria-query": "^5.0.0", "css.escape": "^1.5.1", "dom-accessibility-api": "^0.6.3", "picocolors": "^1.1.1", "redent": "^3.0.0" } }, "sha512-zIcONa+hVtVSSep9UT3jZ5rizo2BsxgyDYU7WFD5eICBE7no3881HGeb/QkGfsJs6JTkY1aQhT7rIPC7e+0nnA=="],
 
     "@testing-library/react": ["@testing-library/react@16.3.2", "", { "dependencies": { "@babel/runtime": "^7.12.5" }, "peerDependencies": { "@types/react": "^18.0.0 || ^19.0.0", "@types/react-dom": "^18.0.0 || ^19.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" } }, "sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g=="],
+
+    "@transistorsoft/background-geolocation-types": ["@transistorsoft/background-geolocation-types@5.2.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/background-geolocation-types/-/background-geolocation-types-5.2.0.tgz", {}, "sha512-X1cZ85eM1OMhQVo4BOEZIXHGkpnxF+MCSnL34OC/lZzIDDeq0+78NAQlK2Aa0RQWPK4CEi7D81OhQY2gskJ9+A=="],
+
+    "@transistorsoft/capacitor-background-geolocation": ["@transistorsoft/capacitor-background-geolocation@9.1.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@transistorsoft/capacitor-background-geolocation/-/capacitor-background-geolocation-9.1.1.tgz", { "dependencies": { "@transistorsoft/background-geolocation-types": "^5.1.0", "tslib": "^2.8.1" }, "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-gTDLvJU4IfL//SwYzm2zjmMb/DtXvTvYEF2O1xR6JU8hsZO/OIqt6SYxOVtHtF+dJTPXw/FSjJkimgsQsU+Aew=="],
 
     "@types/chai": ["@types/chai@5.2.3", "", { "dependencies": { "@types/deep-eql": "*", "assertion-error": "^2.0.1" } }, "sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA=="],
 
