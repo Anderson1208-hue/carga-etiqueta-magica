@@ -15,7 +15,7 @@ import {
 import { enqueue as enqueueGpsPoint } from "@/lib/gpsQueue";
 
 /**
- * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 nested config).
+ * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 grouped config).
  *
  * Por que esse plugin:
  * - Mantém GPS com tela bloqueada, Doze Mode e fabricantes agressivos.
@@ -179,63 +179,77 @@ export async function ensureTransistorGpsReady(
 
     markError("[transistor] ready:start");
     const locationTemplate = buildNativeLocationTemplate();
-    // IMPORTANTE: Config do Transistorsoft é FLAT. Não existem grupos
-    // `geolocation`, `http`, `app`, `persistence`. Qualquer coisa aninhada
-    // nesses objetos é silenciosamente ignorada pelo plugin (motivo do HTTP
-    // nativo nunca disparar e do plugin parar em segundo plano nos APKs
-    // anteriores).
+    // IMPORTANTE: Config v9 do Transistorsoft é AGRUPADA. As opções legacy
+    // flat são ignoradas ou mapeadas de forma parcial. Sem `geolocation` e
+    // `activity`, o SDK entra em stationary (`isMoving=false`) e só volta a
+    // emitir quando a WebView reaparece em foreground.
     const readyConfig = {
       reset: true,
-      // --- Geolocation
-      desiredAccuracy: -1, // High
-      distanceFilter,
-      locationUpdateInterval: 60_000,
-      fastestLocationUpdateInterval: 30_000,
-      allowIdenticalLocations: true,
-      locationAuthorizationRequest: "Always",
-      stopTimeout: 5,
-      disableStopDetection: true,
-      pausesLocationUpdatesAutomatically: false,
-      // --- HTTP
-      url: GPS_ENDPOINT,
-      autoSync: true,
-      batchSync: false,
-      maxBatchSize: 1,
-      method: "POST",
-      httpRootProperty: ".",
-      locationTemplate,
-      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
-      persistMode: 1,
-      params: monitoramentoRotaId
-        ? { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE }
-        : { source: NATIVE_SOURCE },
-      headers: {
-        Authorization: `Bearer ${SUPABASE_ANON}`,
-        apikey: SUPABASE_ANON,
-        "Content-Type": "application/json",
+      geolocation: {
+        desiredAccuracy: -1, // DesiredAccuracy.High
+        distanceFilter,
+        stationaryRadius: 1,
+        locationUpdateInterval: 60_000,
+        fastestLocationUpdateInterval: 30_000,
+        allowIdenticalLocations: true,
+        locationAuthorizationRequest: "Always",
+        stopTimeout: 1,
+        stopOnStationary: false,
+        disableStopDetection: true,
+        disableElasticity: true,
+        pausesLocationUpdatesAutomatically: false,
       },
-      // --- App / background
-      stopOnTerminate: false,
-      startOnBoot: true,
-      enableHeadless: true,
-      heartbeatInterval: 60,
-      preventSuspend: true,
-      foregroundService: true,
-      backgroundPermissionRationale: {
-        title: "Localização em segundo plano",
-        message: BACKGROUND_PERMISSION_RATIONALE,
-        positiveAction: "Abrir permissões",
-        negativeAction: "Agora não",
+      activity: {
+        disableStopDetection: true,
+        stopOnStationary: false,
+        activityRecognitionInterval: 10_000,
+        minimumActivityRecognitionConfidence: 0,
       },
-      notification: {
-        title: "Orkestria — Rota ativa",
-        text: "Rastreando posição em segundo plano",
-        sticky: true,
-        channelName: "Rastreamento GPS",
+      http: {
+        url: GPS_ENDPOINT,
+        autoSync: true,
+        autoSyncThreshold: 0,
+        batchSync: false,
+        maxBatchSize: 1,
+        method: "POST",
+        rootProperty: ".",
+        params: monitoramentoRotaId
+          ? { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE }
+          : { source: NATIVE_SOURCE },
+        headers: {
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+          apikey: SUPABASE_ANON,
+          "Content-Type": "application/json",
+        },
       },
-      // --- Logger
-      debug: false,
-      logLevel: 3,
+      persistence: {
+        locationTemplate,
+        extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
+        persistMode: 1,
+      },
+      app: {
+        stopOnTerminate: false,
+        startOnBoot: true,
+        enableHeadless: true,
+        heartbeatInterval: 60,
+        backgroundPermissionRationale: {
+          title: "Localização em segundo plano",
+          message: BACKGROUND_PERMISSION_RATIONALE,
+          positiveAction: "Abrir permissões",
+          negativeAction: "Agora não",
+        },
+        notification: {
+          title: "Orkestria — Rota ativa",
+          text: "Rastreando posição em segundo plano",
+          sticky: true,
+          priority: 1,
+          channelName: "Rastreamento GPS",
+        },
+      },
+      logger: {
+        debug: false,
+        logLevel: 3,
+      },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = await withTimeout(
@@ -285,11 +299,15 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   if (!plugin) return;
   try {
     await plugin.setConfig({
-      // Config FLAT — sem grupos `persistence`/`http`.
-      locationTemplate: buildNativeLocationTemplate(),
-      extras: { monitoramento_rota_id: monitoramentoRotaId },
-      persistMode: 1,
-      params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE },
+      persistence: {
+        locationTemplate: buildNativeLocationTemplate(),
+        extras: { monitoramento_rota_id: monitoramentoRotaId },
+        persistMode: 1,
+      },
+      http: {
+        rootProperty: ".",
+        params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE },
+      },
     } as any);
     markNativeDriver({
       routeId: monitoramentoRotaId,
