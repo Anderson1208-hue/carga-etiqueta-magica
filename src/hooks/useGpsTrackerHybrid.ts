@@ -7,9 +7,14 @@ import { useGpsTrackerTransistor } from "./useGpsTrackerTransistor";
  * Seletor automático de tracker GPS.
  *
  * Roteamento por ambiente (VITE_BUILD_ENV):
- *   - web (não-nativo)        → useGpsTracker (navigator.geolocation)
- *   - nativo + staging|prod   → useGpsTrackerTransistor (HTTP nativo, com licença)
- *   - nativo + homolog|dev    → useGpsTrackerNative (community, fallback livre)
+ *   - web (não-nativo)      → useGpsTracker (navigator.geolocation)
+ *   - nativo + homolog      → useGpsTrackerNative (community, fallback livre)
+ *   - nativo demais builds  → useGpsTrackerTransistor (HTTP nativo, com licença)
+ *
+ * Importante: se VITE_BUILD_ENV vier vazio em um APK embutido, o padrão seguro
+ * é Transistorsoft. Não podemos cair silenciosamente no driver community, pois
+ * no Android 15 o Permissions API da WebView pode ficar como "prompt" mesmo com
+ * getCurrentPosition funcionando, impedindo o watcher community de iniciar.
  *
  * Override manual (debug): VITE_GPS_DRIVER=community|transistor força um driver.
  *
@@ -38,9 +43,9 @@ function resolveDriver(): Driver {
   const forced = import.meta.env.VITE_GPS_DRIVER as string | undefined;
   if (forced === "transistor") return "transistor";
   if (forced === "community") return "community";
-  const env = (import.meta.env.VITE_BUILD_ENV as string | undefined) ?? "dev";
-  if (env === "staging" || env === "prod") return "transistor";
-  return "community";
+  const env = String((import.meta.env.VITE_BUILD_ENV as string | undefined) ?? "").toLowerCase();
+  if (env === "homolog") return "community";
+  return "transistor";
 }
 
 export function useGpsTrackerHybrid(options: UseGpsTrackerOptions) {
