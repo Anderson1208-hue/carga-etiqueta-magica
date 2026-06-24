@@ -1,18 +1,19 @@
 import { Capacitor } from "@capacitor/core";
 import { useGpsTracker } from "./useGpsTracker";
 import { useGpsTrackerNative } from "./useGpsTrackerNative";
+import { useGpsTrackerTransistor } from "./useGpsTrackerTransistor";
 
 /**
- * Seletor automático de tracker GPS:
- * - Em ambiente nativo (APK Android via Capacitor) → usa Foreground Service
- *   com notificação persistente. GPS continua mesmo com tela bloqueada.
- * - Em ambiente web (navegador / PWA) → usa o tracker web atual
- *   (navigator.geolocation), que requer aba/app em primeiro plano.
+ * Seletor automático de tracker GPS.
  *
- * No nativo usamos @capacitor-community/background-geolocation, o mesmo driver
- * do APK anexado que estava atualizando a Torre continuamente.
+ * Roteamento por ambiente (VITE_BUILD_ENV):
+ *   - web (não-nativo)        → useGpsTracker (navigator.geolocation)
+ *   - nativo + staging|prod   → useGpsTrackerTransistor (HTTP nativo, com licença)
+ *   - nativo + homolog|dev    → useGpsTrackerNative (community, fallback livre)
  *
- * Mesma assinatura para todos os caminhos. Drop-in replacement de useGpsTracker.
+ * Override manual (debug): VITE_GPS_DRIVER=community|transistor força um driver.
+ *
+ * Regra dos hooks: TODOS são sempre chamados; quem não é alvo recebe enabled=false.
  */
 interface GpsConfig {
   intervalo_padrao_segundos: number;
@@ -30,20 +31,35 @@ interface UseGpsTrackerOptions {
   config?: Partial<GpsConfig>;
 }
 
-export function useGpsTrackerHybrid(options: UseGpsTrackerOptions) {
-  const isNative = Capacitor.isNativePlatform();
+type Driver = "web" | "transistor" | "community";
 
-  // IMPORTANTE: TODOS os hooks são chamados sempre (regra dos hooks).
-  // Cada um internamente faz no-op quando `enabled` é false ou plataforma errada.
+function resolveDriver(): Driver {
+  if (!Capacitor.isNativePlatform()) return "web";
+  const forced = import.meta.env.VITE_GPS_DRIVER as string | undefined;
+  if (forced === "transistor") return "transistor";
+  if (forced === "community") return "community";
+  const env = (import.meta.env.VITE_BUILD_ENV as string | undefined) ?? "dev";
+  if (env === "staging" || env === "prod") return "transistor";
+  return "community";
+}
+
+export function useGpsTrackerHybrid(options: UseGpsTrackerOptions) {
+  const driver = resolveDriver();
+
+  const transistor = useGpsTrackerTransistor({
+    ...options,
+    enabled: driver === "transistor" && options.enabled,
+  });
   const native = useGpsTrackerNative({
     ...options,
-    enabled: isNative && options.enabled,
+    enabled: driver === "community" && options.enabled,
   });
   const web = useGpsTracker({
     ...options,
-    enabled: !isNative && options.enabled,
+    enabled: driver === "web" && options.enabled,
   });
 
-  if (isNative) return native;
+  if (driver === "transistor") return transistor;
+  if (driver === "community") return native;
   return web;
 }
