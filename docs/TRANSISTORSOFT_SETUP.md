@@ -106,8 +106,9 @@ Esperado:
 - `package.json` — adicionado `@transistorsoft/capacitor-background-geolocation`.
 - `src/hooks/useGpsTrackerTransistor.ts` — driver completo (HTTP nativo).
 - `src/hooks/useGpsTrackerHybrid.ts` — roteamento por `VITE_BUILD_ENV`.
-- `src/lib/registerGpsHeadlessTask.ts` — registra task headless real.
-- `src/main.tsx` — chama `registerGpsHeadlessTask()` no bootstrap.
+- Headless Java custom fica **desativado** no Capacitor v9: sem uma classe nativa
+  `BackgroundGeolocationHeadlessTask`, `enableHeadless=true` pode gerar crash-loop.
+  O envio em segundo plano deve ser feito pelo Foreground Service + HTTP nativo do plugin.
 - `docs/TRANSISTORSOFT_SETUP.md` — este arquivo.
 
 `AndroidManifest.xml` **NÃO** é versionado no repo Lovable (pasta `android/`

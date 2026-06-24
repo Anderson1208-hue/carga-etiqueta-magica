@@ -19,8 +19,8 @@ import { enqueue as enqueueGpsPoint } from "@/lib/gpsQueue";
  *
  * Por que esse plugin:
  * - Mantém GPS com tela bloqueada, Doze Mode e fabricantes agressivos.
- * - Sobrevive a app encerrado (app.stopOnTerminate=false, startOnBoot=true,
- *   enableHeadless=true).
+ * - Sobrevive a app em background com Foreground Service e HTTP nativo
+ *   (app.stopOnTerminate=false, startOnBoot=true).
  * - Uploader HTTP NATIVO → posições vão direto a `processar-gps` sem
  *   depender da WebView/JS/IndexedDB com tela bloqueada.
  *
@@ -237,7 +237,11 @@ export async function ensureTransistorGpsReady(
       app: {
         stopOnTerminate: false,
         startOnBoot: true,
-        enableHeadless: true,
+        // Capacitor v9 NÃO possui headless JS; exigir uma classe Java
+        // BackgroundGeolocationHeadlessTask inexistente causa crash-loop no Android
+        // quando o sistema dispara eventos após o app sair/encerrar. O envio deve
+        // permanecer pelo serviço/HTTP nativo do plugin, sem HeadlessTask custom.
+        enableHeadless: false,
         heartbeatInterval: 60,
         backgroundPermissionRationale: {
           title: "Localização em segundo plano",
