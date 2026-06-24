@@ -26,6 +26,22 @@ interface GpsPosition {
   heartbeat?: boolean;
 }
 
+function firstNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (value == null) continue;
+    const parsed = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -33,15 +49,23 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    const coords = body.coords ?? body.location?.coords ?? {};
+    const extras = body.extras ?? body.location?.extras ?? {};
     const {
-      monitoramento_rota_id,
-      latitude,
-      longitude,
-      accuracy,
       batch,
       heartbeat: heartbeatFlag,
       source = "legacy-js",
     } = body;
+
+    const monitoramento_rota_id = firstString(
+      body.monitoramento_rota_id,
+      extras.monitoramento_rota_id,
+      body.params?.monitoramento_rota_id,
+    );
+    const latitude = firstNumber(body.latitude, coords.latitude);
+    const longitude = firstNumber(body.longitude, coords.longitude);
+    const accuracy = firstNumber(body.accuracy, coords.accuracy) ?? 0;
+    const clientTs = firstString(body.timestamp, body.client_ts, body.recorded_at, body.created_at);
 
     if (!monitoramento_rota_id || (latitude == null && (!batch || batch.length === 0))) {
       return new Response(JSON.stringify({ error: "Dados incompletos" }), {
@@ -62,7 +86,7 @@ Deno.serve(async (req) => {
           latitude,
           longitude,
           accuracy,
-          timestamp: new Date().toISOString(),
+          timestamp: clientTs || new Date().toISOString(),
           heartbeat: !!heartbeatFlag,
         }];
 
