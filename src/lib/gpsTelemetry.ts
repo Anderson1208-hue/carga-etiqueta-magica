@@ -148,16 +148,22 @@ export function markNativeDriver(patch: {
   notificationConfigured?: boolean | null;
   backgroundPermissionRationale?: string | null;
 }) {
-  write({
+  // Só sobrescreve as chaves explicitamente presentes no patch. Caso contrário,
+  // chamadas "de boot" do hook apagariam o `nativeSource` recém escrito pela
+  // pipeline de ready() (ex: "transistor-native-http"), mascarando o progresso.
+  const next: Partial<GpsTelemetry> = {
     activeDriver: "transistorsoft",
     driverActivatedAt: Date.now(),
-    nativeRouteId: patch.routeId ?? null,
-    nativeSource: patch.source ?? null,
-    nativeHttpUrlConfigured: patch.httpUrlConfigured ?? null,
-    nativeHttpAutoSync: patch.httpAutoSync ?? null,
-    nativeNotificationConfigured: patch.notificationConfigured ?? null,
-    nativeBackgroundPermissionRationale: patch.backgroundPermissionRationale ?? null,
-  });
+  };
+  if ("routeId" in patch) next.nativeRouteId = patch.routeId ?? null;
+  if ("source" in patch) next.nativeSource = patch.source ?? null;
+  if ("httpUrlConfigured" in patch) next.nativeHttpUrlConfigured = patch.httpUrlConfigured ?? null;
+  if ("httpAutoSync" in patch) next.nativeHttpAutoSync = patch.httpAutoSync ?? null;
+  if ("notificationConfigured" in patch) next.nativeNotificationConfigured = patch.notificationConfigured ?? null;
+  if ("backgroundPermissionRationale" in patch) {
+    next.nativeBackgroundPermissionRationale = patch.backgroundPermissionRationale ?? null;
+  }
+  write(next);
 }
 
 export function authorizationStatusText(status: number | null | undefined): string {
