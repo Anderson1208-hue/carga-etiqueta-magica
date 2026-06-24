@@ -306,10 +306,8 @@ export function useGpsTrackerTransistor({
     if (!Capacitor.isNativePlatform()) return;
     if (!enabled) return;
 
-    // Sinaliza no log de erro (NÃO em activeDriver/source) que o efeito
-    // montou. Antes usávamos markNativeDriver aqui, mas isso sobrescrevia
-    // o `source` (de "transistor-native-http" para "transistor-effect-mounted")
-    // toda vez que o componente re-renderizava, mascarando o progresso real.
+    // Marca o driver como ativo SEM tocar em `source` (vide gpsTelemetry).
+    markNativeDriver({ routeId: monitoramentoRotaId });
     markError(`[transistor] effect:mounted rotaId=${monitoramentoRotaId ?? "null"}`);
 
     let cancelled = false;
