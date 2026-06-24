@@ -23,8 +23,16 @@ export function registerGpsHeadlessTask() {
         markError("[headless] register:plugin import sem default");
         return;
       }
+      const registerHeadlessTask = (BackgroundGeolocation as any).registerHeadlessTask;
+      if (typeof registerHeadlessTask !== "function") {
+        // O pacote Capacitor v9 tipa registerHeadlessTask pelos tipos compartilhados,
+        // mas o wrapper JS runtime não expõe esse método. Não depender disso: o
+        // upload nativo deve funcionar por locationTemplate/http mesmo sem JS.
+        markError("[headless] register:indisponivel no Capacitor v9; usando HTTP nativo");
+        return;
+      }
 
-      await BackgroundGeolocation.registerHeadlessTask(async (event) => {
+      await registerHeadlessTask(async (event: { name: string }) => {
         try {
           // Não chamar ready/reset aqui: isso pode apagar os extras persistidos
           // da rota ativa (`monitoramento_rota_id`) quando o app está morto.

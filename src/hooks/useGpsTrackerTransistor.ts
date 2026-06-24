@@ -92,6 +92,8 @@ const GPS_ENDPOINT = `${SUPABASE_URL}/functions/v1/processar-gps`;
 const NATIVE_SOURCE = "transistor-native-http";
 const PERMISSION_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 45_000;
+const NATIVE_LOCATION_INTERVAL_MS = 60_000;
+const NATIVE_FASTEST_LOCATION_INTERVAL_MS = 30_000;
 
 let readyPromise: Promise<void> | null = null;
 
@@ -183,14 +185,18 @@ export async function ensureTransistorGpsReady(
     // flat são ignoradas ou mapeadas de forma parcial. Sem `geolocation` e
     // `activity`, o SDK entra em stationary (`isMoving=false`) e só volta a
     // emitir quando a WebView reaparece em foreground.
+    markError(`[transistor] ready:config time-based distanceFilter=0 requested=${distanceFilter}`);
     const readyConfig = {
       reset: true,
       geolocation: {
         desiredAccuracy: -1, // DesiredAccuracy.High
-        distanceFilter,
+        // Android: `locationUpdateInterval` só governa amostragem por tempo quando
+        // `distanceFilter` é 0. Com 50m, teste parado + tela bloqueada não gera
+        // ponto nativo; app aberto mascarava isso pelo watchdog JS.
+        distanceFilter: 0,
         stationaryRadius: 1,
-        locationUpdateInterval: 60_000,
-        fastestLocationUpdateInterval: 30_000,
+        locationUpdateInterval: NATIVE_LOCATION_INTERVAL_MS,
+        fastestLocationUpdateInterval: NATIVE_FASTEST_LOCATION_INTERVAL_MS,
         allowIdenticalLocations: true,
         locationAuthorizationRequest: "Always",
         stopTimeout: 1,
@@ -213,6 +219,7 @@ export async function ensureTransistorGpsReady(
         maxBatchSize: 1,
         method: "POST",
         rootProperty: ".",
+        timeout: 30_000,
         params: monitoramentoRotaId
           ? { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE }
           : { source: NATIVE_SOURCE },
@@ -516,7 +523,9 @@ export function useGpsTrackerTransistor({
           });
         }
         try {
-          const moving = await plugin.changePace(true);
+          await plugin.changePace(true);
+          const moving = await plugin.getState();
+          markError(`[transistor] changePace:ok isMoving=${moving.isMoving}`);
           markNativeState({
             enabled: moving.enabled,
             isMoving: moving.isMoving,
