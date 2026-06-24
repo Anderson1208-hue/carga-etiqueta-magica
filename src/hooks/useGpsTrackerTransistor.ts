@@ -147,13 +147,6 @@ export async function ensureTransistorGpsReady(
         '"accuracy":<%= accuracy %>,"heartbeat":false,' +
         `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
       extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
-      reset: true,
-      locationTemplate:
-        '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-        '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
-        '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-        `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
-      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
       geolocation: {
         desiredAccuracy: -1, // High
         distanceFilter,
