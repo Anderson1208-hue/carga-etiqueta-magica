@@ -95,6 +95,15 @@ const READY_TIMEOUT_MS = 45_000;
 
 let readyPromise: Promise<void> | null = null;
 
+function buildNativeLocationTemplate(): string {
+  return (
+    '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
+    '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+    '"accuracy":<%= accuracy %>,"heartbeat":false,' +
+    `"timestamp":"<%= timestamp %>","client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`
+  );
+}
+
 function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeout = new Promise<never>((_, reject) => {
@@ -169,11 +178,7 @@ export async function ensureTransistorGpsReady(
     await requestNativeLocationPermission(plugin, "pre-ready");
 
     markError("[transistor] ready:start");
-    const locationTemplate =
-      '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-      '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
-      '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-      `"timestamp":"<%= timestamp %>","client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`;
+    const locationTemplate = buildNativeLocationTemplate();
     const readyConfig = {
       reset: true,
       geolocation: {
@@ -281,7 +286,11 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   if (!plugin) return;
   try {
     await plugin.setConfig({
-      persistence: { extras: { monitoramento_rota_id: monitoramentoRotaId } },
+      persistence: {
+        locationTemplate: buildNativeLocationTemplate(),
+        extras: { monitoramento_rota_id: monitoramentoRotaId },
+        persistMode: 1,
+      },
       http: { params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE } },
     } as any);
     markNativeDriver({
