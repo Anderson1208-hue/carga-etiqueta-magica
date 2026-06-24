@@ -59,15 +59,27 @@ const BACKGROUND_PERMISSION_RATIONALE =
   "Permita localização o tempo todo para rastrear a rota com a tela bloqueada.";
 
 async function loadPlugin(): Promise<TSBgGeo | null> {
-  if (BackgroundGeolocation || pluginLoadAttempted) return BackgroundGeolocation;
+  if (BackgroundGeolocation) return BackgroundGeolocation;
+  if (pluginLoadAttempted) return BackgroundGeolocation;
   pluginLoadAttempted = true;
   if (!Capacitor.isNativePlatform()) return null;
+  // Marca tentativa para o diagnóstico ver mesmo se o import travar.
+  markError("[transistor] loadPlugin:start dynamic import");
   try {
     const mod = await import("@transistorsoft/capacitor-background-geolocation");
-    BackgroundGeolocation = mod.default;
+    BackgroundGeolocation = mod.default ?? null;
+    if (!BackgroundGeolocation) {
+      markError("[transistor] loadPlugin:import returned no default export");
+    } else {
+      markError("[transistor] loadPlugin:ok plugin module carregado");
+    }
     return BackgroundGeolocation;
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[GPS Transistor] falha ao carregar plugin:", err);
+    markError(`[transistor] loadPlugin:falhou ${msg}`);
+    // Permite retry no próximo mount, em vez de bloquear para sempre.
+    pluginLoadAttempted = false;
     return null;
   }
 }
@@ -221,6 +233,18 @@ export function useGpsTrackerTransistor({
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (!enabled) return;
+
+    // Sinaliza imediatamente que o hook efetivamente montou com enabled=true.
+    // Sem isso, "Driver ativo: desconhecido" não distingue "efeito não rodou"
+    // de "plugin não carregou".
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: "transistor-effect-mounted",
+      httpUrlConfigured: !!GPS_ENDPOINT,
+      httpAutoSync: true,
+      notificationConfigured: true,
+      backgroundPermissionRationale: BACKGROUND_PERMISSION_RATIONALE,
+    });
 
     let cancelled = false;
 

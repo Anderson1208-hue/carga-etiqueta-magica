@@ -1,18 +1,14 @@
 import { Capacitor } from "@capacitor/core";
 import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
+import { markError } from "@/lib/gpsTelemetry";
 
 let registered = false;
 
 /**
  * Registra a Headless Task do Transistorsoft para Android.
  *
- * Por que existe: quando o SO mata o app, o plugin reaparece em headless mode
- * (sem WebView/JS rodando). Precisamos garantir que o Foreground Service
- * permaneça ativo e o uploader HTTP nativo continue enviando.
- *
- * Como o envio é 100% nativo via http.url, não precisamos processar locations
- * em JS aqui — só re-ensure config + manter o plugin ligado em eventos críticos
- * (terminate, heartbeat, http).
+ * Erros vão para markError() para aparecer no diagnóstico do motorista,
+ * em vez de ficarem só no logcat.
  */
 export function registerGpsHeadlessTask() {
   if (registered) return;
@@ -21,26 +17,34 @@ export function registerGpsHeadlessTask() {
 
   void (async () => {
     try {
+      markError("[headless] register:start");
       const mod = await import("@transistorsoft/capacitor-background-geolocation");
       const BackgroundGeolocation = mod.default;
+      if (!BackgroundGeolocation) {
+        markError("[headless] register:plugin import sem default");
+        return;
+      }
 
       await BackgroundGeolocation.registerHeadlessTask(async (event) => {
-        // event.name ∈ "terminate" | "heartbeat" | "location" | "http" | ...
         try {
           await ensureTransistorGpsReady();
           if (event.name === "terminate") {
-            // Garante restart do tracking após terminate do app.
             const state = await BackgroundGeolocation.getState();
             if (!state.enabled) {
               await BackgroundGeolocation.start();
             }
           }
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
           console.warn("[GPS Headless] erro:", err);
+          markError(`[headless] event:${event.name} ${msg}`);
         }
       });
+      markError("[headless] register:ok");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.warn("[GPS Headless] registro falhou:", err);
+      markError(`[headless] register:falhou ${msg}`);
     }
   })();
 }
