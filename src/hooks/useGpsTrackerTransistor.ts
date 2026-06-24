@@ -285,12 +285,11 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   if (!plugin) return;
   try {
     await plugin.setConfig({
-      persistence: {
-        locationTemplate: buildNativeLocationTemplate(),
-        extras: { monitoramento_rota_id: monitoramentoRotaId },
-        persistMode: 1,
-      },
-      http: { params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE } },
+      // Config FLAT — sem grupos `persistence`/`http`.
+      locationTemplate: buildNativeLocationTemplate(),
+      extras: { monitoramento_rota_id: monitoramentoRotaId },
+      persistMode: 1,
+      params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE },
     } as any);
     markNativeDriver({
       routeId: monitoramentoRotaId,
