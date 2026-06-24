@@ -136,7 +136,17 @@ export async function ensureTransistorGpsReady(
     // silêncio (a promise nunca resolve em algumas builds), o que explica
     // o travamento observado após loadPlugin:ok.
     markError("[transistor] ready:start");
+    // Cast: `locationTemplate` e `extras` são keys de root da Config do
+    // plugin (documentadas em transistorsoft/background-geolocation) mas
+    // não estão expostas no .d.ts da versão Capacitor. Runtime aceita.
     const state = await plugin.ready({
+      reset: true,
+      locationTemplate:
+        '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
+        '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+        '"accuracy":<%= accuracy %>,"heartbeat":false,' +
+        `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
+      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
       reset: true,
       locationTemplate:
         '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
