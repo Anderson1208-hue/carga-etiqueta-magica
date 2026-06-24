@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import {
+  markEnqueue,
   markNativeDriver,
   markNativeHttp,
   markNativeLocation,
@@ -11,6 +12,7 @@ import {
   markNativeState,
   markError,
 } from "@/lib/gpsTelemetry";
+import { enqueue as enqueueGpsPoint } from "@/lib/gpsQueue";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 nested config).
@@ -191,6 +193,11 @@ export async function ensureTransistorGpsReady(
         allowIdenticalLocations: true,
         locationAuthorizationRequest: "Always",
         stopTimeout: 5,
+        // Sem isso o plugin entra em "stationary" e para de emitir locations.
+        disableStopDetection: true,
+        pausesLocationUpdatesAutomatically: false,
+        preventSuspend: true,
+        isMoving: true,
       },
       http: {
         url: GPS_ENDPOINT,
@@ -362,10 +369,37 @@ export function useGpsTrackerTransistor({
               });
               lastNativeLocationAtRef.current = Date.now();
               setError(null);
+              // Fallback: o uploader HTTP nativo (locationTemplate + rootProperty)
+              // estava descartando pontos em silêncio. Enfileira na fila JS, que
+              // tem worker funcionando (useGpsQueueWorker -> processar-gps).
+              // Backend faz UPSERT por client_ts: se o HTTP nativo um dia voltar
+              // a funcionar, dedup automático.
+              if (monitoramentoRotaId) {
+                const ts = loc.timestamp ?? new Date().toISOString();
+                void enqueueGpsPoint({
+                  monitoramento_rota_id: monitoramentoRotaId,
+                  latitude: loc.coords.latitude,
+                  longitude: loc.coords.longitude,
+                  accuracy: loc.coords.accuracy ?? 0,
+                  timestamp: typeof ts === "string" ? ts : new Date(ts).toISOString(),
+                  heartbeat: loc.event === "heartbeat",
+                })
+                  .then(() =>
+                    markEnqueue({
+                      lat: loc.coords.latitude,
+                      lng: loc.coords.longitude,
+                      accuracy: loc.coords.accuracy ?? 0,
+                    })
+                  )
+                  .catch((err) =>
+                    markError(`[transistor] enqueue-js:falhou ${err instanceof Error ? err.message : String(err)}`)
+                  );
+              }
             },
             (errCode) => {
               console.warn("[GPS Transistor] onLocation error:", errCode);
               setError(`GPS erro ${errCode}`);
+              markError(`[transistor] onLocation:erro ${errCode}`);
             }
           )
         );
