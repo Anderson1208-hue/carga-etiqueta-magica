@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import {
+  markNativeDriver,
+  markNativeHttp,
+  markNativeLocation,
+  markNativeProvider,
+  markNativeReady,
+  markNativeRequestPermission,
+  markNativeStartCalled,
+  markNativeState,
+  markError,
+} from "@/lib/gpsTelemetry";
 
 /**
  * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 nested config).
@@ -44,6 +55,8 @@ interface UseGpsTrackerOptions {
 type TSBgGeo = typeof import("@transistorsoft/capacitor-background-geolocation").default;
 let BackgroundGeolocation: TSBgGeo | null = null;
 let pluginLoadAttempted = false;
+const BACKGROUND_PERMISSION_RATIONALE =
+  "Permita localização o tempo todo para rastrear a rota com a tela bloqueada.";
 
 async function loadPlugin(): Promise<TSBgGeo | null> {
   if (BackgroundGeolocation || pluginLoadAttempted) return BackgroundGeolocation;
@@ -79,11 +92,30 @@ export async function ensureTransistorGpsReady(
     const plugin = await loadPlugin();
     if (!plugin) throw new Error("Plugin Transistorsoft indisponível");
 
-    await plugin.ready({
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: "transistor-native-http",
+      httpUrlConfigured: !!GPS_ENDPOINT,
+      httpAutoSync: true,
+      notificationConfigured: true,
+      backgroundPermissionRationale: BACKGROUND_PERMISSION_RATIONALE,
+    });
+
+    try {
+      const provider = await plugin.getProviderState();
+      markNativeProvider(provider);
+    } catch (err) {
+      console.warn("[GPS Transistor] getProviderState antes do ready falhou:", err);
+    }
+
+    const state = await plugin.ready({
       reset: true,
       geolocation: {
         desiredAccuracy: -1, // High
         distanceFilter,
+        locationUpdateInterval: 60_000,
+        fastestLocationUpdateInterval: 30_000,
+        allowIdenticalLocations: true,
         locationAuthorizationRequest: "Always",
         stopTimeout: 5,
       },
@@ -103,6 +135,13 @@ export async function ensureTransistorGpsReady(
         stopOnTerminate: false,
         startOnBoot: true,
         enableHeadless: true,
+        heartbeatInterval: 60,
+        backgroundPermissionRationale: {
+          title: "Localização em segundo plano",
+          message: BACKGROUND_PERMISSION_RATIONALE,
+          positiveAction: "Abrir permissões",
+          negativeAction: "Agora não",
+        },
         notification: {
           title: "Orkestria — Rota ativa",
           text: "Rastreando posição em segundo plano",
@@ -120,12 +159,28 @@ export async function ensureTransistorGpsReady(
       },
       logger: { debug: false, logLevel: 3 },
     });
+    markNativeReady({ enabled: state.enabled });
+    markNativeState({
+      enabled: state.enabled,
+      isMoving: state.isMoving,
+      trackingMode: state.trackingMode,
+      notificationConfigured: !!state.app?.notification,
+      pendingLocations: await plugin.getCount().catch(() => null),
+    });
+
+    const status = await plugin.requestPermission();
+    markNativeRequestPermission({ status });
+
+    const provider = await plugin.getProviderState();
+    markNativeProvider(provider);
   })();
 
   try {
     await readyPromise;
   } catch (err) {
     readyPromise = null;
+    markNativeReady({ enabled: null, error: err instanceof Error ? err.message : String(err) });
+    markError(err instanceof Error ? err.message : String(err));
     throw err;
   }
 }
@@ -136,6 +191,14 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   try {
     await plugin.setConfig({
       persistence: { extras: { monitoramento_rota_id: monitoramentoRotaId } },
+    });
+    markNativeDriver({
+      routeId: monitoramentoRotaId,
+      source: "transistor-native-http",
+      httpUrlConfigured: true,
+      httpAutoSync: true,
+      notificationConfigured: true,
+      backgroundPermissionRationale: BACKGROUND_PERMISSION_RATIONALE,
     });
   } catch (err) {
     console.warn("[GPS Transistor] setConfig extras falhou:", err);
@@ -171,6 +234,12 @@ export function useGpsTrackerTransistor({
           plugin.onLocation(
             (loc) => {
               setLastPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+              markNativeLocation({
+                lat: loc.coords.latitude,
+                lng: loc.coords.longitude,
+                accuracy: loc.coords.accuracy,
+                event: loc.event ?? null,
+              });
               setError(null);
             },
             (errCode) => {
@@ -181,10 +250,38 @@ export function useGpsTrackerTransistor({
         );
         subsRef.current.push(
           plugin.onHttp((res) => {
+            markNativeHttp(res);
             if (!res.success) {
               setError(`HTTP ${res.status}`);
             } else {
               setError(null);
+            }
+          })
+        );
+        subsRef.current.push(
+          plugin.onProviderChange((provider) => {
+            markNativeProvider(provider);
+          })
+        );
+        subsRef.current.push(
+          plugin.onHeartbeat(async () => {
+            try {
+              const loc = await plugin.getCurrentPosition({
+                samples: 1,
+                desiredAccuracy: -1,
+                timeout: 30,
+                maximumAge: 60_000,
+                persist: true,
+                extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
+              });
+              markNativeLocation({
+                lat: loc.coords.latitude,
+                lng: loc.coords.longitude,
+                accuracy: loc.coords.accuracy,
+                event: "heartbeat",
+              });
+            } catch (err) {
+              console.warn("[GPS Transistor] heartbeat getCurrentPosition falhou:", err);
             }
           })
         );
@@ -193,6 +290,14 @@ export function useGpsTrackerTransistor({
           try {
             const c = await plugin.getCount();
             setPendingQueue(c);
+            const state = await plugin.getState();
+            markNativeState({
+              enabled: state.enabled,
+              isMoving: state.isMoving,
+              trackingMode: state.trackingMode,
+              notificationConfigured: !!state.app?.notification,
+              pendingLocations: c,
+            });
           } catch {
             /* ignore */
           }
@@ -203,11 +308,28 @@ export function useGpsTrackerTransistor({
 
         const state = await plugin.getState();
         if (!state.enabled) {
-          await plugin.start();
+          markNativeStartCalled();
+          const started = await plugin.start();
+          markNativeState({
+            enabled: started.enabled,
+            isMoving: started.isMoving,
+            trackingMode: started.trackingMode,
+            notificationConfigured: !!started.app?.notification,
+            pendingLocations: await plugin.getCount().catch(() => null),
+          });
+        } else {
+          markNativeState({
+            enabled: state.enabled,
+            isMoving: state.isMoving,
+            trackingMode: state.trackingMode,
+            notificationConfigured: !!state.app?.notification,
+            pendingLocations: await plugin.getCount().catch(() => null),
+          });
         }
         if (!cancelled) setTracking(true);
       } catch (err) {
         console.error("[GPS Transistor] init falhou:", err);
+        markError(err instanceof Error ? err.message : String(err));
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       }
     })();
@@ -234,6 +356,13 @@ export function useGpsTrackerTransistor({
       try {
         const state = await plugin.getState();
         if (state.enabled) await plugin.stop();
+        markNativeState({
+          enabled: false,
+          isMoving: false,
+          trackingMode: state.trackingMode,
+          notificationConfigured: !!state.app?.notification,
+          pendingLocations: await plugin.getCount().catch(() => null),
+        });
       } catch (err) {
         console.warn("[GPS Transistor] stop falhou:", err);
       }
