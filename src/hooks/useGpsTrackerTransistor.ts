@@ -193,6 +193,11 @@ export async function ensureTransistorGpsReady(
         allowIdenticalLocations: true,
         locationAuthorizationRequest: "Always",
         stopTimeout: 5,
+        // Sem isso o plugin entra em "stationary" e para de emitir locations.
+        disableStopDetection: true,
+        pausesLocationUpdatesAutomatically: false,
+        preventSuspend: true,
+        isMoving: true,
       },
       http: {
         url: GPS_ENDPOINT,
