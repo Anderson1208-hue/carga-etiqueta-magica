@@ -1,5 +1,4 @@
 import { Capacitor } from "@capacitor/core";
-import { ensureTransistorGpsReady } from "@/hooks/useGpsTrackerTransistor";
 import { markError } from "@/lib/gpsTelemetry";
 
 let registered = false;
@@ -27,7 +26,8 @@ export function registerGpsHeadlessTask() {
 
       await BackgroundGeolocation.registerHeadlessTask(async (event) => {
         try {
-          await ensureTransistorGpsReady();
+          // Não chamar ready/reset aqui: isso pode apagar os extras persistidos
+          // da rota ativa (`monitoramento_rota_id`) quando o app está morto.
           if (event.name === "terminate") {
             const state = await BackgroundGeolocation.getState();
             if (!state.enabled) {
