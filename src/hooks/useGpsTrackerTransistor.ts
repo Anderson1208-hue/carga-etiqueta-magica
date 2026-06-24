@@ -88,8 +88,39 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const GPS_ENDPOINT = `${SUPABASE_URL}/functions/v1/processar-gps`;
 const NATIVE_SOURCE = "transistor-native-http";
+const PERMISSION_TIMEOUT_MS = 45_000;
+const READY_TIMEOUT_MS = 45_000;
 
 let readyPromise: Promise<void> | null = null;
+
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label}:timeout ${timeoutMs}ms`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
+
+async function requestNativeLocationPermission(plugin: TSBgGeo, stage: string): Promise<number | null> {
+  try {
+    markError(`[transistor] requestPermission:${stage}:start`);
+    const status = await withTimeout(
+      plugin.requestPermission(),
+      `[transistor] requestPermission:${stage}`,
+      PERMISSION_TIMEOUT_MS
+    );
+    markNativeRequestPermission({ status });
+    markError(`[transistor] requestPermission:${stage}:ok status=${status}`);
+    return status;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    markNativeRequestPermission({ status: null, error: msg });
+    markError(`[transistor] requestPermission:${stage}:falhou ${msg}`);
+    throw err;
+  }
+}
 
 export async function ensureTransistorGpsReady(
   distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
@@ -129,6 +160,11 @@ export async function ensureTransistorGpsReady(
       console.warn("[GPS Transistor] getProviderState antes do ready falhou:", err);
       markError(`[transistor] getProviderState:falhou ${msg}`);
     }
+
+    // Android estava ficando em `Permissão GPS: prompt` e o plugin não avançava
+    // para ready/start. Solicita a permissão ANTES do ready(), para abrir o
+    // diálogo do sistema de forma determinística quando a rota ativa monta.
+    await requestNativeLocationPermission(plugin, "pre-ready");
 
     // IMPORTANTE: Transistorsoft v9 NÃO tem grupo `persistence` na config.
     // `locationTemplate` e `extras` são keys de NÍVEL RAIZ. Aninhar dentro
@@ -193,7 +229,12 @@ export async function ensureTransistorGpsReady(
       logger: { debug: false, logLevel: 3 },
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const state = await plugin.ready(readyConfig as any);
+    const state = await withTimeout(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      plugin.ready(readyConfig as any),
+      "[transistor] ready",
+      READY_TIMEOUT_MS
+    );
     markError(`[transistor] ready:ok enabled=${state.enabled} trackingMode=${state.trackingMode}`);
     markNativeReady({ enabled: state.enabled });
     markNativeState({
@@ -204,16 +245,7 @@ export async function ensureTransistorGpsReady(
       pendingLocations: await plugin.getCount().catch(() => null),
     });
 
-    try {
-      markError("[transistor] requestPermission:start");
-      const status = await plugin.requestPermission();
-      markNativeRequestPermission({ status });
-      markError(`[transistor] requestPermission:ok status=${status}`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      markNativeRequestPermission({ status: null, error: msg });
-      markError(`[transistor] requestPermission:falhou ${msg}`);
-    }
+    await requestNativeLocationPermission(plugin, "post-ready");
 
     try {
       const provider = await plugin.getProviderState();
@@ -244,9 +276,9 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   if (!plugin) return;
   try {
     await plugin.setConfig({
-      persistence: { extras: { monitoramento_rota_id: monitoramentoRotaId } },
+      extras: { monitoramento_rota_id: monitoramentoRotaId },
       http: { params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE } },
-    });
+    } as any);
     markNativeDriver({
       routeId: monitoramentoRotaId,
       source: NATIVE_SOURCE,
