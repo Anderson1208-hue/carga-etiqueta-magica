@@ -82,7 +82,7 @@ export async function ensureTransistorGpsReady(
     await plugin.ready({
       reset: true,
       geolocation: {
-        desiredAccuracy: 0, // HIGH
+        desiredAccuracy: -1, // High
         distanceFilter,
         locationAuthorizationRequest: "Always",
         stopTimeout: 5,
