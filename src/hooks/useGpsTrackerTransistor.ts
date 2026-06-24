@@ -87,6 +87,7 @@ async function loadPlugin(): Promise<TSBgGeo | null> {
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const GPS_ENDPOINT = `${SUPABASE_URL}/functions/v1/processar-gps`;
+const NATIVE_SOURCE = "transistor-native-http";
 
 let readyPromise: Promise<void> | null = null;
 
@@ -97,7 +98,10 @@ export async function ensureTransistorGpsReady(
   if (!Capacitor.isNativePlatform()) return;
   if (readyPromise) {
     await readyPromise;
-    if (monitoramentoRotaId) await updateRotaExtras(monitoramentoRotaId);
+    if (monitoramentoRotaId) {
+      await updateRotaExtras(monitoramentoRotaId);
+      await forceNativePosition(monitoramentoRotaId, "route-extras-updated");
+    }
     return;
   }
   readyPromise = (async () => {
@@ -106,7 +110,7 @@ export async function ensureTransistorGpsReady(
 
     markNativeDriver({
       routeId: monitoramentoRotaId,
-      source: "transistor-native-http",
+      source: NATIVE_SOURCE,
       httpUrlConfigured: !!GPS_ENDPOINT,
       httpAutoSync: true,
       notificationConfigured: true,
@@ -133,10 +137,17 @@ export async function ensureTransistorGpsReady(
       },
       http: {
         url: GPS_ENDPOINT,
+        // O backend `processar-gps` espera os campos no corpo raiz.
+        // O padrão do Transistorsoft é encapsular em `{ location: ... }`,
+        // o que faz o endpoint recusar como "Dados incompletos".
+        rootProperty: ".",
         autoSync: true,
         batchSync: false,
         maxBatchSize: 1,
         method: "POST",
+        params: monitoramentoRotaId
+          ? { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE }
+          : { source: NATIVE_SOURCE },
         headers: {
           Authorization: `Bearer ${SUPABASE_ANON}`,
           apikey: SUPABASE_ANON,
@@ -166,7 +177,7 @@ export async function ensureTransistorGpsReady(
           '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
           '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
           '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-          '"client_ts":"<%= timestamp %>","source":"transistor-native-http"}',
+          `"client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`,
         extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
       },
       logger: { debug: false, logLevel: 3 },
@@ -185,6 +196,10 @@ export async function ensureTransistorGpsReady(
 
     const provider = await plugin.getProviderState();
     markNativeProvider(provider);
+
+    if (monitoramentoRotaId) {
+      await forceNativePosition(monitoramentoRotaId, "ready-initial-position");
+    }
   })();
 
   try {
@@ -203,10 +218,11 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   try {
     await plugin.setConfig({
       persistence: { extras: { monitoramento_rota_id: monitoramentoRotaId } },
+      http: { params: { monitoramento_rota_id: monitoramentoRotaId, source: NATIVE_SOURCE } },
     });
     markNativeDriver({
       routeId: monitoramentoRotaId,
-      source: "transistor-native-http",
+      source: NATIVE_SOURCE,
       httpUrlConfigured: true,
       httpAutoSync: true,
       notificationConfigured: true,
@@ -214,6 +230,34 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
     });
   } catch (err) {
     console.warn("[GPS Transistor] setConfig extras falhou:", err);
+  }
+}
+
+async function forceNativePosition(monitoramentoRotaId: string | null, reason: string): Promise<void> {
+  if (!monitoramentoRotaId) return;
+  const plugin = BackgroundGeolocation;
+  if (!plugin) return;
+  try {
+    markError(`[transistor] getCurrentPosition:start ${reason}`);
+    const loc = await plugin.getCurrentPosition({
+      samples: 1,
+      desiredAccuracy: -1,
+      timeout: 30,
+      maximumAge: 0,
+      persist: true,
+      extras: { monitoramento_rota_id: monitoramentoRotaId },
+    });
+    markNativeLocation({
+      lat: loc.coords.latitude,
+      lng: loc.coords.longitude,
+      accuracy: loc.coords.accuracy,
+      event: reason,
+    });
+    markError(`[transistor] getCurrentPosition:ok ${reason}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[GPS Transistor] getCurrentPosition falhou (${reason}):`, err);
+    markError(`[transistor] getCurrentPosition:falhou ${reason} ${msg}`);
   }
 }
 
@@ -229,6 +273,7 @@ export function useGpsTrackerTransistor({
   const [modoCritico] = useState(false);
   const [pendingQueue, setPendingQueue] = useState(0);
   const subsRef = useRef<Array<{ remove: () => void }>>([]);
+  const lastNativeLocationAtRef = useRef<number>(0);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -264,6 +309,7 @@ export function useGpsTrackerTransistor({
                 accuracy: loc.coords.accuracy,
                 event: loc.event ?? null,
               });
+              lastNativeLocationAtRef.current = Date.now();
               setError(null);
             },
             (errCode) => {
@@ -304,11 +350,22 @@ export function useGpsTrackerTransistor({
                 accuracy: loc.coords.accuracy,
                 event: "heartbeat",
               });
+              lastNativeLocationAtRef.current = Date.now();
             } catch (err) {
               console.warn("[GPS Transistor] heartbeat getCurrentPosition falhou:", err);
+              markError(`[transistor] heartbeat getCurrentPosition:falhou ${err instanceof Error ? err.message : String(err)}`);
             }
           })
         );
+        const forcedPositionInterval = window.setInterval(() => {
+          if (!monitoramentoRotaId) return;
+          if (document.visibilityState !== "visible") return;
+          const silentFor = Date.now() - lastNativeLocationAtRef.current;
+          if (!lastNativeLocationAtRef.current || silentFor > 60_000) {
+            void forceNativePosition(monitoramentoRotaId, "foreground-watchdog");
+          }
+        }, 60_000);
+        subsRef.current.push({ remove: () => window.clearInterval(forcedPositionInterval) });
         // Atualiza contagem pendente periodicamente via API do plugin.
         const refreshCount = async () => {
           try {
@@ -350,6 +407,19 @@ export function useGpsTrackerTransistor({
             pendingLocations: await plugin.getCount().catch(() => null),
           });
         }
+        try {
+          const moving = await plugin.changePace(true);
+          markNativeState({
+            enabled: moving.enabled,
+            isMoving: moving.isMoving,
+            trackingMode: moving.trackingMode,
+            notificationConfigured: !!moving.app?.notification,
+            pendingLocations: await plugin.getCount().catch(() => null),
+          });
+        } catch (err) {
+          markError(`[transistor] changePace:falhou ${err instanceof Error ? err.message : String(err)}`);
+        }
+        await forceNativePosition(monitoramentoRotaId, "after-start");
         if (!cancelled) setTracking(true);
       } catch (err) {
         console.error("[GPS Transistor] init falhou:", err);
