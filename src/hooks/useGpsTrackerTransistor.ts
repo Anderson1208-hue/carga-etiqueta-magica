@@ -2,25 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 
 /**
- * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation.
+ * Tracker GPS nativo usando @transistorsoft/capacitor-background-geolocation (v9 nested config).
  *
- * Por que esse plugin (vs @capacitor-community/background-geolocation):
- * - Mantém GPS com tela bloqueada, Doze Mode e fabricantes agressivos
- *   (Xiaomi/Huawei/Samsung/Motorola) — padrão last-mile.
- * - Sobrevive a app encerrado pelo SO (stopOnTerminate=false, startOnBoot=true,
+ * Por que esse plugin:
+ * - Mantém GPS com tela bloqueada, Doze Mode e fabricantes agressivos.
+ * - Sobrevive a app encerrado (app.stopOnTerminate=false, startOnBoot=true,
  *   enableHeadless=true).
- * - Foreground Service nativo já gerenciado pelo plugin.
+ * - Uploader HTTP NATIVO → posições vão direto a `processar-gps` sem
+ *   depender da WebView/JS/IndexedDB com tela bloqueada.
  *
- * Estratégia de envio:
- * - Posições → uploader HTTP NATIVO do Transistorsoft → processar-gps.
- * - Isto NÃO depende de JS/WebView/IndexedDB para entregar com tela bloqueada,
- *   resolvendo a causa raiz do problema histórico no APK community.
- * - `extras.monitoramento_rota_id` é injetado em cada POST via locationTemplate.
- *
- * Licença Android:
- * - Configurada via <meta-data android:name="com.transistorsoft.locationmanager.license">
- *   no AndroidManifest.xml. Ver docs/TRANSISTORSOFT_SETUP.md.
- * - Licença é emitida para com.orkestria.driver e cobre `.staging` automaticamente.
+ * Licença Android: <meta-data android:name="com.transistorsoft.locationmanager.license">
+ * no AndroidManifest. Cobre PROD (com.orkestria.driver) e STAGING (.staging).
+ * Ver docs/TRANSISTORSOFT_SETUP.md.
  */
 
 interface GpsConfig {
@@ -48,7 +41,6 @@ interface UseGpsTrackerOptions {
   config?: Partial<GpsConfig>;
 }
 
-// Carrega o plugin só em runtime nativo — evita quebrar build web.
 type TSBgGeo = typeof import("@transistorsoft/capacitor-background-geolocation").default;
 let BackgroundGeolocation: TSBgGeo | null = null;
 let pluginLoadAttempted = false;
@@ -73,10 +65,6 @@ const GPS_ENDPOINT = `${SUPABASE_URL}/functions/v1/processar-gps`;
 
 let readyPromise: Promise<void> | null = null;
 
-/**
- * Inicializa o plugin uma única vez por sessão. Idempotente.
- * Pode ser chamado tanto pelo hook quanto pelo headless task.
- */
 export async function ensureTransistorGpsReady(
   distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
   monitoramentoRotaId: string | null = null
@@ -92,45 +80,45 @@ export async function ensureTransistorGpsReady(
     if (!plugin) throw new Error("Plugin Transistorsoft indisponível");
 
     await plugin.ready({
-      // ---- Geolocation
-      desiredAccuracy: 0, // HIGH
-      distanceFilter,
-      stopOnTerminate: false,
-      startOnBoot: true,
-      enableHeadless: true,
-      locationAuthorizationRequest: "Always",
-      // ---- Activity Recognition (deixa o plugin decidir quando rastrear)
-      stopTimeout: 5,
-      // ---- HTTP nativo: envia cada posição direto para processar-gps
-      url: GPS_ENDPOINT,
-      autoSync: true,
-      batchSync: false,
-      maxBatchSize: 1,
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SUPABASE_ANON}`,
-        apikey: SUPABASE_ANON,
-        "Content-Type": "application/json",
-      },
-      // Template = corpo JSON enviado por POST. Mantém o contrato da edge function.
-      locationTemplate:
-        '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-        '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
-        '"accuracy":<%= accuracy %>,"heartbeat":false,' +
-        '"client_ts":"<%= timestamp %>","source":"transistor-native-http"}',
-      extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
-      // ---- Notificação persistente (Foreground Service Android)
-      notification: {
-        title: "Orkestria — Rota ativa",
-        text: "Rastreando posição em segundo plano",
-        sticky: true,
-        channelName: "Rastreamento GPS",
-      },
-      // ---- Debug
-      debug: false,
-      logLevel: 3, // WARN
-      // ---- Reset = false: mantém qualquer config salva entre reaberturas
       reset: true,
+      geolocation: {
+        desiredAccuracy: 0, // HIGH
+        distanceFilter,
+        locationAuthorizationRequest: "Always",
+        stopTimeout: 5,
+      },
+      http: {
+        url: GPS_ENDPOINT,
+        autoSync: true,
+        batchSync: false,
+        maxBatchSize: 1,
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+          apikey: SUPABASE_ANON,
+          "Content-Type": "application/json",
+        },
+      },
+      app: {
+        stopOnTerminate: false,
+        startOnBoot: true,
+        enableHeadless: true,
+        notification: {
+          title: "Orkestria — Rota ativa",
+          text: "Rastreando posição em segundo plano",
+          sticky: true,
+          channelName: "Rastreamento GPS",
+        },
+      },
+      persistence: {
+        locationTemplate:
+          '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
+          '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+          '"accuracy":<%= accuracy %>,"heartbeat":false,' +
+          '"client_ts":"<%= timestamp %>","source":"transistor-native-http"}',
+        extras: monitoramentoRotaId ? { monitoramento_rota_id: monitoramentoRotaId } : {},
+      },
+      logger: { debug: false, logLevel: 3 },
     });
   })();
 
@@ -146,7 +134,9 @@ async function updateRotaExtras(monitoramentoRotaId: string): Promise<void> {
   const plugin = BackgroundGeolocation;
   if (!plugin) return;
   try {
-    await plugin.setConfig({ extras: { monitoramento_rota_id: monitoramentoRotaId } });
+    await plugin.setConfig({
+      persistence: { extras: { monitoramento_rota_id: monitoramentoRotaId } },
+    });
   } catch (err) {
     console.warn("[GPS Transistor] setConfig extras falhou:", err);
   }
@@ -177,23 +167,20 @@ export function useGpsTrackerTransistor({
         const plugin = BackgroundGeolocation;
         if (!plugin || cancelled) return;
 
-        // Listeners para UI / telemetria — não bloqueiam envio nativo.
         subsRef.current.push(
           plugin.onLocation(
             (loc) => {
               setLastPosition({ lat: loc.coords.latitude, lng: loc.coords.longitude });
               setError(null);
             },
-            (err) => {
-              console.warn("[GPS Transistor] onLocation error:", err);
-              setError(`GPS erro ${err.code}`);
+            (errCode) => {
+              console.warn("[GPS Transistor] onLocation error:", errCode);
+              setError(`GPS erro ${errCode}`);
             }
           )
         );
         subsRef.current.push(
           plugin.onHttp((res) => {
-            // Sucesso/falha do uploader HTTP nativo. count = posições restantes no SQLite do plugin.
-            setPendingQueue(res.count ?? 0);
             if (!res.success) {
               setError(`HTTP ${res.status}`);
             } else {
@@ -201,6 +188,18 @@ export function useGpsTrackerTransistor({
             }
           })
         );
+        // Atualiza contagem pendente periodicamente via API do plugin.
+        const refreshCount = async () => {
+          try {
+            const c = await plugin.getCount();
+            setPendingQueue(c);
+          } catch {
+            /* ignore */
+          }
+        };
+        const countInterval = window.setInterval(refreshCount, 15_000);
+        subsRef.current.push({ remove: () => window.clearInterval(countInterval) });
+        void refreshCount();
 
         const state = await plugin.getState();
         if (!state.enabled) {
@@ -223,12 +222,9 @@ export function useGpsTrackerTransistor({
         }
       }
       subsRef.current = [];
-      // NÃO chamar stop() aqui — derrubaria o Foreground Service entre re-mounts.
-      // O stop real acontece quando enabled=false abaixo.
     };
   }, [enabled, monitoramentoRotaId, config.distance_filter_metros]);
 
-  // Quando enabled=false, paramos efetivamente o plugin.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (enabled) return;
