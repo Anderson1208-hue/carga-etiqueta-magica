@@ -30,6 +30,9 @@ CAP_ENV=staging npx cap sync android
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
 assert_android_background_gps_ready
 
+echo "==> 3.6/6 Garantindo FQN da MainActivity (fix do crash ClassNotFoundException)"
+assert_main_activity_fqn
+
 echo "==> 4/6 Gerando APK release"
 assert_gradle_wrapper
 run_android_gradle_release
