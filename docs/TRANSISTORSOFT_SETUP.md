@@ -49,7 +49,29 @@ Cole **uma única vez** dentro de `<application>...</application>`:
 
 Validade: `max_build_stamp = 2027-07-18`. Cobre PROD + STAGING + DEV pela mesma licença.
 
+### 1.3 MainActivity com nome ABSOLUTO (obrigatório para STAGING/HOMOLOG)
+
+Ainda em `android/app/src/main/AndroidManifest.xml`, dentro do `<activity ...>` principal, troque:
+
+```xml
+<activity android:name=".MainActivity" ... >
+```
+
+por:
+
+```xml
+<activity android:name="com.orkestria.driver.MainActivity" ... >
+```
+
+**Por quê:** o ponto inicial em `.MainActivity` faz o Android resolver o nome relativo ao `applicationId`. Como STAGING usa `applicationId = com.orkestria.driver.staging`, o sistema procura `com.orkestria.driver.staging.MainActivity`, classe que não existe (o `npx cap add android` gera a classe sempre em `com.orkestria.driver.MainActivity`). Resultado: app crasha no boot com `ClassNotFoundException` / `Unable to instantiate activity`. PROD funciona por coincidência (applicationId == package da classe), mas qualquer build com sufixo (`.staging`, `.homolog`, `.dev`) quebra.
+
+Confira também que o arquivo da classe está em:
+`android/app/src/main/java/com/orkestria/driver/MainActivity.java` (ou `.kt`).
+
+O script `./scripts/build-apk-staging.sh` (e os de homolog/release) agora valida e auto-corrige isso antes de buildar — então depois desta correção, builds futuros ficam protegidos automaticamente.
+
 ---
+
 
 ## 2. Build STAGING
 
