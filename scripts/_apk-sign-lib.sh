@@ -220,6 +220,47 @@ assert_android_background_gps_ready() {
   fi
 }
 
+# Garante que <activity android:name="..."> usa o nome ABSOLUTO da classe
+# MainActivity (com.orkestria.driver.MainActivity). Sem isso, builds com
+# applicationId sufixado (.staging/.homolog) crasham no boot com
+# ClassNotFoundException porque o Android resolve ".MainActivity" relativo
+# ao applicationId e procura com.orkestria.driver.staging.MainActivity, que
+# não existe (a classe fica sempre no package base com.orkestria.driver).
+assert_main_activity_fqn() {
+  local manifest="android/app/src/main/AndroidManifest.xml"
+  [ -f "$manifest" ] || return 0
+
+  local fqn="com.orkestria.driver.MainActivity"
+
+  if grep -q "android:name=\"$fqn\"" "$manifest"; then
+    echo "[manifest] MainActivity já está com FQN: $fqn"
+    return 0
+  fi
+
+  if grep -qE 'android:name="\.MainActivity"|android:name="com\.orkestria\.driver\.(staging|homolog|dev)\.MainActivity"' "$manifest"; then
+    echo "==> Corrigindo MainActivity no AndroidManifest.xml para FQN: $fqn"
+    # Substitui qualquer variante (.MainActivity ou com.orkestria.driver.<sufixo>.MainActivity)
+    sed -i.bak -E \
+      -e "s|android:name=\"\.MainActivity\"|android:name=\"$fqn\"|g" \
+      -e "s|android:name=\"com\.orkestria\.driver\.(staging\|homolog\|dev)\.MainActivity\"|android:name=\"$fqn\"|g" \
+      "$manifest"
+    rm -f "$manifest.bak"
+    if ! grep -q "android:name=\"$fqn\"" "$manifest"; then
+      echo "ERRO: não consegui aplicar FQN no AndroidManifest.xml. Edite manualmente:"
+      echo "      <activity android:name=\"$fqn\" ... >"
+      exit 1
+    fi
+  fi
+
+  # Confirma que o .java/.kt da MainActivity está no diretório correto.
+  if [ ! -f "android/app/src/main/java/com/orkestria/driver/MainActivity.java" ] \
+     && [ ! -f "android/app/src/main/java/com/orkestria/driver/MainActivity.kt" ]; then
+    echo "ERRO: MainActivity não encontrada em android/app/src/main/java/com/orkestria/driver/"
+    echo "      Recrie a pasta android/ com: rm -rf android && npx cap add android"
+    exit 1
+  fi
+}
+
 # Assina manualmente um APK unsigned via apksigner se o gradle não assinou.
 sign_if_needed() {
   local release_dir="android/app/build/outputs/apk/release"

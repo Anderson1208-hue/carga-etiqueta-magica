@@ -29,6 +29,9 @@ CAP_ENV=homolog npx cap sync android
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
 assert_android_background_gps_ready
 
+echo "==> Garantindo FQN da MainActivity"
+assert_main_activity_fqn
+
 echo "==> 4/6 Gerando APK release"
 assert_gradle_wrapper
 run_android_gradle_release
