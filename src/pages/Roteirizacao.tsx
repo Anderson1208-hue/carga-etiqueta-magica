@@ -1213,13 +1213,16 @@ export default function Roteirizacao() {
     const rotsRanked = rots
       .map((r: any) => {
         const ps = paradasPorRot.get(r.id) || [];
-        const coverage = ps.filter((p) => cnpjsDoVeiculo.has(p.cnpj)).length;
+        const coverage = new Set(
+          ps.filter((p) => cnpjsDoVeiculo.has(p.cnpj)).map((p) => p.cnpj)
+        ).size;
         return { id: r.id, created_at: r.created_at, coverage, paradas: ps };
       })
       .sort((a, b) => {
         if (b.coverage !== a.coverage) return b.coverage - a.coverage;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
+
 
     // Aplica melhor rota primeiro; depois preenche CNPJs ainda sem ordem.
     // IMPORTANTE: considera apenas CNPJs do veículo atual, para que a
