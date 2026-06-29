@@ -303,7 +303,10 @@ export function ReroteirizarVeiculoDialog({
       const entregaMap = new Map<string, Entrega>();
       for (const vnf of vnfs as any[]) {
         const nf = vnf.notas_fiscais;
-        const cnpj = nf.cnpj_destinatario || `SEM_CNPJ_${nf.id}`;
+        const cnpjRaw = nf.cnpj_destinatario || `SEM_CNPJ_${nf.id}`;
+        // Normaliza CNPJ para evitar duplicar paradas quando o mesmo cliente
+        // vem com formatos diferentes (com/sem máscara) entre NFs.
+        const cnpj = (cnpjRaw || "").replace(/\D/g, "") || cnpjRaw;
         const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep]
           .filter(Boolean)
           .join(", ");
@@ -315,7 +318,7 @@ export function ReroteirizarVeiculoDialog({
         if (!entregaMap.has(cnpj)) {
           entregaMap.set(cnpj, {
             cep: nf.dest_cep || "SEM_CEP",
-            cnpjDestinatario: cnpj,
+            cnpjDestinatario: cnpjRaw,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
             bairro: nf.dest_bairro || "",
@@ -334,6 +337,7 @@ export function ReroteirizarVeiculoDialog({
             cargaIds: [],
           });
         }
+
         const e = entregaMap.get(cnpj)!;
         e.totalNfs += 1;
         e.totalCaixas += caixas;
