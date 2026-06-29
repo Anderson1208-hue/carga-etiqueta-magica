@@ -395,7 +395,7 @@ export default function Roteirizacao() {
             nfs: [], nfIds: [], cargaIds: [],
           });
         }
-        const entrega = entregasMap.get(cnpj)!;
+        const entrega = entregasMap.get(chave)!;
         entrega.totalNfs++;
         entrega.nfs.push(nf.numero_nf);
         entrega.nfIds.push(nf.id);
