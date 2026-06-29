@@ -797,21 +797,32 @@ export default function Roteirizacao() {
         })
         .eq("id", rotData.id);
 
-      const paradasInsert = orderedEntregas.map((e, index) => ({
-        roteirizacao_id: rotData.id,
-        cnpj_destinatario: e.cnpjDestinatario,
-        razao_social: e.razaoSocial,
-        endereco_completo: e.enderecoCompleto,
-        latitude: e.latitude,
-        longitude: e.longitude,
-        ordem: e.ordem || index + 1,
-        total_nfs: e.totalNfs,
-        total_caixas: e.totalCaixas,
-        peso_total_kg: e.pesoTotalKg,
-        volume_total_m3: e.volumeTotalM3,
-      }));
+      // Dedup defensivo por CNPJ normalizado: garante 1 linha por cliente,
+      // mantendo a primeira ocorrência (já está na ordem da rota).
+      const paradasSeen = new Set<string>();
+      const paradasInsert = orderedEntregas
+        .filter((e) => {
+          const key = (e.cnpjDestinatario || "").replace(/\D/g, "") || e.cnpjDestinatario;
+          if (paradasSeen.has(key)) return false;
+          paradasSeen.add(key);
+          return true;
+        })
+        .map((e, index) => ({
+          roteirizacao_id: rotData.id,
+          cnpj_destinatario: e.cnpjDestinatario,
+          razao_social: e.razaoSocial,
+          endereco_completo: e.enderecoCompleto,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          ordem: index + 1,
+          total_nfs: e.totalNfs,
+          total_caixas: e.totalCaixas,
+          peso_total_kg: e.pesoTotalKg,
+          volume_total_m3: e.volumeTotalM3,
+        }));
 
       await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
 
       setRoteirizacao({
         id: rotData.id,
