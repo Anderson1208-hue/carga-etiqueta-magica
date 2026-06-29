@@ -380,10 +380,12 @@ export default function Roteirizacao() {
       const entregasMap = new Map<string, Entrega>();
       allNfs.forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
-        if (!entregasMap.has(cnpj)) {
+        const chave = (cnpj || "").replace(/\D/g, "") || cnpj;
+        if (!entregasMap.has(chave)) {
           const bairro = nf.dest_bairro || "";
           const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep].filter(Boolean).join(", ");
-          entregasMap.set(cnpj, {
+          entregasMap.set(chave, {
+
             cep: nf.dest_cep || "SEM_CEP", cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado", bairro,
