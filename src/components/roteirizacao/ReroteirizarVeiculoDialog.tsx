@@ -303,7 +303,10 @@ export function ReroteirizarVeiculoDialog({
       const entregaMap = new Map<string, Entrega>();
       for (const vnf of vnfs as any[]) {
         const nf = vnf.notas_fiscais;
-        const cnpj = nf.cnpj_destinatario || `SEM_CNPJ_${nf.id}`;
+        const cnpjRaw = nf.cnpj_destinatario || `SEM_CNPJ_${nf.id}`;
+        // Normaliza CNPJ para evitar duplicar paradas quando o mesmo cliente
+        // vem com formatos diferentes (com/sem máscara) entre NFs.
+        const cnpj = (cnpjRaw || "").replace(/\D/g, "") || cnpjRaw;
         const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep]
           .filter(Boolean)
           .join(", ");
@@ -315,7 +318,7 @@ export function ReroteirizarVeiculoDialog({
         if (!entregaMap.has(cnpj)) {
           entregaMap.set(cnpj, {
             cep: nf.dest_cep || "SEM_CEP",
-            cnpjDestinatario: cnpj,
+            cnpjDestinatario: cnpjRaw,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado",
             bairro: nf.dest_bairro || "",
@@ -334,6 +337,7 @@ export function ReroteirizarVeiculoDialog({
             cargaIds: [],
           });
         }
+
         const e = entregaMap.get(cnpj)!;
         e.totalNfs += 1;
         e.totalCaixas += caixas;
@@ -526,21 +530,30 @@ export function ReroteirizarVeiculoDialog({
       // Replace all paradas
       await supabase.from("roteirizacao_paradas").delete().eq("roteirizacao_id", rotId);
 
-      const paradasInsert = entregas.map((e, idx) => ({
-        roteirizacao_id: rotId!,
-        cnpj_destinatario: e.cnpjDestinatario,
-        razao_social: e.razaoSocial,
-        endereco_completo: e.enderecoCompleto,
-        latitude: e.latitude,
-        longitude: e.longitude,
-        ordem: e.ordem || idx + 1,
-        total_nfs: e.totalNfs,
-        total_caixas: e.totalCaixas,
-        peso_total_kg: e.pesoTotalKg,
-        volume_total_m3: e.volumeTotalM3,
-      }));
+      const seenCnpj = new Set<string>();
+      const paradasInsert = entregas
+        .filter((e) => {
+          const key = (e.cnpjDestinatario || "").replace(/\D/g, "") || e.cnpjDestinatario;
+          if (seenCnpj.has(key)) return false;
+          seenCnpj.add(key);
+          return true;
+        })
+        .map((e, idx) => ({
+          roteirizacao_id: rotId!,
+          cnpj_destinatario: e.cnpjDestinatario,
+          razao_social: e.razaoSocial,
+          endereco_completo: e.enderecoCompleto,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          ordem: idx + 1,
+          total_nfs: e.totalNfs,
+          total_caixas: e.totalCaixas,
+          peso_total_kg: e.pesoTotalKg,
+          volume_total_m3: e.volumeTotalM3,
+        }));
 
       const { error: insErr } = await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
       if (insErr) throw insErr;
 
       toast({

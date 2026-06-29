@@ -285,7 +285,11 @@ export default function Roteirizacao() {
 
       nfsDisponiveis.forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
-        const chave = cnpj;
+        // Normaliza CNPJ para evitar duplicar paradas quando o mesmo cliente
+        // vem com formatos diferentes (com/sem máscara, espaços etc.).
+        const chave = (cnpj || "").replace(/\D/g, "") || cnpj;
+
+
 
         if (!entregasMap.has(chave)) {
           const bairro = nf.dest_bairro || "";
@@ -376,10 +380,12 @@ export default function Roteirizacao() {
       const entregasMap = new Map<string, Entrega>();
       allNfs.forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
-        if (!entregasMap.has(cnpj)) {
+        const chave = (cnpj || "").replace(/\D/g, "") || cnpj;
+        if (!entregasMap.has(chave)) {
           const bairro = nf.dest_bairro || "";
           const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep].filter(Boolean).join(", ");
-          entregasMap.set(cnpj, {
+          entregasMap.set(chave, {
+
             cep: nf.dest_cep || "SEM_CEP", cnpjDestinatario: cnpj,
             razaoSocial: nf.dest_razao_social || "Cliente não identificado",
             enderecoCompleto: endereco || "Endereço não informado", bairro,
@@ -389,7 +395,7 @@ export default function Roteirizacao() {
             nfs: [], nfIds: [], cargaIds: [],
           });
         }
-        const entrega = entregasMap.get(cnpj)!;
+        const entrega = entregasMap.get(chave)!;
         entrega.totalNfs++;
         entrega.nfs.push(nf.numero_nf);
         entrega.nfIds.push(nf.id);
@@ -791,21 +797,32 @@ export default function Roteirizacao() {
         })
         .eq("id", rotData.id);
 
-      const paradasInsert = orderedEntregas.map((e, index) => ({
-        roteirizacao_id: rotData.id,
-        cnpj_destinatario: e.cnpjDestinatario,
-        razao_social: e.razaoSocial,
-        endereco_completo: e.enderecoCompleto,
-        latitude: e.latitude,
-        longitude: e.longitude,
-        ordem: e.ordem || index + 1,
-        total_nfs: e.totalNfs,
-        total_caixas: e.totalCaixas,
-        peso_total_kg: e.pesoTotalKg,
-        volume_total_m3: e.volumeTotalM3,
-      }));
+      // Dedup defensivo por CNPJ normalizado: garante 1 linha por cliente,
+      // mantendo a primeira ocorrência (já está na ordem da rota).
+      const paradasSeen = new Set<string>();
+      const paradasInsert = orderedEntregas
+        .filter((e) => {
+          const key = (e.cnpjDestinatario || "").replace(/\D/g, "") || e.cnpjDestinatario;
+          if (paradasSeen.has(key)) return false;
+          paradasSeen.add(key);
+          return true;
+        })
+        .map((e, index) => ({
+          roteirizacao_id: rotData.id,
+          cnpj_destinatario: e.cnpjDestinatario,
+          razao_social: e.razaoSocial,
+          endereco_completo: e.enderecoCompleto,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          ordem: index + 1,
+          total_nfs: e.totalNfs,
+          total_caixas: e.totalCaixas,
+          peso_total_kg: e.pesoTotalKg,
+          volume_total_m3: e.volumeTotalM3,
+        }));
 
       await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
 
       setRoteirizacao({
         id: rotData.id,
@@ -922,20 +939,29 @@ export default function Roteirizacao() {
         .single();
       if (rotError) throw rotError;
 
-      const paradasInsert = orderedEntregas.map((e, index) => ({
-        roteirizacao_id: rotData.id,
-        cnpj_destinatario: e.cnpjDestinatario,
-        razao_social: e.razaoSocial,
-        endereco_completo: e.enderecoCompleto,
-        latitude: e.latitude,
-        longitude: e.longitude,
-        ordem: e.ordem || index + 1,
-        total_nfs: e.totalNfs,
-        total_caixas: e.totalCaixas,
-        peso_total_kg: e.pesoTotalKg,
-        volume_total_m3: e.volumeTotalM3,
-      }));
+      const paradasSeenManual = new Set<string>();
+      const paradasInsert = orderedEntregas
+        .filter((e) => {
+          const key = (e.cnpjDestinatario || "").replace(/\D/g, "") || e.cnpjDestinatario;
+          if (paradasSeenManual.has(key)) return false;
+          paradasSeenManual.add(key);
+          return true;
+        })
+        .map((e, index) => ({
+          roteirizacao_id: rotData.id,
+          cnpj_destinatario: e.cnpjDestinatario,
+          razao_social: e.razaoSocial,
+          endereco_completo: e.enderecoCompleto,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          ordem: index + 1,
+          total_nfs: e.totalNfs,
+          total_caixas: e.totalCaixas,
+          peso_total_kg: e.pesoTotalKg,
+          volume_total_m3: e.volumeTotalM3,
+        }));
       await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
 
       setRoteirizacao({
         id: rotData.id,
@@ -1187,13 +1213,16 @@ export default function Roteirizacao() {
     const rotsRanked = rots
       .map((r: any) => {
         const ps = paradasPorRot.get(r.id) || [];
-        const coverage = ps.filter((p) => cnpjsDoVeiculo.has(p.cnpj)).length;
+        const coverage = new Set(
+          ps.filter((p) => cnpjsDoVeiculo.has(p.cnpj)).map((p) => p.cnpj)
+        ).size;
         return { id: r.id, created_at: r.created_at, coverage, paradas: ps };
       })
       .sort((a, b) => {
         if (b.coverage !== a.coverage) return b.coverage - a.coverage;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
+
 
     // Aplica melhor rota primeiro; depois preenche CNPJs ainda sem ordem.
     // IMPORTANTE: considera apenas CNPJs do veículo atual, para que a
