@@ -285,7 +285,11 @@ export default function Roteirizacao() {
 
       nfsDisponiveis.forEach((nf) => {
         const cnpj = nf.cnpj_destinatario || "SEM_CNPJ";
-        const chave = cnpj;
+        // Normaliza CNPJ para evitar duplicar paradas quando o mesmo cliente
+        // vem com formatos diferentes (com/sem máscara, espaços etc.).
+        const chave = (cnpj || "").replace(/\D/g, "") || cnpj;
+
+
 
         if (!entregasMap.has(chave)) {
           const bairro = nf.dest_bairro || "";
