@@ -530,21 +530,30 @@ export function ReroteirizarVeiculoDialog({
       // Replace all paradas
       await supabase.from("roteirizacao_paradas").delete().eq("roteirizacao_id", rotId);
 
-      const paradasInsert = entregas.map((e, idx) => ({
-        roteirizacao_id: rotId!,
-        cnpj_destinatario: e.cnpjDestinatario,
-        razao_social: e.razaoSocial,
-        endereco_completo: e.enderecoCompleto,
-        latitude: e.latitude,
-        longitude: e.longitude,
-        ordem: e.ordem || idx + 1,
-        total_nfs: e.totalNfs,
-        total_caixas: e.totalCaixas,
-        peso_total_kg: e.pesoTotalKg,
-        volume_total_m3: e.volumeTotalM3,
-      }));
+      const seenCnpj = new Set<string>();
+      const paradasInsert = entregas
+        .filter((e) => {
+          const key = (e.cnpjDestinatario || "").replace(/\D/g, "") || e.cnpjDestinatario;
+          if (seenCnpj.has(key)) return false;
+          seenCnpj.add(key);
+          return true;
+        })
+        .map((e, idx) => ({
+          roteirizacao_id: rotId!,
+          cnpj_destinatario: e.cnpjDestinatario,
+          razao_social: e.razaoSocial,
+          endereco_completo: e.enderecoCompleto,
+          latitude: e.latitude,
+          longitude: e.longitude,
+          ordem: idx + 1,
+          total_nfs: e.totalNfs,
+          total_caixas: e.totalCaixas,
+          peso_total_kg: e.pesoTotalKg,
+          volume_total_m3: e.volumeTotalM3,
+        }));
 
       const { error: insErr } = await supabase.from("roteirizacao_paradas").insert(paradasInsert);
+
       if (insErr) throw insErr;
 
       toast({
