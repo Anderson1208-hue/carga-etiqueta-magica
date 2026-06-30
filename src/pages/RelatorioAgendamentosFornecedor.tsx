@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Download, Loader2, FileSpreadsheet, FileText, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -60,18 +61,48 @@ export default function RelatorioAgendamentosFornecedor() {
   async function carregar() {
     setLoading(true);
     try {
-      let query = supabase
+      // Statuses sem data_agendamento (pendentes) — sempre incluir quando o filtro permite
+      const STATUS_SEM_DATA = ["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA"];
+
+      // 1) Agendamentos com data dentro do período
+      let qComData = supabase
         .from("agendamentos")
         .select("id, nf_id, status, data_agendamento, created_at")
+        .not("data_agendamento", "is", null)
         .order("data_agendamento", { ascending: false });
+      if (dataIni) qComData = qComData.gte("data_agendamento", dataIni);
+      if (dataFim) qComData = qComData.lte("data_agendamento", dataFim);
+      if (statusFilter !== "todos") qComData = qComData.eq("status", statusFilter);
 
-      if (dataIni) query = query.gte("data_agendamento", dataIni);
-      if (dataFim) query = query.lte("data_agendamento", dataFim);
-      if (statusFilter !== "todos") query = query.eq("status", statusFilter);
+      // 2) Agendamentos pendentes (sem data) — sempre incluir se o filtro de status permitir
+      const statusPendentes =
+        statusFilter === "todos"
+          ? STATUS_SEM_DATA
+          : STATUS_SEM_DATA.includes(statusFilter)
+          ? [statusFilter]
+          : [];
 
-      // Defensive limit: report unlikely to exceed 5000 agendamentos
-      const { data: agData, error: agErr } = await query.limit(5000);
-      if (agErr) throw agErr;
+      const queries: Promise<any>[] = [Promise.resolve(qComData.limit(5000))];
+      if (statusPendentes.length > 0) {
+        queries.push(
+          Promise.resolve(
+            supabase
+              .from("agendamentos")
+              .select("id, nf_id, status, data_agendamento, created_at")
+              .is("data_agendamento", null)
+              .in("status", statusPendentes)
+              .order("created_at", { ascending: false })
+              .limit(5000)
+          )
+        );
+      }
+
+      const results = await Promise.all(queries);
+      for (const r of results) if (r.error) throw r.error;
+      const agData = [
+        ...((results[0]?.data as any[]) || []),
+        ...((results[1]?.data as any[]) || []),
+      ];
 
       if (!agData || agData.length === 0) {
         setItems([]);
@@ -367,7 +398,7 @@ export default function RelatorioAgendamentosFornecedor() {
               </p>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <p className="text-xs text-muted-foreground">
                     {filtered.length} NF(s) • {grouped.length} fornecedor(es)
                   </p>
@@ -376,97 +407,107 @@ export default function RelatorioAgendamentosFornecedor() {
                     {totals.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} • Cx: {totals.cx}
                   </p>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-[40px]"></TableHead>
-                        <TableHead>NF</TableHead>
-                        <TableHead>Destinatário</TableHead>
-                        <TableHead>Cidade/UF</TableHead>
-                        <TableHead>Faturamento</TableHead>
-                        <TableHead>Agenda</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Peso (kg)</TableHead>
-                        <TableHead className="text-right">M³</TableHead>
-                        <TableHead className="text-right">Valor (R$)</TableHead>
-                        <TableHead className="text-right">Cx</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {grouped.map(([fornecedor, grupo]) => {
-                        const sub = grupo.reduce(
-                          (acc, it) => ({
-                            peso: acc.peso + it.peso_bruto,
-                            m3: acc.m3 + it.volume_m3,
-                            valor: acc.valor + it.valor_nf,
-                            cx: acc.cx + it.caixas,
-                          }),
-                          { peso: 0, m3: 0, valor: 0, cx: 0 }
-                        );
-                        return (
-                          <>
-                            <TableRow key={fornecedor} className="bg-muted/30">
-                              <TableCell colSpan={11} className="py-1.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-sm">{fornecedor}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {grupo[0]?.cnpj_emitente || ""} • {grupo.length} NF(s)
-                                  </span>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            {grupo.map((it) => (
-                              <TableRow key={`${fornecedor}-${it.numero_nf}-${it.data_agendamento}`}>
-                                <TableCell></TableCell>
-                                <TableCell className="font-mono text-xs">{it.numero_nf}</TableCell>
-                                <TableCell className="text-xs max-w-[240px] truncate">
-                                  {it.dest_razao_social || "—"}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  {it.dest_cidade ? `${it.dest_cidade}/${it.dest_uf || ""}` : "—"}
-                                </TableCell>
-                                <TableCell className="text-xs whitespace-nowrap">
-                                  {fmtDate(it.data_emissao)}
-                                </TableCell>
-                                <TableCell className="text-xs whitespace-nowrap">
-                                  {fmtDate(it.data_agendamento)}
-                                </TableCell>
-                                <TableCell>{statusBadge(it.status)}</TableCell>
-                                <TableCell className="text-xs text-right">
-                                  {it.peso_bruto.toFixed(1)}
-                                </TableCell>
-                                <TableCell className="text-xs text-right">
-                                  {it.volume_m3.toFixed(3)}
-                                </TableCell>
-                                <TableCell className="text-xs text-right">
-                                  {it.valor_nf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                                </TableCell>
-                                <TableCell className="text-xs text-right">{it.caixas}</TableCell>
+
+                <Tabs defaultValue="__todos__" className="w-full">
+                  <TabsList className="flex flex-wrap h-auto justify-start gap-1">
+                    <TabsTrigger value="__todos__" className="text-xs">
+                      Todos ({filtered.length})
+                    </TabsTrigger>
+                    {grouped.map(([fornecedor, grupo]) => (
+                      <TabsTrigger key={fornecedor} value={fornecedor} className="text-xs">
+                        {fornecedor.length > 30 ? fornecedor.slice(0, 30) + "…" : fornecedor} ({grupo.length})
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {[
+                    ["__todos__", filtered] as [string, AgendamentoFornecedorItem[]],
+                    ...grouped.map(([f, g]) => [f, g] as [string, AgendamentoFornecedorItem[]]),
+                  ].map(([tabKey, rows]) => {
+                    const sub = rows.reduce(
+                      (acc, it) => ({
+                        peso: acc.peso + it.peso_bruto,
+                        m3: acc.m3 + it.volume_m3,
+                        valor: acc.valor + it.valor_nf,
+                        cx: acc.cx + it.caixas,
+                      }),
+                      { peso: 0, m3: 0, valor: 0, cx: 0 }
+                    );
+                    const isTodos = tabKey === "__todos__";
+                    return (
+                      <TabsContent key={tabKey} value={tabKey} className="mt-3">
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50">
+                                {isTodos && <TableHead>Fornecedor</TableHead>}
+                                <TableHead>NF</TableHead>
+                                <TableHead>Destinatário</TableHead>
+                                <TableHead>Cidade/UF</TableHead>
+                                <TableHead>Faturamento</TableHead>
+                                <TableHead>Agenda</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Peso (kg)</TableHead>
+                                <TableHead className="text-right">M³</TableHead>
+                                <TableHead className="text-right">Valor (R$)</TableHead>
+                                <TableHead className="text-right">Cx</TableHead>
                               </TableRow>
-                            ))}
-                            <TableRow className="bg-muted/10 border-b-2">
-                              <TableCell></TableCell>
-                              <TableCell colSpan={6} className="text-xs font-medium">
-                                Subtotal {fornecedor}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium text-right">
-                                {sub.peso.toFixed(1)}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium text-right">
-                                {sub.m3.toFixed(3)}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium text-right">
-                                {sub.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                              </TableCell>
-                              <TableCell className="text-xs font-medium text-right">{sub.cx}</TableCell>
-                            </TableRow>
-                          </>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                            </TableHeader>
+                            <TableBody>
+                              {rows.map((it, idx) => (
+                                <TableRow key={`${tabKey}-${idx}-${it.numero_nf}`}>
+                                  {isTodos && (
+                                    <TableCell className="text-xs max-w-[200px] truncate">
+                                      {it.razao_social_emitente || "—"}
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="font-mono text-xs">{it.numero_nf}</TableCell>
+                                  <TableCell className="text-xs max-w-[240px] truncate">
+                                    {it.dest_razao_social || "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {it.dest_cidade ? `${it.dest_cidade}/${it.dest_uf || ""}` : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-xs whitespace-nowrap">
+                                    {fmtDate(it.data_emissao)}
+                                  </TableCell>
+                                  <TableCell className="text-xs whitespace-nowrap">
+                                    {fmtDate(it.data_agendamento)}
+                                  </TableCell>
+                                  <TableCell>{statusBadge(it.status)}</TableCell>
+                                  <TableCell className="text-xs text-right">
+                                    {it.peso_bruto.toFixed(1)}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right">
+                                    {it.volume_m3.toFixed(3)}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right">
+                                    {it.valor_nf.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-right">{it.caixas}</TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-muted/30 border-t-2 font-medium">
+                                <TableCell
+                                  colSpan={isTodos ? 7 : 6}
+                                  className="text-xs"
+                                >
+                                  Total: {rows.length} NF(s)
+                                </TableCell>
+                                <TableCell className="text-xs text-right">{sub.peso.toFixed(1)}</TableCell>
+                                <TableCell className="text-xs text-right">{sub.m3.toFixed(3)}</TableCell>
+                                <TableCell className="text-xs text-right">
+                                  {sub.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </TableCell>
+                                <TableCell className="text-xs text-right">{sub.cx}</TableCell>
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
               </>
             )}
           </CardContent>
