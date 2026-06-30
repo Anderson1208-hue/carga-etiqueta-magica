@@ -61,18 +61,46 @@ export default function RelatorioAgendamentosFornecedor() {
   async function carregar() {
     setLoading(true);
     try {
-      let query = supabase
+      // Statuses sem data_agendamento (pendentes) — sempre incluir quando o filtro permite
+      const STATUS_SEM_DATA = ["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA"];
+
+      // 1) Agendamentos com data dentro do período
+      let qComData = supabase
         .from("agendamentos")
         .select("id, nf_id, status, data_agendamento, created_at")
+        .not("data_agendamento", "is", null)
         .order("data_agendamento", { ascending: false });
+      if (dataIni) qComData = qComData.gte("data_agendamento", dataIni);
+      if (dataFim) qComData = qComData.lte("data_agendamento", dataFim);
+      if (statusFilter !== "todos") qComData = qComData.eq("status", statusFilter);
 
-      if (dataIni) query = query.gte("data_agendamento", dataIni);
-      if (dataFim) query = query.lte("data_agendamento", dataFim);
-      if (statusFilter !== "todos") query = query.eq("status", statusFilter);
+      // 2) Agendamentos pendentes (sem data) — sempre incluir se o filtro de status permitir
+      const statusPendentes =
+        statusFilter === "todos"
+          ? STATUS_SEM_DATA
+          : STATUS_SEM_DATA.includes(statusFilter)
+          ? [statusFilter]
+          : [];
 
-      // Defensive limit: report unlikely to exceed 5000 agendamentos
-      const { data: agData, error: agErr } = await query.limit(5000);
-      if (agErr) throw agErr;
+      const queries: Promise<any>[] = [qComData.limit(5000)];
+      if (statusPendentes.length > 0) {
+        queries.push(
+          supabase
+            .from("agendamentos")
+            .select("id, nf_id, status, data_agendamento, created_at")
+            .is("data_agendamento", null)
+            .in("status", statusPendentes)
+            .order("created_at", { ascending: false })
+            .limit(5000)
+        );
+      }
+
+      const results = await Promise.all(queries);
+      for (const r of results) if (r.error) throw r.error;
+      const agData = [
+        ...((results[0]?.data as any[]) || []),
+        ...((results[1]?.data as any[]) || []),
+      ];
 
       if (!agData || agData.length === 0) {
         setItems([]);
