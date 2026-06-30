@@ -133,7 +133,17 @@ export default function RelatorioAgendamentosFornecedor() {
       const nfIds = agData.map((a) => a.nf_id);
       const nfMap = new Map<string, any>();
       const itensMap = new Map<string, number>();
+      const veiculoSet = new Set<string>();
       const batch = 200;
+
+      for (let i = 0; i < nfIds.length; i += batch) {
+        const slice2 = nfIds.slice(i, i + batch);
+        const { data: vnfs } = await supabase
+          .from("veiculo_nfs")
+          .select("nf_id")
+          .in("nf_id", slice2);
+        (vnfs || []).forEach((v: any) => veiculoSet.add(v.nf_id));
+      }
 
       for (let i = 0; i < nfIds.length; i += batch) {
         const slice = nfIds.slice(i, i + batch);
@@ -154,7 +164,8 @@ export default function RelatorioAgendamentosFornecedor() {
         });
       }
 
-      // Esconde "AGUARDANDO AGENDA/REAGENDA" quando a NF já saiu do depósito
+      // Esconde "AGUARDANDO AGENDA/REAGENDA" quando a NF não está mais no depósito
+      // (já está em rota / entregue / recusado, ou já foi alocada a um veículo)
       const PENDENTES = new Set(["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA"]);
 
       const result: AgendamentoFornecedorItem[] = agData
@@ -162,12 +173,10 @@ export default function RelatorioAgendamentosFornecedor() {
           const nf = nfMap.get(a.nf_id);
           if (!nf) return null;
           const statusEntrega = (nf.status_entrega || "").toUpperCase();
-          if (
-            PENDENTES.has(a.status) &&
-            statusEntrega &&
-            statusEntrega !== "CARGA NO DEPOSITO"
-          ) {
-            return null; // já está em rota / entregue / recusado → não é mais pendente
+          if (PENDENTES.has(a.status)) {
+            // só é pendente real se ainda está no depósito E sem veículo alocado
+            if (statusEntrega !== "CARGA NO DEPOSITO") return null;
+            if (veiculoSet.has(a.nf_id)) return null;
           }
           return {
             numero_nf: nf.numero_nf || "—",
