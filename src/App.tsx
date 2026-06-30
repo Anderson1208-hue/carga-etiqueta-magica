@@ -30,6 +30,7 @@ import AuditoriaLog from "./pages/AuditoriaLog";
 
 import RelatorioBaixas from "./pages/RelatorioBaixas";
 import RelatorioPendentesBaixa from "./pages/RelatorioPendentesBaixa";
+import RelatorioAgendamentosFornecedor from "./pages/RelatorioAgendamentosFornecedor";
 import PrestacaoContas from "./pages/PrestacaoContas";
 
 import MotoristaAcesso from "./pages/MotoristaAcesso";
@@ -282,6 +283,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RelatorioPendentesBaixa />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/relatorios/agendamentos-fornecedor"
+        element={
+          <ProtectedRoute>
+            <RelatorioAgendamentosFornecedor />
           </ProtectedRoute>
         }
       />
