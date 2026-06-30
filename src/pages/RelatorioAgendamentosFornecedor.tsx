@@ -133,7 +133,17 @@ export default function RelatorioAgendamentosFornecedor() {
       const nfIds = agData.map((a) => a.nf_id);
       const nfMap = new Map<string, any>();
       const itensMap = new Map<string, number>();
+      const veiculoSet = new Set<string>();
       const batch = 200;
+
+      for (let i = 0; i < nfIds.length; i += batch) {
+        const slice2 = nfIds.slice(i, i + batch);
+        const { data: vnfs } = await supabase
+          .from("veiculo_nfs")
+          .select("nf_id")
+          .in("nf_id", slice2);
+        (vnfs || []).forEach((v: any) => veiculoSet.add(v.nf_id));
+      }
 
       for (let i = 0; i < nfIds.length; i += batch) {
         const slice = nfIds.slice(i, i + batch);
