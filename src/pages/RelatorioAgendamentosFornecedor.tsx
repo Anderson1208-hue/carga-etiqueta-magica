@@ -99,15 +99,36 @@ export default function RelatorioAgendamentosFornecedor() {
 
       const results = await Promise.all(queries);
       for (const r of results) if (r.error) throw r.error;
-      const agData = [
+      const agDataRaw = [
         ...((results[0]?.data as any[]) || []),
         ...((results[1]?.data as any[]) || []),
       ];
 
-      if (!agData || agData.length === 0) {
+      if (!agDataRaw || agDataRaw.length === 0) {
         setItems([]);
         return;
       }
+
+      // Deduplicação: manter apenas o agendamento mais relevante por NF.
+      // Critério: agendamento com data_agendamento mais recente vence; em empate, created_at mais recente.
+      const bestByNf = new Map<string, any>();
+      for (const a of agDataRaw) {
+        const cur = bestByNf.get(a.nf_id);
+        if (!cur) {
+          bestByNf.set(a.nf_id, a);
+          continue;
+        }
+        const aHasDate = !!a.data_agendamento;
+        const cHasDate = !!cur.data_agendamento;
+        if (aHasDate && !cHasDate) {
+          bestByNf.set(a.nf_id, a);
+        } else if (aHasDate === cHasDate) {
+          const aKey = a.data_agendamento || a.created_at || "";
+          const cKey = cur.data_agendamento || cur.created_at || "";
+          if (aKey > cKey) bestByNf.set(a.nf_id, a);
+        }
+      }
+      const agData = Array.from(bestByNf.values());
 
       const nfIds = agData.map((a) => a.nf_id);
       const nfMap = new Map<string, any>();
@@ -120,7 +141,7 @@ export default function RelatorioAgendamentosFornecedor() {
           supabase
             .from("notas_fiscais")
             .select(
-              "id, numero_nf, razao_social_emitente, cnpj_emitente, dest_razao_social, dest_cidade, dest_uf, data_emissao, peso_bruto, volume_m3, valor_nf"
+              "id, numero_nf, razao_social_emitente, cnpj_emitente, dest_razao_social, dest_cidade, dest_uf, data_emissao, peso_bruto, volume_m3, valor_nf, status_entrega"
             )
             .in("id", slice),
           supabase.from("itens_nf").select("nf_id, q_com").in("nf_id", slice),
@@ -133,10 +154,21 @@ export default function RelatorioAgendamentosFornecedor() {
         });
       }
 
+      // Esconde "AGUARDANDO AGENDA/REAGENDA" quando a NF já saiu do depósito
+      const PENDENTES = new Set(["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA"]);
+
       const result: AgendamentoFornecedorItem[] = agData
         .map((a) => {
           const nf = nfMap.get(a.nf_id);
           if (!nf) return null;
+          const statusEntrega = (nf.status_entrega || "").toUpperCase();
+          if (
+            PENDENTES.has(a.status) &&
+            statusEntrega &&
+            statusEntrega !== "CARGA NO DEPOSITO"
+          ) {
+            return null; // já está em rota / entregue / recusado → não é mais pendente
+          }
           return {
             numero_nf: nf.numero_nf || "—",
             razao_social_emitente: nf.razao_social_emitente || null,
@@ -147,6 +179,7 @@ export default function RelatorioAgendamentosFornecedor() {
             data_emissao: nf.data_emissao,
             data_agendamento: a.data_agendamento,
             status: a.status,
+            status_entrega: nf.status_entrega || null,
             peso_bruto: Number(nf.peso_bruto || 0),
             volume_m3: Number(nf.volume_m3 || 0),
             valor_nf: Number(nf.valor_nf || 0),
