@@ -11,7 +11,7 @@ export interface AgendamentoFornecedorItem {
   data_emissao: string | null; // yyyy-MM-dd
   data_agendamento: string | null; // yyyy-MM-dd
   status: string;
-  status_entrega?: string | null;
+  status_entrega: string | null;
   peso_bruto: number;
   volume_m3: number;
   valor_nf: number;
