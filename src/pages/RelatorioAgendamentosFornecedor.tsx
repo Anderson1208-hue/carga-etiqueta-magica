@@ -173,6 +173,9 @@ export default function RelatorioAgendamentosFornecedor() {
           const nf = nfMap.get(a.nf_id);
           if (!nf) return null;
           const statusEntrega = (nf.status_entrega || "").toUpperCase();
+          // NFs já entregues não devem constar no relatório de agendamentos,
+          // pois o histórico de agendamento fica desatualizado após a entrega.
+          if (statusEntrega === "ENTREGUE") return null;
           if (PENDENTES.has(a.status)) {
             // só é pendente real se ainda está no depósito E sem veículo alocado
             if (statusEntrega !== "CARGA NO DEPOSITO") return null;
