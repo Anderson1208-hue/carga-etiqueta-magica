@@ -82,16 +82,18 @@ export default function RelatorioAgendamentosFornecedor() {
           ? [statusFilter]
           : [];
 
-      const queries: Promise<any>[] = [qComData.limit(5000)];
+      const queries: Promise<any>[] = [Promise.resolve(qComData.limit(5000))];
       if (statusPendentes.length > 0) {
         queries.push(
-          supabase
-            .from("agendamentos")
-            .select("id, nf_id, status, data_agendamento, created_at")
-            .is("data_agendamento", null)
-            .in("status", statusPendentes)
-            .order("created_at", { ascending: false })
-            .limit(5000)
+          Promise.resolve(
+            supabase
+              .from("agendamentos")
+              .select("id, nf_id, status, data_agendamento, created_at")
+              .is("data_agendamento", null)
+              .in("status", statusPendentes)
+              .order("created_at", { ascending: false })
+              .limit(5000)
+          )
         );
       }
 
