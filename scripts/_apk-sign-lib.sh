@@ -220,44 +220,90 @@ assert_android_background_gps_ready() {
   fi
 }
 
-# Garante que <activity android:name="..."> usa o nome ABSOLUTO da classe
-# MainActivity (com.orkestria.driver.MainActivity). Sem isso, builds com
-# applicationId sufixado (.staging/.homolog) crasham no boot com
-# ClassNotFoundException porque o Android resolve ".MainActivity" relativo
-# ao applicationId e procura com.orkestria.driver.staging.MainActivity, que
-# não existe (a classe fica sempre no package base com.orkestria.driver).
+# Garante que:
+#   1) android/app/build.gradle tem `namespace "com.orkestria.driver"` (fixo,
+#      independente do applicationId). Sem isso, o Capacitor gera a
+#      MainActivity dentro do package que casa com o applicationId
+#      (ex.: com.orkestria.driver.staging.MainActivity) — e o FQN do
+#      Manifest (com.orkestria.driver.MainActivity) some, causando
+#      ClassNotFoundException no boot.
+#   2) MainActivity.java está em android/app/src/main/java/com/orkestria/driver/
+#      com `package com.orkestria.driver;`. Se o Capacitor gerou em
+#      .staging/.homolog/.dev, movemos e reescrevemos o `package`.
+#   3) <activity android:name="..."> usa o FQN absoluto.
 assert_main_activity_fqn() {
   local manifest="android/app/src/main/AndroidManifest.xml"
-  [ -f "$manifest" ] || return 0
-
+  local gradle="android/app/build.gradle"
+  local base_dir="android/app/src/main/java/com/orkestria/driver"
   local fqn="com.orkestria.driver.MainActivity"
 
-  if grep -q "android:name=\"$fqn\"" "$manifest"; then
-    echo "[manifest] MainActivity já está com FQN: $fqn"
-    return 0
+  [ -f "$manifest" ] || return 0
+
+  # --- 1) Força namespace fixo no build.gradle (AGP 8+) ---
+  if [ -f "$gradle" ]; then
+    if grep -qE '^\s*namespace\s+"[^"]+"' "$gradle"; then
+      if ! grep -qE '^\s*namespace\s+"com\.orkestria\.driver"\s*$' "$gradle"; then
+        echo "==> Forçando namespace fixo com.orkestria.driver em $gradle"
+        awk '
+          BEGIN{done=0}
+          {
+            if (!done && match($0, /^[[:space:]]*namespace[[:space:]]+"[^"]+"/)) {
+              sub(/"[^"]+"/, "\"com.orkestria.driver\""); done=1
+            }
+            print
+          }' "$gradle" > "$gradle.tmp" && mv "$gradle.tmp" "$gradle"
+      fi
+    else
+      echo "==> Injetando namespace \"com.orkestria.driver\" no bloco android { ... } de $gradle"
+      awk '
+        BEGIN{done=0}
+        {
+          print
+          if (!done && $0 ~ /^android[[:space:]]*\{/) {
+            print "    namespace \"com.orkestria.driver\""
+            done=1
+          }
+        }' "$gradle" > "$gradle.tmp" && mv "$gradle.tmp" "$gradle"
+    fi
   fi
 
-  if grep -qE 'android:name="\.MainActivity"|android:name="com\.orkestria\.driver\.(staging|homolog|dev)\.MainActivity"' "$manifest"; then
+  # --- 2) Move MainActivity para o package base e reescreve `package` ---
+  mkdir -p "$base_dir"
+  local suffix ext
+  for suffix in staging homolog dev; do
+    local src_dir="android/app/src/main/java/com/orkestria/driver/$suffix"
+    for ext in java kt; do
+      local src="$src_dir/MainActivity.$ext"
+      if [ -f "$src" ]; then
+        echo "==> Movendo $src -> $base_dir/MainActivity.$ext (package com.orkestria.driver)"
+        sed -E "s|^package[[:space:]]+com\.orkestria\.driver\.$suffix[[:space:]]*;|package com.orkestria.driver;|" \
+          "$src" > "$base_dir/MainActivity.$ext"
+        rm -f "$src"
+        rmdir "$src_dir" 2>/dev/null || true
+      fi
+    done
+  done
+
+  if [ ! -f "$base_dir/MainActivity.java" ] && [ ! -f "$base_dir/MainActivity.kt" ]; then
+    echo "ERRO: MainActivity não encontrada em $base_dir/ e nada para mover."
+    echo "      Rode: rm -rf android && npx cap add android && npx cap sync android"
+    exit 1
+  fi
+
+  # --- 3) Corrige android:name no Manifest ---
+  if grep -q "android:name=\"$fqn\"" "$manifest"; then
+    echo "[manifest] MainActivity já está com FQN: $fqn"
+  elif grep -qE 'android:name="\.MainActivity"|android:name="com\.orkestria\.driver\.(staging|homolog|dev)\.MainActivity"' "$manifest"; then
     echo "==> Corrigindo MainActivity no AndroidManifest.xml para FQN: $fqn"
-    # Substitui qualquer variante (.MainActivity ou com.orkestria.driver.<sufixo>.MainActivity)
     sed -i.bak -E \
       -e "s|android:name=\"\.MainActivity\"|android:name=\"$fqn\"|g" \
       -e "s|android:name=\"com\.orkestria\.driver\.(staging\|homolog\|dev)\.MainActivity\"|android:name=\"$fqn\"|g" \
       "$manifest"
     rm -f "$manifest.bak"
     if ! grep -q "android:name=\"$fqn\"" "$manifest"; then
-      echo "ERRO: não consegui aplicar FQN no AndroidManifest.xml. Edite manualmente:"
-      echo "      <activity android:name=\"$fqn\" ... >"
+      echo "ERRO: não consegui aplicar FQN no AndroidManifest.xml."
       exit 1
     fi
-  fi
-
-  # Confirma que o .java/.kt da MainActivity está no diretório correto.
-  if [ ! -f "android/app/src/main/java/com/orkestria/driver/MainActivity.java" ] \
-     && [ ! -f "android/app/src/main/java/com/orkestria/driver/MainActivity.kt" ]; then
-    echo "ERRO: MainActivity não encontrada em android/app/src/main/java/com/orkestria/driver/"
-    echo "      Recrie a pasta android/ com: rm -rf android && npx cap add android"
-    exit 1
   fi
 }
 
