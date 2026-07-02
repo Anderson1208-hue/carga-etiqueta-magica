@@ -353,6 +353,26 @@ async function forceNativePosition(monitoramentoRotaId: string | null, reason: s
       accuracy: loc.coords.accuracy,
       event: reason,
     });
+    const rawTs = loc.timestamp ?? new Date().toISOString();
+    const timestamp = typeof rawTs === "string" ? rawTs : new Date(rawTs).toISOString();
+    await enqueueGpsPoint({
+      monitoramento_rota_id: monitoramentoRotaId,
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      accuracy: loc.coords.accuracy ?? 0,
+      timestamp,
+      heartbeat: reason.includes("heartbeat") || reason.includes("watchdog"),
+    })
+      .then(() =>
+        markEnqueue({
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
+          accuracy: loc.coords.accuracy ?? 0,
+        })
+      )
+      .catch((err) =>
+        markError(`[transistor] force-enqueue:falhou ${err instanceof Error ? err.message : String(err)}`)
+      );
     markError(`[transistor] getCurrentPosition:ok ${reason}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
