@@ -164,34 +164,51 @@ export async function ensureTransistorGpsReady(
     markError("[transistor] ensure:driver-marked");
 
     let preReadyProviderStatus: number | null = null;
+    let preReadyProviderEnabled: boolean | null = null;
+    let preReadyProviderGps: boolean | null = null;
     try {
       markError("[transistor] getProviderState:start (pre-ready)");
       const provider = await plugin.getProviderState();
       markNativeProvider(provider);
       preReadyProviderStatus = provider.status ?? null;
-      markError(`[transistor] getProviderState:ok (pre-ready) status=${provider.status}`);
+      preReadyProviderEnabled = provider.enabled ?? null;
+      preReadyProviderGps = provider.gps ?? null;
+      markError(
+        `[transistor] getProviderState:ok (pre-ready) status=${provider.status} enabled=${provider.enabled} gps=${provider.gps}`
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn("[GPS Transistor] getProviderState antes do ready falhou:", err);
       markError(`[transistor] getProviderState:falhou ${msg}`);
     }
 
-    // Android estava ficando em `Permissão GPS: prompt` e o plugin não avançava
-    // para ready/start. Solicita a permissão ANTES do ready(), para abrir o
-    // diálogo do sistema de forma determinística quando a rota ativa monta.
-    // IMPORTANTE: requestPermission() pode rejeitar com status=2 (DENIED) mesmo
-    // quando a permissão foi concedida via Configurações do Android depois de
-    // uma negação anterior (o SDK cacheia o denied). Se o provider já reporta
-    // Always(3) ou WhenInUse(4), tratamos como sucesso e seguimos para ready().
+    // Android 15 pode negar o popup de requestPermission() (erro=2) quando o
+    // usuário já disse "Não perguntar mais" ou quando a permissão FINE foi
+    // concedida mas BACKGROUND ainda não — o SDK devolve DENIED cacheado.
+    // Estratégia resiliente:
+    //   - Se provider.status = Always(3)/WhenInUse(4) → seguir, permissão OK.
+    //   - Se provider.enabled=true e provider.gps=true → seguir mesmo assim,
+    //     deixamos o ready() tentar; se o OS bloquear de fato, surge lá com
+    //     mensagem clara e o motorista vai pra Configurações.
+    //   - Caso contrário → abortar com erro amigável indicando abrir Configurações.
     try {
       await requestNativeLocationPermission(plugin, "pre-ready");
     } catch (err) {
-      if (preReadyProviderStatus === 3 || preReadyProviderStatus === 4) {
+      const permissionLikelyOk =
+        preReadyProviderStatus === 3 ||
+        preReadyProviderStatus === 4 ||
+        (preReadyProviderEnabled === true && preReadyProviderGps === true);
+      if (permissionLikelyOk) {
         markError(
-          `[transistor] requestPermission:pre-ready ignorado (provider.status=${preReadyProviderStatus} já autoriza)`
+          `[transistor] requestPermission:pre-ready ignorado (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps})`
         );
       } else {
-        throw err;
+        markError(
+          `[transistor] requestPermission:pre-ready abortando (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps}) — abrir Configurações → Localização`
+        );
+        throw new Error(
+          "Permissão de localização negada pelo Android. Abra Configurações → Apps → Orkestria → Permissões → Localização → 'Permitir o tempo todo'."
+        );
       }
     }
 
