@@ -641,10 +641,10 @@ export function useGpsTrackerTransistor({
             await ensureTransistorGpsReady(config.distance_filter_metros, monitoramentoRotaId);
             const st = await plugin.getState();
             if (!st.enabled) {
-              markNativeStartCalled();
-              await plugin.start();
+              await safeStart(plugin, `reinit-${reason}`);
             }
             try { await plugin.changePace(true); } catch { /* ignore */ }
+
             const finalSt = await plugin.getState();
             markNativeState({
               enabled: finalSt.enabled,
