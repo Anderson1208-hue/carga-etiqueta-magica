@@ -94,6 +94,7 @@ const PERMISSION_TIMEOUT_MS = 45_000;
 const READY_TIMEOUT_MS = 45_000;
 const NATIVE_LOCATION_INTERVAL_MS = 60_000;
 const NATIVE_FASTEST_LOCATION_INTERVAL_MS = 30_000;
+const WEBVIEW_FALLBACK_PING_MS = 20_000;
 
 let readyPromise: Promise<void> | null = null;
 
@@ -114,6 +115,10 @@ function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs: number): 
   return Promise.race([promise, timeout]).finally(() => {
     if (timeoutId) clearTimeout(timeoutId);
   });
+}
+
+function isPageVisible(): boolean {
+  return typeof document === "undefined" || document.visibilityState === "visible";
 }
 
 async function requestNativeLocationPermission(plugin: TSBgGeo, stage: string): Promise<number | null> {
@@ -443,6 +448,56 @@ export function useGpsTrackerTransistor({
     markError(`[transistor] effect:mounted rotaId=${monitoramentoRotaId ?? "null"}`);
 
     let cancelled = false;
+
+    async function enqueueWebViewFallback(reason: string) {
+      if (!monitoramentoRotaId) return;
+      if (!isPageVisible()) return;
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          if (cancelled) return;
+          try {
+            await enqueueGpsPoint({
+              monitoramento_rota_id: monitoramentoRotaId,
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy ?? 0,
+              timestamp: new Date(pos.timestamp || Date.now()).toISOString(),
+              heartbeat: reason !== "webview-fallback-initial",
+            });
+            markEnqueue({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: pos.coords.accuracy ?? 0,
+            });
+            setLastPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            lastNativeLocationAtRef.current = Date.now();
+            setError(null);
+            markError(`[transistor] webview-fallback:ok ${reason}`);
+          } catch (err) {
+            markError(`[transistor] webview-fallback:enqueue-falhou ${err instanceof Error ? err.message : String(err)}`);
+          }
+        },
+        (err) => {
+          markError(`[transistor] webview-fallback:gps-falhou ${reason} ${err.code}:${err.message}`);
+        },
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 5_000 }
+      );
+    }
+
+    // Contenção operacional: se o serviço nativo Transistorsoft ficar bloqueado
+    // por cache de permissão do Android 15, ainda assim a Torre recebe posição
+    // enquanto o app estiver aberto. Isso recupera o comportamento dos APKs
+    // anteriores sem abrir mão do Transistorsoft quando ele conseguir iniciar.
+    void enqueueWebViewFallback("webview-fallback-initial");
+    const webViewFallbackInterval = window.setInterval(() => {
+      const silentFor = Date.now() - lastNativeLocationAtRef.current;
+      if (!lastNativeLocationAtRef.current || silentFor >= WEBVIEW_FALLBACK_PING_MS) {
+        void enqueueWebViewFallback("webview-fallback-periodic");
+      }
+    }, WEBVIEW_FALLBACK_PING_MS);
+    subsRef.current.push({ remove: () => window.clearInterval(webViewFallbackInterval) });
 
     (async () => {
       try {
