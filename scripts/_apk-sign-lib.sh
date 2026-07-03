@@ -208,8 +208,8 @@ assert_android_background_gps_ready() {
   check_manifest_item "android.permission.POST_NOTIFICATIONS" "POST_NOTIFICATIONS"
   check_manifest_item "android.permission.WAKE_LOCK" "WAKE_LOCK"
   check_manifest_item "android.permission.CAMERA" "CAMERA"
-  # Transistorsoft removido no rollback — driver atual é @capacitor-community/background-geolocation,
-  # que não exige licença. Não reintroduzir esta checagem sem antes reintroduzir o plugin.
+  check_manifest_item "android.permission.RECEIVE_BOOT_COMPLETED" "RECEIVE_BOOT_COMPLETED"
+  check_manifest_item "com.transistorsoft.locationmanager.license" "licença Transistorsoft"
 
   if [ "$missing" -ne 0 ]; then
     echo ""
