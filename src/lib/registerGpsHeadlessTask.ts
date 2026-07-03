@@ -34,13 +34,13 @@ export function registerGpsHeadlessTask() {
 
       await registerHeadlessTask(async (event: { name: string }) => {
         try {
-          // Não chamar ready/reset aqui: isso pode apagar os extras persistidos
-          // da rota ativa (`monitoramento_rota_id`) quando o app está morto.
+          // Não chamar ready/reset/start aqui: isso pode apagar extras persistidos
+          // e disputar com o start() do hook, gerando "Waiting for previous start
+          // action to complete". O Foreground Service + HTTP nativo devem seguir
+          // ativos por stopOnTerminate=false/startOnBoot=true.
           if (event.name === "terminate") {
             const state = await BackgroundGeolocation.getState();
-            if (!state.enabled) {
-              await BackgroundGeolocation.start();
-            }
+            markError(`[headless] terminate state.enabled=${state.enabled}`);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
