@@ -163,11 +163,13 @@ export async function ensureTransistorGpsReady(
     });
     markError("[transistor] ensure:driver-marked");
 
+    let preReadyProviderStatus: number | null = null;
     try {
       markError("[transistor] getProviderState:start (pre-ready)");
       const provider = await plugin.getProviderState();
       markNativeProvider(provider);
-      markError("[transistor] getProviderState:ok (pre-ready)");
+      preReadyProviderStatus = provider.status ?? null;
+      markError(`[transistor] getProviderState:ok (pre-ready) status=${provider.status}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn("[GPS Transistor] getProviderState antes do ready falhou:", err);
@@ -177,7 +179,21 @@ export async function ensureTransistorGpsReady(
     // Android estava ficando em `Permissão GPS: prompt` e o plugin não avançava
     // para ready/start. Solicita a permissão ANTES do ready(), para abrir o
     // diálogo do sistema de forma determinística quando a rota ativa monta.
-    await requestNativeLocationPermission(plugin, "pre-ready");
+    // IMPORTANTE: requestPermission() pode rejeitar com status=2 (DENIED) mesmo
+    // quando a permissão foi concedida via Configurações do Android depois de
+    // uma negação anterior (o SDK cacheia o denied). Se o provider já reporta
+    // Always(3) ou WhenInUse(4), tratamos como sucesso e seguimos para ready().
+    try {
+      await requestNativeLocationPermission(plugin, "pre-ready");
+    } catch (err) {
+      if (preReadyProviderStatus === 3 || preReadyProviderStatus === 4) {
+        markError(
+          `[transistor] requestPermission:pre-ready ignorado (provider.status=${preReadyProviderStatus} já autoriza)`
+        );
+      } else {
+        throw err;
+      }
+    }
 
     markError("[transistor] ready:start");
     const locationTemplate = buildNativeLocationTemplate();
