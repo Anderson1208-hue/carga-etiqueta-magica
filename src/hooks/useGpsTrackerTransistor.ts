@@ -756,8 +756,8 @@ export function useGpsTrackerTransistor({
 
         const state = await plugin.getState();
         if (!state.enabled) {
-          markNativeStartCalled();
-          const started = await plugin.start();
+          await safeStart(plugin, "initial");
+          const started = await plugin.getState();
           markNativeState({
             enabled: started.enabled,
             isMoving: started.isMoving,
@@ -774,6 +774,7 @@ export function useGpsTrackerTransistor({
             pendingLocations: await plugin.getCount().catch(() => null),
           });
         }
+
         try {
           await plugin.changePace(true);
           const moving = await plugin.getState();
