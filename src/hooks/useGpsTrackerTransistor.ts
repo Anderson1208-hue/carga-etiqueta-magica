@@ -295,7 +295,13 @@ export async function ensureTransistorGpsReady(
       pendingLocations: await plugin.getCount().catch(() => null),
     });
 
-    await requestNativeLocationPermission(plugin, "post-ready");
+    try {
+      await requestNativeLocationPermission(plugin, "post-ready");
+    } catch (err) {
+      markError(
+        `[transistor] requestPermission:post-ready ignorado ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
     try {
       const provider = await plugin.getProviderState();
