@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import {
   markEnqueue,
   markNativeDriver,
@@ -97,6 +98,16 @@ const NATIVE_FASTEST_LOCATION_INTERVAL_MS = 30_000;
 const WEBVIEW_FALLBACK_PING_MS = 20_000;
 
 let readyPromise: Promise<void> | null = null;
+
+/**
+ * Zera o cache do ensureTransistorGpsReady para forçar um novo ready() do SDK.
+ * Necessário quando o usuário concede permissão via Configurações do Android
+ * após um ready() com status=Denied — o SDK Transistorsoft cacheia o status
+ * internamente e não reavalia sem um novo ready(reset:true).
+ */
+export function resetTransistorReadyCache(): void {
+  readyPromise = null;
+}
 
 function buildNativeLocationTemplate(): string {
   return (
@@ -561,11 +572,83 @@ export function useGpsTrackerTransistor({
             }
           })
         );
+
+        // Reinit resiliente: quando o Android 15 nega a permissão inicialmente,
+        // o SDK Transistorsoft cacheia status=Denied mesmo após o usuário
+        // conceder "Permitir o tempo todo" nas Configurações. Precisamos
+        // detectar essa mudança (via onProviderChange e via retorno ao app)
+        // e refazer ready(reset:true) + start() para o SDK reavaliar.
+        let reinitInFlight = false;
+        async function reinitAfterPermissionGrant(reason: string) {
+          if (reinitInFlight) return;
+          if (cancelled) return;
+          reinitInFlight = true;
+          try {
+            markError(`[transistor] reinit:start ${reason}`);
+            try { await plugin.stop(); } catch { /* ignore */ }
+            resetTransistorReadyCache();
+            await ensureTransistorGpsReady(config.distance_filter_metros, monitoramentoRotaId);
+            const st = await plugin.getState();
+            if (!st.enabled) {
+              markNativeStartCalled();
+              await plugin.start();
+            }
+            try { await plugin.changePace(true); } catch { /* ignore */ }
+            const finalSt = await plugin.getState();
+            markNativeState({
+              enabled: finalSt.enabled,
+              isMoving: finalSt.isMoving,
+              trackingMode: finalSt.trackingMode,
+              notificationConfigured: !!finalSt.app?.notification,
+              pendingLocations: await plugin.getCount().catch(() => null),
+            });
+            markError(`[transistor] reinit:ok ${reason} enabled=${finalSt.enabled}`);
+            if (finalSt.enabled) setError(null);
+            await forceNativePosition(monitoramentoRotaId, `reinit-${reason}`);
+          } catch (err) {
+            markError(`[transistor] reinit:falhou ${reason} ${err instanceof Error ? err.message : String(err)}`);
+          } finally {
+            reinitInFlight = false;
+          }
+        }
+
         subsRef.current.push(
           plugin.onProviderChange((provider) => {
             markNativeProvider(provider);
+            markError(`[transistor] onProviderChange status=${provider.status} enabled=${provider.enabled} gps=${provider.gps}`);
+            // Permissão passou a ser Always(3) ou WhenInUse(4): tentar reiniciar.
+            if ((provider.status === 3 || provider.status === 4) && provider.enabled) {
+              void plugin.getState().then((st) => {
+                if (!st.enabled) void reinitAfterPermissionGrant(`provider-status-${provider.status}`);
+              }).catch(() => {
+                void reinitAfterPermissionGrant(`provider-status-${provider.status}`);
+              });
+            }
           })
         );
+
+        // Quando o motorista volta das Configurações do Android para o app,
+        // re-verificar permissão e reiniciar tracking se estava travado.
+        const appStateSubPromise = App.addListener("appStateChange", async ({ isActive }) => {
+          if (!isActive) return;
+          if (cancelled) return;
+          try {
+            const provider = await plugin.getProviderState();
+            markNativeProvider(provider);
+            markError(`[transistor] appStateChange:active provider.status=${provider.status} enabled=${provider.enabled}`);
+            const st = await plugin.getState();
+            const permOk = (provider.status === 3 || provider.status === 4) && provider.enabled;
+            if (permOk && !st.enabled) {
+              void reinitAfterPermissionGrant("app-resume-permission-ok");
+            }
+          } catch (err) {
+            markError(`[transistor] appStateChange:falhou ${err instanceof Error ? err.message : String(err)}`);
+          }
+        });
+        subsRef.current.push({
+          remove: () => { void appStateSubPromise.then((h) => h.remove()).catch(() => {}); },
+        });
+
         subsRef.current.push(
           plugin.onHeartbeat(async () => {
             try {
