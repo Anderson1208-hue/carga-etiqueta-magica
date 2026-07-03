@@ -99,6 +99,16 @@ const WEBVIEW_FALLBACK_PING_MS = 20_000;
 
 let readyPromise: Promise<void> | null = null;
 
+/**
+ * Zera o cache do ensureTransistorGpsReady para forçar um novo ready() do SDK.
+ * Necessário quando o usuário concede permissão via Configurações do Android
+ * após um ready() com status=Denied — o SDK Transistorsoft cacheia o status
+ * internamente e não reavalia sem um novo ready(reset:true).
+ */
+export function resetTransistorReadyCache(): void {
+  readyPromise = null;
+}
+
 function buildNativeLocationTemplate(): string {
   return (
     '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
