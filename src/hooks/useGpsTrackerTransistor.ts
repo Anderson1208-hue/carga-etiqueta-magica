@@ -339,16 +339,11 @@ export async function ensureTransistorGpsReady(
     markError("[transistor] ready:start");
     const locationTemplate = buildNativeLocationTemplate();
     // IMPORTANTE: Config v9 do Transistorsoft é AGRUPADA. As opções legacy
-    // flat são ignoradas ou mapeadas de forma parcial. Sem `geolocation` e
-    // `activity`, o SDK entra em stationary (`isMoving=false`) e só volta a
-    // emitir quando a WebView reaparece em foreground.
+    // flat são ignoradas. Não existe `foregroundService` na raiz da Config v9;
+    // o Foreground Service Android é acionado por start() + app.notification.
     markError(`[transistor] ready:config time-based distanceFilter=0 requested=${distanceFilter}`);
     const readyConfig = {
       reset: true,
-      // Android 12+ exige Foreground Service explícito para manter GPS com
-      // tela bloqueada. Mantemos também a notification em `app.notification`,
-      // pois esta versão do plugin usa config agrupada.
-      foregroundService: true,
       geolocation: {
         desiredAccuracy: -1, // DesiredAccuracy.High
         // Android: `locationUpdateInterval` só governa amostragem por tempo quando
@@ -369,6 +364,7 @@ export async function ensureTransistorGpsReady(
       activity: {
         disableStopDetection: true,
         stopOnStationary: false,
+        disableMotionActivityUpdates: true,
         activityRecognitionInterval: 10_000,
         minimumActivityRecognitionConfidence: 0,
       },
@@ -416,6 +412,7 @@ export async function ensureTransistorGpsReady(
           sticky: true,
           priority: 1,
           channelName: "Rastreamento GPS",
+          channelId: "orkestria-driver-gps-tracking",
         },
       },
       logger: {
