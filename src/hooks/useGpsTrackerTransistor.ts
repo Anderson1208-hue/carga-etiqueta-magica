@@ -98,6 +98,56 @@ const NATIVE_FASTEST_LOCATION_INTERVAL_MS = 30_000;
 const WEBVIEW_FALLBACK_PING_MS = 20_000;
 
 let readyPromise: Promise<void> | null = null;
+let startInFlight: Promise<void> | null = null;
+
+/**
+ * Serializa chamadas de start(). O SDK Transistorsoft rejeita chamadas
+ * concorrentes com "Waiting for previous start action to complete" e deixa
+ * o Foreground Service fora do ar — resultado: GPS morre com tela bloqueada.
+ *
+ * Se o start real falhar (por qualquer motivo), espera até 4s e reconfere
+ * o state.enabled — o start anterior às vezes sobe depois do erro sincronico.
+ */
+async function safeStart(plugin: TSBgGeo, reason: string): Promise<boolean> {
+  if (startInFlight) {
+    markError(`[transistor] safeStart:aguardando anterior (${reason})`);
+    try { await startInFlight; } catch { /* ignore */ }
+    const st = await plugin.getState().catch(() => null);
+    if (st?.enabled) {
+      markError(`[transistor] safeStart:ja-enabled apos wait (${reason})`);
+      return true;
+    }
+  }
+  startInFlight = (async () => {
+    markNativeStartCalled();
+    markError(`[transistor] safeStart:call (${reason})`);
+    try {
+      await plugin.start();
+      markError(`[transistor] safeStart:ok (${reason})`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      markError(`[transistor] safeStart:erro (${reason}) ${msg}`);
+      // "Waiting for previous start action to complete" → aguardar e reconferir
+      if (/waiting for previous start/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const st = await plugin.getState().catch(() => null);
+        if (st?.enabled) {
+          markError(`[transistor] safeStart:recuperado apos wait (${reason})`);
+          return;
+        }
+      }
+      throw err;
+    }
+  })();
+  try {
+    await startInFlight;
+    return true;
+  } catch {
+    return false;
+  } finally {
+    startInFlight = null;
+  }
+}
 
 /**
  * Zera o cache do ensureTransistorGpsReady para forçar um novo ready() do SDK.
@@ -108,6 +158,7 @@ let readyPromise: Promise<void> | null = null;
 export function resetTransistorReadyCache(): void {
   readyPromise = null;
 }
+
 
 function buildNativeLocationTemplate(): string {
   return (
@@ -590,10 +641,10 @@ export function useGpsTrackerTransistor({
             await ensureTransistorGpsReady(config.distance_filter_metros, monitoramentoRotaId);
             const st = await plugin.getState();
             if (!st.enabled) {
-              markNativeStartCalled();
-              await plugin.start();
+              await safeStart(plugin, `reinit-${reason}`);
             }
             try { await plugin.changePace(true); } catch { /* ignore */ }
+
             const finalSt = await plugin.getState();
             markNativeState({
               enabled: finalSt.enabled,
@@ -705,8 +756,8 @@ export function useGpsTrackerTransistor({
 
         const state = await plugin.getState();
         if (!state.enabled) {
-          markNativeStartCalled();
-          const started = await plugin.start();
+          await safeStart(plugin, "initial");
+          const started = await plugin.getState();
           markNativeState({
             enabled: started.enabled,
             isMoving: started.isMoving,
@@ -723,6 +774,7 @@ export function useGpsTrackerTransistor({
             pendingLocations: await plugin.getCount().catch(() => null),
           });
         }
+
         try {
           await plugin.changePace(true);
           const moving = await plugin.getState();
