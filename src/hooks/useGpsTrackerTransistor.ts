@@ -288,6 +288,10 @@ export async function ensureTransistorGpsReady(
     markError(`[transistor] ready:config time-based distanceFilter=0 requested=${distanceFilter}`);
     const readyConfig = {
       reset: true,
+      // Android 12+ exige Foreground Service explícito para manter GPS com
+      // tela bloqueada. Mantemos também a notification em `app.notification`,
+      // pois esta versão do plugin usa config agrupada.
+      foregroundService: true,
       geolocation: {
         desiredAccuracy: -1, // DesiredAccuracy.High
         // Android: `locationUpdateInterval` só governa amostragem por tempo quando
@@ -378,6 +382,28 @@ export async function ensureTransistorGpsReady(
       notificationConfigured: !!state.app?.notification,
       pendingLocations: await plugin.getCount().catch(() => null),
     });
+
+    // Sequência crítica: ready() totalmente resolvido → start() único/awaited
+    // → changePace(true). Isso evita "Waiting for previous start action" e
+    // garante que o serviço nativo suba antes de qualquer fallback JS mascarar.
+    if (!state.enabled) {
+      await safeStart(plugin, "ready-sequence");
+    }
+
+    try {
+      await plugin.changePace(true);
+      const moving = await plugin.getState();
+      markError(`[transistor] ready-sequence changePace:ok enabled=${moving.enabled} isMoving=${moving.isMoving}`);
+      markNativeState({
+        enabled: moving.enabled,
+        isMoving: moving.isMoving,
+        trackingMode: moving.trackingMode,
+        notificationConfigured: !!moving.app?.notification,
+        pendingLocations: await plugin.getCount().catch(() => null),
+      });
+    } catch (err) {
+      markError(`[transistor] ready-sequence changePace:falhou ${err instanceof Error ? err.message : String(err)}`);
+    }
 
     try {
       await requestNativeLocationPermission(plugin, "post-ready");
@@ -755,25 +781,15 @@ export function useGpsTrackerTransistor({
         void refreshCount();
 
         const state = await plugin.getState();
-        if (!state.enabled) {
-          await safeStart(plugin, "initial");
-          const started = await plugin.getState();
-          markNativeState({
-            enabled: started.enabled,
-            isMoving: started.isMoving,
-            trackingMode: started.trackingMode,
-            notificationConfigured: !!started.app?.notification,
-            pendingLocations: await plugin.getCount().catch(() => null),
-          });
-        } else {
-          markNativeState({
-            enabled: state.enabled,
-            isMoving: state.isMoving,
-            trackingMode: state.trackingMode,
-            notificationConfigured: !!state.app?.notification,
-            pendingLocations: await plugin.getCount().catch(() => null),
-          });
-        }
+        if (!state.enabled) await safeStart(plugin, "effect-recovery");
+        const currentState = await plugin.getState();
+        markNativeState({
+          enabled: currentState.enabled,
+          isMoving: currentState.isMoving,
+          trackingMode: currentState.trackingMode,
+          notificationConfigured: !!currentState.app?.notification,
+          pendingLocations: await plugin.getCount().catch(() => null),
+        });
 
         try {
           await plugin.changePace(true);
