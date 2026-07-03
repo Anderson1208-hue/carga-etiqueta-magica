@@ -98,7 +98,25 @@ const NATIVE_FASTEST_LOCATION_INTERVAL_MS = 30_000;
 const WEBVIEW_FALLBACK_PING_MS = 20_000;
 
 let readyPromise: Promise<void> | null = null;
-let startInFlight: Promise<void> | null = null;
+let startInFlight: Promise<boolean> | null = null;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function normalizeAuthorizationStatus(value: unknown): number | null {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "status" in value) {
+    const status = (value as { status?: unknown }).status;
+    return typeof status === "number" ? status : null;
+  }
+  return null;
+}
 
 /**
  * Serializa chamadas de start(). O SDK Transistorsoft rejeita chamadas
@@ -111,7 +129,7 @@ let startInFlight: Promise<void> | null = null;
 async function safeStart(plugin: TSBgGeo, reason: string): Promise<boolean> {
   if (startInFlight) {
     markError(`[transistor] safeStart:aguardando anterior (${reason})`);
-    try { await startInFlight; } catch { /* ignore */ }
+    try { await withTimeout(startInFlight, `[transistor] wait-start:${reason}`, 10_000); } catch { /* ignore */ }
     const st = await plugin.getState().catch(() => null);
     if (st?.enabled) {
       markError(`[transistor] safeStart:ja-enabled apos wait (${reason})`);
@@ -122,26 +140,63 @@ async function safeStart(plugin: TSBgGeo, reason: string): Promise<boolean> {
     markNativeStartCalled();
     markError(`[transistor] safeStart:call (${reason})`);
     try {
-      await plugin.start();
-      markError(`[transistor] safeStart:ok (${reason})`);
+      const state = await withTimeout(plugin.start(), `[transistor] start:${reason}`, 15_000);
+      markError(`[transistor] safeStart:ok (${reason}) enabled=${state?.enabled}`);
+      if (state) {
+        markNativeState({
+          enabled: state.enabled,
+          isMoving: state.isMoving,
+          trackingMode: state.trackingMode,
+          notificationConfigured: !!state.app?.notification,
+          pendingLocations: await plugin.getCount().catch(() => null),
+        });
+      }
+      return state?.enabled !== false;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errorMessage(err);
       markError(`[transistor] safeStart:erro (${reason}) ${msg}`);
-      // "Waiting for previous start action to complete" → aguardar e reconferir
-      if (/waiting for previous start/i.test(msg)) {
-        await new Promise((r) => setTimeout(r, 4000));
+
+      // Nunca deixar o hook preso no bridge nativo. Em alguns Android 15 o
+      // start() fica sem callback, mas o serviço sobe segundos depois. Fazemos
+      // polling de estado e seguimos o fluxo para registrar listeners/watchdogs.
+      for (let i = 0; i < 8; i++) {
+        await sleep(1_000);
         const st = await plugin.getState().catch(() => null);
         if (st?.enabled) {
-          markError(`[transistor] safeStart:recuperado apos wait (${reason})`);
-          return;
+          markError(`[transistor] safeStart:recuperado via polling (${reason})`);
+          markNativeState({
+            enabled: st.enabled,
+            isMoving: st.isMoving,
+            trackingMode: st.trackingMode,
+            notificationConfigured: !!st.app?.notification,
+            pendingLocations: await plugin.getCount().catch(() => null),
+          });
+          return true;
         }
       }
-      throw err;
+
+      // Se o start nativo ficou travado, uma tentativa curta de stop limpa boa
+      // parte dos estados intermediários antes de liberar o hook.
+      try {
+        markError(`[transistor] safeStart:stop-cleanup (${reason})`);
+        await withTimeout(plugin.stop(), `[transistor] stop-cleanup:${reason}`, 6_000);
+      } catch (stopErr) {
+        markError(`[transistor] safeStart:stop-cleanup falhou (${reason}) ${errorMessage(stopErr)}`);
+      }
+
+      const finalState = await plugin.getState().catch(() => null);
+      markNativeState({
+        enabled: finalState?.enabled ?? false,
+        isMoving: finalState?.isMoving ?? false,
+        trackingMode: finalState?.trackingMode,
+        notificationConfigured: !!finalState?.app?.notification,
+        pendingLocations: await plugin.getCount().catch(() => null),
+      });
+      return false;
     }
   })();
   try {
-    await startInFlight;
-    return true;
+    return await startInFlight;
   } catch {
     return false;
   } finally {
@@ -186,17 +241,19 @@ function isPageVisible(): boolean {
 async function requestNativeLocationPermission(plugin: TSBgGeo, stage: string): Promise<number | null> {
   try {
     markError(`[transistor] requestPermission:${stage}:start`);
-    const status = await withTimeout(
+    const rawStatus = await withTimeout(
       plugin.requestPermission(),
       `[transistor] requestPermission:${stage}`,
       PERMISSION_TIMEOUT_MS
     );
+    const status = normalizeAuthorizationStatus(rawStatus);
     markNativeRequestPermission({ status });
     markError(`[transistor] requestPermission:${stage}:ok status=${status}`);
     return status;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    markNativeRequestPermission({ status: null, error: msg });
+    const msg = errorMessage(err);
+    const status = normalizeAuthorizationStatus(err);
+    markNativeRequestPermission({ status, error: msg });
     markError(`[transistor] requestPermission:${stage}:falhou ${msg}`);
     throw err;
   }
