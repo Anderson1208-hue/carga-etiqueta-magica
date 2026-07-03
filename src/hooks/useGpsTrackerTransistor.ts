@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import {
   markEnqueue,
   markNativeDriver,
