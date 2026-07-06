@@ -96,7 +96,7 @@ export default function Romaneio() {
   const [romaneioItems, setRomaneioItems] = useState<RomaneioItem[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | null>(null);
+  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | "nota-crescente" | null>(null);
   const [selectedMR, setSelectedMR] = useState<string>("todas");
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
