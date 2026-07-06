@@ -33,7 +33,7 @@ import { format } from "date-fns";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
-import { getMacroRegiao } from "@/lib/macro-regioes";
+import { getMacroRegiao, getMacroRegiaoLabel } from "@/lib/macro-regioes";
 
 interface NfResult {
   id: string;
@@ -540,6 +540,11 @@ export default function ConsultaNF() {
                     .filter(Boolean)
                     .join(", ")}
                 </p>
+                <div className="mt-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {getMacroRegiaoLabel(getMacroRegiao(selectedNf.dest_bairro, selectedNf.dest_cidade))}
+                  </Badge>
+                </div>
               </div>
 
               {/* Totais */}
