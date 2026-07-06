@@ -540,6 +540,11 @@ export default function ConsultaNF() {
                     .filter(Boolean)
                     .join(", ")}
                 </p>
+                <div className="mt-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {getMacroRegiaoLabel(getMacroRegiao(selectedNf.dest_bairro, selectedNf.dest_cidade))}
+                  </Badge>
+                </div>
               </div>
 
               {/* Totais */}
