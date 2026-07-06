@@ -724,7 +724,7 @@ export default function Romaneio() {
                   ) : (
                     <SortAsc className="w-4 h-4 mr-2" />
                   )}
-                  Nota de Carga Crescente
+                  Nota de Carga em Ordem Crescente
                 </Button>
               </div>
             </div>
