@@ -714,6 +714,18 @@ export default function Romaneio() {
                   )}
                   Imprimir Nota de Carga
                 </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleGenerateNotaDeCargaCrescente}
+                  disabled={generating !== null || notasFiscais.length === 0}
+                >
+                  {generating === "nota-crescente" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <SortAsc className="w-4 h-4 mr-2" />
+                  )}
+                  Nota de Carga Crescente
+                </Button>
               </div>
             </div>
             {/* Summary of NFs by MR */}
