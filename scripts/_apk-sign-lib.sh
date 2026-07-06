@@ -201,7 +201,57 @@ ensure_transistorsoft_license() {
   fi
 
   if grep -q "com.transistorsoft.locationmanager.license" "$manifest"; then
-    echo "[license] Transistorsoft já presente no AndroidManifest.xml"
+    if grep -qF "$TRANSISTORSOFT_LICENSE_KEY" "$manifest"; then
+      echo "[license] Transistorsoft já presente e confere com a chave versionada"
+      return 0
+    fi
+
+    echo "==> Atualizando licença Transistorsoft divergente em $manifest"
+    awk -v key="$TRANSISTORSOFT_LICENSE_KEY" '
+      BEGIN { in_meta=0; has_license_name=0; has_value=0; done=0; buffer="" }
+
+      function flush_buffer(    replacement) {
+        if (has_license_name && !done) {
+          replacement = "        <meta-data android:name=\"com.transistorsoft.locationmanager.license\" android:value=\"" key "\"/>"
+          print replacement
+          done=1
+        } else {
+          printf "%s", buffer
+        }
+        in_meta=0; has_license_name=0; has_value=0; buffer=""
+      }
+
+      {
+        if (!in_meta && $0 ~ /<meta-data/) {
+          in_meta=1
+          has_license_name=0
+          has_value=0
+          buffer=$0 "\n"
+          if ($0 ~ /com\.transistorsoft\.locationmanager\.license/) has_license_name=1
+          if ($0 ~ /android:value=/) has_value=1
+          if ($0 ~ /\/>|>/) flush_buffer()
+          next
+        }
+
+        if (in_meta) {
+          buffer = buffer $0 "\n"
+          if ($0 ~ /com\.transistorsoft\.locationmanager\.license/) has_license_name=1
+          if ($0 ~ /android:value=/) has_value=1
+          if ($0 ~ /\/>|>/) flush_buffer()
+          next
+        }
+
+        print
+      }
+
+      END { if (in_meta) flush_buffer() }
+    ' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+
+    if ! grep -qF "$TRANSISTORSOFT_LICENSE_KEY" "$manifest"; then
+      echo "ERRO: licença Transistorsoft existe, mas não consegui substituir pela chave versionada."
+      exit 1
+    fi
+    echo "[license] Transistorsoft atualizada"
     return 0
   fi
 
