@@ -30,7 +30,7 @@ import { calculateBoxes } from "@/lib/xml-parser";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc } from "lucide-react";
 import {
   Dialog,
   DialogContent,
