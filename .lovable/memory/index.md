@@ -87,3 +87,4 @@ type: reference
 - [GPS Background NÃO confiável](mem://operacao/gps-background-nao-funciona-campo) — **PREVALECE** sobre outras memórias de GPS. Em campo, GPS para com tela bloqueada. Não afirmar "funciona igual Waze". 5 causas e o que dá pra atacar pelo Lovable.
 - [Transistorsoft v9 Config](mem://operacao/transistorsoft-v9-config) — Config agrupada obrigatória; não reverter para formato flat/legacy.
 - [Histórico NF (nf_eventos)](mem://funcionalidades/historico-nf-eventos) — Event store + triggers + RPC chegada_cd_manual; Dialog Histórico na Consulta de NF.
+- [Licença Transistorsoft auto](mem://operacao/transistorsoft-licenca-auto-inject) — build-apk-*.sh injetam <meta-data> da licença no Manifest se faltar.
