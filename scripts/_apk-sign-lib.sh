@@ -284,10 +284,41 @@ assert_main_activity_fqn() {
     done
   done
 
+  # --- 2b) Fallback: se não existe MainActivity em nenhum lugar, cria do zero.
+  # Sem isso, gradle compila o APK sem a classe e Android crasha no boot com
+  # ClassNotFoundException: com.orkestria.driver.MainActivity.
   if [ ! -f "$base_dir/MainActivity.java" ] && [ ! -f "$base_dir/MainActivity.kt" ]; then
-    echo "ERRO: MainActivity não encontrada em $base_dir/ e nada para mover."
-    echo "      Rode: rm -rf android && npx cap add android && npx cap sync android"
-    exit 1
+    echo "==> MainActivity ausente — criando $base_dir/MainActivity.java do zero"
+    cat > "$base_dir/MainActivity.java" <<'JAVA_EOF'
+package com.orkestria.driver;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
+JAVA_EOF
+  fi
+
+  # --- 2c) Sanidade: garante que o `package` do arquivo bate com o esperado.
+  # Se veio com package divergente (ex.: .staging não coberto pelo sed acima
+  # por espaços/tab), reescreve. Sem isso o arquivo existe mas o compilador o
+  # registra em outro pacote e Android crasha com ClassNotFoundException.
+  for ext in java kt; do
+    local f="$base_dir/MainActivity.$ext"
+    [ -f "$f" ] || continue
+    if ! grep -qE "^[[:space:]]*package[[:space:]]+com\.orkestria\.driver[[:space:]]*;?[[:space:]]*$" "$f"; then
+      echo "==> Corrigindo declaração 'package' em $f -> com.orkestria.driver"
+      awk 'BEGIN{done=0}
+        /^[[:space:]]*package[[:space:]]+/{ if(!done){ print "package com.orkestria.driver;"; done=1 } next }
+        { if(!done){ print "package com.orkestria.driver;"; done=1 } print }
+      ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    fi
+  done
+
+  # --- 2d) ProGuard keep p/ R8 não descartar MainActivity no release.
+  local pg="android/app/proguard-rules.pro"
+  if [ -f "$pg" ] && ! grep -q "com.orkestria.driver.MainActivity" "$pg"; then
+    echo "==> Adicionando keep rule para MainActivity em $pg"
+    printf '\n# Orkestria: manter MainActivity para evitar ClassNotFoundException em release\n-keep class com.orkestria.driver.MainActivity { *; }\n' >> "$pg"
   fi
 
   # --- 3) Corrige android:name no Manifest ---
@@ -304,6 +335,20 @@ assert_main_activity_fqn() {
       echo "ERRO: não consegui aplicar FQN no AndroidManifest.xml."
       exit 1
     fi
+  fi
+
+  # --- 4) Verificação final: arquivo existe E declara o package correto.
+  local ok=0
+  for ext in java kt; do
+    local f="$base_dir/MainActivity.$ext"
+    if [ -f "$f" ] && grep -qE "^[[:space:]]*package[[:space:]]+com\.orkestria\.driver[[:space:]]*;?" "$f"; then
+      echo "[ok] $f -> package com.orkestria.driver"
+      ok=1
+    fi
+  done
+  if [ "$ok" -ne 1 ]; then
+    echo "ERRO: MainActivity.java não ficou válida em $base_dir/. Abortando build."
+    exit 1
   fi
 }
 
