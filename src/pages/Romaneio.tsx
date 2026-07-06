@@ -30,7 +30,7 @@ import { calculateBoxes } from "@/lib/xml-parser";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -96,7 +96,7 @@ export default function Romaneio() {
   const [romaneioItems, setRomaneioItems] = useState<RomaneioItem[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscalData[]>([]);
   const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | null>(null);
+  const [generating, setGenerating] = useState<"romaneio" | "nota" | "print-romaneio" | "print-nota" | "nota-por-nf" | "nota-crescente" | null>(null);
   const [selectedMR, setSelectedMR] = useState<string>("todas");
   const [searchNf, setSearchNf] = useState("");
   const [selectedNfDetail, setSelectedNfDetail] = useState<NotaFiscalData | null>(null);
@@ -342,6 +342,42 @@ export default function Romaneio() {
       toast({
         title: "PDF gerado com sucesso!",
         description: `${filteredNFs.length} NFs incluídas.`,
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao gerar PDF",
+      });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  async function handleGenerateNotaDeCargaCrescente() {
+    if (!selectedCarga || notasFiscais.length === 0) return;
+
+    setGenerating("nota-crescente");
+    try {
+      const nfsPDF = await buildNfsPDF(notasFiscais);
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        nfsPDF,
+        "nf-ascending"
+      );
+
+      downloadBlob(
+        blob,
+        `nota_carga_crescente_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+
+      toast({
+        title: "PDF gerado com sucesso!",
+        description: `${notasFiscais.length} NFs em ordem crescente.`,
       });
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -677,6 +713,18 @@ export default function Romaneio() {
                     <Printer className="w-4 h-4 mr-2" />
                   )}
                   Imprimir Nota de Carga
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleGenerateNotaDeCargaCrescente}
+                  disabled={generating !== null || notasFiscais.length === 0}
+                >
+                  {generating === "nota-crescente" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <SortAsc className="w-4 h-4 mr-2" />
+                  )}
+                  Nota de Carga em Ordem Crescente
                 </Button>
               </div>
             </div>

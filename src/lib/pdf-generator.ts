@@ -189,7 +189,8 @@ export async function generateRomaneioPDF(
 
 export async function generateNotaDeCargaPDF(
   carregamentoInfo: { data: string; placa: string; motorista: string },
-  notasFiscais: NotaFiscalPDF[]
+  notasFiscais: NotaFiscalPDF[],
+  sortMode: "default" | "nf-ascending" = "default"
 ): Promise<Blob> {
   const A4_WIDTH = 210;
   const A4_HEIGHT = 297;
@@ -205,7 +206,11 @@ export async function generateNotaDeCargaPDF(
   // Sort NFs by MR → bairro → CNPJ → NF number
   // Se houver ordem de entrega (vinda da roteirização), ela tem prioridade absoluta.
   // Caso contrário, ordena por MR → bairro → CNPJ → NF.
+  // Modo "nf-ascending": ordena apenas pelo número da NF em ordem crescente.
   const sortedNFs = [...notasFiscais].sort((a, b) => {
+    if (sortMode === "nf-ascending") {
+      return numericSort(a.numeroNf, b.numeroNf);
+    }
     const oa = a.ordemEntrega ?? Number.POSITIVE_INFINITY;
     const ob = b.ordemEntrega ?? Number.POSITIVE_INFINITY;
     if (oa !== ob) return oa - ob;
