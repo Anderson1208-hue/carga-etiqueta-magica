@@ -18,13 +18,12 @@ Override de debug: `VITE_GPS_DRIVER=community` ou `transistor`.
 
 ---
 
-## 1. AndroidManifest.xml — adicionar manualmente na sua máquina
+## 1. AndroidManifest.xml
 
-Arquivo: `android/app/src/main/AndroidManifest.xml`
+### 1.1 Permissões (validadas automaticamente pelo build)
 
-### 1.1 Permissões (dentro de `<manifest>`, fora de `<application>`)
-
-Confirme que existem (o `scripts/_apk-sign-lib.sh` já valida):
+O script `scripts/_apk-sign-lib.sh` (`assert_android_background_gps_ready`)
+bloqueia o build se faltar qualquer permissão obrigatória:
 
 ```xml
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -37,17 +36,22 @@ Confirme que existem (o `scripts/_apk-sign-lib.sh` já valida):
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 ```
 
-### 1.2 Meta-data da licença Transistorsoft (dentro de `<application>`)
+### 1.2 Licença Transistorsoft — INJEÇÃO AUTOMÁTICA
 
-Cole **uma única vez** dentro de `<application>...</application>`:
+**Não é mais necessário colar `<meta-data>` manualmente.** O script
+`ensure_transistorsoft_license` (chamado por todos os `build-apk-*.sh`
+antes do gradle) injeta o bloco abaixo dentro de `<application>` se ele
+não estiver presente:
 
 ```xml
 <meta-data
     android:name="com.transistorsoft.locationmanager.license"
-    android:value="eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImFuZHJvaWQiLCJhcHBfaWQiOiJjb20ub3JrZXN0cmlhLmRyaXZlciIsIm9yZGVyX251bWJlciI6MTY1NzEsInJlbmV3YWxfdXJsIjoiaHR0cHM6Ly9zaG9wLnRyYW5zaXN0b3Jzb2Z0LmNvbS9jYXJ0LzM5MzY3MDcxMjM2MTk5OjE_bm90ZT0xMDk4NCIsImN1c3RvbWVyX2lkIjo5OTgyLCJwcm9kdWN0IjoiY2FwYWNpdG9yLWJhY2tncm91bmQtZ2VvbG9jYXRpb24iLCJrZXlfdmVyc2lvbiI6MSwiYWxsb3dlZF9zdWZmaXhlcyI6WyIuZGV2IiwiLmRldmVsb3BtZW50IiwiLnN0YWdpbmciLCIuc3RhZ2UiLCIucWEiLCIudWF0IiwiLnRlc3QiLCIuZGVidWciXSwibWF4X2J1aWxkX3N0YW1wIjoyMDI3MDcxOCwiZ3JhY2VfYnVpbGRzIjowLCJlbnRpdGxlbWVudHMiOlsiY29yZSJdLCJpYXQiOjE3ODIyNjA5ODh9.GwtqqkOLVWm5c_4jK7aZ4OPju-xvm23elNRRmyS-bM_FA4eCi4Utza8z-OiOWm7DTjGFcZUGPfoGnyFFry9oAg"/>
+    android:value="eyJhbGciOi...GnyFFry9oAg"/>
 ```
 
-Validade: `max_build_stamp = 2027-07-18`. Cobre PROD + STAGING + DEV pela mesma licença.
+A chave fica em `TRANSISTORSOFT_LICENSE_KEY` dentro de `_apk-sign-lib.sh`.
+Validade: `max_build_stamp = 2027-07-18`. Cobre PROD + STAGING + DEV.
+
 
 ### 1.3 MainActivity com nome ABSOLUTO (obrigatório para STAGING/HOMOLOG)
 

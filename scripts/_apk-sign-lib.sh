@@ -183,6 +183,42 @@ EOF
   exit 1
 }
 
+# Licença Transistorsoft (Capacitor Background Geolocation).
+# Emitida para com.orkestria.driver, cobre sufixos .staging/.homolog/.dev/.qa/.uat/.test/.debug/.stage/.development.
+# Validade: max_build_stamp = 2027-07-18.
+# Referência: docs/TRANSISTORSOFT_SETUP.md.
+TRANSISTORSOFT_LICENSE_KEY="eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImFuZHJvaWQiLCJhcHBfaWQiOiJjb20ub3JrZXN0cmlhLmRyaXZlciIsIm9yZGVyX251bWJlciI6MTY1NzEsInJlbmV3YWxfdXJsIjoiaHR0cHM6Ly9zaG9wLnRyYW5zaXN0b3Jzb2Z0LmNvbS9jYXJ0LzM5MzY3MDcxMjM2MTk5OjE_bm90ZT0xMDk4NCIsImN1c3RvbWVyX2lkIjo5OTgyLCJwcm9kdWN0IjoiY2FwYWNpdG9yLWJhY2tncm91bmQtZ2VvbG9jYXRpb24iLCJrZXlfdmVyc2lvbiI6MSwiYWxsb3dlZF9zdWZmaXhlcyI6WyIuZGV2IiwiLmRldmVsb3BtZW50IiwiLnN0YWdpbmciLCIuc3RhZ2UiLCIucWEiLCIudWF0IiwiLnRlc3QiLCIuZGVidWciXSwibWF4X2J1aWxkX3N0YW1wIjoyMDI3MDcxOCwiZ3JhY2VfYnVpbGRzIjowLCJlbnRpdGxlbWVudHMiOlsiY29yZSJdLCJpYXQiOjE3ODIyNjA5ODh9.GwtqqkOLVWm5c_4jK7aZ4OPju-xvm23elNRRmyS-bM_FA4eCi4Utza8z-OiOWm7DTjGFcZUGPfoGnyFFry9oAg"
+
+# Injeta o <meta-data> da licença Transistorsoft no AndroidManifest.xml se
+# ainda não estiver presente. Sem essa meta-data, em release o plugin recusa
+# iniciar (ready.enabled=false, requestPermission=Denied), Foreground Service
+# não sobe e nenhum ponto com source='transistor-native-http' chega ao backend.
+ensure_transistorsoft_license() {
+  local manifest="android/app/src/main/AndroidManifest.xml"
+  if [ ! -f "$manifest" ]; then
+    echo "ERRO: $manifest não encontrado. Rode 'npx cap sync android' antes."
+    exit 1
+  fi
+
+  if grep -q "com.transistorsoft.locationmanager.license" "$manifest"; then
+    echo "[license] Transistorsoft já presente no AndroidManifest.xml"
+    return 0
+  fi
+
+  echo "==> Injetando <meta-data> da licença Transistorsoft em $manifest"
+  local block="        <meta-data android:name=\"com.transistorsoft.locationmanager.license\" android:value=\"${TRANSISTORSOFT_LICENSE_KEY}\"/>"
+  # Insere antes de </application>. Escapa | do awk usando outro delimitador.
+  awk -v line="$block" '
+    { if ($0 ~ /<\/application>/) print line; print }
+  ' "$manifest" > "$manifest.tmp" && mv "$manifest.tmp" "$manifest"
+
+  if ! grep -q "com.transistorsoft.locationmanager.license" "$manifest"; then
+    echo "ERRO: falhei ao inserir a licença Transistorsoft no Manifest."
+    exit 1
+  fi
+  echo "[license] Transistorsoft injetada"
+}
+
 assert_android_background_gps_ready() {
   local manifest="android/app/src/main/AndroidManifest.xml"
   if [ ! -f "$manifest" ]; then
