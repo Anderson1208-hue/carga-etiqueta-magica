@@ -354,6 +354,42 @@ export default function Romaneio() {
     }
   }
 
+  async function handleGenerateNotaDeCargaCrescente() {
+    if (!selectedCarga || notasFiscais.length === 0) return;
+
+    setGenerating("nota-crescente");
+    try {
+      const nfsPDF = await buildNfsPDF(notasFiscais);
+      const blob = await generateNotaDeCargaPDF(
+        {
+          data: selectedCarga.data,
+          placa: selectedCarga.placa,
+          motorista: selectedCarga.motorista,
+        },
+        nfsPDF,
+        "nf-ascending"
+      );
+
+      downloadBlob(
+        blob,
+        `nota_carga_crescente_${selectedCarga.placa}_${format(new Date(selectedCarga.data + "T00:00:00"), "yyyyMMdd")}.pdf`
+      );
+
+      toast({
+        title: "PDF gerado com sucesso!",
+        description: `${notasFiscais.length} NFs em ordem crescente.`,
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao gerar PDF",
+      });
+    } finally {
+      setGenerating(null);
+    }
+  }
+
   async function handlePrintRomaneio() {
     if (!selectedCarga) return;
     setGenerating("print-romaneio");
