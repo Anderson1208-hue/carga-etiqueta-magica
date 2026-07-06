@@ -26,6 +26,7 @@ VITE_BUILD_ENV=homolog npm run build
 echo "==> 3/6 Sincronizando Capacitor em modo HOMOLOG (embutido, sem server.url)"
 CAP_ENV=homolog npx cap sync android
 
+echo "==> 3.4/6 Injetando licença Transistorsoft se necessário"
 ensure_transistorsoft_license
 
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
