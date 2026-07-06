@@ -30,6 +30,10 @@ echo "==> 3/6 Sincronizando Capacitor em modo PROD (sem hot-reload)"
 CAP_ENV=prod npx cap sync android
 
 echo "==> 3.5/6 Validando permissões nativas de GPS background"
+echo "==> 3.4/6 Injetando licença Transistorsoft se necessário"
+ensure_transistorsoft_license
+
+echo "==> 3.5/6 Validando permissões nativas de GPS background"
 assert_android_background_gps_ready
 
 echo "==> Garantindo FQN da MainActivity"
