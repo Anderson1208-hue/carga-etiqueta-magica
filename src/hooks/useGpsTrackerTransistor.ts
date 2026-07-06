@@ -259,6 +259,11 @@ async function requestNativeLocationPermission(plugin: TSBgGeo, stage: string): 
   }
 }
 
+function isNativeLocationGranted(status: number | null): boolean {
+  // Transistorsoft AuthorizationStatus: 3 = Always, 4 = WhenInUse.
+  return status === 3 || status === 4;
+}
+
 export async function ensureTransistorGpsReady(
   distanceFilter: number = DEFAULT_CONFIG.distance_filter_metros,
   monitoramentoRotaId: string | null = null
@@ -306,33 +311,31 @@ export async function ensureTransistorGpsReady(
       markError(`[transistor] getProviderState:falhou ${msg}`);
     }
 
-    // Android 15 pode negar o popup de requestPermission() (erro=2) quando o
-    // usuário já disse "Não perguntar mais" ou quando a permissão FINE foi
-    // concedida mas BACKGROUND ainda não — o SDK devolve DENIED cacheado.
-    // Estratégia resiliente:
-    //   - Se provider.status = Always(3)/WhenInUse(4) → seguir, permissão OK.
-    //   - Se provider.enabled=true e provider.gps=true → seguir mesmo assim,
-    //     deixamos o ready() tentar; se o OS bloquear de fato, surge lá com
-    //     mensagem clara e o motorista vai pra Configurações.
-    //   - Caso contrário → abortar com erro amigável indicando abrir Configurações.
-    try {
-      await requestNativeLocationPermission(plugin, "pre-ready");
-    } catch (err) {
-      const permissionLikelyOk =
-        preReadyProviderStatus === 3 ||
-        preReadyProviderStatus === 4 ||
-        (preReadyProviderEnabled === true && preReadyProviderGps === true);
-      if (permissionLikelyOk) {
-        markError(
-          `[transistor] requestPermission:pre-ready ignorado (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps})`
-        );
-      } else {
-        markError(
-          `[transistor] requestPermission:pre-ready abortando (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps}) — abrir Configurações → Localização`
-        );
-        throw new Error(
-          "Permissão de localização negada pelo Android. Abra Configurações → Apps → Orkestria → Permissões → Localização → 'Permitir o tempo todo'."
-        );
+    // Android 11+ não oferece "Permitir o tempo todo" no popup normal. Se o
+    // provider já reporta Always(3) / WhenInUse(4), não chamar requestPermission()
+    // de novo: em Android 15 / WebView isso pode retornar erro=2 (Denied)
+    // mesmo com a permissão real concedida, deixando o SDK em estado negado e
+    // impedindo start() / Foreground Service. O provider é a fonte confiável.
+    if (isNativeLocationGranted(preReadyProviderStatus)) {
+      markNativeRequestPermission({ status: preReadyProviderStatus });
+      markError(`[transistor] requestPermission:pre-ready pulado provider.status=${preReadyProviderStatus}`);
+    } else {
+      try {
+        await requestNativeLocationPermission(plugin, "pre-ready");
+      } catch (err) {
+        const permissionLikelyOk = preReadyProviderEnabled === true && preReadyProviderGps === true;
+        if (permissionLikelyOk) {
+          markError(
+            `[transistor] requestPermission:pre-ready ignorado (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps})`
+          );
+        } else {
+          markError(
+            `[transistor] requestPermission:pre-ready abortando (status=${preReadyProviderStatus} enabled=${preReadyProviderEnabled} gps=${preReadyProviderGps}) — abrir Configurações → Localização`
+          );
+          throw new Error(
+            "Permissão de localização negada pelo Android. Abra Configurações → Apps → Orkestria → Permissões → Localização → 'Permitir o tempo todo'."
+          );
+        }
       }
     }
 
@@ -460,17 +463,21 @@ export async function ensureTransistorGpsReady(
     }
 
     try {
-      await requestNativeLocationPermission(plugin, "post-ready");
-    } catch (err) {
-      markError(
-        `[transistor] requestPermission:post-ready ignorado ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-
-    try {
       const provider = await plugin.getProviderState();
       markNativeProvider(provider);
       markError(`[transistor] getProviderState:ok enabled=${provider.enabled} gps=${provider.gps} status=${provider.status}`);
+      if (isNativeLocationGranted(provider.status ?? null)) {
+        markNativeRequestPermission({ status: provider.status ?? null });
+        markError(`[transistor] requestPermission:post-ready pulado provider.status=${provider.status}`);
+      } else {
+        try {
+          await requestNativeLocationPermission(plugin, "post-ready");
+        } catch (err) {
+          markError(
+            `[transistor] requestPermission:post-ready ignorado ${err instanceof Error ? err.message : String(err)}`
+          );
+        }
+      }
     } catch (err) {
       markError(`[transistor] getProviderState:falhou(post-ready) ${err instanceof Error ? err.message : String(err)}`);
     }
