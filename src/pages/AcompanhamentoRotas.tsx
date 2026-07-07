@@ -69,30 +69,36 @@ export default function AcompanhamentoRotas() {
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
   const [config, setConfig] = useState<MonitoramentoConfig | null>(null);
 
-  // Carrega apenas rotas ATIVAS da data + exclui veículos já baixados
+  // Carrega apenas rotas ATIVAS de veículos que estão na roteirização da data
+  // (veiculos.data é setada pela roteirização e reagendada no pernoite).
   const loadRotas = useCallback(async (dataFiltro: string) => {
     try {
       const all = await fetchAllPages<any>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .eq("data", dataFiltro)
           .eq("status", "ativa")
           .order("created_at", { ascending: false })
           .range(from, to)
       );
 
       const veicIds = Array.from(new Set(all.map((r) => r.veiculo_id).filter(Boolean)));
+      let veicDoDia = new Set<string>();
       let baixados = new Set<string>();
       if (veicIds.length > 0) {
         const { data: veics } = await supabase
           .from("veiculos")
-          .select("id, prestacao_contas_em")
-          .in("id", veicIds)
-          .not("prestacao_contas_em", "is", null);
-        baixados = new Set((veics || []).map((v: any) => v.id));
+          .select("id, data, prestacao_contas_em")
+          .in("id", veicIds);
+        (veics || []).forEach((v: any) => {
+          if (String(v.data).slice(0, 10) === dataFiltro) veicDoDia.add(v.id);
+          if (v.prestacao_contas_em) baixados.add(v.id);
+        });
       }
-      const filtered = all.filter((r) => !baixados.has(r.veiculo_id));
+      const filtered = all.filter(
+        (r) => veicDoDia.has(r.veiculo_id) && !baixados.has(r.veiculo_id)
+      );
+
 
       // Dedup por placa
       const seen = new Set<string>();
