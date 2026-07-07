@@ -216,9 +216,14 @@ export function resetTransistorReadyCache(): void {
 
 
 function buildNativeLocationTemplate(): string {
+  // IMPORTANTE: TSTemplate.render do Transistorsoft NÃO suporta acesso a campos
+  // aninhados de `extras` (ex.: <%= extras.monitoramento_rota_id %> lança
+  // IllegalArgumentException "Unknown template variable"). O SDK mescla os
+  // campos de `extras` automaticamente no root do JSON quando rootProperty=".",
+  // então basta omitir do template — monitoramento_rota_id chega no backend
+  // via merge automático do extras.
   return (
-    '{"monitoramento_rota_id":"<%= extras.monitoramento_rota_id %>",' +
-    '"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
+    '{"latitude":<%= latitude %>,"longitude":<%= longitude %>,' +
     '"accuracy":<%= accuracy %>,"heartbeat":false,' +
     `"timestamp":"<%= timestamp %>","client_ts":"<%= timestamp %>","source":"${NATIVE_SOURCE}"}`
   );
