@@ -77,17 +77,34 @@ export default function MonitoramentoRotas() {
         .from("monitoramento_rotas")
         .select("*")
         .order("created_at", { ascending: false });
-      if (!incluirAntigas) {
-        // Apenas rotas da data selecionada
-        query = query.eq("data", dataFiltro);
-      } else {
+      if (incluirAntigas) {
         // Data selecionada + rotas anteriores ainda abertas (não finalizadas)
         query = query.lte("data", dataFiltro);
       }
+      // Quando incluirAntigas=false, não filtramos por monitoramento_rotas.data:
+      // o vínculo com "roteirização do dia" vem via veiculos.data logo abaixo.
       const data = await fetchAllPages<any>((from, to) => query.range(from, to));
+
+      let rotasFiltradas = data;
+      if (!incluirAntigas) {
+        // Só veículos que estão na roteirização da data selecionada
+        // (veiculos.data é definido pela roteirização e movido no pernoite).
+        const veicIds = Array.from(new Set(data.map((r: any) => r.veiculo_id).filter(Boolean)));
+        let veicDoDia = new Set<string>();
+        if (veicIds.length > 0) {
+          const { data: veics } = await supabase
+            .from("veiculos")
+            .select("id, data")
+            .in("id", veicIds)
+            .eq("data", dataFiltro);
+          veicDoDia = new Set((veics || []).map((v: any) => v.id));
+        }
+        rotasFiltradas = data.filter((r: any) => veicDoDia.has(r.veiculo_id));
+      }
+
       // Dedup por placa normalizada — mantém a rota mais recente (já vem ordenada desc).
       const seen = new Set<string>();
-      const dedup = data.filter((r: any) => {
+      const dedup = rotasFiltradas.filter((r: any) => {
         const key = normalizePlate(r.placa) || r.veiculo_id;
         if (!key) return true;
         if (seen.has(key)) return false;
@@ -103,6 +120,7 @@ export default function MonitoramentoRotas() {
       setLoading(false);
     }
   }, []);
+
 
 
   const loadParadas = useCallback(async (rotaId: string) => {
