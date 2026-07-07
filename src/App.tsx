@@ -25,6 +25,7 @@ import Enderecamento from "./pages/Enderecamento";
 import ConsultaNF from "./pages/ConsultaNF";
 import MonitoramentoRotas from "./pages/MonitoramentoRotas";
 import TorreControle from "./pages/TorreControle";
+import AcompanhamentoRotas from "./pages/AcompanhamentoRotas";
 import Operadores from "./pages/Operadores";
 import AuditoriaLog from "./pages/AuditoriaLog";
 
