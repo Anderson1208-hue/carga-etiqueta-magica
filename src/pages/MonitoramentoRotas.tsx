@@ -492,7 +492,7 @@ export default function MonitoramentoRotas() {
             <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
               <Switch id="mostrar-antigas" checked={mostrarAntigas} onCheckedChange={setMostrarAntigas} />
               <Label htmlFor="mostrar-antigas" className="text-xs cursor-pointer">
-                Incluir rotas antigas em aberto
+                Incluir rotas antigas em aberto (fora da roteirização do dia)
               </Label>
             </div>
             <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
