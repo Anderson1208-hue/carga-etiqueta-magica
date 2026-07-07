@@ -508,7 +508,7 @@ export default function MonitoramentoRotas() {
                 Incluir rotas antigas em aberto (fora da roteirização do dia)
               </Label>
             </div>
-            <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(); }}>
+            <Button size="sm" onClick={() => { setShowIniciar(true); loadVeiculosDisponiveis(dataSelecionada); }}>
               <Truck className="w-4 h-4 mr-1" /> Iniciar Monitoramento
             </Button>
             <Button variant="outline" size="sm" onClick={() => { loadRotas(dataSelecionada, mostrarAntigas); if (selectedRota) { loadParadas(selectedRota.id); loadAlertas(selectedRota.id); } }}>
