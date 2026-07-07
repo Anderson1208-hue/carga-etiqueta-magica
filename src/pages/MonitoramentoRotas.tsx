@@ -173,13 +173,17 @@ export default function MonitoramentoRotas() {
     }
   }, []);
 
-  const loadVeiculosDisponiveis = useCallback(async () => {
+  const loadVeiculosDisponiveis = useCallback(async (dataFiltro: string) => {
     setLoadingVeiculos(true);
     try {
+      // Apenas veículos da roteirização do dia selecionado (amarrado por veiculos.data),
+      // ainda não baixados na prestação de contas.
       const { data: veiculos } = await supabase
         .from("veiculos")
-        .select("id, placa, motorista, data, status")
+        .select("id, placa, motorista, data, status, prestacao_contas_em")
         .in("status", ["pendente", "em_rota"])
+        .eq("data", dataFiltro)
+        .is("prestacao_contas_em", null)
         .order("created_at", { ascending: false });
       const { data: monAtivas } = await supabase
         .from("monitoramento_rotas")
@@ -187,7 +191,16 @@ export default function MonitoramentoRotas() {
         .eq("status", "ativa");
       const ativosIds = new Set((monAtivas || []).map((m: any) => m.veiculo_id));
       const ativosPlacas = new Set((monAtivas || []).map((m: any) => normalizePlate(m.placa)).filter(Boolean));
-      setVeiculosDisponiveis((veiculos || []).filter((v: any) => !ativosIds.has(v.id) && !ativosPlacas.has(normalizePlate(v.placa))));
+      // Dedup por placa (mantém o mais recente já ordenado)
+      const seen = new Set<string>();
+      const filtrados = (veiculos || []).filter((v: any) => {
+        if (ativosIds.has(v.id) || ativosPlacas.has(normalizePlate(v.placa))) return false;
+        const key = normalizePlate(v.placa) || v.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setVeiculosDisponiveis(filtrados);
     } finally {
       setLoadingVeiculos(false);
     }
