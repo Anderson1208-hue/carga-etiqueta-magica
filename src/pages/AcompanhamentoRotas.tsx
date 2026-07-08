@@ -504,6 +504,7 @@ export default function AcompanhamentoRotas() {
               }}
               formatTime={formatTime}
               baixasPorCnpj={baixasPorCnpj}
+              analisePorParada={analisePorParada}
             />
           </>
         )}
