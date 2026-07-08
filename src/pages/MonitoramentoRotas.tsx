@@ -42,6 +42,7 @@ export default function MonitoramentoRotas() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
+  const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
