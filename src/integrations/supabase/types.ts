@@ -2142,6 +2142,23 @@ export type Database = {
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      detectar_paradas_suspeitas: {
+        Args: { p_rota_id: string }
+        Returns: {
+          classificacao: string
+          cluster_num: number
+          distancia_parada_m: number
+          duracao_min: number
+          fim: string
+          inicio: string
+          latitude: number
+          longitude: number
+          parada_ordem: number
+          parada_planejada_id: string
+          parada_razao_social: string
+          pontos: number
+        }[]
+      }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
       fn_ibac_enqueue: {
         Args: {

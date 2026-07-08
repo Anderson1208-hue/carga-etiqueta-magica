@@ -29,6 +29,7 @@ import { RotaDetailHeader } from "@/components/monitoramento/RotaDetailHeader";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento";
+import { AuditoriaPercursoPanel } from "@/components/monitoramento/AuditoriaPercursoPanel";
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { ConfigDialog } from "@/components/monitoramento/ConfigDialog";
 import { IniciarDialog } from "@/components/monitoramento/IniciarDialog";
@@ -612,6 +613,7 @@ export default function MonitoramentoRotas() {
                   placa={selectedRota.placa}
                   rotaId={selectedRota.id}
                 />
+                <AuditoriaPercursoPanel rotaId={selectedRota.id} formatTime={formatTime} />
                 <ParadasTable
                   paradas={paradas}
                   onJustificar={(p) => setJustificativaParada(p)}
