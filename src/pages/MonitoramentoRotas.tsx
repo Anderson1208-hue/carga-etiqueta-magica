@@ -33,6 +33,7 @@ import { AuditoriaPercursoPanel } from "@/components/monitoramento/AuditoriaPerc
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { ConfigDialog } from "@/components/monitoramento/ConfigDialog";
 import { IniciarDialog } from "@/components/monitoramento/IniciarDialog";
+import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
 
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
@@ -43,6 +44,7 @@ export default function MonitoramentoRotas() {
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
   const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
+  const [analisePorParada, setAnalisePorParada] = useState<Record<string, ParadaAnalise>>({});
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
@@ -141,7 +143,7 @@ export default function MonitoramentoRotas() {
     const baixas = await fetchAllPages<any>((from, to) =>
       supabase
         .from("baixas_entrega")
-        .select("registrado_em, status, notas_fiscais!inner(cnpj_destinatario)")
+        .select("registrado_em, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
         .eq("veiculo_id", veiculoId)
         .eq("status", "entregue")
         .order("registrado_em", { ascending: false })
@@ -154,7 +156,48 @@ export default function MonitoramentoRotas() {
       if (!map[cnpj]) map[cnpj] = b.registrado_em;
     });
     setBaixasPorCnpj(map);
+    return baixas;
   }, []);
+
+  const loadAnalise = useCallback(async (rotaId: string, veiculoId: string | null) => {
+    const [pars, pings, baixasRaw] = await Promise.all([
+      fetchAllPages<any>((from, to) =>
+        supabase
+          .from("monitoramento_paradas")
+          .select("id, cnpj_destinatario, latitude, longitude, raio_geofence_metros")
+          .eq("monitoramento_rota_id", rotaId)
+          .range(from, to)
+      ),
+      fetchAllPages<any>((from, to) =>
+        supabase
+          .from("posicoes_gps")
+          .select("latitude, longitude, registrado_em")
+          .eq("monitoramento_rota_id", rotaId)
+          .eq("heartbeat", false)
+          .order("registrado_em", { ascending: true })
+          .range(from, to)
+      ),
+      veiculoId
+        ? fetchAllPages<any>((from, to) =>
+            supabase
+              .from("baixas_entrega")
+              .select("registrado_em, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
+              .eq("veiculo_id", veiculoId)
+              .eq("status", "entregue")
+              .order("registrado_em", { ascending: false })
+              .range(from, to)
+          )
+        : Promise.resolve([] as any[]),
+    ]);
+    const baixasCoord = (baixasRaw || []).map((b: any) => ({
+      cnpj: (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""),
+      registrado_em: b.registrado_em,
+      latitude: b.latitude != null ? Number(b.latitude) : null,
+      longitude: b.longitude != null ? Number(b.longitude) : null,
+    }));
+    setAnalisePorParada(analisarParadas(pars, pings, baixasCoord, 30));
+  }, []);
+
 
 
   const loadAlertas = useCallback(async (rotaId: string) => {
@@ -506,6 +549,7 @@ export default function MonitoramentoRotas() {
     loadParadas(selectedRota.id);
     loadAlertas(selectedRota.id);
     if (selectedRota.veiculo_id) loadBaixas(selectedRota.veiculo_id);
+    loadAnalise(selectedRota.id, selectedRota.veiculo_id);
 
     const channelParadas = supabase
       .channel(`mon-paradas-${selectedRota.id}`)
@@ -641,6 +685,7 @@ export default function MonitoramentoRotas() {
                   onJustificar={(p) => setJustificativaParada(p)}
                   formatTime={formatTime}
                   baixasPorCnpj={baixasPorCnpj}
+                  analisePorParada={analisePorParada}
                 />
               </>
             )}
