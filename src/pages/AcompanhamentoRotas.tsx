@@ -29,6 +29,7 @@ import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento";
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
+import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
 
 const todayISO = () => {
   const d = new Date();
