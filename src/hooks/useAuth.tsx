@@ -1,6 +1,13 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+
+const IS_NATIVE_APK = Capacitor.isNativePlatform();
+// Flag por aba: garante que ao abrir/reabrir o navegador (nova aba), o
+// operador precise informar a senha novamente. Dentro da mesma aba, a
+// navegação continua funcionando sem novo login.
+const SESSION_FLAG_KEY = "wms:session-active";
 
 interface Profile {
   id: string;
