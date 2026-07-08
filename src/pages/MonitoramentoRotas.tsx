@@ -613,6 +613,7 @@ export default function MonitoramentoRotas() {
                   placa={selectedRota.placa}
                   rotaId={selectedRota.id}
                 />
+                <AuditoriaPercursoPanel rotaId={selectedRota.id} formatTime={formatTime} />
                 <ParadasTable
                   paradas={paradas}
                   onJustificar={(p) => setJustificativaParada(p)}
