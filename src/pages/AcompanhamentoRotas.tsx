@@ -251,7 +251,7 @@ export default function AcompanhamentoRotas() {
 
   async function handleMarkAlertRead(id: string) {
     await supabase.from("alertas_monitoramento").update({ lido: true }).eq("id", id);
-    if (selectedRota) loadDetalhe(selectedRota.id);
+    if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
     loadRotas(dataSelecionada);
   }
 
