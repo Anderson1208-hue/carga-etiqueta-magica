@@ -40,6 +40,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let lastUserId: string | null = null;
 
+    // Web: se a aba foi aberta agora (sem flag na sessionStorage), descarta
+    // qualquer sessão persistida do localStorage para forçar novo login.
+    const bootstrap = async () => {
+      if (!IS_NATIVE_APK) {
+        const hasActiveTab = sessionStorage.getItem(SESSION_FLAG_KEY) === "1";
+        if (!hasActiveTab) {
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.warn("[Auth] signOut inicial falhou:", err);
+          }
+        }
+      }
+      return setupListener();
+    };
+
+    const setupListener = () => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
