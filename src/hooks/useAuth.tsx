@@ -147,6 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
+      if (!error) {
+        sessionStorage.setItem(SESSION_FLAG_KEY, "1");
+      }
       return { error };
     } catch (err) {
       console.error("[Auth] Exceção no signIn:", err);
@@ -163,10 +166,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: window.location.origin,
       },
     });
+    if (!error) {
+      sessionStorage.setItem(SESSION_FLAG_KEY, "1");
+    }
     return { error };
   };
 
   const signOut = async () => {
+    sessionStorage.removeItem(SESSION_FLAG_KEY);
     await supabase.auth.signOut();
     setProfile(null);
   };
