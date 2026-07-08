@@ -104,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     );
+    subscription = listener.data.subscription;
 
     // THEN get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -131,9 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     });
+    };
+
+    bootstrap();
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
