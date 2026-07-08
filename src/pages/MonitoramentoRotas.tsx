@@ -610,6 +610,7 @@ export default function MonitoramentoRotas() {
                   veiculoLat={selectedRota.ultima_lat}
                   veiculoLng={selectedRota.ultima_lng}
                   placa={selectedRota.placa}
+                  rotaId={selectedRota.id}
                 />
                 <ParadasTable
                   paradas={paradas}
