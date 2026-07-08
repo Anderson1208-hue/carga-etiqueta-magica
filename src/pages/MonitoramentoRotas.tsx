@@ -137,6 +137,26 @@ export default function MonitoramentoRotas() {
     setParadas(data);
   }, []);
 
+  const loadBaixas = useCallback(async (veiculoId: string) => {
+    const baixas = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("baixas_entrega")
+        .select("registrado_em, status, notas_fiscais!inner(cnpj_destinatario)")
+        .eq("veiculo_id", veiculoId)
+        .eq("status", "entregue")
+        .order("registrado_em", { ascending: false })
+        .range(from, to)
+    );
+    const map: Record<string, string> = {};
+    baixas.forEach((b: any) => {
+      const cnpj = (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
+      if (!cnpj) return;
+      if (!map[cnpj]) map[cnpj] = b.registrado_em;
+    });
+    setBaixasPorCnpj(map);
+  }, []);
+
+
   const loadAlertas = useCallback(async (rotaId: string) => {
     const data = await fetchAllPages<any>((from, to) =>
       supabase
