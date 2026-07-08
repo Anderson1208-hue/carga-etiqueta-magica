@@ -33,6 +33,7 @@ import { AuditoriaPercursoPanel } from "@/components/monitoramento/AuditoriaPerc
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { ConfigDialog } from "@/components/monitoramento/ConfigDialog";
 import { IniciarDialog } from "@/components/monitoramento/IniciarDialog";
+import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
 
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
