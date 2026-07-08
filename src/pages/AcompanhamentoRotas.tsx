@@ -226,8 +226,8 @@ export default function AcompanhamentoRotas() {
       setAlertas([]);
       return;
     }
-    loadDetalhe(selectedRota.id);
-    const iv = setInterval(() => loadDetalhe(selectedRota.id), 15000);
+    loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+    const iv = setInterval(() => loadDetalhe(selectedRota.id, selectedRota.veiculo_id), 15000);
     return () => clearInterval(iv);
   }, [selectedRota, loadDetalhe]);
 
