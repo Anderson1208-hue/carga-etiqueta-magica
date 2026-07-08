@@ -640,6 +640,7 @@ export default function MonitoramentoRotas() {
                   paradas={paradas}
                   onJustificar={(p) => setJustificativaParada(p)}
                   formatTime={formatTime}
+                  baixasPorCnpj={baixasPorCnpj}
                 />
               </>
             )}
