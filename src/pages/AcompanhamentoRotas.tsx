@@ -171,27 +171,48 @@ export default function AcompanhamentoRotas() {
     setParadas(pars);
     setAlertas(alrts);
 
-    // Última baixa "entregue" por CNPJ do destinatário (dentro deste veículo)
+    // Última baixa "entregue" por CNPJ + coords para análise off-site
+    let baixasComCoord: any[] = [];
     if (veiculoId) {
-      const baixas = await fetchAllPages<any>((from, to) =>
+      baixasComCoord = await fetchAllPages<any>((from, to) =>
         supabase
           .from("baixas_entrega")
-          .select("registrado_em, nf_id, status, notas_fiscais!inner(cnpj_destinatario)")
+          .select("registrado_em, nf_id, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
           .eq("veiculo_id", veiculoId)
           .eq("status", "entregue")
           .order("registrado_em", { ascending: false })
           .range(from, to)
       );
       const map: Record<string, string> = {};
-      baixas.forEach((b: any) => {
+      baixasComCoord.forEach((b: any) => {
         const cnpj = (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
         if (!cnpj) return;
-        if (!map[cnpj]) map[cnpj] = b.registrado_em; // já vem desc → primeiro = mais recente
+        if (!map[cnpj]) map[cnpj] = b.registrado_em;
       });
       setBaixasPorCnpj(map);
     } else {
       setBaixasPorCnpj({});
     }
+
+    // GPS pings (sem heartbeats) para dwell "estilo mercado"
+    const pings = await fetchAllPages<any>((from, to) =>
+      supabase
+        .from("posicoes_gps")
+        .select("latitude, longitude, registrado_em")
+        .eq("monitoramento_rota_id", rotaId)
+        .eq("heartbeat", false)
+        .order("registrado_em", { ascending: true })
+        .range(from, to)
+    );
+
+    const baixasCoord = baixasComCoord.map((b: any) => ({
+      cnpj: (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""),
+      registrado_em: b.registrado_em,
+      latitude: b.latitude != null ? Number(b.latitude) : null,
+      longitude: b.longitude != null ? Number(b.longitude) : null,
+    }));
+
+    setAnalisePorParada(analisarParadas(pars, pings, baixasCoord, 30));
   }, []);
 
 
