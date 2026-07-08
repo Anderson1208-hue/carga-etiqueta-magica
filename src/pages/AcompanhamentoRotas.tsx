@@ -63,6 +63,7 @@ export default function AcompanhamentoRotas() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
+  const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +146,7 @@ export default function AcompanhamentoRotas() {
     }
   }, []);
 
-  const loadDetalhe = useCallback(async (rotaId: string) => {
+  const loadDetalhe = useCallback(async (rotaId: string, veiculoId: string | null) => {
     const [pars, alrts] = await Promise.all([
       fetchAllPages<any>((from, to) =>
         supabase
@@ -167,7 +168,30 @@ export default function AcompanhamentoRotas() {
     ]);
     setParadas(pars);
     setAlertas(alrts);
+
+    // Última baixa "entregue" por CNPJ do destinatário (dentro deste veículo)
+    if (veiculoId) {
+      const baixas = await fetchAllPages<any>((from, to) =>
+        supabase
+          .from("baixas_entrega")
+          .select("registrado_em, nf_id, status, notas_fiscais!inner(cnpj_destinatario)")
+          .eq("veiculo_id", veiculoId)
+          .eq("status", "entregue")
+          .order("registrado_em", { ascending: false })
+          .range(from, to)
+      );
+      const map: Record<string, string> = {};
+      baixas.forEach((b: any) => {
+        const cnpj = (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
+        if (!cnpj) return;
+        if (!map[cnpj]) map[cnpj] = b.registrado_em; // já vem desc → primeiro = mais recente
+      });
+      setBaixasPorCnpj(map);
+    } else {
+      setBaixasPorCnpj({});
+    }
   }, []);
+
 
   useEffect(() => {
     supabase
@@ -202,8 +226,8 @@ export default function AcompanhamentoRotas() {
       setAlertas([]);
       return;
     }
-    loadDetalhe(selectedRota.id);
-    const iv = setInterval(() => loadDetalhe(selectedRota.id), 15000);
+    loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+    const iv = setInterval(() => loadDetalhe(selectedRota.id, selectedRota.veiculo_id), 15000);
     return () => clearInterval(iv);
   }, [selectedRota, loadDetalhe]);
 
@@ -227,7 +251,7 @@ export default function AcompanhamentoRotas() {
 
   async function handleMarkAlertRead(id: string) {
     await supabase.from("alertas_monitoramento").update({ lido: true }).eq("id", id);
-    if (selectedRota) loadDetalhe(selectedRota.id);
+    if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
     loadRotas(dataSelecionada);
   }
 
@@ -456,6 +480,7 @@ export default function AcompanhamentoRotas() {
                 /* justificativa fica em Monitoramento detalhado */
               }}
               formatTime={formatTime}
+              baixasPorCnpj={baixasPorCnpj}
             />
           </>
         )}
