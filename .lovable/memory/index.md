@@ -52,6 +52,7 @@ type: reference
 - [Mapa Leaflet UI](mem://funcionalidades/monitoramento/visualizacao-mapa-leaflet) — Map visuals, tokens, truck icon.
 - [Acesso Motorista](mem://arquitetura/banco-de-dados/veiculo-acesso-codigo-motorista) — 6-char public route access code.
 - [Status de Entrega](mem://logica/ciclo-de-vida-status-entrega) — Delivery lifecycle trigger points.
+- [Reconciliação Parada↔Baixa](mem://logica/reconciliacao-parada-baixa) — Baixa 'entregue' reabre paradas 'pulada'/'visita_inconsistente' e finaliza. Verdade da baixa > geofence.
 - [Agendamento Regras](mem://funcionalidades/transporte/agendamento) — Schedule rules (releases day before).
 - [Feriados RJ Dias Úteis](mem://funcionalidades/transporte/feriados-rj-dias-uteis) — Liberação considera próximo dia útil RJ (sáb/dom + feriados).
 - [Agendamento Auto](mem://logica/agendamento/automacao-cnpj) — Specific CNPJs flagged automatically via triggers.
