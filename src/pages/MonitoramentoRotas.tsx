@@ -226,7 +226,7 @@ export default function MonitoramentoRotas() {
       const { data: veiculoNfs } = await supabase
         .from("veiculo_nfs")
         .select(`
-          nf_id,
+          nf_id, carga_origem_id,
           notas_fiscais (
             id, numero_nf, cnpj_destinatario, dest_razao_social,
             dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf, dest_cep,
@@ -247,11 +247,63 @@ export default function MonitoramentoRotas() {
         return { sucesso: false, placa: veiculo.placa, motivo: "Sem NF vinculada" };
       }
 
-      const { data: rotParadas } = await supabase
-        .from("roteirizacao_paradas")
-        .select("cnpj_destinatario, latitude, longitude, ordem, razao_social, endereco_completo, total_nfs, total_caixas, peso_total_kg, volume_total_m3")
-        .in("cnpj_destinatario", Object.keys(groupedByCnpj))
-        .order("ordem", { ascending: true });
+      // Normaliza CNPJ para casar com roteirizacao_paradas (ambos os formatos possíveis)
+      const norm = (s: string) => (s || "").replace(/\D/g, "");
+      const cnpjsDoVeiculo = new Set(Object.keys(groupedByCnpj).map(norm).filter(Boolean));
+      const cargaIds = Array.from(
+        new Set((veiculoNfs || []).map((v: any) => v.carga_origem_id).filter(Boolean))
+      );
+
+      // Escolhe a roteirização com maior cobertura dos CNPJs deste veículo e
+      // renumera 1..N (mesma lógica de Roteirizacao.buildOrdemPorCnpj)
+      const ordemPorCnpj = new Map<string, number>();
+      const dadosPorCnpj = new Map<string, any>();
+      if (cargaIds.length > 0) {
+        const { data: rots } = await supabase
+          .from("roteirizacoes")
+          .select("id, created_at")
+          .in("carga_id", cargaIds)
+          .order("created_at", { ascending: false });
+        const rotIds = (rots || []).map((r: any) => r.id);
+        if (rotIds.length > 0) {
+          const { data: paradasAll } = await supabase
+            .from("roteirizacao_paradas")
+            .select("roteirizacao_id, cnpj_destinatario, latitude, longitude, ordem, razao_social, endereco_completo, total_nfs, total_caixas, peso_total_kg, volume_total_m3")
+            .in("roteirizacao_id", rotIds)
+            .order("ordem", { ascending: true });
+          const paradasPorRot = new Map<string, any[]>();
+          for (const p of paradasAll || []) {
+            const arr = paradasPorRot.get(p.roteirizacao_id) || [];
+            arr.push(p);
+            paradasPorRot.set(p.roteirizacao_id, arr);
+          }
+          const ranked = (rots || [])
+            .map((r: any) => {
+              const ps = paradasPorRot.get(r.id) || [];
+              const coverage = new Set(
+                ps.filter((p: any) => cnpjsDoVeiculo.has(norm(p.cnpj_destinatario)))
+                  .map((p: any) => norm(p.cnpj_destinatario))
+              ).size;
+              return { id: r.id, created_at: r.created_at, coverage, paradas: ps };
+            })
+            .sort((a, b) => {
+              if (b.coverage !== a.coverage) return b.coverage - a.coverage;
+              return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            });
+
+          const cnpjsOrdenados: string[] = [];
+          for (const r of ranked) {
+            const ordenadas = [...r.paradas].sort((a: any, b: any) => a.ordem - b.ordem);
+            for (const p of ordenadas) {
+              const c = norm(p.cnpj_destinatario);
+              if (!cnpjsDoVeiculo.has(c)) continue;
+              if (!dadosPorCnpj.has(c)) dadosPorCnpj.set(c, p);
+              if (!cnpjsOrdenados.includes(c)) cnpjsOrdenados.push(c);
+            }
+          }
+          cnpjsOrdenados.forEach((c, idx) => ordemPorCnpj.set(c, idx + 1));
+        }
+      }
 
       const { data: monRota, error: rotaErr } = await supabase
         .from("monitoramento_rotas")
@@ -266,13 +318,14 @@ export default function MonitoramentoRotas() {
         .single();
       if (rotaErr) throw rotaErr;
 
-      const paradasMap = new Map((rotParadas || []).map((p: any) => [p.cnpj_destinatario, p]));
-      let ordem = 1;
+      let proximaOrdem = ordemPorCnpj.size + 1;
       const paradasInsert = Object.entries(groupedByCnpj).map(([cnpj, cnpjNfs]) => {
-        const rotP = paradasMap.get(cnpj);
+        const cnpjN = norm(cnpj);
+        const rotP = dadosPorCnpj.get(cnpjN);
+        const ord = ordemPorCnpj.get(cnpjN) ?? proximaOrdem++;
         return {
           monitoramento_rota_id: (monRota as any).id,
-          ordem: rotP?.ordem || ordem++,
+          ordem: ord,
           cnpj_destinatario: cnpj,
           razao_social: rotP?.razao_social || cnpjNfs[0]?.dest_razao_social,
           endereco_completo: rotP?.endereco_completo || `${cnpjNfs[0]?.dest_logradouro || ""}, ${cnpjNfs[0]?.dest_numero || ""} - ${cnpjNfs[0]?.dest_bairro || ""}, ${cnpjNfs[0]?.dest_cidade || ""}/${cnpjNfs[0]?.dest_uf || ""}`,
