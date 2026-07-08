@@ -56,9 +56,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return setupListener();
     };
 
+    let subscription: { unsubscribe: () => void } | null = null;
+
     const setupListener = () => {
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const listener = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
