@@ -480,6 +480,7 @@ export default function AcompanhamentoRotas() {
                 /* justificativa fica em Monitoramento detalhado */
               }}
               formatTime={formatTime}
+              baixasPorCnpj={baixasPorCnpj}
             />
           </>
         )}
