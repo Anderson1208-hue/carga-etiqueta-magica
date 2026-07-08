@@ -1,6 +1,13 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+
+const IS_NATIVE_APK = Capacitor.isNativePlatform();
+// Flag por aba: garante que ao abrir/reabrir o navegador (nova aba), o
+// operador precise informar a senha novamente. Dentro da mesma aba, a
+// navegação continua funcionando sem novo login.
+const SESSION_FLAG_KEY = "wms:session-active";
 
 interface Profile {
   id: string;
@@ -33,8 +40,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let lastUserId: string | null = null;
 
+    // Web: se a aba foi aberta agora (sem flag na sessionStorage), descarta
+    // qualquer sessão persistida do localStorage para forçar novo login.
+    const bootstrap = async () => {
+      if (!IS_NATIVE_APK) {
+        const hasActiveTab = sessionStorage.getItem(SESSION_FLAG_KEY) === "1";
+        if (!hasActiveTab) {
+          try {
+            await supabase.auth.signOut();
+          } catch (err) {
+            console.warn("[Auth] signOut inicial falhou:", err);
+          }
+        }
+      }
+      return setupListener();
+    };
+
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    const setupListener = () => {
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const listener = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
@@ -78,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     );
+    subscription = listener.data.subscription;
 
     // THEN get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -105,9 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       }
     });
+    };
+
+    bootstrap();
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
@@ -117,6 +147,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
+      if (!error) {
+        sessionStorage.setItem(SESSION_FLAG_KEY, "1");
+      }
       return { error };
     } catch (err) {
       console.error("[Auth] Exceção no signIn:", err);
@@ -133,10 +166,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: window.location.origin,
       },
     });
+    if (!error) {
+      sessionStorage.setItem(SESSION_FLAG_KEY, "1");
+    }
     return { error };
   };
 
   const signOut = async () => {
+    sessionStorage.removeItem(SESSION_FLAG_KEY);
     await supabase.auth.signOut();
     setProfile(null);
   };
