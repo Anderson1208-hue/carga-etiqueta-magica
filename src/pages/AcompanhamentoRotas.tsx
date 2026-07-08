@@ -65,6 +65,7 @@ export default function AcompanhamentoRotas() {
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
   const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
+  const [analisePorParada, setAnalisePorParada] = useState<Record<string, ParadaAnalise>>({});
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
