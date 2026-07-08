@@ -549,6 +549,7 @@ export default function MonitoramentoRotas() {
     loadParadas(selectedRota.id);
     loadAlertas(selectedRota.id);
     if (selectedRota.veiculo_id) loadBaixas(selectedRota.veiculo_id);
+    loadAnalise(selectedRota.id, selectedRota.veiculo_id);
 
     const channelParadas = supabase
       .channel(`mon-paradas-${selectedRota.id}`)
