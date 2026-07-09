@@ -314,28 +314,66 @@ function DestinatarioDialog({
         cep: (e.cep || "").replace(/\D/g, "") || null,
         principal: e.principal,
       };
+      let enderecoId = e.id;
       if (e.id) {
         const { error } = await supabase.from("destinatario_enderecos").update(payload).eq("id", e.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("destinatario_enderecos").insert(payload);
+        const { data, error } = await supabase
+          .from("destinatario_enderecos")
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
+        enderecoId = data.id;
       }
       // se marcou como principal, desmarca os outros
       if (e.principal) {
         await supabase.from("destinatario_enderecos")
           .update({ principal: false })
           .eq("destinatario_id", destinatarioId)
-          .neq("id", e.id || "00000000-0000-0000-0000-000000000000");
+          .neq("id", enderecoId || "00000000-0000-0000-0000-000000000000");
+      }
+
+      // geocodifica via Google (não bloqueia se falhar)
+      try {
+        const { data: geo, error: geoErr } = await supabase.functions.invoke("geocodificar-endereco", {
+          body: {
+            logradouro: payload.logradouro,
+            numero: payload.numero,
+            bairro: payload.bairro,
+            cidade: payload.cidade,
+            uf: payload.uf,
+            cep: payload.cep,
+            endereco_id: enderecoId,
+          },
+        });
+        if (geoErr) {
+          console.warn("Geocoding falhou:", geoErr);
+          return { geoStatus: "fail" as const };
+        }
+        return { geoStatus: "ok" as const, geo };
+      } catch (err) {
+        console.warn("Geocoding erro:", err);
+        return { geoStatus: "fail" as const };
       }
     },
-    onSuccess: () => {
-      toast.success("Endereço salvo");
+    onSuccess: (res) => {
+      if (res?.geoStatus === "ok") {
+        const lt = (res.geo as { location_type?: string } | undefined)?.location_type;
+        toast.success(`Endereço salvo${lt ? ` · GPS ${lt}` : ""}`);
+      } else {
+        toast.success("Endereço salvo");
+        if (res?.geoStatus === "fail") {
+          toast.warning("Não foi possível geocodificar automaticamente");
+        }
+      }
       qc.invalidateQueries({ queryKey: ["destinatario-enderecos", destinatarioId] });
       setEndForm(null);
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
 
   const delEndereco = useMutation({
     mutationFn: async (id: string) => {
