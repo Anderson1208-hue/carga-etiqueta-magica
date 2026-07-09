@@ -38,7 +38,7 @@ export function RotaDetailHeader({ rota, formatDateTime, onFinalizada }: RotaDet
     try {
       const { error } = await supabase
         .from("monitoramento_rotas")
-        .update({ status: "finalizada", finalizada_em: new Date().toISOString() })
+        .update({ status: "finalizada" })
         .eq("id", rota.id);
       if (error) throw error;
       toast({ title: "Rota finalizada", description: `${rota.placa} — GPS será encerrado no próximo ping do APK.` });
