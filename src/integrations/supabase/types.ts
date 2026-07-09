@@ -985,6 +985,51 @@ export type Database = {
           },
         ]
       }
+      geocode_cache: {
+        Row: {
+          address_input: string
+          cache_key: string
+          created_at: string
+          formatted_address: string | null
+          hit_count: number
+          id: string
+          latitude: number
+          location_type: string | null
+          longitude: number
+          place_id: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          address_input: string
+          cache_key: string
+          created_at?: string
+          formatted_address?: string | null
+          hit_count?: number
+          id?: string
+          latitude: number
+          location_type?: string | null
+          longitude: number
+          place_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          address_input?: string
+          cache_key?: string
+          created_at?: string
+          formatted_address?: string | null
+          hit_count?: number
+          id?: string
+          latitude?: number
+          location_type?: string | null
+          longitude?: number
+          place_id?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ibac_alertas: {
         Row: {
           created_at: string
