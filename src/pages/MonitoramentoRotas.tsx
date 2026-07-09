@@ -670,7 +670,7 @@ export default function MonitoramentoRotas() {
               </Card>
             ) : (
               <>
-                <RotaDetailHeader rota={selectedRota} formatDateTime={formatDateTime} />
+                <RotaDetailHeader rota={selectedRota} formatDateTime={formatDateTime} onFinalizada={() => { setSelectedRota(null); loadRotas(dataSelecionada, mostrarAntigas); }} />
                 <AlertasPanel alertas={alertas} onMarkRead={handleMarkAlertRead} formatDateTime={formatDateTime} />
                 <MapaMonitoramento
                   paradas={paradas}
