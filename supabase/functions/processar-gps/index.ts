@@ -137,6 +137,12 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (rotaAtual?.status !== "ativa") {
+      return new Response(JSON.stringify({ status: "ok", events: [], ignored_inactive_route: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const gpsRows = validPositions.map((p: GpsPosition) => {
       const ts = p.timestamp || new Date().toISOString();
       return {
@@ -198,14 +204,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    await supabase
-      .from("monitoramento_rotas")
-      .update({
-        ultima_lat: lat,
-        ultima_lng: lng,
-        ultima_atualizacao: lastTs,
-      })
-      .eq("id", monitoramento_rota_id);
+    const shouldUpdateLatest = !rotaAtual?.ultima_atualizacao ||
+      new Date(lastTs).getTime() >= new Date(rotaAtual.ultima_atualizacao).getTime();
+
+    if (shouldUpdateLatest) {
+      await supabase
+        .from("monitoramento_rotas")
+        .update({
+          ultima_lat: lat,
+          ultima_lng: lng,
+          ultima_atualizacao: lastTs,
+        })
+        .eq("id", monitoramento_rota_id);
+    }
 
     // 3. Get config
     const { data: config } = await supabase
