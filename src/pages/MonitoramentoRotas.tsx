@@ -405,9 +405,54 @@ export default function MonitoramentoRotas() {
         };
       });
 
+      // Prioridade 1 (Parecer Manus + relatório interno 10/07/2026):
+      // Reconciliar coordenadas com o cadastro mestre (destinatario_enderecos)
+      // antes de gravar. Isso evita que enriquecimentos de geocoding feitos
+      // após a criação da roteirização fiquem "congelados" na parada.
+      try {
+        const cnpjsList = Array.from(cnpjsDoVeiculo);
+        if (cnpjsList.length > 0) {
+          const { data: dests } = await supabase
+            .from("destinatarios")
+            .select("id, cnpj_cpf")
+            .in("cnpj_cpf", cnpjsList);
+          const destIds = (dests || []).map((d: any) => d.id);
+          const cnpjPorDestId = new Map<string, string>();
+          (dests || []).forEach((d: any) => cnpjPorDestId.set(d.id, norm(d.cnpj_cpf)));
+          if (destIds.length > 0) {
+            const { data: ends } = await supabase
+              .from("destinatario_enderecos")
+              .select("destinatario_id, latitude, longitude, principal, updated_at")
+              .in("destinatario_id", destIds)
+              .not("latitude", "is", null)
+              .not("longitude", "is", null);
+            // Escolhe o endereço principal; se não houver, o mais recente
+            const melhorPorCnpj = new Map<string, { lat: number; lng: number }>();
+            for (const e of ends || []) {
+              const c = cnpjPorDestId.get(e.destinatario_id);
+              if (!c) continue;
+              const atual = melhorPorCnpj.get(c);
+              if (!atual || e.principal) {
+                melhorPorCnpj.set(c, { lat: Number(e.latitude), lng: Number(e.longitude) });
+              }
+            }
+            for (const p of paradasInsert) {
+              const m = melhorPorCnpj.get(norm(p.cnpj_destinatario));
+              if (m) {
+                p.latitude = m.lat;
+                p.longitude = m.lng;
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn("[monitoramento] falha ao sincronizar coordenadas do cadastro mestre:", syncErr);
+      }
+
       paradasInsert.sort((a, b) => a.ordem - b.ordem);
       paradasInsert.forEach((p, i) => (p.ordem = i + 1));
       await supabase.from("monitoramento_paradas").insert(paradasInsert);
+
 
       return { sucesso: true, placa: veiculo.placa, paradas: paradasInsert.length };
     } catch (err) {
