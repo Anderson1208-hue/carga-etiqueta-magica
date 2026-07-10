@@ -84,9 +84,10 @@ export default function MonitoramentoRotas() {
       if (incluirAntigas) {
         // Data selecionada + rotas anteriores ainda abertas (não finalizadas)
         query = query.lte("data", dataFiltro);
+      } else {
+        // Somente rotas cuja data bate com a data selecionada.
+        query = query.eq("data", dataFiltro);
       }
-      // Quando incluirAntigas=false, não filtramos por monitoramento_rotas.data:
-      // o vínculo com "roteirização do dia" vem via veiculos.data logo abaixo.
       const data = await fetchAllPages<any>((from, to) => query.range(from, to));
 
       let rotasFiltradas = data;
