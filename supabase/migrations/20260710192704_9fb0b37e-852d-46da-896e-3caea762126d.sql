@@ -1,0 +1,2 @@
+ALTER TABLE public.destinatarios ADD COLUMN IF NOT EXISTS raio_geofence_metros INTEGER NULL;
+COMMENT ON COLUMN public.destinatarios.raio_geofence_metros IS 'Raio de geofence customizado por destinatário (metros). Se NULL, usa raio_padrao_metros da config global. Útil para grandes centros de distribuição (atacadistas) onde o motorista descarrega longe do ponto ROOFTOP.';

@@ -414,11 +414,16 @@ export default function MonitoramentoRotas() {
         if (cnpjsList.length > 0) {
           const { data: dests } = await supabase
             .from("destinatarios")
-            .select("id, cnpj_cpf")
+            .select("id, cnpj_cpf, raio_geofence_metros")
             .in("cnpj_cpf", cnpjsList);
           const destIds = (dests || []).map((d: any) => d.id);
           const cnpjPorDestId = new Map<string, string>();
-          (dests || []).forEach((d: any) => cnpjPorDestId.set(d.id, norm(d.cnpj_cpf)));
+          const raioPorCnpj = new Map<string, number>();
+          (dests || []).forEach((d: any) => {
+            const c = norm(d.cnpj_cpf);
+            cnpjPorDestId.set(d.id, c);
+            if (d.raio_geofence_metros != null) raioPorCnpj.set(c, Number(d.raio_geofence_metros));
+          });
           if (destIds.length > 0) {
             const { data: ends } = await supabase
               .from("destinatario_enderecos")
@@ -437,10 +442,18 @@ export default function MonitoramentoRotas() {
               }
             }
             for (const p of paradasInsert) {
-              const m = melhorPorCnpj.get(norm(p.cnpj_destinatario));
+              const cnpjN = norm(p.cnpj_destinatario);
+              const m = melhorPorCnpj.get(cnpjN);
               if (m) {
                 p.latitude = m.lat;
                 p.longitude = m.lng;
+              }
+              // Prioridade 2 (Parecer Manus): raio customizado por destinatário
+              // sobrescreve o raio padrão global. Essencial para grandes centros
+              // (atacadistas) onde a doca fica longe do ponto ROOFTOP.
+              const raioCliente = raioPorCnpj.get(cnpjN);
+              if (raioCliente && raioCliente > 0) {
+                p.raio_geofence_metros = raioCliente;
               }
             }
           }

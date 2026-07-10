@@ -820,6 +820,7 @@ export type Database = {
           id: string
           nome_fantasia: string | null
           observacao: string | null
+          raio_geofence_metros: number | null
           rascunho: boolean
           razao_social: string
           updated_at: string
@@ -832,6 +833,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           observacao?: string | null
+          raio_geofence_metros?: number | null
           rascunho?: boolean
           razao_social: string
           updated_at?: string
@@ -844,6 +846,7 @@ export type Database = {
           id?: string
           nome_fantasia?: string | null
           observacao?: string | null
+          raio_geofence_metros?: number | null
           rascunho?: boolean
           razao_social?: string
           updated_at?: string

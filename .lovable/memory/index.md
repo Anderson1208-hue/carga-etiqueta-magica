@@ -28,6 +28,7 @@ type: reference
 - [Múltiplas Cargas Rota](mem://arquitetura/banco-de-dados/roteirizacao/multi-carga-vinculo) — Routes use primary carga_id as reference.
 - [Clustering Geográfico](mem://logica/roteirizacao/clustering-geografico) — Haversine clustering (6km urban / 17km interior).
 - [Sync Coord Parada](mem://arquitetura/monitoramento/sync-coordenadas-cadastro-mestre) — monitoramento_paradas reconcilia lat/lng com destinatario_enderecos ao iniciar.
+- [Raio Geofence por Cliente](mem://arquitetura/monitoramento/raio-geofence-por-destinatario) — destinatarios.raio_geofence_metros sobrescreve raio global (P2 Manus).
 - [Roteirização Manual](mem://funcionalidades/roteirizacao/modo-manual) — Botão alternativo na Preparação: drag-and-drop + Haversine, sem OSRM.
 - [Geocodificação RJ](mem://logica/geocodificacao-fallback-estratetiga) — Fallback chain: BrasilAPI CEP -> Bairro -> Logradouro.
 - [Geocoding Google Fase 1](mem://funcionalidades/geocoding/google-fase1) — Edge function geocodificar-endereco + cache. Coordenada ROOFTOP via connector google_maps.

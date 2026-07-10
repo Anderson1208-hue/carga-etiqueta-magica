@@ -26,6 +26,7 @@ type Destinatario = {
   observacao: string | null;
   ativo: boolean;
   rascunho: boolean;
+  raio_geofence_metros: number | null;
 };
 
 type Endereco = {
@@ -250,7 +251,7 @@ function DestinatarioDialog({
   });
 
   const [form, setForm] = useState<Partial<Destinatario>>({
-    cnpj_cpf: "", razao_social: "", nome_fantasia: "", observacao: "", ativo: true,
+    cnpj_cpf: "", razao_social: "", nome_fantasia: "", observacao: "", ativo: true, raio_geofence_metros: null,
   });
   const [endForm, setEndForm] = useState<Endereco | null>(null);
   const [restrForm, setRestrForm] = useState<Restricao>({
@@ -280,6 +281,7 @@ function DestinatarioDialog({
         observacao: form.observacao || null,
         ativo: form.ativo ?? true,
         rascunho: false,
+        raio_geofence_metros: form.raio_geofence_metros ?? null,
       };
       if (destinatarioId) {
         const { error } = await supabase.from("destinatarios").update(payload).eq("id", destinatarioId);
@@ -452,6 +454,24 @@ function DestinatarioDialog({
               <div className="col-span-2 space-y-2">
                 <Label>Observação</Label>
                 <Textarea rows={3} value={form.observacao || ""} onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Raio de geofence customizado (metros)</Label>
+                <Input
+                  type="number"
+                  min={30}
+                  max={2000}
+                  step={10}
+                  placeholder="Vazio = usa raio padrão global da Torre"
+                  value={form.raio_geofence_metros ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setForm({ ...form, raio_geofence_metros: v === "" ? null : parseInt(v, 10) });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sobrescreve o raio padrão apenas para este cliente. Útil para grandes centros de distribuição (atacadistas) onde o motorista descarrega em docas distantes do ponto de referência. Aplica-se apenas a rotas criadas depois da edição.
+                </p>
               </div>
               <label className="flex items-center gap-2 col-span-2 text-sm">
                 <Switch checked={form.ativo ?? true} onCheckedChange={(v) => setForm({ ...form, ativo: v })} />
