@@ -26,6 +26,7 @@ interface MapaMonitoramentoProps {
   veiculoLng: number | null;
   placa: string;
   rotaId?: string;
+  rotaData?: string;
 }
 
 type PosicaoRow = {
@@ -45,7 +46,22 @@ function distMeters(a: L.LatLngTuple, b: L.LatLngTuple): number {
   return Math.sqrt(x * x + dLat * dLat) * R;
 }
 
-export function MapaMonitoramento({ paradas, veiculoLat, veiculoLng, placa, rotaId }: MapaMonitoramentoProps) {
+function toSaoPauloDate(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
+export function MapaMonitoramento({ paradas, veiculoLat, veiculoLng, placa, rotaId, rotaData }: MapaMonitoramentoProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const percursoLayerRef = useRef<L.LayerGroup | null>(null);
@@ -231,10 +247,14 @@ export function MapaMonitoramento({ paradas, veiculoLat, veiculoLng, placa, rota
           .range(from, to)
       );
 
+      const rowsDaOperacao = rotaData
+        ? rows.filter((r) => toSaoPauloDate(r.registrado_em) === rotaData.slice(0, 10))
+        : rows;
+
       // Simplificação: descarta pontos a menos de 15m do anterior
       const simplified: L.LatLngTuple[] = [];
       const MIN_DIST = 15;
-      for (const r of rows) {
+      for (const r of rowsDaOperacao) {
         const p: L.LatLngTuple = [Number(r.latitude), Number(r.longitude)];
         if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) continue;
         if (simplified.length === 0 || distMeters(simplified[simplified.length - 1], p) >= MIN_DIST) {
