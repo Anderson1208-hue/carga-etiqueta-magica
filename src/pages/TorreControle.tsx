@@ -57,11 +57,13 @@ export default function TorreControle() {
 
   const loadRotas = useCallback(async (dataFiltro: string) => {
     try {
+      // Inclui rotas da data selecionada + rotas 'ativa' de qualquer data
+      // (motorista pode ter iniciado ontem e continuar em rota hoje).
       const rotasAll = await fetchAllPages<TorreRotaRow>((from, to) =>
         supabase
           .from("monitoramento_rotas")
           .select("*")
-          .eq("data", dataFiltro)
+          .or(`data.eq.${dataFiltro},status.eq.ativa`)
           .order("created_at", { ascending: false })
           .range(from, to)
       );
