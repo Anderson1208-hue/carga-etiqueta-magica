@@ -679,6 +679,7 @@ export default function MonitoramentoRotas() {
                   veiculoLng={selectedRota.ultima_lng}
                   placa={selectedRota.placa}
                   rotaId={selectedRota.id}
+                  rotaData={selectedRota.data}
                 />
                 <AuditoriaPercursoPanel rotaId={selectedRota.id} formatTime={formatTime} />
                 <ParadasTable

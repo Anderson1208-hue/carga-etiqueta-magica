@@ -42,6 +42,26 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+function toSaoPauloDate(value: string | Date): string | null {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  const day = parts.find((p) => p.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
+function normalizeDateOnly(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  return value.slice(0, 10);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -79,6 +99,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const { data: rotaAtual } = await supabase
+      .from("monitoramento_rotas")
+      .select("ultima_atualizacao, status, data")
+      .eq("id", monitoramento_rota_id)
+      .maybeSingle();
+
+    const rotaData = normalizeDateOnly(rotaAtual?.data);
+
     // 1. Insert GPS positions (batch or single) — com dedup via client_ts (UPSERT)
     const positions: GpsPosition[] = batch && batch.length > 0
       ? batch
@@ -90,7 +118,32 @@ Deno.serve(async (req) => {
           heartbeat: !!heartbeatFlag,
         }];
 
-    const gpsRows = positions.map((p: GpsPosition) => {
+    // Rotas de distribuição são diárias: ignore pings de outro dia operacional.
+    // Isso evita percurso/torre contaminados por pernoite ou fila offline antiga.
+    const validPositions = positions
+      .map((p: GpsPosition) => ({
+        ...p,
+        timestamp: p.timestamp || new Date().toISOString(),
+      }))
+      .filter((p) => {
+        if (!rotaData) return true;
+        return toSaoPauloDate(p.timestamp as string) === rotaData;
+      })
+      .sort((a, b) => new Date(a.timestamp as string).getTime() - new Date(b.timestamp as string).getTime());
+
+    if (validPositions.length === 0) {
+      return new Response(JSON.stringify({ status: "ok", events: [], ignored_out_of_day: positions.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (rotaAtual?.status !== "ativa") {
+      return new Response(JSON.stringify({ status: "ok", events: [], ignored_inactive_route: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const gpsRows = validPositions.map((p: GpsPosition) => {
       const ts = p.timestamp || new Date().toISOString();
       return {
         monitoramento_rota_id,
@@ -115,24 +168,20 @@ Deno.serve(async (req) => {
       console.error("[processar-gps] insert error:", insertErr);
     }
 
-    // 2. Use last position for route update and geofence checks
+    // 2. Use valid positions for route update and geofence checks
     // Heartbeats puros (sem movimento) não disparam geofence.
-    const lastPos = positions[positions.length - 1];
+    const lastPos = validPositions[validPositions.length - 1];
     const lat = lastPos.latitude;
     const lng = lastPos.longitude;
-    const isHeartbeatOnly = positions.every((p) => p.heartbeat === true);
+    const lastTs = lastPos.timestamp || new Date().toISOString();
+    const isHeartbeatOnly = validPositions.every((p) => p.heartbeat === true);
 
     // 2.1 Detecta GAP de GPS > 5min — provável "Permitir o tempo todo" ausente
     // ou app morto pelo SO. Cria um alerta único por janela para a Torre.
     const GAP_THRESHOLD_MS = 5 * 60 * 1000;
-    const nowMs = Date.now();
-    const { data: rotaAtual } = await supabase
-      .from("monitoramento_rotas")
-      .select("ultima_atualizacao, status")
-      .eq("id", monitoramento_rota_id)
-      .maybeSingle();
+    const nowMs = new Date(lastTs).getTime();
 
-    if (rotaAtual?.ultima_atualizacao && rotaAtual.status === "ativa") {
+    if (rotaAtual?.ultima_atualizacao && rotaAtual.status === "ativa" && Date.now() - nowMs < 10 * 60 * 1000) {
       const gapMs = nowMs - new Date(rotaAtual.ultima_atualizacao).getTime();
       if (gapMs > GAP_THRESHOLD_MS) {
         const minutos = Math.round(gapMs / 60000);
@@ -155,14 +204,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    await supabase
-      .from("monitoramento_rotas")
-      .update({
-        ultima_lat: lat,
-        ultima_lng: lng,
-        ultima_atualizacao: new Date().toISOString(),
-      })
-      .eq("id", monitoramento_rota_id);
+    const shouldUpdateLatest = !rotaAtual?.ultima_atualizacao ||
+      new Date(lastTs).getTime() >= new Date(rotaAtual.ultima_atualizacao).getTime();
+
+    if (shouldUpdateLatest) {
+      await supabase
+        .from("monitoramento_rotas")
+        .update({
+          ultima_lat: lat,
+          ultima_lng: lng,
+          ultima_atualizacao: lastTs,
+        })
+        .eq("id", monitoramento_rota_id);
+    }
 
     // 3. Get config
     const { data: config } = await supabase
@@ -191,153 +245,178 @@ Deno.serve(async (req) => {
     }
 
     const events: string[] = [];
-    const now = new Date();
+    const paradasState = [...paradas];
+    const routePositions = validPositions.filter((p) => p.heartbeat !== true);
 
-    for (const parada of paradas) {
-      if (!parada.latitude || !parada.longitude) continue;
+    for (const pos of routePositions) {
+      const posLat = Number(pos.latitude);
+      const posLng = Number(pos.longitude);
+      const eventAt = new Date(pos.timestamp as string);
+      if (!Number.isFinite(posLat) || !Number.isFinite(posLng) || Number.isNaN(eventAt.getTime())) continue;
 
-      const dist = haversineDistance(lat, lng, Number(parada.latitude), Number(parada.longitude));
-      const raio = (parada.raio_geofence_metros || raio_padrao) + tolerancia_gps;
-      const dentroGeofence = dist <= raio;
+      for (const parada of paradasState) {
+        if (!parada.latitude || !parada.longitude) continue;
 
-      // RULE: Vehicle entered geofence
-      if (dentroGeofence && parada.status === "programada") {
-        await supabase
-          .from("monitoramento_paradas")
-          .update({ status: "chegou_cliente", horario_chegada: now.toISOString() })
-          .eq("id", parada.id);
+        const dist = haversineDistance(posLat, posLng, Number(parada.latitude), Number(parada.longitude));
+        const raio = (parada.raio_geofence_metros || raio_padrao) + tolerancia_gps;
+        const dentroGeofence = dist <= raio;
 
-        // Check if out of sequence
-        const anterioresNaoConcluidas = paradas.filter(
-          (p: any) => p.ordem < parada.ordem && !["finalizada", "pulada"].includes(p.status)
-        );
+        // RULE: Vehicle entered geofence
+        if (dentroGeofence && parada.status === "programada") {
+          parada.status = "chegou_cliente";
+          parada.horario_chegada = eventAt.toISOString();
+          await supabase
+            .from("monitoramento_paradas")
+            .update({ status: "chegou_cliente", horario_chegada: parada.horario_chegada })
+            .eq("id", parada.id);
 
-        if (anterioresNaoConcluidas.length > 0) {
-          for (const ant of anterioresNaoConcluidas) {
-            if (ant.status === "programada") {
+          // Check if out of sequence
+          const anterioresNaoConcluidas = paradasState.filter(
+            (p: any) => p.ordem < parada.ordem && !["finalizada", "pulada", "visita_inconsistente"].includes(p.status)
+          );
+
+          if (anterioresNaoConcluidas.length > 0) {
+            for (const ant of anterioresNaoConcluidas) {
+              if (ant.status === "programada") {
+                ant.status = "pulada";
+                ant.is_excecao = true;
+                await supabase
+                  .from("monitoramento_paradas")
+                  .update({ status: "pulada", is_excecao: true })
+                  .eq("id", ant.id);
+
+                await supabase.from("alertas_monitoramento").insert({
+                  monitoramento_rota_id,
+                  monitoramento_parada_id: ant.id,
+                  tipo: "entrega_pulada",
+                  mensagem: `Entrega #${ant.ordem} (${ant.razao_social || ant.cnpj_destinatario}) foi pulada`,
+                });
+                events.push(`pulada_${ant.id}`);
+              }
+            }
+
+            parada.is_excecao = true;
+            parada.status = "fora_sequencia";
+            await supabase
+              .from("monitoramento_paradas")
+              .update({ is_excecao: true, status: "fora_sequencia" })
+              .eq("id", parada.id)
+              .eq("status", "chegou_cliente");
+
+            await supabase.from("alertas_monitoramento").insert({
+              monitoramento_rota_id,
+              monitoramento_parada_id: parada.id,
+              tipo: "fora_sequencia",
+              mensagem: `Entrega #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) atendida fora de sequência`,
+            });
+            events.push(`fora_sequencia_${parada.id}`);
+          }
+
+          events.push(`chegou_${parada.id}`);
+        }
+
+        // RULE: Check minimum time for "em_atendimento"
+        if (
+          dentroGeofence &&
+          ["chegou_cliente", "fora_sequencia"].includes(parada.status) &&
+          parada.horario_chegada
+        ) {
+          const chegada = new Date(parada.horario_chegada);
+          const minutos = (eventAt.getTime() - chegada.getTime()) / 60000;
+
+          if (minutos >= tempo_min_atendimento) {
+            parada.status = "em_atendimento";
+            await supabase
+              .from("monitoramento_paradas")
+              .update({ status: "em_atendimento" })
+              .eq("id", parada.id);
+            events.push(`em_atendimento_${parada.id}`);
+          }
+        }
+
+        // RULE: Check excessive stay
+        if (
+          dentroGeofence &&
+          parada.status === "em_atendimento" &&
+          parada.horario_chegada
+        ) {
+          const chegada = new Date(parada.horario_chegada);
+          const minutos = (eventAt.getTime() - chegada.getTime()) / 60000;
+
+          if (minutos >= tempo_max_cliente) {
+            const { data: existingAlert } = await supabase
+              .from("alertas_monitoramento")
+              .select("id")
+              .eq("monitoramento_parada_id", parada.id)
+              .eq("tipo", "parada_excessiva")
+              .limit(1);
+
+            if (!existingAlert || existingAlert.length === 0) {
+              parada.status = "parada_excessiva";
+              parada.is_excecao = true;
               await supabase
                 .from("monitoramento_paradas")
-                .update({ status: "pulada", is_excecao: true })
-                .eq("id", ant.id);
+                .update({ status: "parada_excessiva", is_excecao: true })
+                .eq("id", parada.id);
 
               await supabase.from("alertas_monitoramento").insert({
                 monitoramento_rota_id,
-                monitoramento_parada_id: ant.id,
-                tipo: "entrega_pulada",
-                mensagem: `Entrega #${ant.ordem} (${ant.razao_social || ant.cnpj_destinatario}) foi pulada`,
+                monitoramento_parada_id: parada.id,
+                tipo: "parada_excessiva",
+                mensagem: `Parada excessiva em #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) - ${Math.round(minutos)} min`,
               });
-              events.push(`pulada_${ant.id}`);
+              events.push(`parada_excessiva_${parada.id}`);
             }
           }
-
-          await supabase
-            .from("monitoramento_paradas")
-            .update({ is_excecao: true, status: "fora_sequencia" })
-            .eq("id", parada.id)
-            .eq("status", "chegou_cliente");
-
-          await supabase.from("alertas_monitoramento").insert({
-            monitoramento_rota_id,
-            monitoramento_parada_id: parada.id,
-            tipo: "fora_sequencia",
-            mensagem: `Entrega #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) atendida fora de sequência`,
-          });
-          events.push(`fora_sequencia_${parada.id}`);
         }
 
-        events.push(`chegou_${parada.id}`);
-      }
+        // RULE: Vehicle LEFT geofence
+        if (
+          !dentroGeofence &&
+          ["chegou_cliente", "em_atendimento", "parada_excessiva", "fora_sequencia"].includes(parada.status) &&
+          parada.horario_chegada
+        ) {
+          const chegada = new Date(parada.horario_chegada);
+          const permanencia = Math.max(0, Math.round((eventAt.getTime() - chegada.getTime()) / 60000));
 
-      // RULE: Check minimum time for "em_atendimento"
-      if (
-        dentroGeofence &&
-        ["chegou_cliente", "fora_sequencia"].includes(parada.status) &&
-        parada.horario_chegada
-      ) {
-        const chegada = new Date(parada.horario_chegada);
-        const minutos = (now.getTime() - chegada.getTime()) / 60000;
-
-        if (minutos >= tempo_min_atendimento) {
-          await supabase
-            .from("monitoramento_paradas")
-            .update({ status: "em_atendimento" })
-            .eq("id", parada.id);
-          events.push(`em_atendimento_${parada.id}`);
-        }
-      }
-
-      // RULE: Check excessive stay
-      if (
-        dentroGeofence &&
-        parada.status === "em_atendimento" &&
-        parada.horario_chegada
-      ) {
-        const chegada = new Date(parada.horario_chegada);
-        const minutos = (now.getTime() - chegada.getTime()) / 60000;
-
-        if (minutos >= tempo_max_cliente) {
-          const { data: existingAlert } = await supabase
-            .from("alertas_monitoramento")
-            .select("id")
-            .eq("monitoramento_parada_id", parada.id)
-            .eq("tipo", "parada_excessiva")
-            .limit(1);
-
-          if (!existingAlert || existingAlert.length === 0) {
+          if (permanencia < tempo_min_atendimento) {
+            parada.status = "visita_inconsistente";
+            parada.horario_saida = eventAt.toISOString();
+            parada.tempo_permanencia_min = permanencia;
+            parada.is_excecao = true;
             await supabase
               .from("monitoramento_paradas")
-              .update({ status: "parada_excessiva", is_excecao: true })
+              .update({
+                status: "visita_inconsistente",
+                horario_saida: parada.horario_saida,
+                tempo_permanencia_min: permanencia,
+                is_excecao: true,
+              })
               .eq("id", parada.id);
 
             await supabase.from("alertas_monitoramento").insert({
               monitoramento_rota_id,
               monitoramento_parada_id: parada.id,
-              tipo: "parada_excessiva",
-              mensagem: `Parada excessiva em #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) - ${Math.round(minutos)} min`,
+              tipo: "visita_inconsistente",
+              mensagem: `Visita inconsistente em #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) - apenas ${permanencia} min`,
             });
-            events.push(`parada_excessiva_${parada.id}`);
+            events.push(`visita_inconsistente_${parada.id}`);
+          } else {
+            parada.status = "finalizada";
+            parada.horario_saida = eventAt.toISOString();
+            parada.tempo_permanencia_min = permanencia;
+            parada.is_excecao = false;
+            await supabase
+              .from("monitoramento_paradas")
+              .update({
+                status: "finalizada",
+                horario_saida: parada.horario_saida,
+                tempo_permanencia_min: permanencia,
+                is_excecao: false,
+              })
+              .eq("id", parada.id);
+            events.push(`finalizada_${parada.id}`);
           }
-        }
-      }
-
-      // RULE: Vehicle LEFT geofence
-      if (
-        !dentroGeofence &&
-        ["chegou_cliente", "em_atendimento", "parada_excessiva", "fora_sequencia"].includes(parada.status) &&
-        parada.horario_chegada
-      ) {
-        const chegada = new Date(parada.horario_chegada);
-        const permanencia = Math.round((now.getTime() - chegada.getTime()) / 60000);
-
-        if (permanencia < tempo_min_atendimento) {
-          await supabase
-            .from("monitoramento_paradas")
-            .update({
-              status: "visita_inconsistente",
-              horario_saida: now.toISOString(),
-              tempo_permanencia_min: permanencia,
-              is_excecao: true,
-            })
-            .eq("id", parada.id);
-
-          await supabase.from("alertas_monitoramento").insert({
-            monitoramento_rota_id,
-            monitoramento_parada_id: parada.id,
-            tipo: "visita_inconsistente",
-            mensagem: `Visita inconsistente em #${parada.ordem} (${parada.razao_social || parada.cnpj_destinatario}) - apenas ${permanencia} min`,
-          });
-          events.push(`visita_inconsistente_${parada.id}`);
-        } else {
-          await supabase
-            .from("monitoramento_paradas")
-            .update({
-              status: "finalizada",
-              horario_saida: now.toISOString(),
-              tempo_permanencia_min: permanencia,
-              is_excecao: false,
-            })
-            .eq("id", parada.id);
-          events.push(`finalizada_${parada.id}`);
         }
       }
     }
