@@ -455,6 +455,24 @@ function DestinatarioDialog({
                 <Label>Observação</Label>
                 <Textarea rows={3} value={form.observacao || ""} onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
               </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Raio de geofence customizado (metros)</Label>
+                <Input
+                  type="number"
+                  min={30}
+                  max={2000}
+                  step={10}
+                  placeholder="Vazio = usa raio padrão global da Torre"
+                  value={form.raio_geofence_metros ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setForm({ ...form, raio_geofence_metros: v === "" ? null : parseInt(v, 10) });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sobrescreve o raio padrão apenas para este cliente. Útil para grandes centros de distribuição (atacadistas) onde o motorista descarrega em docas distantes do ponto de referência. Aplica-se apenas a rotas criadas depois da edição.
+                </p>
+              </div>
               <label className="flex items-center gap-2 col-span-2 text-sm">
                 <Switch checked={form.ativo ?? true} onCheckedChange={(v) => setForm({ ...form, ativo: v })} />
                 Ativo
