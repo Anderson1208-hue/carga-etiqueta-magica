@@ -26,6 +26,7 @@ type Destinatario = {
   observacao: string | null;
   ativo: boolean;
   rascunho: boolean;
+  raio_geofence_metros: number | null;
 };
 
 type Endereco = {
@@ -250,7 +251,7 @@ function DestinatarioDialog({
   });
 
   const [form, setForm] = useState<Partial<Destinatario>>({
-    cnpj_cpf: "", razao_social: "", nome_fantasia: "", observacao: "", ativo: true,
+    cnpj_cpf: "", razao_social: "", nome_fantasia: "", observacao: "", ativo: true, raio_geofence_metros: null,
   });
   const [endForm, setEndForm] = useState<Endereco | null>(null);
   const [restrForm, setRestrForm] = useState<Restricao>({
@@ -280,6 +281,7 @@ function DestinatarioDialog({
         observacao: form.observacao || null,
         ativo: form.ativo ?? true,
         rascunho: false,
+        raio_geofence_metros: form.raio_geofence_metros ?? null,
       };
       if (destinatarioId) {
         const { error } = await supabase.from("destinatarios").update(payload).eq("id", destinatarioId);
