@@ -217,6 +217,42 @@ export default function Roteirizacao() {
     }
   }, [selectedCargaIds, modoNfIds]);
 
+  // Debounced NF search → resolves matching veiculo_ids
+  useEffect(() => {
+    const q = nfSearch.trim();
+    if (!q) {
+      setNfSearchIds(null);
+      setNfSearchLoading(false);
+      return;
+    }
+    setNfSearchLoading(true);
+    const handle = setTimeout(async () => {
+      try {
+        const { data: nfs } = await supabase
+          .from("notas_fiscais")
+          .select("id")
+          .ilike("numero_nf", `%${q}%`)
+          .limit(500);
+        const nfIds = (nfs || []).map((n: any) => n.id);
+        if (nfIds.length === 0) {
+          setNfSearchIds(new Set());
+        } else {
+          const { data: vnfs } = await supabase
+            .from("veiculo_nfs")
+            .select("veiculo_id")
+            .in("nf_id", nfIds);
+          setNfSearchIds(new Set((vnfs || []).map((v: any) => v.veiculo_id)));
+        }
+      } catch (err) {
+        console.error("NF search error:", err);
+        setNfSearchIds(new Set());
+      } finally {
+        setNfSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [nfSearch]);
+
   async function loadCargas() {
     const data = await fetchAllPages<any>((from, to) =>
       supabase
