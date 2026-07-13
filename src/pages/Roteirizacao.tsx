@@ -1580,8 +1580,17 @@ export default function Roteirizacao() {
     }
   }
 
-  // Group vehicles by date for display
-  const veiculosByDate = veiculos.reduce<Record<string, typeof veiculos>>((acc, v) => {
+  // Group vehicles by date for display (com filtro opcional de placa/motorista)
+  const veiculosFiltradosPorBusca = veiculoSearch.trim()
+    ? veiculos.filter((v) => {
+        const q = veiculoSearch.trim().toLowerCase();
+        return (
+          (v.placa || "").toLowerCase().includes(q) ||
+          (v.motorista || "").toLowerCase().includes(q)
+        );
+      })
+    : veiculos;
+  const veiculosByDate = veiculosFiltradosPorBusca.reduce<Record<string, typeof veiculos>>((acc, v) => {
     const dateKey = v.data;
     if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(v);
