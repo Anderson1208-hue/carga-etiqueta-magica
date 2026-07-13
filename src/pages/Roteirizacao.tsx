@@ -147,6 +147,7 @@ export default function Roteirizacao() {
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
+  const [veiculoSearch, setVeiculoSearch] = useState("");
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
