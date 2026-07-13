@@ -1584,16 +1584,21 @@ export default function Roteirizacao() {
     }
   }
 
-  // Group vehicles by date for display (com filtro opcional de placa/motorista)
-  const veiculosFiltradosPorBusca = veiculoSearch.trim()
-    ? veiculos.filter((v) => {
-        const q = veiculoSearch.trim().toLowerCase();
-        return (
-          (v.placa || "").toLowerCase().includes(q) ||
-          (v.motorista || "").toLowerCase().includes(q)
-        );
-      })
-    : veiculos;
+  // Group vehicles by date for display (com filtro opcional de placa/motorista e NF)
+  const veiculosFiltradosPorBusca = (() => {
+    let list = veiculos;
+    if (veiculoSearch.trim()) {
+      const q = veiculoSearch.trim().toLowerCase();
+      list = list.filter((v) =>
+        (v.placa || "").toLowerCase().includes(q) ||
+        (v.motorista || "").toLowerCase().includes(q)
+      );
+    }
+    if (nfSearch.trim() && nfSearchIds) {
+      list = list.filter((v) => nfSearchIds.has(v.id));
+    }
+    return list;
+  })();
   const veiculosByDate = veiculosFiltradosPorBusca.reduce<Record<string, typeof veiculos>>((acc, v) => {
     const dateKey = v.data;
     if (!acc[dateKey]) acc[dateKey] = [];
