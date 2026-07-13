@@ -2438,7 +2438,31 @@ export default function Roteirizacao() {
                     ))}
                   </SelectContent>
                 </Select>
+              <div className="flex-1 min-w-[220px]">
+                <Label className="text-xs">Buscar placa / motorista</Label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={veiculoSearch}
+                    onChange={(e) => setVeiculoSearch(e.target.value)}
+                    placeholder="Ex.: ABC1D23"
+                    className="h-9 pl-7"
+                  />
+                  {veiculoSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setVeiculoSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                      aria-label="Limpar busca"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
+            </div>
+
+
               <div>
                 <Label className="text-xs">Dia</Label>
                 <Select value={filtroDia} onValueChange={setFiltroDia}>
