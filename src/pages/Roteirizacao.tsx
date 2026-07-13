@@ -2504,6 +2504,35 @@ export default function Roteirizacao() {
                   )}
                 </div>
               </div>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-xs">Buscar NF</Label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={nfSearch}
+                    onChange={(e) => setNfSearch(e.target.value)}
+                    placeholder="Nº da NF"
+                    className="h-9 pl-7"
+                  />
+                  {nfSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setNfSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                      aria-label="Limpar busca NF"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {nfSearch.trim() && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {nfSearchLoading
+                      ? "Buscando..."
+                      : `${nfSearchIds?.size ?? 0} veículo(s) com essa NF`}
+                  </p>
+                )}
+              </div>
             </div>
 
 
