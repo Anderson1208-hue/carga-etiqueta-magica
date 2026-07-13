@@ -65,7 +65,7 @@ import {
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2, FileSpreadsheet } from "lucide-react";
+import { Settings2, FileSpreadsheet, Search } from "lucide-react";
 
 interface Carga {
   id: string;
@@ -147,6 +147,7 @@ export default function Roteirizacao() {
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
+  const [veiculoSearch, setVeiculoSearch] = useState("");
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
@@ -1580,8 +1581,17 @@ export default function Roteirizacao() {
     }
   }
 
-  // Group vehicles by date for display
-  const veiculosByDate = veiculos.reduce<Record<string, typeof veiculos>>((acc, v) => {
+  // Group vehicles by date for display (com filtro opcional de placa/motorista)
+  const veiculosFiltradosPorBusca = veiculoSearch.trim()
+    ? veiculos.filter((v) => {
+        const q = veiculoSearch.trim().toLowerCase();
+        return (
+          (v.placa || "").toLowerCase().includes(q) ||
+          (v.motorista || "").toLowerCase().includes(q)
+        );
+      })
+    : veiculos;
+  const veiculosByDate = veiculosFiltradosPorBusca.reduce<Record<string, typeof veiculos>>((acc, v) => {
     const dateKey = v.data;
     if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(v);
@@ -2428,7 +2438,31 @@ export default function Roteirizacao() {
                     ))}
                   </SelectContent>
                 </Select>
+              <div className="flex-1 min-w-[220px]">
+                <Label className="text-xs">Buscar placa / motorista</Label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={veiculoSearch}
+                    onChange={(e) => setVeiculoSearch(e.target.value)}
+                    placeholder="Ex.: ABC1D23"
+                    className="h-9 pl-7"
+                  />
+                  {veiculoSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setVeiculoSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                      aria-label="Limpar busca"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
+            </div>
+
+
               <div>
                 <Label className="text-xs">Dia</Label>
                 <Select value={filtroDia} onValueChange={setFiltroDia}>
