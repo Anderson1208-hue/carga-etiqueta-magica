@@ -148,6 +148,9 @@ export default function Roteirizacao() {
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
   const [veiculoSearch, setVeiculoSearch] = useState("");
+  const [nfSearch, setNfSearch] = useState("");
+  const [nfSearchIds, setNfSearchIds] = useState<Set<string> | null>(null);
+  const [nfSearchLoading, setNfSearchLoading] = useState(false);
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
@@ -213,6 +216,42 @@ export default function Roteirizacao() {
       setVeiculoCriado(null);
     }
   }, [selectedCargaIds, modoNfIds]);
+
+  // Debounced NF search → resolves matching veiculo_ids
+  useEffect(() => {
+    const q = nfSearch.trim();
+    if (!q) {
+      setNfSearchIds(null);
+      setNfSearchLoading(false);
+      return;
+    }
+    setNfSearchLoading(true);
+    const handle = setTimeout(async () => {
+      try {
+        const { data: nfs } = await supabase
+          .from("notas_fiscais")
+          .select("id")
+          .ilike("numero_nf", `%${q}%`)
+          .limit(500);
+        const nfIds = (nfs || []).map((n: any) => n.id);
+        if (nfIds.length === 0) {
+          setNfSearchIds(new Set());
+        } else {
+          const { data: vnfs } = await supabase
+            .from("veiculo_nfs")
+            .select("veiculo_id")
+            .in("nf_id", nfIds);
+          setNfSearchIds(new Set((vnfs || []).map((v: any) => v.veiculo_id)));
+        }
+      } catch (err) {
+        console.error("NF search error:", err);
+        setNfSearchIds(new Set());
+      } finally {
+        setNfSearchLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [nfSearch]);
 
   async function loadCargas() {
     const data = await fetchAllPages<any>((from, to) =>
@@ -1581,16 +1620,21 @@ export default function Roteirizacao() {
     }
   }
 
-  // Group vehicles by date for display (com filtro opcional de placa/motorista)
-  const veiculosFiltradosPorBusca = veiculoSearch.trim()
-    ? veiculos.filter((v) => {
-        const q = veiculoSearch.trim().toLowerCase();
-        return (
-          (v.placa || "").toLowerCase().includes(q) ||
-          (v.motorista || "").toLowerCase().includes(q)
-        );
-      })
-    : veiculos;
+  // Group vehicles by date for display (com filtro opcional de placa/motorista e NF)
+  const veiculosFiltradosPorBusca = (() => {
+    let list = veiculos;
+    if (veiculoSearch.trim()) {
+      const q = veiculoSearch.trim().toLowerCase();
+      list = list.filter((v) =>
+        (v.placa || "").toLowerCase().includes(q) ||
+        (v.motorista || "").toLowerCase().includes(q)
+      );
+    }
+    if (nfSearch.trim() && nfSearchIds) {
+      list = list.filter((v) => nfSearchIds.has(v.id));
+    }
+    return list;
+  })();
   const veiculosByDate = veiculosFiltradosPorBusca.reduce<Record<string, typeof veiculos>>((acc, v) => {
     const dateKey = v.data;
     if (!acc[dateKey]) acc[dateKey] = [];
@@ -2459,6 +2503,35 @@ export default function Roteirizacao() {
                     </button>
                   )}
                 </div>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <Label className="text-xs">Buscar NF</Label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={nfSearch}
+                    onChange={(e) => setNfSearch(e.target.value)}
+                    placeholder="Nº da NF"
+                    className="h-9 pl-7"
+                  />
+                  {nfSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setNfSearch("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                      aria-label="Limpar busca NF"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                {nfSearch.trim() && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {nfSearchLoading
+                      ? "Buscando..."
+                      : `${nfSearchIds?.size ?? 0} veículo(s) com essa NF`}
+                  </p>
+                )}
               </div>
             </div>
 
