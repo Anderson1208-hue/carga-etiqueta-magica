@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       .select('id, cnpj_cpf')
       .in('id', (dests ?? []).map((d) => d.id));
     const cnpjById = new Map<string, string>();
-    for (const d of destsCnpj ?? []) cnpjById.set(d.id, d.cnpj_cpf);
+    for (const d of destsCnpj ?? []) cnpjById.set(d.id, String(d.cnpj_cpf ?? '').replace(/\D/g, ''));
 
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
