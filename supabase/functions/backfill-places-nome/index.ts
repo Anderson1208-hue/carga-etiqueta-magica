@@ -149,25 +149,41 @@ Deno.serve(async (req) => {
           const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
             .filter(Boolean).join(', ');
 
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), PLACES_TIMEOUT_MS);
-          const resp = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              'X-Connection-Api-Key': GOOGLE_MAPS_API_KEY,
-              'Content-Type': 'application/json',
-              'X-Goog-FieldMask':
-                'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
-            },
-            body: JSON.stringify({ textQuery, languageCode: 'pt-BR', regionCode: 'BR', maxResultCount: 3 }),
-            signal: controller.signal,
-          }).finally(() => clearTimeout(timeout));
+          let resp: Response | null = null;
+          let lastErr = '';
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), PLACES_TIMEOUT_MS);
+            try {
+              resp = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                  'X-Connection-Api-Key': GOOGLE_MAPS_API_KEY,
+                  'Content-Type': 'application/json',
+                  'X-Goog-FieldMask':
+                    'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
+                },
+                body: JSON.stringify({ textQuery, languageCode: 'pt-BR', regionCode: 'BR', maxResultCount: 3 }),
+                signal: controller.signal,
+              });
+            } catch (e: any) {
+              lastErr = `fetch: ${e?.message || e}`;
+              resp = null;
+            } finally {
+              clearTimeout(timeout);
+            }
+            // Retry on transient errors (network, 5xx, 429)
+            if (resp && resp.ok) break;
+            if (resp && resp.status < 500 && resp.status !== 429) break;
+            if (resp) lastErr = `HTTP ${resp.status}`;
+            await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+          }
 
-          if (!resp.ok) {
-            const txt = await resp.text();
+          if (!resp || !resp.ok) {
+            const txt = resp ? await resp.text().catch(() => '') : lastErr;
             erros++;
-            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: `HTTP ${resp.status}: ${txt.slice(0, 200)}` });
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: `${resp ? `HTTP ${resp.status}` : 'network'}: ${txt.slice(0, 200)}` });
             continue;
           }
 
