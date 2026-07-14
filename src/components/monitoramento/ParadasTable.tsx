@@ -90,12 +90,12 @@ export function ParadasTable({
                     {parada.ordem}
                   </TableCell>
 
-                  <TableCell className="py-1 px-1.5 align-top">
+                  <TableCell className="py-1 px-1.5 align-top overflow-hidden">
                     <p className="font-medium text-xs truncate leading-tight" title={parada.razao_social || parada.cnpj_destinatario || ""}>
                       {parada.razao_social || parada.cnpj_destinatario}
                     </p>
                     <p className="text-[10px] text-muted-foreground truncate leading-tight" title={parada.endereco_completo || ""}>
-                      {parada.endereco_completo}
+                      {(parada.endereco_completo || "").split(",").slice(0, 2).join(",")}
                     </p>
                   </TableCell>
 
