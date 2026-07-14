@@ -24,6 +24,14 @@ export interface NFeParsed {
   pesoBruto: number;
   pesoLiquido: number;
   volumeM3: number;
+  // Campos fiscais (Fase 1 fiscal) — opcionais, usados para enriquecer cadastros
+  ieEmitente?: string | null;
+  crtEmitente?: number | null;      // 1=Simples, 2=Simples excesso, 3=Regime normal, 4=MEI
+  ufEmitente?: string | null;
+  municipioEmitente?: string | null;
+  codigoMunicipioIbgeEmitente?: string | null;
+  ieDestinatario?: string | null;
+  indicadorIeDestinatario?: number | null; // 1=contrib, 2=isento, 9=não contrib
 }
 
 export interface ItemNFParsed {
