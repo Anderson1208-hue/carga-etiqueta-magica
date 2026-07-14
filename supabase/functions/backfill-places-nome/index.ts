@@ -7,10 +7,14 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/google_maps';
+const MAX_ITEMS_PER_CALL = 20;
+const PLACES_TIMEOUT_MS = 12_000;
+const CONCURRENCY = 3;
 
 interface BackfillInput {
   dry_run?: boolean;
   limit?: number; // máximo de destinatários a processar
+  offset?: number; // usado pela tela para processar em lotes pequenos
   min_baixas_90d?: number; // só clientes com N baixas nos últimos 90 dias
   force?: boolean; // reprocessa mesmo quem já tem coord
   only_ids?: string[]; // limitar a destinatarios específicos
@@ -60,7 +64,8 @@ Deno.serve(async (req) => {
 
     const body = (await req.json().catch(() => ({}))) as BackfillInput;
     const dry_run = body.dry_run !== false; // default true por segurança
-    const limit = Math.min(Math.max(body.limit ?? 50, 1), 500);
+    const limit = Math.min(Math.max(body.limit ?? 10, 1), MAX_ITEMS_PER_CALL);
+    const offset = Math.max(body.offset ?? 0, 0);
     const min_baixas_90d = body.min_baixas_90d ?? 0;
     const force = body.force === true;
     const only_ids = Array.isArray(body.only_ids) ? body.only_ids : null;
@@ -69,7 +74,7 @@ Deno.serve(async (req) => {
     // (top clientes primeiro; quem tem 0 baixas fica no final se aceito)
     let query = supabase
       .from('destinatarios')
-      .select('id, razao_social, nome_fantasia, ativo')
+      .select('id, razao_social, nome_fantasia, ativo, cnpj_cpf')
       .eq('ativo', true);
     if (only_ids && only_ids.length > 0) query = query.in('id', only_ids);
     const { data: dests, error: destErr } = await query;
@@ -118,25 +123,19 @@ Deno.serve(async (req) => {
       console.log('cnpj rank keys:', cnpjRanks.size);
     }
 
-    // Buscar cnpj_cpf para todos os destinatarios
-    const { data: destsCnpj } = await supabase
-      .from('destinatarios')
-      .select('id, cnpj_cpf')
-      .in('id', (dests ?? []).map((d) => d.id));
     const cnpjById = new Map<string, string>();
-    for (const d of destsCnpj ?? []) cnpjById.set(d.id, String(d.cnpj_cpf ?? '').replace(/\D/g, ''));
+    for (const d of dests ?? []) cnpjById.set(d.id, String(d.cnpj_cpf ?? '').replace(/\D/g, ''));
 
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
       .map((d) => ({ ...d, baixas: cnpjRanks.get(cnpjById.get(d.id) ?? '') ?? 0 }))
-      .filter((d) => d.baixas >= min_baixas_90d)
+      .filter((d) => only_ids || d.baixas >= min_baixas_90d)
       .sort((a, b) => b.baixas - a.baixas)
-      .slice(0, limit);
+      .slice(offset, offset + limit);
 
     const results: ItemResult[] = [];
     let atualizados = 0, sem_match = 0, rejeitados = 0, erros = 0, ok_atual = 0, sem_endereco = 0;
 
-    const CONCURRENCY = 8;
     let cursor = 0;
     async function worker() {
       while (true) {
@@ -166,6 +165,8 @@ Deno.serve(async (req) => {
           const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
             .filter(Boolean).join(', ');
 
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), PLACES_TIMEOUT_MS);
           const resp = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
             method: 'POST',
             headers: {
@@ -176,7 +177,8 @@ Deno.serve(async (req) => {
                 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
             },
             body: JSON.stringify({ textQuery, languageCode: 'pt-BR', regionCode: 'BR', maxResultCount: 3 }),
-          });
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeout));
 
           if (!resp.ok) {
             const txt = await resp.text();
