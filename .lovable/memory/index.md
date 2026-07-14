@@ -92,3 +92,4 @@ type: reference
 - [Transistorsoft v9 Config](mem://operacao/transistorsoft-v9-config) — Config agrupada obrigatória; não reverter para formato flat/legacy.
 - [Histórico NF (nf_eventos)](mem://funcionalidades/historico-nf-eventos) — Event store + triggers + RPC chegada_cd_manual; Dialog Histórico na Consulta de NF.
 - [Licença Transistorsoft auto](mem://operacao/transistorsoft-licenca-auto-inject) — build-apk-*.sh injetam <meta-data> da licença no Manifest se faltar.
+- [Emitente Fiscal Piloto](mem://fiscal/emitente-piloto) — CNPJ 31.598.974/0001-42, IE 12.149.65-4, Série CT-e 1 / MDF-e 2, A1 até 03/12/2026.
