@@ -43,6 +43,7 @@ import Destinatarios from "./pages/Destinatarios";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
 import ImportarOcoren from "./pages/ImportarOcoren";
+import FiscalConfiguracao from "./pages/FiscalConfiguracao";
 
 const queryClient = new QueryClient({
   defaultOptions: {
