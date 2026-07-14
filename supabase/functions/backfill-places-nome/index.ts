@@ -77,22 +77,18 @@ Deno.serve(async (req) => {
 
     // Contagem de baixas por CNPJ (para ranking)
     const cnpjRanks = new Map<string, number>();
-    if (min_baixas_90d > 0 || (dests?.length ?? 0) > 0) {
+    if ((dests?.length ?? 0) > 0) {
       const desde = new Date(Date.now() - 90 * 86400000).toISOString();
-      const { data: baixasRows } = await supabase.rpc('exec_sql', {}).catch(() => ({ data: null }));
-      // fallback: contar via query direta agrupada
-      if (!baixasRows) {
-        const { data: rows } = await supabase
-          .from('baixas_entrega')
-          .select('nf_id, notas_fiscais!inner(cnpj_destinatario)')
-          .eq('status', 'entregue')
-          .gte('registrado_em', desde)
-          .limit(20000);
-        for (const r of (rows ?? []) as any[]) {
-          const c = r.notas_fiscais?.cnpj_destinatario;
-          if (!c) continue;
-          cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + 1);
-        }
+      const { data: rows } = await supabase
+        .from('baixas_entrega')
+        .select('nf_id, notas_fiscais!inner(cnpj_destinatario)')
+        .eq('status', 'entregue')
+        .gte('registrado_em', desde)
+        .limit(20000);
+      for (const r of (rows ?? []) as any[]) {
+        const c = r.notas_fiscais?.cnpj_destinatario;
+        if (!c) continue;
+        cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + 1);
       }
     }
 
