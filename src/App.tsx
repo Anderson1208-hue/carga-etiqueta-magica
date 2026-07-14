@@ -43,6 +43,7 @@ import Destinatarios from "./pages/Destinatarios";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
 import ImportarOcoren from "./pages/ImportarOcoren";
+import FiscalConfiguracao from "./pages/FiscalConfiguracao";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -318,6 +319,7 @@ function AppRoutes() {
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
       <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
+      <Route path="/fiscal/configuracao" element={<ProtectedRoute><FiscalConfiguracao /></ProtectedRoute>} />
       <Route path="/motorista" element={<ErrorBoundary><MotoristaAcesso /></ErrorBoundary>} />
 
       <Route path="/motorista/diagnostico" element={<ErrorBoundary><MotoristaDiagnostico /></ErrorBoundary>} />

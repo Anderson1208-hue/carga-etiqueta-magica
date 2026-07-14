@@ -630,6 +630,108 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracao_fiscal_emitente: {
+        Row: {
+          ambiente: string
+          ativo: boolean
+          bairro: string | null
+          cep: string | null
+          cnae: string | null
+          cnpj: string
+          codigo_municipio_ibge: string
+          complemento: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          emissor_api: string
+          id: string
+          ie: string
+          ie_st: string | null
+          logradouro: string | null
+          municipio: string
+          nome_fantasia: string | null
+          numero: string | null
+          observacao_padrao: string | null
+          proximo_numero_cte: number
+          proximo_numero_mdfe: number
+          razao_social: string
+          regime_tributario: string
+          rntrc: string | null
+          serie_cte: number
+          serie_mdfe: number
+          telefone: string | null
+          tomador_padrao: string | null
+          uf: string
+          updated_at: string
+        }
+        Insert: {
+          ambiente?: string
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cnae?: string | null
+          cnpj: string
+          codigo_municipio_ibge: string
+          complemento?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          emissor_api?: string
+          id?: string
+          ie: string
+          ie_st?: string | null
+          logradouro?: string | null
+          municipio: string
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacao_padrao?: string | null
+          proximo_numero_cte?: number
+          proximo_numero_mdfe?: number
+          razao_social: string
+          regime_tributario: string
+          rntrc?: string | null
+          serie_cte?: number
+          serie_mdfe?: number
+          telefone?: string | null
+          tomador_padrao?: string | null
+          uf: string
+          updated_at?: string
+        }
+        Update: {
+          ambiente?: string
+          ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
+          cnae?: string | null
+          cnpj?: string
+          codigo_municipio_ibge?: string
+          complemento?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          emissor_api?: string
+          id?: string
+          ie?: string
+          ie_st?: string | null
+          logradouro?: string | null
+          municipio?: string
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacao_padrao?: string | null
+          proximo_numero_cte?: number
+          proximo_numero_mdfe?: number
+          razao_social?: string
+          regime_tributario?: string
+          rntrc?: string | null
+          serie_cte?: number
+          serie_mdfe?: number
+          telefone?: string | null
+          tomador_padrao?: string | null
+          uf?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ctes: {
         Row: {
           carga_id: string
@@ -818,11 +920,17 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          ie: string | null
+          ie_st: string | null
+          indicador_ie: number | null
           nome_fantasia: string | null
           observacao: string | null
+          orgao_publico: boolean
           raio_geofence_metros: number | null
           rascunho: boolean
           razao_social: string
+          regime_tributario: string | null
+          suframa: string | null
           updated_at: string
         }
         Insert: {
@@ -831,11 +939,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          ie?: string | null
+          ie_st?: string | null
+          indicador_ie?: number | null
           nome_fantasia?: string | null
           observacao?: string | null
+          orgao_publico?: boolean
           raio_geofence_metros?: number | null
           rascunho?: boolean
           razao_social: string
+          regime_tributario?: string | null
+          suframa?: string | null
           updated_at?: string
         }
         Update: {
@@ -844,11 +958,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          ie?: string | null
+          ie_st?: string | null
+          indicador_ie?: number | null
           nome_fantasia?: string | null
           observacao?: string | null
+          orgao_publico?: boolean
           raio_geofence_metros?: number | null
           rascunho?: boolean
           razao_social?: string
+          regime_tributario?: string | null
+          suframa?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -858,51 +978,75 @@ export type Database = {
           ativo: boolean
           centro_custo: string | null
           cnpj: string
+          codigo_municipio_ibge: string | null
           contato_email: string | null
           contato_nome: string | null
           contato_telefone: string | null
           created_at: string
           created_by: string | null
           id: string
+          ie: string | null
+          ie_st: string | null
+          indicador_ie: number | null
+          municipio: string | null
           nome_fantasia: string | null
           observacao_operacional: string | null
           rascunho: boolean
           razao_social: string
+          regime_tributario: string | null
           sla_padrao_horas: number | null
+          suframa: string | null
+          uf: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           centro_custo?: string | null
           cnpj: string
+          codigo_municipio_ibge?: string | null
           contato_email?: string | null
           contato_nome?: string | null
           contato_telefone?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          ie?: string | null
+          ie_st?: string | null
+          indicador_ie?: number | null
+          municipio?: string | null
           nome_fantasia?: string | null
           observacao_operacional?: string | null
           rascunho?: boolean
           razao_social: string
+          regime_tributario?: string | null
           sla_padrao_horas?: number | null
+          suframa?: string | null
+          uf?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           centro_custo?: string | null
           cnpj?: string
+          codigo_municipio_ibge?: string | null
           contato_email?: string | null
           contato_nome?: string | null
           contato_telefone?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          ie?: string | null
+          ie_st?: string | null
+          indicador_ie?: number | null
+          municipio?: string | null
           nome_fantasia?: string | null
           observacao_operacional?: string | null
           rascunho?: boolean
           razao_social?: string
+          regime_tributario?: string | null
           sla_padrao_horas?: number | null
+          suframa?: string | null
+          uf?: string | null
           updated_at?: string
         }
         Relationships: []
