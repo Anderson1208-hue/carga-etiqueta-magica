@@ -108,6 +108,16 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   // Format CNPJ emitente
   const cnpjEmitenteFormatted = formatCNPJ(cnpjEmitente);
 
+  // Dados fiscais do emitente (Fase 1 fiscal)
+  const ieEmitenteRaw = emit?.querySelector("IE")?.textContent?.trim() || null;
+  const ieEmitente = ieEmitenteRaw && ieEmitenteRaw.toUpperCase() !== "ISENTO" ? ieEmitenteRaw : ieEmitenteRaw;
+  const crtEmitenteStr = emit?.querySelector("CRT")?.textContent?.trim();
+  const crtEmitente = crtEmitenteStr ? parseInt(crtEmitenteStr, 10) : null;
+  const enderEmit = emit?.querySelector("enderEmit");
+  const ufEmitente = enderEmit?.querySelector("UF")?.textContent?.trim() || null;
+  const municipioEmitente = enderEmit?.querySelector("xMun")?.textContent?.trim() || null;
+  const codigoMunicipioIbgeEmitente = enderEmit?.querySelector("cMun")?.textContent?.trim() || null;
+
   // Extract recipient data (destinatário) — pode ser CNPJ (PJ) ou CPF (PF)
   const dest = xmlDoc.querySelector("dest");
   const destCNPJ = dest?.querySelector("CNPJ");
@@ -117,6 +127,11 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   const cnpjDestinatarioFormatted = cnpjDestinatario
     ? formatCNPJ(cnpjDestinatario)
     : formatCPF(cpfDestinatario);
+
+  // Dados fiscais do destinatário
+  const ieDestinatario = dest?.querySelector("IE")?.textContent?.trim() || null;
+  const indIeStr = dest?.querySelector("indIEDest")?.textContent?.trim();
+  const indicadorIeDestinatario = indIeStr ? parseInt(indIeStr, 10) : null;
 
   // Extract recipient address (endereço do destinatário)
   let destinatario: DestinatarioEndereco | undefined;
