@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
 
     // Contagem de baixas por CNPJ (para ranking)
     const cnpjRanks = new Map<string, number>();
-    if ((dests?.length ?? 0) > 0) {
+    if ((dests?.length ?? 0) > 0 && min_baixas_90d > 0) {
       const desde = new Date(Date.now() - 90 * 86400000).toISOString();
       // 1) pegar nf_ids das baixas entregues
       const nfIds = new Set<string>();
