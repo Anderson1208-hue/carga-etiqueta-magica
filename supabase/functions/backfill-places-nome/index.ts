@@ -136,163 +136,158 @@ Deno.serve(async (req) => {
     const results: ItemResult[] = [];
     let atualizados = 0, sem_match = 0, rejeitados = 0, erros = 0, ok_atual = 0, sem_endereco = 0;
 
-    for (const d of ranked) {
-      try {
-        // pega endereço principal
-        const { data: ends } = await supabase
-          .from('destinatario_enderecos')
-          .select('id, logradouro, numero, bairro, cidade, uf, cep, latitude, longitude, principal')
-          .eq('destinatario_id', d.id)
-          .order('principal', { ascending: false });
-        const endereco = (ends ?? []).find((e) => e.principal) ?? (ends ?? [])[0];
-        if (!endereco || !endereco.cidade) {
-          sem_endereco++;
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_endereco' });
-          continue;
-        }
-
-        const nome = (d.nome_fantasia || d.razao_social || '').trim();
-        if (!nome) {
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match', detalhe: 'sem nome' });
-          sem_match++;
-          continue;
-        }
-
-        // Query textual como o Waze: nome + bairro + cidade + UF
-        const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
-          .filter(Boolean).join(', ');
-
-        const resp = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            'X-Connection-Api-Key': GOOGLE_MAPS_API_KEY,
-            'Content-Type': 'application/json',
-            'X-Goog-FieldMask':
-              'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
-          },
-          body: JSON.stringify({ textQuery, languageCode: 'pt-BR', regionCode: 'BR', maxResultCount: 3 }),
-        });
-
-        if (!resp.ok) {
-          const txt = await resp.text();
-          erros++;
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: `HTTP ${resp.status}: ${txt.slice(0, 200)}` });
-          await new Promise((r) => setTimeout(r, 100));
-          continue;
-        }
-
-        const json = await resp.json();
-        const places = Array.isArray(json.places) ? json.places : [];
-        if (places.length === 0) {
-          sem_match++;
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match' });
-          await new Promise((r) => setTimeout(r, 80));
-          continue;
-        }
-
-        // Escolher primeiro com type establishment E cidade compatível
-        const cidadeCad = stripAcc(endereco.cidade || '');
-        const ufCad = stripAcc(endereco.uf || '');
-        let escolhido: any = null;
-        let motivoRej = '';
-        for (const p of places) {
-          const types: string[] = Array.isArray(p.types) ? p.types : [];
-          if (!types.includes('establishment') && !types.includes('point_of_interest') && !types.includes('store')) continue;
-          const comps: any[] = Array.isArray(p.addressComponents) ? p.addressComponents : [];
-          // Prioriza locality > admin_area_level_2 (município); ignora sublocality (bairro)
-          const cityComp =
-            comps.find((c) => (c.types || []).includes('locality')) ||
-            comps.find((c) => (c.types || []).includes('administrative_area_level_2'));
-          const ufComp = comps.find((c) => (c.types || []).includes('administrative_area_level_1'));
-          const cityG = cityComp ? stripAcc(cityComp.longText || cityComp.shortText || '') : '';
-          const ufG = ufComp ? stripAcc(ufComp.shortText || ufComp.longText || '') : '';
-          if (ufCad && ufG && ufG !== ufCad) { motivoRej = `UF ${ufG} != ${ufCad}`; continue; }
-          if (cidadeCad && cityG && !cityG.includes(cidadeCad) && !cidadeCad.includes(cityG)) {
-            motivoRej = `Cidade ${cityG} != ${cidadeCad}`;
+    const CONCURRENCY = 8;
+    let cursor = 0;
+    async function worker() {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= ranked.length) return;
+        const d = ranked[idx];
+        try {
+          const { data: ends } = await supabase
+            .from('destinatario_enderecos')
+            .select('id, logradouro, numero, bairro, cidade, uf, cep, latitude, longitude, principal')
+            .eq('destinatario_id', d.id)
+            .order('principal', { ascending: false });
+          const endereco = (ends ?? []).find((e) => e.principal) ?? (ends ?? [])[0];
+          if (!endereco || !endereco.cidade) {
+            sem_endereco++;
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_endereco' });
             continue;
           }
-          escolhido = p;
-          break;
-        }
 
-        if (!escolhido) {
-          rejeitados++;
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'rejeitado_cidade', detalhe: motivoRej || 'nenhum resultado do tipo establishment na cidade' });
-          await new Promise((r) => setTimeout(r, 80));
-          continue;
-        }
+          const nome = (d.nome_fantasia || d.razao_social || '').trim();
+          if (!nome) {
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match', detalhe: 'sem nome' });
+            sem_match++;
+            continue;
+          }
 
-        const lat = Number(escolhido.location?.latitude);
-        const lng = Number(escolhido.location?.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          erros++;
-          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: 'sem coords no place' });
-          continue;
-        }
+          const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
+            .filter(Boolean).join(', ');
 
-        // Sanity: se já existe coord e a nova está a >20km, rejeitar
-        let dist: number | undefined;
-        if (endereco.latitude != null && endereco.longitude != null) {
-          dist = Math.round(haversineM(Number(endereco.latitude), Number(endereco.longitude), lat, lng));
-          if (dist > 20000) {
+          const resp = await fetch(`${GATEWAY_URL}/places/v1/places:searchText`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              'X-Connection-Api-Key': GOOGLE_MAPS_API_KEY,
+              'Content-Type': 'application/json',
+              'X-Goog-FieldMask':
+                'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.addressComponents',
+            },
+            body: JSON.stringify({ textQuery, languageCode: 'pt-BR', regionCode: 'BR', maxResultCount: 3 }),
+          });
+
+          if (!resp.ok) {
+            const txt = await resp.text();
+            erros++;
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: `HTTP ${resp.status}: ${txt.slice(0, 200)}` });
+            continue;
+          }
+
+          const json = await resp.json();
+          const places = Array.isArray(json.places) ? json.places : [];
+          if (places.length === 0) {
+            sem_match++;
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match' });
+            continue;
+          }
+
+          const cidadeCad = stripAcc(endereco.cidade || '');
+          const ufCad = stripAcc(endereco.uf || '');
+          let escolhido: any = null;
+          let motivoRej = '';
+          for (const p of places) {
+            const types: string[] = Array.isArray(p.types) ? p.types : [];
+            if (!types.includes('establishment') && !types.includes('point_of_interest') && !types.includes('store')) continue;
+            const comps: any[] = Array.isArray(p.addressComponents) ? p.addressComponents : [];
+            const cityComp =
+              comps.find((c) => (c.types || []).includes('locality')) ||
+              comps.find((c) => (c.types || []).includes('administrative_area_level_2'));
+            const ufComp = comps.find((c) => (c.types || []).includes('administrative_area_level_1'));
+            const cityG = cityComp ? stripAcc(cityComp.longText || cityComp.shortText || '') : '';
+            const ufG = ufComp ? stripAcc(ufComp.shortText || ufComp.longText || '') : '';
+            if (ufCad && ufG && ufG !== ufCad) { motivoRej = `UF ${ufG} != ${ufCad}`; continue; }
+            if (cidadeCad && cityG && !cityG.includes(cidadeCad) && !cidadeCad.includes(cityG)) {
+              motivoRej = `Cidade ${cityG} != ${cidadeCad}`;
+              continue;
+            }
+            escolhido = p;
+            break;
+          }
+
+          if (!escolhido) {
             rejeitados++;
-            results.push({
-              destinatario_id: d.id, razao_social: d.razao_social,
-              status: 'rejeitado_distancia', dist_deslocamento_m: dist,
-              detalhe: `${(dist / 1000).toFixed(1)}km da coord atual`,
-              place_id: escolhido.id, formatted_address: escolhido.formattedAddress,
-            });
-            await new Promise((r) => setTimeout(r, 80));
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'rejeitado_cidade', detalhe: motivoRej || 'nenhum resultado do tipo establishment na cidade' });
             continue;
           }
-          if (!force && dist < 50) {
-            ok_atual++;
-            results.push({
-              destinatario_id: d.id, razao_social: d.razao_social,
-              status: 'ok_atual', dist_deslocamento_m: dist,
-              place_id: escolhido.id, formatted_address: escolhido.formattedAddress,
-            });
-            await new Promise((r) => setTimeout(r, 80));
+
+          const lat = Number(escolhido.location?.latitude);
+          const lng = Number(escolhido.location?.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            erros++;
+            results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: 'sem coords no place' });
             continue;
           }
+
+          let dist: number | undefined;
+          if (endereco.latitude != null && endereco.longitude != null) {
+            dist = Math.round(haversineM(Number(endereco.latitude), Number(endereco.longitude), lat, lng));
+            if (dist > 20000) {
+              rejeitados++;
+              results.push({
+                destinatario_id: d.id, razao_social: d.razao_social,
+                status: 'rejeitado_distancia', dist_deslocamento_m: dist,
+                detalhe: `${(dist / 1000).toFixed(1)}km da coord atual`,
+                place_id: escolhido.id, formatted_address: escolhido.formattedAddress,
+              });
+              continue;
+            }
+            if (!force && dist < 50) {
+              ok_atual++;
+              results.push({
+                destinatario_id: d.id, razao_social: d.razao_social,
+                status: 'ok_atual', dist_deslocamento_m: dist,
+                place_id: escolhido.id, formatted_address: escolhido.formattedAddress,
+              });
+              continue;
+            }
+          }
+
+          if (!dry_run) {
+            await supabase.from('destinatario_enderecos')
+              .update({ latitude: lat, longitude: lng })
+              .eq('id', endereco.id);
+
+            const cacheKey = `PLACES|${d.id}|${(escolhido.id || '').slice(0, 60)}`;
+            await supabase.from('geocode_cache').upsert({
+              cache_key: cacheKey,
+              address_input: textQuery,
+              latitude: lat, longitude: lng,
+              formatted_address: escolhido.formattedAddress ?? null,
+              location_type: 'ROOFTOP',
+              place_id: escolhido.id ?? null,
+              source: 'places',
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'cache_key' });
+          }
+
+          atualizados++;
+          results.push({
+            destinatario_id: d.id, razao_social: d.razao_social,
+            status: 'atualizado',
+            dist_deslocamento_m: dist,
+            place_id: escolhido.id,
+            formatted_address: escolhido.formattedAddress,
+            detalhe: dry_run ? '[dry-run]' : undefined,
+          });
+        } catch (e) {
+          erros++;
+          results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: (e as Error).message });
         }
-
-        if (!dry_run) {
-          await supabase.from('destinatario_enderecos')
-            .update({ latitude: lat, longitude: lng })
-            .eq('id', endereco.id);
-
-          // registra no cache com source=places
-          const cacheKey = `PLACES|${d.id}|${(escolhido.id || '').slice(0, 60)}`;
-          await supabase.from('geocode_cache').upsert({
-            cache_key: cacheKey,
-            address_input: textQuery,
-            latitude: lat, longitude: lng,
-            formatted_address: escolhido.formattedAddress ?? null,
-            location_type: 'ROOFTOP',
-            place_id: escolhido.id ?? null,
-            source: 'places',
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'cache_key' });
-        }
-
-        atualizados++;
-        results.push({
-          destinatario_id: d.id, razao_social: d.razao_social,
-          status: 'atualizado',
-          dist_deslocamento_m: dist,
-          place_id: escolhido.id,
-          formatted_address: escolhido.formattedAddress,
-          detalhe: dry_run ? '[dry-run]' : undefined,
-        });
-
-        await new Promise((r) => setTimeout(r, 80)); // rate limit
-      } catch (e) {
-        erros++;
-        results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'erro', detalhe: (e as Error).message });
       }
     }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, ranked.length) }, () => worker()));
 
     return new Response(JSON.stringify({
       dry_run, processados: ranked.length,
