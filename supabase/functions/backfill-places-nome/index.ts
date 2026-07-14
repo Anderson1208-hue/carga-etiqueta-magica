@@ -200,8 +200,10 @@ Deno.serve(async (req) => {
           const types: string[] = Array.isArray(p.types) ? p.types : [];
           if (!types.includes('establishment') && !types.includes('point_of_interest') && !types.includes('store')) continue;
           const comps: any[] = Array.isArray(p.addressComponents) ? p.addressComponents : [];
-          const cityComp = comps.find((c) => (c.types || []).some((t: string) =>
-            ['locality', 'administrative_area_level_2', 'sublocality'].includes(t)));
+          // Prioriza locality > admin_area_level_2 (município); ignora sublocality (bairro)
+          const cityComp =
+            comps.find((c) => (c.types || []).includes('locality')) ||
+            comps.find((c) => (c.types || []).includes('administrative_area_level_2'));
           const ufComp = comps.find((c) => (c.types || []).includes('administrative_area_level_1'));
           const cityG = cityComp ? stripAcc(cityComp.longText || cityComp.shortText || '') : '';
           const ufG = ufComp ? stripAcc(ufComp.shortText || ufComp.longText || '') : '';
