@@ -88,6 +88,7 @@ type: reference
 - [Validação Canhoto IA](mem://funcionalidades/operacao/validacao-canhoto-ia) — Edge function validar-canhoto (Gemini 2.5 Flash) audita foto em background e grava score/status em baixas_entrega.
 - [ARQUIVADO: APP tipo Waze](mem://operacao/projeto-arquivado-app-tipo-waze) — Projeto futuro de APP motorista parrudo com alertas. NÃO iniciar até usuário pedir. Plano em .lovable/plan.md.
 - [Cadastros Fase 1](mem://funcionalidades/cadastros/embarcadores-destinatarios-fase1) — Tabelas embarcadores, destinatarios, destinatario_enderecos, destinatario_restricoes. Trigger auto-cria rascunhos em cada INSERT em notas_fiscais.
+- [Enriquecimento Fiscal XML](mem://funcionalidades/cadastros/enriquecimento-fiscal-via-xml) — RPC enriquecer_cadastros_fiscais_lote preenche IE/CRT/UF/IBGE em embarcadores e destinatarios a partir dos XMLs. Só campos NULOS.
 - [GPS Background NÃO confiável](mem://operacao/gps-background-nao-funciona-campo) — **PREVALECE** sobre outras memórias de GPS. Em campo, GPS para com tela bloqueada. Não afirmar "funciona igual Waze". 5 causas e o que dá pra atacar pelo Lovable.
 - [Transistorsoft v9 Config](mem://operacao/transistorsoft-v9-config) — Config agrupada obrigatória; não reverter para formato flat/legacy.
 - [Histórico NF (nf_eventos)](mem://funcionalidades/historico-nf-eventos) — Event store + triggers + RPC chegada_cd_manual; Dialog Histórico na Consulta de NF.
