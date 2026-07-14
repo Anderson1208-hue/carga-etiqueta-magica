@@ -79,19 +79,43 @@ Deno.serve(async (req) => {
     const cnpjRanks = new Map<string, number>();
     if ((dests?.length ?? 0) > 0) {
       const desde = new Date(Date.now() - 90 * 86400000).toISOString();
-      const { data: rows } = await supabase
-        .from('baixas_entrega')
-        .select('nf_id, notas_fiscais!inner(cnpj_destinatario)')
-        .eq('status', 'entregue')
-        .gte('registrado_em', desde)
-        .limit(20000);
-      for (const r of (rows ?? []) as any[]) {
-        const raw = r.notas_fiscais?.cnpj_destinatario;
-        if (!raw) continue;
-        const c = String(raw).replace(/\D/g, '');
-        if (!c) continue;
-        cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + 1);
+      // 1) pegar nf_ids das baixas entregues
+      const nfIds = new Set<string>();
+      const nfIdCount = new Map<string, number>();
+      let from = 0; const page = 1000;
+      while (true) {
+        const { data: brows, error: berr } = await supabase
+          .from('baixas_entrega')
+          .select('nf_id')
+          .eq('status', 'entregue')
+          .gte('registrado_em', desde)
+          .range(from, from + page - 1);
+        if (berr) { console.error('baixas err', berr); break; }
+        if (!brows || brows.length === 0) break;
+        for (const b of brows) {
+          if (!b.nf_id) continue;
+          nfIds.add(b.nf_id);
+          nfIdCount.set(b.nf_id, (nfIdCount.get(b.nf_id) ?? 0) + 1);
+        }
+        if (brows.length < page) break;
+        from += page;
       }
+      // 2) buscar cnpj_destinatario das NFs, em lotes
+      const nfIdArr = Array.from(nfIds);
+      for (let i = 0; i < nfIdArr.length; i += 500) {
+        const chunk = nfIdArr.slice(i, i + 500);
+        const { data: nfrows } = await supabase
+          .from('notas_fiscais')
+          .select('id, cnpj_destinatario')
+          .in('id', chunk);
+        for (const n of nfrows ?? []) {
+          const c = String(n.cnpj_destinatario ?? '').replace(/\D/g, '');
+          if (!c) continue;
+          const inc = nfIdCount.get(n.id) ?? 1;
+          cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + inc);
+        }
+      }
+      console.log('cnpj rank keys:', cnpjRanks.size);
     }
 
     // Buscar cnpj_cpf para todos os destinatarios
