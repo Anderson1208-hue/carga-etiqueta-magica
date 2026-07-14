@@ -38,26 +38,28 @@ export function ParadasTable({
 }: ParadasTableProps) {
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardHeader className="pb-2 pt-3">
+        <CardTitle className="text-sm flex items-center gap-2">
           <MapPin className="w-4 h-4" />
           Paradas da Rota
+          <span className="text-xs font-normal text-muted-foreground ml-auto">
+            {paradas.length} {paradas.length === 1 ? "parada" : "paradas"}
+          </span>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-2">
         <div className="overflow-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">#</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Chegada GPS</TableHead>
-                <TableHead>Saída GPS</TableHead>
-                <TableHead>Dwell (raio)</TableHead>
-                <TableHead>Baixa</TableHead>
-                <TableHead>Δ Gap</TableHead>
-                <TableHead className="w-20">Ações</TableHead>
+              <TableRow className="h-8">
+                <TableHead className="w-8 h-8 px-2 text-[11px]">#</TableHead>
+                <TableHead className="h-8 px-2 text-[11px]">Cliente</TableHead>
+                <TableHead className="h-8 px-2 text-[11px]">Status</TableHead>
+                <TableHead className="h-8 px-2 text-[11px]">Chegada → Saída</TableHead>
+                <TableHead className="h-8 px-2 text-[11px]">Dwell</TableHead>
+                <TableHead className="h-8 px-2 text-[11px]">Baixa</TableHead>
+                <TableHead className="h-8 px-2 text-[11px] w-16">Gap</TableHead>
+                <TableHead className="h-8 px-2 text-[11px] w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -71,92 +73,97 @@ export function ParadasTable({
                 }
                 const gapSuspeito = gapMin !== null && Math.abs(gapMin) >= GAP_ALERTA_MIN;
                 const analise = analisePorParada[parada.id];
+                const chegada = formatTime(parada.horario_chegada);
+                const saida = formatTime(parada.horario_saida);
                 return (
                   <TableRow
                     key={parada.id}
-                    className={parada.is_excecao ? "bg-destructive/5" : ""}
+                    className={`h-9 ${parada.is_excecao ? "bg-destructive/5" : ""}`}
                   >
-                    <TableCell className="font-bold">{parada.ordem}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-sm truncate max-w-[200px]">
-                          {parada.razao_social || parada.cnpj_destinatario}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                          {parada.endereco_completo}
-                        </p>
-                      </div>
+                    <TableCell className="font-bold py-1 px-2 text-xs">{parada.ordem}</TableCell>
+                    <TableCell className="py-1 px-2">
+                      <p className="font-medium text-xs truncate max-w-[180px] leading-tight">
+                        {parada.razao_social || parada.cnpj_destinatario}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate max-w-[180px] leading-tight">
+                        {parada.endereco_completo}
+                      </p>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1 px-2">
                       <StatusBadge status={parada.status} size="sm" />
                       {parada.justificativa_tipo && (
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
                           ✓ {parada.justificativa_tipo}
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">{formatTime(parada.horario_chegada)}</TableCell>
-                    <TableCell className="text-sm">{formatTime(parada.horario_saida)}</TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="py-1 px-2 text-xs whitespace-nowrap tabular-nums">
+                      {chegada !== "—" || saida !== "—" ? (
+                        <span>
+                          {chegada} <span className="text-muted-foreground">→</span> {saida}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-1 px-2 text-xs">
                       {analise && analise.dwellMin != null ? (
-                        <div className="flex flex-col leading-tight">
-                          {isPassagem(analise) ? (
-                            <Badge variant="outline" className="h-5 w-fit text-[11px] gap-1">
-                              Passagem
-                            </Badge>
-                          ) : (
-                            <span className="font-medium">{analise.dwellMin} min</span>
-                          )}
-                          <span className="text-[10px] text-muted-foreground">
-                            {analise.pingsDentro} pings
+                        isPassagem(analise) ? (
+                          <Badge variant="outline" className="h-4 text-[10px] px-1">
+                            Passagem
+                          </Badge>
+                        ) : (
+                          <span className="font-medium tabular-nums">
+                            {analise.dwellMin}m
+                            <span className="text-[10px] text-muted-foreground ml-1">
+                              ({analise.pingsDentro}p)
+                            </span>
                           </span>
-                        </div>
+                        )
                       ) : parada.tempo_permanencia_min != null ? (
-                        <span className="text-muted-foreground italic">
-                          {parada.tempo_permanencia_min} min*
+                        <span className="text-muted-foreground italic tabular-nums">
+                          {parada.tempo_permanencia_min}m*
                         </span>
                       ) : parada.horario_chegada && !parada.horario_saida ? (
-                        "..."
+                        <span className="text-muted-foreground">…</span>
                       ) : (
-                        "—"
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex flex-col leading-tight">
-                        <span>{formatTime(baixaIso)}</span>
-                        {analise?.offSite && analise.baixaDistM != null && (
-                          <Badge
-                            variant="destructive"
-                            className="h-5 w-fit text-[10px] gap-1 mt-0.5"
-                          >
-                            <MapPinOff className="w-2.5 h-2.5" />
-                            Off-site {analise.baixaDistM}m
-                          </Badge>
-                        )}
-                      </div>
+                    <TableCell className="py-1 px-2 text-xs whitespace-nowrap tabular-nums">
+                      {formatTime(baixaIso)}
+                      {analise?.offSite && analise.baixaDistM != null && (
+                        <Badge
+                          variant="destructive"
+                          className="h-4 text-[10px] px-1 gap-0.5 ml-1"
+                        >
+                          <MapPinOff className="w-2.5 h-2.5" />
+                          {analise.baixaDistM}m
+                        </Badge>
+                      )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1 px-2">
                       {gapMin === null ? (
-                        <span className="text-xs text-muted-foreground">—</span>
+                        <span className="text-[11px] text-muted-foreground">—</span>
                       ) : gapSuspeito ? (
-                        <Badge variant="destructive" className="gap-1 h-6 text-[11px]">
-                          <AlertTriangle className="w-3 h-3" />
+                        <Badge variant="destructive" className="gap-0.5 h-5 text-[10px] px-1 tabular-nums">
+                          <AlertTriangle className="w-2.5 h-2.5" />
                           {gapMin > 0 ? "+" : ""}
-                          {gapMin} min
+                          {gapMin}m
                         </Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
                           {gapMin > 0 ? "+" : ""}
-                          {gapMin} min
+                          {gapMin}m
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-1 px-2">
                       {parada.is_excecao && !parada.justificativa_tipo && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-xs h-7"
+                          className="text-[10px] h-6 px-2"
                           onClick={() => onJustificar(parada)}
                         >
                           Justificar
@@ -168,7 +175,7 @@ export function ParadasTable({
               })}
               {paradas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground py-6 text-sm">
                     Nenhuma parada registrada
                   </TableCell>
                 </TableRow>
@@ -176,10 +183,9 @@ export function ParadasTable({
             </TableBody>
           </Table>
         </div>
-        <p className="text-[11px] text-muted-foreground mt-2">
-          <strong>Dwell</strong> = tempo entre 1º e último ping GPS dentro do raio da parada
-          (padrão Samsara/Trimble). <em>*</em> quando não há GPS suficiente, mostra o valor legado
-          do sistema. <strong>Off-site</strong> = baixa registrada fora do raio cadastrado.
+        <p className="text-[10px] text-muted-foreground mt-1 px-1">
+          <strong>Dwell</strong> = tempo entre 1º e último ping GPS dentro do raio.
+          <em> *</em> valor legado quando falta GPS. <strong>Off-site</strong> = baixa fora do raio.
         </p>
       </CardContent>
     </Card>
