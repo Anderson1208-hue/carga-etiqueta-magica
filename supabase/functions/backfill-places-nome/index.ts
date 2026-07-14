@@ -86,7 +86,9 @@ Deno.serve(async (req) => {
         .gte('registrado_em', desde)
         .limit(20000);
       for (const r of (rows ?? []) as any[]) {
-        const c = r.notas_fiscais?.cnpj_destinatario;
+        const raw = r.notas_fiscais?.cnpj_destinatario;
+        if (!raw) continue;
+        const c = String(raw).replace(/\D/g, '');
         if (!c) continue;
         cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + 1);
       }
