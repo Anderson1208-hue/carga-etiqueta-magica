@@ -77,23 +77,45 @@ Deno.serve(async (req) => {
 
     // Contagem de baixas por CNPJ (para ranking)
     const cnpjRanks = new Map<string, number>();
-    if (min_baixas_90d > 0 || (dests?.length ?? 0) > 0) {
+    if ((dests?.length ?? 0) > 0 && min_baixas_90d > 0) {
       const desde = new Date(Date.now() - 90 * 86400000).toISOString();
-      const { data: baixasRows } = await supabase.rpc('exec_sql', {}).catch(() => ({ data: null }));
-      // fallback: contar via query direta agrupada
-      if (!baixasRows) {
-        const { data: rows } = await supabase
+      // 1) pegar nf_ids das baixas entregues
+      const nfIds = new Set<string>();
+      const nfIdCount = new Map<string, number>();
+      let from = 0; const page = 1000;
+      while (true) {
+        const { data: brows, error: berr } = await supabase
           .from('baixas_entrega')
-          .select('nf_id, notas_fiscais!inner(cnpj_destinatario)')
+          .select('nf_id')
           .eq('status', 'entregue')
           .gte('registrado_em', desde)
-          .limit(20000);
-        for (const r of (rows ?? []) as any[]) {
-          const c = r.notas_fiscais?.cnpj_destinatario;
+          .range(from, from + page - 1);
+        if (berr) { console.error('baixas err', berr); break; }
+        if (!brows || brows.length === 0) break;
+        for (const b of brows) {
+          if (!b.nf_id) continue;
+          nfIds.add(b.nf_id);
+          nfIdCount.set(b.nf_id, (nfIdCount.get(b.nf_id) ?? 0) + 1);
+        }
+        if (brows.length < page) break;
+        from += page;
+      }
+      // 2) buscar cnpj_destinatario das NFs, em lotes
+      const nfIdArr = Array.from(nfIds);
+      for (let i = 0; i < nfIdArr.length; i += 500) {
+        const chunk = nfIdArr.slice(i, i + 500);
+        const { data: nfrows } = await supabase
+          .from('notas_fiscais')
+          .select('id, cnpj_destinatario')
+          .in('id', chunk);
+        for (const n of nfrows ?? []) {
+          const c = String(n.cnpj_destinatario ?? '').replace(/\D/g, '');
           if (!c) continue;
-          cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + 1);
+          const inc = nfIdCount.get(n.id) ?? 1;
+          cnpjRanks.set(c, (cnpjRanks.get(c) ?? 0) + inc);
         }
       }
+      console.log('cnpj rank keys:', cnpjRanks.size);
     }
 
     // Buscar cnpj_cpf para todos os destinatarios
@@ -102,7 +124,7 @@ Deno.serve(async (req) => {
       .select('id, cnpj_cpf')
       .in('id', (dests ?? []).map((d) => d.id));
     const cnpjById = new Map<string, string>();
-    for (const d of destsCnpj ?? []) cnpjById.set(d.id, d.cnpj_cpf);
+    for (const d of destsCnpj ?? []) cnpjById.set(d.id, String(d.cnpj_cpf ?? '').replace(/\D/g, ''));
 
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
@@ -178,8 +200,10 @@ Deno.serve(async (req) => {
           const types: string[] = Array.isArray(p.types) ? p.types : [];
           if (!types.includes('establishment') && !types.includes('point_of_interest') && !types.includes('store')) continue;
           const comps: any[] = Array.isArray(p.addressComponents) ? p.addressComponents : [];
-          const cityComp = comps.find((c) => (c.types || []).some((t: string) =>
-            ['locality', 'administrative_area_level_2', 'sublocality'].includes(t)));
+          // Prioriza locality > admin_area_level_2 (município); ignora sublocality (bairro)
+          const cityComp =
+            comps.find((c) => (c.types || []).includes('locality')) ||
+            comps.find((c) => (c.types || []).includes('administrative_area_level_2'));
           const ufComp = comps.find((c) => (c.types || []).includes('administrative_area_level_1'));
           const cityG = cityComp ? stripAcc(cityComp.longText || cityComp.shortText || '') : '';
           const ufG = ufComp ? stripAcc(ufComp.shortText || ufComp.longText || '') : '';
