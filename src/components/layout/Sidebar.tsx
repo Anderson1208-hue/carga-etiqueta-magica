@@ -235,6 +235,10 @@ export function Sidebar() {
                   item={{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }}
                   isActive={location.pathname === "/integracoes/ocoren"}
                 />
+                <NavItem
+                  item={{ name: "Config. Fiscal", href: "/fiscal/configuracao", icon: Receipt }}
+                  isActive={location.pathname === "/fiscal/configuracao"}
+                />
               </>
             )}
           </div>
