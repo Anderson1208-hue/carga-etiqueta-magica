@@ -408,6 +408,33 @@ export default function Cargas() {
         toast({ title: "Carga criada com sucesso!", description });
       }
 
+      // Enriquecer cadastros fiscais (embarcadores/destinatarios) com dados do XML.
+      // Não bloqueia o fluxo — se falhar, apenas registra no console.
+      if (result.status !== "already_processed") {
+        try {
+          const fiscalPayload = {
+            nfs: parsedFiles
+              .filter((f) => f.status === "success" && f.data)
+              .map((f) => ({
+                cnpj_emitente: f.data!.cnpjEmitente,
+                ie_emitente: f.data!.ieEmitente ?? null,
+                crt_emitente: f.data!.crtEmitente ?? null,
+                uf_emitente: f.data!.ufEmitente ?? null,
+                municipio_emitente: f.data!.municipioEmitente ?? null,
+                codigo_municipio_ibge_emitente: f.data!.codigoMunicipioIbgeEmitente ?? null,
+                cnpj_destinatario: f.data!.cnpjDestinatario,
+                ie_destinatario: f.data!.ieDestinatario ?? null,
+                indicador_ie_destinatario: f.data!.indicadorIeDestinatario ?? null,
+              })),
+          };
+          await supabase.rpc("enriquecer_cadastros_fiscais_lote", {
+            payload: fiscalPayload as any,
+          });
+        } catch (fiscalErr) {
+          console.warn("Falha ao enriquecer cadastros fiscais (não crítico):", fiscalErr);
+        }
+      }
+
       setFormData({ data: format(new Date(), "yyyy-MM-dd"), placa: "", motorista: "", observacao: "" });
       setParsedFiles([]);
       setDialogOpen(false);
