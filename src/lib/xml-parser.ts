@@ -219,6 +219,13 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     pesoBruto,
     pesoLiquido,
     volumeM3,
+    ieEmitente,
+    crtEmitente,
+    ufEmitente,
+    municipioEmitente,
+    codigoMunicipioIbgeEmitente,
+    ieDestinatario,
+    indicadorIeDestinatario,
   };
 }
 
