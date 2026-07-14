@@ -45,15 +45,15 @@ export function ParadasTable({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-2">
-        <Table>
+        <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow className="h-7">
-              <TableHead className="w-8 h-7 px-1.5 text-[11px]">#</TableHead>
+              <TableHead className="w-7 h-7 px-1 text-[11px]">#</TableHead>
               <TableHead className="h-7 px-1.5 text-[11px]">Cliente</TableHead>
-              <TableHead className="h-7 px-1.5 text-[11px] w-24">Status</TableHead>
-              <TableHead className="h-7 px-1.5 text-[11px] w-32">GPS (chegada/saída/dwell)</TableHead>
-              <TableHead className="h-7 px-1.5 text-[11px] w-28">Baixa / Gap</TableHead>
-              <TableHead className="h-7 px-1.5 text-[11px] w-16"></TableHead>
+              <TableHead className="h-7 px-1 text-[11px] w-[88px]">Status</TableHead>
+              <TableHead className="h-7 px-1 text-[11px] w-[108px]">GPS</TableHead>
+              <TableHead className="h-7 px-1 text-[11px] w-[92px]">Baixa/Gap</TableHead>
+              <TableHead className="h-7 px-1 text-[11px] w-[68px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
