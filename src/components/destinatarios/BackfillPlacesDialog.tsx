@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { MapPinned, Play, Search, AlertTriangle } from "lucide-react";
+import { MapPinned, Play, Search, AlertTriangle, Loader2 } from "lucide-react";
 
 type ItemResult = {
   destinatario_id: string;
@@ -35,6 +34,19 @@ type BackfillResult = {
   results: ItemResult[];
 };
 
+const BATCH_SIZE = 10;
+const EMPTY_RESULT = (dry_run: boolean): BackfillResult => ({
+  dry_run,
+  processados: 0,
+  atualizados: 0,
+  sem_match: 0,
+  rejeitados: 0,
+  ok_atual: 0,
+  sem_endereco: 0,
+  erros: 0,
+  results: [],
+});
+
 const STATUS_LABEL: Record<string, { label: string; variant: "default" | "outline" | "secondary" | "destructive" }> = {
   atualizado: { label: "Atualizado", variant: "default" },
   ok_atual: { label: "OK (coord já bate)", variant: "secondary" },
@@ -51,25 +63,59 @@ export function BackfillPlacesDialog() {
   const [minBaixas, setMinBaixas] = useState(1);
   const [force, setForce] = useState(false);
   const [result, setResult] = useState<BackfillResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number; dryRun: boolean } | null>(null);
 
-  const run = useMutation({
-    mutationFn: async (dry_run: boolean) => {
+  const invokeBatch = async (dry_run: boolean, batchLimit: number, offset: number) => {
       const { data, error } = await supabase.functions.invoke("backfill-places-nome", {
-        body: { dry_run, limit, min_baixas_90d: minBaixas, force },
+        body: { dry_run, limit: batchLimit, offset, min_baixas_90d: minBaixas, force },
       });
-      if (error) throw error;
+      if (error) {
+        const maybeContext = error as Error & { context?: Response };
+        const details = maybeContext.context ? await maybeContext.context.text().catch(() => "") : "";
+        throw new Error(details || error.message);
+      }
       return data as BackfillResult;
-    },
-    onSuccess: (data) => {
-      setResult(data);
+  };
+
+  const runBatched = async (dry_run: boolean) => {
+    const total = Math.max(1, Math.min(500, limit));
+    let acc = EMPTY_RESULT(dry_run);
+    setRunning(true);
+    setResult(acc);
+    setProgress({ done: 0, total, dryRun: dry_run });
+
+    try {
+      for (let offset = 0; offset < total; offset += BATCH_SIZE) {
+        const batchLimit = Math.min(BATCH_SIZE, total - offset);
+        const data = await invokeBatch(dry_run, batchLimit, offset);
+        acc = {
+          dry_run,
+          processados: acc.processados + data.processados,
+          atualizados: acc.atualizados + data.atualizados,
+          sem_match: acc.sem_match + data.sem_match,
+          rejeitados: acc.rejeitados + data.rejeitados,
+          ok_atual: acc.ok_atual + data.ok_atual,
+          sem_endereco: acc.sem_endereco + data.sem_endereco,
+          erros: acc.erros + data.erros,
+          results: [...acc.results, ...data.results],
+        };
+        setResult(acc);
+        setProgress({ done: Math.min(offset + data.processados, total), total, dryRun: dry_run });
+        if (data.processados < batchLimit) break;
+      }
       toast.success(
-        data.dry_run
-          ? `Simulação: ${data.atualizados} coord(s) seriam atualizadas`
-          : `${data.atualizados} coord(s) atualizadas via Places`,
+        dry_run
+          ? `Simulação: ${acc.atualizados} coord(s) seriam atualizadas`
+          : `${acc.atualizados} coord(s) atualizadas via Places`,
       );
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setRunning(false);
+      setProgress(null);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -116,13 +162,30 @@ export function BackfillPlacesDialog() {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => run.mutate(true)} disabled={run.isPending}>
-              <Search className="w-4 h-4 mr-2" /> Simular
+            <Button variant="outline" onClick={() => runBatched(true)} disabled={running}>
+              {running && progress?.dryRun ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+              Simular
             </Button>
-            <Button onClick={() => run.mutate(false)} disabled={run.isPending}>
-              <Play className="w-4 h-4 mr-2" /> Executar
+            <Button onClick={() => runBatched(false)} disabled={running}>
+              {running && !progress?.dryRun ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+              Executar
             </Button>
           </div>
+
+          {progress && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{progress.dryRun ? "Simulando" : "Executando"} em lotes de {BATCH_SIZE}</span>
+                <span>{progress.done}/{progress.total}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${Math.max(4, Math.round((progress.done / progress.total) * 100))}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {result && (
             <div className="space-y-3">
@@ -146,6 +209,13 @@ export function BackfillPlacesDialog() {
                     </tr>
                   </thead>
                   <tbody>
+                    {result.results.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-2 py-6 text-center text-muted-foreground">
+                          {running ? "Buscando clientes..." : "Nenhum resultado retornado."}
+                        </td>
+                      </tr>
+                    )}
                     {result.results.map((r, i) => {
                       const meta = STATUS_LABEL[r.status] ?? { label: r.status, variant: "outline" as const };
                       return (
