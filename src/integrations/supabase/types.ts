@@ -2351,6 +2351,10 @@ export type Database = {
           pontos: number
         }[]
       }
+      enriquecer_cadastros_fiscais_lote: {
+        Args: { payload: Json }
+        Returns: Json
+      }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
       fn_ibac_enqueue: {
         Args: {
