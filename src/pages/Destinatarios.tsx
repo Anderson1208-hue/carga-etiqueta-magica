@@ -123,6 +123,7 @@ export default function Destinatarios() {
             </p>
           </div>
           <div className="flex gap-2">
+            <ApelidosBuscaDialog />
             <BackfillPlacesDialog />
             <Button onClick={() => setEditingId("new")}>
               <Plus className="w-4 h-4 mr-2" /> Novo Destinatário
