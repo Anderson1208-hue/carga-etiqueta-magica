@@ -110,6 +110,17 @@ Deno.serve(async (req) => {
     const cnpjById = new Map<string, string>();
     for (const d of dests ?? []) cnpjById.set(d.id, String(d.cnpj_cpf ?? '').replace(/\D/g, ''));
 
+    // Apelidos de busca por CNPJ raiz (ex.: rede ASSB -> "Cacau Show")
+    const apelidoPorRaiz = new Map<string, string>();
+    {
+      const { data: aliases } = await supabase
+        .from('destinatario_apelidos_busca')
+        .select('cnpj_raiz, nome_busca');
+      for (const a of aliases ?? []) {
+        apelidoPorRaiz.set(String(a.cnpj_raiz), String(a.nome_busca));
+      }
+    }
+
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
       .map((d) => ({ ...d, baixas: cnpjRanks.get(cnpjById.get(d.id) ?? '') ?? 0 }))
@@ -139,7 +150,9 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const nome = (d.nome_fantasia || d.razao_social || '').trim();
+          const cnpj = cnpjById.get(d.id) ?? '';
+          const apelido = cnpj.length >= 8 ? apelidoPorRaiz.get(cnpj.slice(0, 8)) : undefined;
+          const nome = (apelido || d.nome_fantasia || d.razao_social || '').trim();
           if (!nome) {
             results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match', detalhe: 'sem nome' });
             sem_match++;

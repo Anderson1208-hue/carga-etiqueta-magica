@@ -798,6 +798,36 @@ export type Database = {
           },
         ]
       }
+      destinatario_apelidos_busca: {
+        Row: {
+          cnpj_raiz: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nome_busca: string
+          observacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj_raiz: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_busca: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj_raiz?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome_busca?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       destinatario_enderecos: {
         Row: {
           apelido: string | null

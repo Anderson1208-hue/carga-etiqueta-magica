@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Plus, Pencil, Search, MapPin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { BackfillPlacesDialog } from "@/components/destinatarios/BackfillPlacesDialog";
+import { ApelidosBuscaDialog } from "@/components/destinatarios/ApelidosBuscaDialog";
 
 type Destinatario = {
   id: string;
@@ -122,6 +123,7 @@ export default function Destinatarios() {
             </p>
           </div>
           <div className="flex gap-2">
+            <ApelidosBuscaDialog />
             <BackfillPlacesDialog />
             <Button onClick={() => setEditingId("new")}>
               <Plus className="w-4 h-4 mr-2" /> Novo Destinatário
