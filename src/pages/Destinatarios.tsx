@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Plus, Pencil, Search, MapPin, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { BackfillPlacesDialog } from "@/components/destinatarios/BackfillPlacesDialog";
+import { ApelidosBuscaDialog } from "@/components/destinatarios/ApelidosBuscaDialog";
 
 type Destinatario = {
   id: string;
