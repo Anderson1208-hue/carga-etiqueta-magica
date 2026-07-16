@@ -58,7 +58,8 @@ export function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
 
 export function RotaStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; classes: string }> = {
-    ativa: { label: "Ativa", classes: "bg-success/15 text-success border-success/30" },
+    aguardando: { label: "Aguardando saída", classes: "bg-muted text-muted-foreground border-border" },
+    ativa: { label: "Em rota", classes: "bg-success/15 text-success border-success/30" },
     finalizada: { label: "Finalizada", classes: "bg-secondary text-secondary-foreground border-border" },
     pausada: { label: "Pausada", classes: "bg-warning/15 text-warning border-warning/30" },
   };
