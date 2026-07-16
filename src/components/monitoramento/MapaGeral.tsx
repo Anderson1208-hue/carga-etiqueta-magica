@@ -6,6 +6,7 @@ import { Map } from "lucide-react";
 import type { MonitoramentoRota } from "./types";
 
 const STATUS_COLORS: Record<string, string> = {
+  aguardando: "hsl(215, 15%, 60%)",
   ativa: "hsl(142, 70%, 40%)",
   finalizada: "hsl(215, 15%, 45%)",
   pausada: "hsl(38, 92%, 50%)",
@@ -16,9 +17,10 @@ interface MapaGeralProps {
   height?: string;
   onSelectRota?: (rota: MonitoramentoRota) => void;
   showTitle?: boolean;
+  selectedRotaId?: string | null;
 }
 
-export function MapaGeral({ rotas, height = "250px", onSelectRota, showTitle = true }: MapaGeralProps) {
+export function MapaGeral({ rotas, height = "250px", onSelectRota, showTitle = true, selectedRotaId = null }: MapaGeralProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
