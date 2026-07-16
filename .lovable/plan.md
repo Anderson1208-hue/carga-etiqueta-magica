@@ -1,113 +1,98 @@
-## Objetivo
+# Torre de Controle — Análise e Proposta
 
-Todos os dias às **23:00 (horário do servidor / UTC-3 → cron 02:00 UTC)**, enviar para a IBAC as fotos de canhoto (`baixas_entrega.foto_path`) de NFs da **Cacau Show** que ainda não foram enviadas. Eventuais correções (qualidade ruim, NF divergente) continuam tratadas manualmente na Prestação de Contas — o cron não filtra por score.
+## 1. Diagnóstico do que existe hoje
 
-Padrão de mercado adotado para idempotência: **coluna de timestamp de envio** + **dedupe na fila** + **status de erro com retry** (mesmo modelo do `ibac-sync` atual).
+**Fluxo atual (Monitoramento Rotas / Torre):**
+- Operador clica em "Iniciar Monitoramento" → abre `IniciarDialog` com lista de veículos elegíveis (`veiculos.status ∈ {pendente, em_rota}` **da data selecionada**, sem prestação de contas, sem rota ativa já existente).
+- Para cada placa, cria manualmente uma `monitoramento_rotas` (uma por vez ou "Iniciar Todos").
+- A criação faz JOIN pesado: `veiculo_nfs → notas_fiscais → roteirizacao_paradas` para montar paradas e ordem.
+- Torre de Controle (`/torre-controle`) só **exibe** rotas já criadas; ela não cria.
 
----
+**Problemas reais confirmados no código:**
+| # | Problema | Causa |
+|---|---|---|
+| 1 | "Iniciar Todos" é lento | Serial por veículo, cada um faz 3-4 queries + insert + insert de paradas |
+| 2 | Placas na Torre ≠ placas da Roteirização | Torre lista `monitoramento_rotas` (só as já iniciadas); a Roteirização usa `veiculos` do dia. Só coincidem se alguém já apertou "Iniciar" |
+| 3 | Operador precisa lembrar de iniciar | Fricção manual — se esquece, veículo some da Torre |
+| 4 | Sem "seletor de placa" na visão macro | Torre já tem mapa geral, mas selecionar um veículo obriga sair para `/monitoramento-rotas` |
+| 5 | Visualização "ruim" | Marcadores 🚛 iguais para todos, sem filtro por status/atraso/alerta, sem foco rápido em uma placa |
 
-## 1. Schema (migration)
+## 2. Comparando as três abordagens
 
-**`baixas_entrega`** — novas colunas:
-- `imagem_ibac_enviada_em timestamptz` — preenchido quando a IBAC confirma recebimento (HTTP 2xx).
-- `imagem_ibac_tentativas int default 0`
-- `imagem_ibac_ultimo_erro text`
-- `imagem_ibac_queue_id uuid` — referência à última entrada em `ibac_eventos_queue` (para auditoria).
+### Sua sugestão
+> Todo veículo da roteirização do dia já aparece pronto na Torre; operador só escolhe qual placa observar; visão macro com todos + mapa.
 
-Índice parcial para o cron varrer rápido:
-```sql
-CREATE INDEX idx_baixas_pendente_envio_imagem
-  ON baixas_entrega (registrado_em)
-  WHERE foto_path IS NOT NULL AND imagem_ibac_enviada_em IS NULL;
+**Prós:** elimina fricção, alinha 1:1 com roteirização, é como funcionam torres de mercado (Cargo42, Trackage, Sascar).
+**Contra:** se criar `monitoramento_rotas` para todos preventivamente, gera lixo quando o veículo não sai (feriado, quebra). Precisa de estado "aguardando".
+
+### Sugestão anterior do Lovable
+Manteve o modelo manual e apenas adicionou "Iniciar Todos" no diálogo.
+
+**Contra:** não resolve raiz — continua sendo ação manual pontual, ainda cria N linhas em série, e a Torre continua descolada da Roteirização até alguém clicar.
+
+### Prática de mercado (torres de controle logístico)
+1. **Provisionamento automático**: assim que a roteirização é publicada, o veículo já "existe" na torre em estado *Aguardando saída*.
+2. **Estados claros do ciclo**: `Aguardando → Em rota (com GPS) → Sem sinal → Em parada → Finalizada → Baixada`.
+3. **Visão macro sempre-ligada**: mapa único com todos os caminhões, filtros (status, atraso, alertas, região), *cluster* quando muitos, ficha lateral ao clicar no ícone.
+4. **Drill-down sem trocar de tela**: seleção de placa abre painel lateral com paradas/timeline/alertas — sem navegar.
+5. **KPIs no topo**: em rota, sem sinal >X min, atrasados, concluídos, alertas abertos.
+
+## 3. Proposta recomendada (híbrida)
+
+Combina sua ideia + práticas de mercado, **sem** mexer em Roteirização, Cargas, Preparação, Baixa ou nos módulos operacionais.
+
+### 3.1 Provisionamento automático (backend leve)
+- Ao final da roteirização (quando o veículo tem paradas e `veiculos.data = hoje/amanhã`), criar `monitoramento_rotas` com **novo status `aguardando`** (adicionar ao enum atual `ativa|pausada|finalizada`).
+- Implementação: **trigger** em `roteirizacao_paradas` após confirmação da roteirização, OU um botão único "Provisionar dia" na Torre que roda em lote via RPC (uma transação, não N inserts do frontend).
+- Uma linha `aguardando` **não** dispara alertas, não conta como "sem sinal", não polui KPIs — só reserva o slot.
+- Quando chega o primeiro ping GPS da placa → trigger promove `aguardando → ativa` automaticamente.
+
+### 3.2 Torre de Controle repaginada (só frontend)
+Layout em 3 zonas, tudo em uma tela:
+
+```text
+┌─ KPIs (Aguardando | Em rota | Sem sinal | Atrasadas | Alertas) ─┐
+├─ Mapa grande (70% largura) ──────┬─ Painel lateral (30%) ───────┤
+│  • Todos os veículos do dia      │  Sem seleção:                │
+│  • Ícone colorido por status     │   • Lista compacta de placas │
+│  • Badge com nº de alertas       │   • Busca por placa/motor.   │
+│  • Cluster quando >20            │  Com placa selecionada:      │
+│  • Clique → seleciona no painel  │   • Ficha + progresso        │
+│                                  │   • Próximas paradas         │
+│                                  │   • Últimos alertas          │
+│                                  │   • Botão "Abrir detalhe"    │
+└──────────────────────────────────┴──────────────────────────────┘
 ```
 
-**`ibac_de_para_eventos`** — semear linha:
-- `evento_interno = 'envio_canhoto'`, `codigo_ibac = NULL`, `ativo = true`, descrição "Envio de imagem do canhoto (assíncrono, separado do evento 1)".
-> Fica sem código IBAC até a IBAC confirmar o endpoint/código. Enquanto isso, o `ibac-sync` já marca como erro "sem código mapeado" — comportamento conhecido, sem perda. Quando a IBAC responder, basta preencher o `codigo_ibac` e usar **Retry → Reprocessar**.
+- Filtros rápidos acima do mapa: `Todos | Aguardando | Em rota | Sem sinal | Alertas`.
+- Auto-refresh já existe (60 s) + realtime já ligado — mantido.
+- Marcador do veículo selecionado destacado (borda, zoom, "voa" até ele).
 
-**`cnpj_envio_canhoto_auto`** — nova tabela de configuração (substitui hardcode "Cacau"):
-- `cnpj text PK` (somente dígitos)
-- `descricao text`
-- `ativo boolean default true`
-- Seed: CNPJ raiz Cacau Show `51825331` (matching por `LIKE '51825331%'`).
-- Grants: `SELECT` para `authenticated`, `ALL` para `service_role`. RLS: admin gerencia.
+### 3.3 O que muda no botão "Iniciar Monitoramento"
+- **Renomeado** para "Provisionar dia" (ou desaparece se o trigger automático estiver ativo).
+- Continua existindo como *fallback* manual para veículos que entraram fora do fluxo (roteirização tardia, avulso).
+- Executa 1 RPC no banco em vez de N inserts — resolve a lentidão.
 
----
+## 4. Comparativo final
 
-## 2. Edge function `ibac-enfileirar-canhotos` (nova)
+| Critério | Hoje | "Iniciar Todos" do Lovable | Proposta híbrida |
+|---|---|---|---|
+| Placas Torre = Roteirização do dia | Não | Só após clicar | **Sim, automático** |
+| Fricção do operador | Alta | Média | **Nenhuma** |
+| Performance do bulk | Ruim (serial) | Ruim | **Boa (1 RPC)** |
+| Seleção de placa sem trocar tela | Não | Não | **Sim (painel lateral)** |
+| Alinhado com mercado | Não | Não | **Sim** |
+| Risco em outros módulos | — | Baixo | Baixo (só adiciona status novo e trigger) |
 
-Roda **uma vez por execução** (chamada pelo cron). Não envia para a IBAC diretamente — apenas **enfileira** em `ibac_eventos_queue`. O `ibac-sync` (que já roda a cada 2 min) faz o POST real, respeitando retry/backoff/alertas existentes.
+## 5. Riscos e mitigações
+- **Enum `status`**: adicionar `aguardando` é migration de 1 linha; não quebra código atual que já usa `ativa/pausada/finalizada` (novo valor só aparece onde a UI decidir mostrar).
+- **Trigger de provisionamento**: idempotente (checar se já existe rota para o `veiculo_id` do dia antes de inserir).
+- **Não mexer** em: Cargas (regra `status manual`), Preparação, Roteirização (algoritmo/UX), Baixa, Conferência, ERP Praxio, IBAC.
 
-Lógica:
-1. Lista CNPJs ativos em `cnpj_envio_canhoto_auto`.
-2. Busca em lotes (`limit 500`) `baixas_entrega` onde:
-   - `foto_path IS NOT NULL`
-   - `imagem_ibac_enviada_em IS NULL`
-   - `imagem_ibac_tentativas < 5` (cap de segurança; reset manual via UI)
-   - `notas_fiscais.cnpj_destinatario` casa com algum CNPJ ativo
-3. Para cada baixa:
-   - Gera **signed URL** do `comprovantes` (validade 7 dias — IBAC consome assincronamente).
-   - Monta payload com `nf_id`, `numero_nf`, `chave_acesso`, `cnpj_destinatario`, `recebedor_nome`, `registrado_em`, `validacao_status`, `foto_url`, `foto_path`.
-   - Chama `fn_ibac_enqueue('envio_canhoto', nf_id, carga_id, baixa_id, chave_acesso, payload)` — só insere se o de-para estiver ativo (já é o comportamento da função).
-   - Atualiza `baixas_entrega.imagem_ibac_queue_id = <novo id>`, incrementa `imagem_ibac_tentativas`.
-4. Retorna `{ candidatos, enfileirados, sem_destinatario_mapeado, ja_enviadas_ignoradas }`.
+## 6. O que decidir antes de implementar
+1. Provisionamento **automático via trigger** ou **botão "Provisionar dia"** manual?
+2. Aceita adicionar o status `aguardando` ao enum, ou prefere um campo `provisionada boolean` separado?
+3. O redesenho da Torre (mapa + painel lateral + filtros) substitui a página atual `/torre-controle`, ou vira uma nova rota (ex.: `/torre-controle-v2`) para rodar em paralelo?
+4. Manter também a página `/monitoramento-rotas` (detalhe profundo) ou fundir tudo na Torre?
 
-`verify_jwt = false` (chamada via cron service-role). Usa `SERVICE_ROLE` no client.
-
----
-
-## 3. Confirmação de envio (mudança no `ibac-sync`)
-
-No bloco que atualiza `ibac_eventos_queue` após sucesso, adicionar: se `evento_interno = 'envio_canhoto'` e `sucesso = true`, fazer:
-```sql
-UPDATE baixas_entrega
-   SET imagem_ibac_enviada_em = now(),
-       imagem_ibac_ultimo_erro = NULL
- WHERE id = <baixa_id>;
-```
-Em erro terminal (`tentativas >= max`): gravar `imagem_ibac_ultimo_erro` na baixa para visibilidade.
-
----
-
-## 4. Cron (pg_cron + pg_net)
-
-```sql
-SELECT cron.schedule(
-  'ibac-enfileirar-canhotos-diario',
-  '0 2 * * *',           -- 02:00 UTC = 23:00 BRT
-  $$
-  SELECT net.http_post(
-    url := 'https://<projeto>.supabase.co/functions/v1/ibac-enfileirar-canhotos',
-    headers := jsonb_build_object('Content-Type','application/json','apikey','<anon>'),
-    body := '{}'::jsonb
-  );
-  $$
-);
-```
-(Insertion via insert tool — não migration — por conter chave anon específica do projeto.)
-
----
-
-## 5. UI — Painel IBAC (mínimo)
-
-Em `/integracao-ibac`, adicionar aba **Canhotos**:
-- KPIs: pendentes (foto sem envio), enviados últimos 7d, falhas com `imagem_ibac_ultimo_erro`.
-- Botão **"Disparar agora"** chama a edge function manualmente.
-- Sub-aba **CNPJs autorizados** (CRUD simples em `cnpj_envio_canhoto_auto`) — admin only.
-
----
-
-## 6. Fora de escopo (deixar explícito)
-
-- Não muda o fluxo do **evento 1** (entrega/ocorrência continua em tempo real via `fn_ibac_capturar_baixa`).
-- Não muda a validação IA da Prestação de Contas — score continua sendo só sinal humano.
-- Endpoint/contrato exato da IBAC para imagem fica pendente do retorno deles; estrutura já suporta sem mudança de código (basta preencher `codigo_ibac` no de-para).
-
----
-
-## Detalhes técnicos
-
-- Signed URL 7d para a IBAC ter folga em reprocesso. Bucket `comprovantes` permanece privado.
-- Cap `imagem_ibac_tentativas < 5` evita laço se a foto sumir do storage.
-- Cron 1x/dia + `ibac-sync` cada 2 min → janela máx de envio efetivo ≈ 2 min após 23h.
-- Dedupe natural pela coluna `imagem_ibac_enviada_em` (NOT NULL = nunca reenfileirar).
+Responda esses 4 pontos e eu monto o plano de implementação detalhado.
