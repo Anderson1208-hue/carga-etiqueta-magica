@@ -50,30 +50,32 @@ export function MapaGeral({ rotas, height = "250px", onSelectRota, showTitle = t
 
       const color = STATUS_COLORS[rota.status] || STATUS_COLORS.ativa;
       const isActive = rota.status === "ativa";
+      const isSelected = selectedRotaId === rota.id;
       const progress = rota.total_paradas
         ? Math.round((rota.paradas_concluidas / rota.total_paradas) * 100)
         : 0;
 
+      const size = isSelected ? 52 : isActive ? 40 : 32;
       const icon = L.divIcon({
         className: "custom-div-icon",
         html: `<div style="
           background-color: ${color};
           color: white;
-          width: ${isActive ? 40 : 32}px;
-          height: ${isActive ? 40 : 32}px;
+          width: ${size}px;
+          height: ${size}px;
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: bold;
-          font-size: ${isActive ? 16 : 13}px;
-          border: 3px solid white;
+          font-size: ${isSelected ? 20 : isActive ? 16 : 13}px;
+          border: ${isSelected ? 4 : 3}px solid ${isSelected ? "hsl(var(--primary))" : "white"};
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           cursor: pointer;
-          ${isActive ? "animation: pulse 2s infinite;" : "opacity: 0.7;"}
+          ${isActive ? "animation: pulse 2s infinite;" : "opacity: 0.75;"}
         ">🚛</div>`,
-        iconSize: [isActive ? 40 : 32, isActive ? 40 : 32],
-        iconAnchor: [isActive ? 20 : 16, isActive ? 20 : 16],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
       });
 
       const marker = L.marker([rota.ultima_lat, rota.ultima_lng], { icon })
