@@ -108,7 +108,7 @@ export function MapaGeral({ rotas, height = "250px", onSelectRota, showTitle = t
     if (bounds.length > 0) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
     }
-  }, [rotas, onSelectRota]);
+  }, [rotas, onSelectRota, selectedRotaId]);
 
   useEffect(() => {
     return () => {
