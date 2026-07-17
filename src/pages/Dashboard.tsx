@@ -1,245 +1,219 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Truck,
   FileText,
-  Tags,
+  CalendarClock,
   CheckCircle2,
-  Clock,
   ArrowRight,
-  Package,
+  Plus,
+  Map,
+  Radio,
+  FileBarChart,
+  Users,
+  Radar,
 } from "lucide-react";
+import { KpiCard } from "@/components/dashboard/KpiCard";
+import { HealthBanner } from "@/components/dashboard/HealthBanner";
+import { FunilOperacional } from "@/components/dashboard/FunilOperacional";
+import { AlertasResumo } from "@/components/dashboard/AlertasResumo";
+import { IbacResumo } from "@/components/dashboard/IbacResumo";
 
-interface Stats {
-  cargasAbertas: number;
-  cargasFechadas: number;
-  totalNfs: number;
-  etiquetasPendentes: number;
-  etiquetasConferidasInterno: number;
-  etiquetasConferidas: number;
-  etiquetasDivergencia: number;
+const REFRESH_MS = 60_000;
+
+async function loadDashboard() {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const inicioHojeIso = hoje.toISOString();
+  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    cargasAbertasRes,
+    nfsHojeRes,
+    aguardandoConfRes,
+    entreguesHojeRes,
+    ocorrenciasHojeRes,
+    baixasHojeRes,
+    rotasAtivasRes,
+    paradasPendRes,
+    agendHojeStatusRes,
+    alertasRes,
+    ibacQueueRes,
+    ibacLog24hRes,
+  ] = await Promise.all([
+    supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
+    supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
+    supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
+    supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).eq("status", "entregue").gte("registrado_em", inicioHojeIso),
+    supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).neq("status", "entregue").gte("registrado_em", inicioHojeIso),
+    supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).gte("registrado_em", inicioHojeIso),
+    supabase.from("monitoramento_rotas").select("id", { count: "exact", head: true }).in("status", ["em_rota", "iniciada"]),
+    supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
+    supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
+    supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
+    supabase.from("ibac_eventos_queue").select("status"),
+    supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
+  ]);
+
+  const alertasPorTipo: Record<string, number> = {};
+  (alertasRes.data ?? []).forEach((a: { tipo: string }) => {
+    alertasPorTipo[a.tipo] = (alertasPorTipo[a.tipo] ?? 0) + 1;
+  });
+
+  const ibacStatuses = ibacQueueRes.data ?? [];
+  const ibacPendentes = ibacStatuses.filter((r: { status: string }) => r.status === "pendente").length;
+  const ibacErros = ibacStatuses.filter((r: { status: string }) => r.status === "erro").length;
+
+  const ibacLog = ibacLog24hRes.data ?? [];
+  const ibacSucesso24h = ibacLog.filter((r: { sucesso: boolean }) => r.sucesso).length;
+  const ibacTotal24h = ibacLog.length;
+
+  const agendamentos = agendHojeStatusRes.data ?? [];
+
+  return {
+    cargasAbertas: cargasAbertasRes.count ?? 0,
+    nfsHoje: nfsHojeRes.count ?? 0,
+    aguardandoConferencia: aguardandoConfRes.count ?? 0,
+    entreguesHoje: entreguesHojeRes.count ?? 0,
+    ocorrenciasHoje: ocorrenciasHojeRes.count ?? 0,
+    baixasHoje: baixasHojeRes.count ?? 0,
+    rotasAtivas: rotasAtivasRes.count ?? 0,
+    paradasPendentes: paradasPendRes.count ?? 0,
+    agendHoje: agendamentos.length,
+    agendConfirmados: agendamentos.filter((a: { status: string }) => a.status === "confirmado" || a.status === "agendado").length,
+    alertasTotal: (alertasRes.data ?? []).length,
+    alertasPorTipo,
+    ibacPendentes,
+    ibacErros,
+    ibacSucesso24h,
+    ibacTotal24h,
+  };
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({
-    cargasAbertas: 0,
-    cargasFechadas: 0,
-    totalNfs: 0,
-    etiquetasPendentes: 0,
-    etiquetasConferidasInterno: 0,
-    etiquetasConferidas: 0,
-    etiquetasDivergencia: 0,
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: loadDashboard,
+    refetchInterval: REFRESH_MS,
   });
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  async function loadStats() {
-    try {
-      const [cargasRes, nfsRes, etPendente, etConfInterno, etConferido, etDivergencia] = await Promise.all([
-        supabase.from("cargas").select("status"),
-        supabase.from("notas_fiscais").select("id", { count: "exact", head: true }),
-        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "conferido_interno"),
-        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "conferido"),
-        supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "divergencia"),
-      ]);
-
-      const cargas = cargasRes.data || [];
-
-      setStats({
-        cargasAbertas: cargas.filter((c) => c.status === "aberta").length,
-        cargasFechadas: cargas.filter((c) => c.status === "fechada").length,
-        totalNfs: nfsRes.count || 0,
-        etiquetasPendentes: etPendente.count || 0,
-        etiquetasConferidasInterno: etConfInterno.count || 0,
-        etiquetasConferidas: etConferido.count || 0,
-        etiquetasDivergencia: etDivergencia.count || 0,
-      });
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const totalEtiquetas =
-    stats.etiquetasPendentes + stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
-  const totalConferidas = stats.etiquetasConferidasInterno + stats.etiquetasConferidas;
-  const progressPercent =
-    totalEtiquetas > 0
-      ? Math.round((totalConferidas / totalEtiquetas) * 100)
-      : 0;
+  const d = data;
+  const totalPlanejadoHoje = (d?.entreguesHoje ?? 0) + (d?.ocorrenciasHoje ?? 0);
 
   return (
     <MainLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Visão geral do sistema de recebimento
-          </p>
+          <h1 className="text-2xl font-bold">Torre operacional</h1>
+          <p className="text-muted-foreground">Visão consolidada do dia — atualiza a cada minuto</p>
         </div>
 
-        {/* Stats Grid */}
+        {/* Banner de saúde */}
+        <HealthBanner
+          items={[
+            { label: "alertas não lidos na Torre", count: d?.alertasTotal ?? 0, to: "/torre-controle" },
+            { label: "eventos IBAC com erro", count: d?.ibacErros ?? 0, to: "/integracoes/ibac" },
+          ]}
+        />
+
+        {/* KPIs do dia */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Cargas Abertas
-              </CardTitle>
-              <Truck className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.cargasAbertas}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.cargasFechadas} fechadas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Notas Fiscais
-              </CardTitle>
-              <FileText className="h-5 w-5 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.totalNfs}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total importadas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Etiquetas Pendentes
-              </CardTitle>
-              <Clock className="h-5 w-5 text-pending" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.etiquetasPendentes}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Aguardando conferência
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Conferidas (Total)
-              </CardTitle>
-              <CheckCircle2 className="h-5 w-5 text-success" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{totalConferidas}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.etiquetasConferidasInterno} interna · {stats.etiquetasConferidas} externa
-                {stats.etiquetasDivergencia > 0 && ` · ${stats.etiquetasDivergencia} diverg.`}
-              </p>
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="Entregas de hoje"
+            value={`${d?.entreguesHoje ?? 0}${totalPlanejadoHoje > 0 ? ` / ${totalPlanejadoHoje}` : ""}`}
+            subtitle={`${d?.ocorrenciasHoje ?? 0} ocorrências · ${d?.baixasHoje ?? 0} baixas registradas`}
+            icon={CheckCircle2}
+            to="/torre-controle"
+            tone="success"
+            loading={isLoading}
+          />
+          <KpiCard
+            title="Rotas em campo"
+            value={d?.rotasAtivas ?? 0}
+            subtitle={`${d?.paradasPendentes ?? 0} paradas pendentes`}
+            icon={Truck}
+            to="/monitoramento-rotas"
+            tone="info"
+            loading={isLoading}
+          />
+          <KpiCard
+            title="Agendamentos hoje"
+            value={d?.agendHoje ?? 0}
+            subtitle={`${d?.agendConfirmados ?? 0} confirmados`}
+            icon={CalendarClock}
+            to="/agendamento"
+            loading={isLoading}
+          />
+          <KpiCard
+            title="NFs recebidas hoje"
+            value={d?.nfsHoje ?? 0}
+            subtitle={`${d?.cargasAbertas ?? 0} cargas abertas em preparação`}
+            icon={FileText}
+            to="/cargas"
+            loading={isLoading}
+          />
         </div>
 
-        {/* Progress Card */}
-        {totalEtiquetas > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Progresso de Conferência
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {totalConferidas} de {totalEtiquetas} etiquetas
-                  </span>
-                  <span className="font-medium">{progressPercent}%</span>
-                </div>
-                <div className="h-3 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-success transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Funil */}
+        <FunilOperacional
+          recebidas={d?.nfsHoje ?? 0}
+          aguardandoConferencia={d?.aguardandoConferencia ?? 0}
+          emRota={d?.paradasPendentes ?? 0}
+          entreguesHoje={d?.entreguesHoje ?? 0}
+          loading={isLoading}
+        />
 
-        {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold mb-1">Nova Carga</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Criar nova carga e importar XMLs
-                  </p>
-                </div>
-                <Link to="/cargas">
-                  <Button size="sm">
-                    Criar
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold mb-1">Gerar Etiquetas</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Criar PDF de etiquetas para impressão
-                  </p>
-                </div>
-                <Link to="/etiquetas">
-                  <Button size="sm" variant="secondary">
-                    Gerar
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold mb-1">Conferência</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Ler QR codes e conferir etiquetas
-                  </p>
-                </div>
-                <Link to="/conferencia">
-                  <Button size="sm" variant="secondary">
-                    Iniciar
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Torre + IBAC */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <AlertasResumo
+            total={d?.alertasTotal ?? 0}
+            porTipo={d?.alertasPorTipo ?? {}}
+            loading={isLoading}
+          />
+          <IbacResumo
+            pendentes={d?.ibacPendentes ?? 0}
+            erros={d?.ibacErros ?? 0}
+            sucesso24h={d?.ibacSucesso24h ?? 0}
+            total24h={d?.ibacTotal24h ?? 0}
+            loading={isLoading}
+          />
         </div>
+
+        {/* Ações rápidas */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold">Ações rápidas</h3>
+            </div>
+            <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              <QuickAction to="/cargas" icon={Plus} label="Nova carga" />
+              <QuickAction to="/roteirizacao" icon={Map} label="Roteirizar" />
+              <QuickAction to="/torre-controle" icon={Radar} label="Torre" />
+              <QuickAction to="/relatorios/pendentes-baixa" icon={FileBarChart} label="Pendentes baixa" />
+              <QuickAction to="/integracoes/ibac" icon={Radio} label="IBAC" />
+              <QuickAction to="/destinatarios" icon={Users} label="Cadastros" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </MainLayout>
+  );
+}
+
+function QuickAction({ to, icon: Icon, label }: { to: string; icon: typeof Plus; label: string }) {
+  return (
+    <Link to={to}>
+      <Button variant="outline" size="sm" className="w-full justify-between h-auto py-2">
+        <span className="flex items-center gap-2">
+          <Icon className="h-4 w-4" />
+          <span className="text-xs">{label}</span>
+        </span>
+        <ArrowRight className="h-3 w-3 opacity-60" />
+      </Button>
+    </Link>
   );
 }

@@ -1,98 +1,83 @@
-# Plano de Implementação — Torre de Controle Unificada
+## Diagnóstico
 
-Baseado nas suas 4 respostas:
-1. Criar rotas na Torre **automaticamente**.
-2. Liberar **todos os veículos** da roteirização do dia (o que não sair some junto com a roteirização).
-3. **Substituir** a Torre atual (`/torre-controle`).
-4. **Opção B** — juntar tudo em uma tela (Torre + detalhe da rota).
+O Dashboard atual foi feito quando o sistema era só recebimento de XML + etiquetas. Hoje o Orkestria é um TMS/3PL completo com Roteirização, Torre de Controle, GPS, Baixas com POD, Agendamento, IBAC, Prefatura e Cadastros mestres. As 4 métricas atuais (Cargas Abertas, NFs, Etiquetas Pendentes, Conferidas) não refletem o que um operador/gestor precisa ver ao abrir o sistema.
 
-Nada muda em Cargas, Preparação, Roteirização, Baixa, Conferência, IBAC, ERP.
+## Princípios de design
 
----
+- **Foco em "o que exige ação agora"** (alertas, filas presas, entregas do dia) em vez de contadores históricos.
+- **Estrutura por macrofase do fluxo**, espelhando a operação real: Recebimento → Preparação → Rota → Entrega → Integração.
+- **Hoje vs. Estoque**: separa métricas do dia (fluxo) das métricas acumuladas (estoque de trabalho).
+- **Drill-down**: cada card leva à tela operacional correspondente.
 
-## 1. Backend (mínimo necessário)
+## Nova estrutura
 
-### 1.1 Novo status `aguardando`
-Migration:
-- `ALTER TYPE` do enum de `monitoramento_rotas.status` adicionando `aguardando`.
-- Valor só aparece para rotas provisionadas que ainda não receberam ping GPS.
-- Não dispara alerta, não conta como "sem sinal", não vira "atraso".
+### 1. Faixa de saúde do sistema (topo, condicional)
+Só aparece quando há problema. Banner âmbar/vermelho com:
+- Alertas de monitoramento não lidos (`alertas_monitoramento.lido = false`)
+- IBAC fila com erro (`ibac_eventos_queue.status = 'erro'`)
+- Baixas com validação IA reprovada últimas 24h
 
-### 1.2 Provisionamento automático
-Trigger em `roteirizacao_paradas` (AFTER INSERT/UPDATE):
-- Quando um veículo tem paradas confirmadas para uma data, cria 1 linha em `monitoramento_rotas` com `status='aguardando'`, copiando placa, motorista, paradas e ordem — **idempotente** (checa se já existe rota para `veiculo_id + data`).
-- Ao chegar o primeiro `posicoes_gps` da placa → trigger promove `aguardando → ativa`.
-- Se a roteirização for desfeita/veículo removido → rota `aguardando` correspondente é apagada (não afeta `ativa`/`finalizada`).
+### 2. Operação do dia (4 cards principais)
+Substitui a grade atual:
 
-### 1.3 RPC de fallback manual
-`provisionar_torre_dia(data)` — 1 transação que roda o mesmo provisionamento em lote, caso o trigger falhe ou o operador queira forçar.
+| Card | Métrica principal | Subtexto | Link |
+|---|---|---|---|
+| **Entregas de hoje** | Entregues / Total planejado (baixas_entrega + monitoramento_paradas hoje) | X ocorrências | `/torre-controle` |
+| **Rotas em campo** | Rotas ativas | Y paradas pendentes · Z veículos | `/monitoramento` |
+| **Agendamentos hoje** | agendamentos data=hoje | Confirmados vs. pendentes | `/agendamento` |
+| **NFs recebidas hoje** | notas_fiscais created_at=hoje | + cargas abertas em preparação | `/cargas` |
 
----
+### 3. Funil operacional (card único horizontal)
+Barra de progresso segmentada mostrando onde estão as NFs do dia:
+`Recebida → Conferida → Em rota → Entregue`
+Com contagem em cada etapa. Ajuda a identificar gargalos.
 
-## 2. Frontend — Torre Unificada (`/torre-controle`)
+### 4. Alertas & Integrações (2 cards)
+- **Torre de Controle**: alertas não lidos por tipo (atraso, fora de rota, geofence)
+- **IBAC**: fila pendente + últimos erros + taxa de sucesso 24h
 
-Substitui a tela atual. Layout em 3 zonas fixas:
+### 5. Ações rápidas (grid compacto no rodapé)
+Mantém como está mas expande para 6 atalhos alinhados aos perfis:
+Nova Carga · Roteirizar · Torre · Baixas Pendentes · Relatório do Dia · Cadastros
+
+## Escopo técnico
+
+- Reescrever `src/pages/Dashboard.tsx` mantendo `MainLayout`.
+- Criar um único RPC ou 1 query paralela consolidada (`Promise.all`) para buscar todas as métricas em uma passada — evita 8+ round-trips.
+- Auto-refresh a cada 60s via `useQuery` com `refetchInterval` (trocar `useEffect` por React Query, já usado no resto do app).
+- Componentes reutilizáveis novos em `src/components/dashboard/`: `KpiCard`, `HealthBanner`, `FunilOperacional`, `AlertasResumo`, `IbacResumo`.
+- Sem mudanças de schema, sem novas edge functions.
+- Respeitar tokens semânticos (`text-success`, `text-destructive`, `bg-warning/10`, etc.) — nada hardcoded.
+- Mobile continua sendo redirecionado pelo `MobileRedirect` (não afeta motorista).
+
+## Fora de escopo
+
+- Gráficos históricos (linha do tempo de entregas dos últimos 7 dias) — proposta para v2 se o gestor pedir análise.
+- Personalização por usuário/perfil.
+- Widgets de prefatura/financeiro — merecem tela própria.
+
+## Prévia visual (ASCII)
 
 ```text
-┌─ KPIs: Aguardando | Em rota | Sem sinal | Atrasadas | Alertas ─┐
-├─ Filtros: [Todos][Aguardando][Em rota][Sem sinal][Alertas] 🔍 ─┤
-├─ Mapa (65%) ─────────────────┬─ Painel lateral (35%) ─────────┤
-│  Todos os veículos do dia    │ SEM seleção:                   │
-│  Ícone colorido por status   │  Lista compacta (placa/status/ │
-│  Badge de alertas            │  progresso/alertas)            │
-│  Cluster >20                 │ COM seleção (Opção B):         │
-│  Clique → seleciona          │  Tabs: Paradas | Alertas |     │
-│                              │        Auditoria | Ações       │
-│                              │  Reaproveita componentes já    │
-│                              │  existentes de /monitoramento- │
-│                              │  rotas (ParadasTable,          │
-│                              │  AlertasPanel, RotaDetail-     │
-│                              │  Header, AuditoriaPercurso)    │
-└──────────────────────────────┴────────────────────────────────┘
+┌─ [banner vermelho só se algo pegando fogo] ────────────────┐
+
+┌─ Entregas hoje ─┬─ Rotas em campo ─┬─ Agendam. hoje ─┬─ NFs hoje ─┐
+│  42/60          │  8 ativas         │  60             │  0        │
+│  3 ocorrências  │  12 paradas pend. │  55 confirm.    │  325 abt. │
+└─────────────────┴───────────────────┴─────────────────┴───────────┘
+
+┌─ Funil do dia ──────────────────────────────────────────────┐
+│  Recebida ▓▓▓▓▓ 120  →  Conferida ▓▓▓ 80  →  Rota ▓▓ 60    │
+│  →  Entregue ▓ 42                                            │
+└──────────────────────────────────────────────────────────────┘
+
+┌─ Alertas Torre ────────┬─ IBAC ────────────────────┐
+│  585 não lidos          │  Fila: 0  Erros: 0        │
+│  • atraso: 320          │  Sucesso 24h: 98%         │
+│  • geofence: 180        │                            │
+└─────────────────────────┴────────────────────────────┘
+
+┌─ Ações: Nova Carga · Roteirizar · Torre · Baixas · Rel · Cad ┐
 ```
 
-- Realtime + auto-refresh 60s (já existe).
-- Seletor de data no topo (já existe).
-- Botão "Provisionar dia" (fallback) — chama a RPC.
-- `/monitoramento-rotas` é **removido do menu** mas mantido acessível por link direto por 1-2 semanas para rollback rápido, depois deletado.
-
----
-
-## 3. Performance (Opção B exige cuidado)
-
-Para o painel lateral não travar quando o operador clicar em placas rápido:
-- Componentes das abas são **lazy** (`React.lazy`) — só carregam quando a aba é aberta.
-- Dados da rota selecionada em query separada com `staleTime: 30s`.
-- Mapa não re-renderiza ao trocar de placa (só destaca o marcador).
-
----
-
-## 4. Ordem de entrega (2 passos)
-
-**Passo 1 — Backend + provisionamento** (1 migration)
-- Adiciona enum `aguardando`, trigger de provisionamento, trigger de promoção por GPS, RPC de fallback.
-- Torre atual continua funcionando: já vai começar a mostrar as rotas `aguardando` automaticamente.
-
-**Passo 2 — Torre unificada** (frontend)
-- Nova UI substitui `TorreControle.tsx`.
-- Painel lateral com abas reaproveita componentes de `MonitoramentoRotas.tsx`.
-- Remove link do menu para `/monitoramento-rotas`.
-
----
-
-## 5. Riscos e mitigações
-- **Enum novo**: só adiciona valor, código atual não quebra.
-- **Trigger idempotente**: reexecuções não duplicam rotas.
-- **Rollback rápido**: `/monitoramento-rotas` fica acessível 1-2 semanas.
-- **Não toca em**: Cargas (status manual), Roteirização, Preparação, Baixa, IBAC, Praxio.
-
----
-
-## 6. Detalhes técnicos (para referência)
-- Enum: `ALTER TYPE monitoramento_status_enum ADD VALUE 'aguardando';`
-- Trigger `provisionar_rota_torre()` em `roteirizacao_paradas` verificando `EXISTS` antes do INSERT.
-- Trigger `promover_rota_ativa()` em `posicoes_gps` (`UPDATE ... WHERE status='aguardando'`).
-- Painel lateral: `<Tabs>` do shadcn com `TabsContent` envolvendo `<Suspense>` + `React.lazy`.
-- Marcador destacado: prop `selectedRotaId` no `<MapaGeral>` — troca `iconSize` e adiciona borda no ícone selecionado.
-
-Confirma este plano para eu começar pelo Passo 1 (backend + provisionamento)?
+Ao aprovar, implemento direto. Sem migrações, sem quebrar rotas existentes.
