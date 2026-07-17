@@ -119,20 +119,17 @@ async function loadDashboard() {
   let nfsEmRota = 0;
 
   if (nfIds.length > 0) {
-
-    if (nfIds.length > 0) {
-      // Chunk in batches of 500 to avoid URL limits
-      const chunks: string[][] = [];
-      for (let i = 0; i < nfIds.length; i += 500) chunks.push(nfIds.slice(i, i + 500));
-      const statusRows: { status_entrega: string | null }[] = [];
-      for (const c of chunks) {
-        const r = await supabase.from("notas_fiscais").select("status_entrega").in("id", c);
-        statusRows.push(...((r.data ?? []) as { status_entrega: string | null }[]));
-      }
-      nfsEntregues = statusRows.filter((r) => r.status_entrega === "ENTREGUE").length;
-      nfsOcorrencias = statusRows.filter((r) => r.status_entrega === "RECUSADO").length;
-      nfsEmRota = statusRows.filter((r) => r.status_entrega === "NF EM ROTA").length;
+    // Chunk in batches of 500 to avoid URL limits
+    const chunks: string[][] = [];
+    for (let i = 0; i < nfIds.length; i += 500) chunks.push(nfIds.slice(i, i + 500));
+    const statusRows: { status_entrega: string | null }[] = [];
+    for (const c of chunks) {
+      const r = await supabase.from("notas_fiscais").select("status_entrega").in("id", c);
+      statusRows.push(...((r.data ?? []) as { status_entrega: string | null }[]));
     }
+    nfsEntregues = statusRows.filter((r) => r.status_entrega === "ENTREGUE").length;
+    nfsOcorrencias = statusRows.filter((r) => r.status_entrega === "RECUSADO").length;
+    nfsEmRota = statusRows.filter((r) => r.status_entrega === "NF EM ROTA").length;
   }
 
   return {
