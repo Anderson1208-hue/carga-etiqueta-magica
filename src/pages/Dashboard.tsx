@@ -35,10 +35,10 @@ async function loadDashboard() {
   const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
   const ontem24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  // Base da roteirização = sessões criadas ontem (planejamento para operar hoje)
-  const ontemDate = new Date(hoje.getTime() - 86400000);
-  const inicioOntemIso = ontemDate.toISOString();
-  const fimOntemIso = new Date(ontemDate.getTime() + 86400000).toISOString();
+  // Base da roteirização = sessões criadas hoje (dia a dia)
+  const inicioDiaIso = inicioHojeIso;
+  const fimDiaIso = new Date(hoje.getTime() + 86400000).toISOString();
+
 
   const [
     cargasAbertasRes,
