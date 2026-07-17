@@ -96,6 +96,8 @@ async function loadDashboard() {
     ibacErros,
     ibacSucesso24h,
     ibacTotal24h,
+    veiculosEmRota: veiculosEmRotaRes.count ?? 0,
+    nfsEmRota: nfsEmRotaRes.count ?? 0,
   };
 }
 
