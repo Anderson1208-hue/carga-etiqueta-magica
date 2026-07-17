@@ -45,6 +45,8 @@ async function loadDashboard() {
     alertasRes,
     ibacQueueRes,
     ibacLog24hRes,
+    veiculosEmRotaRes,
+    nfsEmRotaRes,
   ] = await Promise.all([
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
@@ -60,8 +62,7 @@ async function loadDashboard() {
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
     supabase.from("veiculos").select("id", { count: "exact", head: true }).eq("status", "em_rota"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).eq("status_entrega", "NF EM ROTA"),
-  ] as const);
-  const [veiculosEmRotaRes, nfsEmRotaRes] = [arguments, arguments]; // placeholder
+  ]);
 
   const alertasPorTipo: Record<string, number> = {};
   (alertasRes.data ?? []).forEach((a: { tipo: string }) => {
