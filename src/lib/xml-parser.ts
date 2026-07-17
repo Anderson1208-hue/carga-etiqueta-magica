@@ -339,6 +339,22 @@ function isPandurataXml(
   return textos.some((texto) => /pandur(?:ata)?/i.test(texto));
 }
 
+function isIbacXml(
+  xmlDoc: Document,
+  emitente: string,
+  getElementsByNames: (root: ParentNode, names: string[]) => Element[]
+): boolean {
+  const textos = [emitente];
+  getElementsByNames(xmlDoc, ["marca", "xmarca", "xnome", "xfant"]).forEach((node) => {
+    if (node.textContent) textos.push(node.textContent);
+  });
+  // Bate por razão social / marca "IBAC" ou pela raiz do CNPJ 61.472.205
+  const emit = xmlDoc.querySelector("emit");
+  const cnpj = emit?.querySelector("CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
+  if (cnpj.startsWith("61472205")) return true;
+  return textos.some((t) => /\bibac\b/i.test(t));
+}
+
 /**
  * Parses a cubic-meter value from free text. Handles BR/EN decimal separators
  * and patterns like "CUBAGEM: 0,025", "0.5 M3", "VOL CUBICO 1,2M³".
