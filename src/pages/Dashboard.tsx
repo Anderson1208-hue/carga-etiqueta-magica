@@ -30,6 +30,7 @@ async function loadDashboard() {
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   const inicioHojeIso = hoje.toISOString();
+  const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
   const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const [
@@ -39,14 +40,12 @@ async function loadDashboard() {
     entreguesHojeRes,
     ocorrenciasHojeRes,
     baixasHojeRes,
-    rotasAtivasRes,
+    rotasHojeRes,
     paradasPendRes,
     agendHojeStatusRes,
     alertasRes,
     ibacQueueRes,
     ibacLog24hRes,
-    veiculosEmRotaRes,
-    nfsEmRotaRes,
   ] = await Promise.all([
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
@@ -54,14 +53,12 @@ async function loadDashboard() {
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).eq("status", "entregue").gte("registrado_em", inicioHojeIso),
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).neq("status", "entregue").gte("registrado_em", inicioHojeIso),
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).gte("registrado_em", inicioHojeIso),
-    supabase.from("monitoramento_rotas").select("id", { count: "exact", head: true }).in("status", ["ativa", "em_rota", "iniciada"]),
+    supabase.from("monitoramento_rotas").select("id, veiculo_id, status, total_paradas, paradas_concluidas").eq("data", hojeStr),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
-    supabase.from("monitoramento_rotas").select("veiculo_id").in("status", ["ativa", "em_rota", "iniciada"]),
-    supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).eq("status_entrega", "NF EM ROTA"),
   ]);
 
   const alertasPorTipo: Record<string, number> = {};
@@ -79,6 +76,20 @@ async function loadDashboard() {
 
   const agendamentos = agendHojeStatusRes.data ?? [];
 
+  const rotasHoje = (rotasHojeRes.data ?? []) as Array<{
+    id: string;
+    veiculo_id: string | null;
+    status: string;
+    total_paradas: number | null;
+    paradas_concluidas: number | null;
+  }>;
+  const rotasAtivasArr = rotasHoje.filter((r) => r.status === "ativa" || r.status === "em_rota");
+  const veiculosEmRota = new Set(rotasAtivasArr.map((r) => r.veiculo_id).filter(Boolean)).size;
+  const paradasTotalRota = rotasAtivasArr.reduce((s, r) => s + (r.total_paradas ?? 0), 0);
+  const paradasFeitasRota = rotasAtivasArr.reduce((s, r) => s + (r.paradas_concluidas ?? 0), 0);
+  const paradasRestantesRota = Math.max(0, paradasTotalRota - paradasFeitasRota);
+  const rotasTotalHoje = rotasHoje.length;
+
   return {
     cargasAbertas: cargasAbertasRes.count ?? 0,
     nfsHoje: nfsHojeRes.count ?? 0,
@@ -86,7 +97,8 @@ async function loadDashboard() {
     entreguesHoje: entreguesHojeRes.count ?? 0,
     ocorrenciasHoje: ocorrenciasHojeRes.count ?? 0,
     baixasHoje: baixasHojeRes.count ?? 0,
-    rotasAtivas: rotasAtivasRes.count ?? 0,
+    rotasAtivas: rotasAtivasArr.length,
+    rotasTotalHoje,
     paradasPendentes: paradasPendRes.count ?? 0,
     agendHoje: agendamentos.length,
     agendConfirmados: agendamentos.filter((a: { status: string }) => a.status === "confirmado" || a.status === "agendado").length,
@@ -96,8 +108,9 @@ async function loadDashboard() {
     ibacErros,
     ibacSucesso24h,
     ibacTotal24h,
-    veiculosEmRota: new Set((veiculosEmRotaRes.data ?? []).map((r: { veiculo_id: string | null }) => r.veiculo_id).filter(Boolean)).size,
-    nfsEmRota: nfsEmRotaRes.count ?? 0,
+    veiculosEmRota,
+    paradasTotalRota,
+    paradasRestantesRota,
   };
 }
 
