@@ -257,6 +257,7 @@ export default function PrestacaoContas() {
 
       if (error) throw error;
       setBaixas((data as unknown as BaixaItem[]) || []);
+      setSelecionadas(new Set());
     } catch (err: any) {
       toast({ title: "Erro ao carregar baixas", description: err?.message, variant: "destructive" });
     } finally {
