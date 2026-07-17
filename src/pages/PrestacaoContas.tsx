@@ -844,6 +844,36 @@ export default function PrestacaoContas() {
                     </CardContent>
                   </Card>
 
+                  {!veiculoSel.prestacao_contas_em && stats.aConferir > 0 && (
+                    <Card className="border-primary/40 bg-primary/5">
+                      <CardContent className="py-3 flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-sm">
+                          <span className="font-semibold">{selecionadas.size}</span> selecionada(s) de {stats.aConferir} a conferir
+                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={selecionadas.size === 0 || conferindoLote}
+                            onClick={() => conferirEmLote(Array.from(selecionadas))}
+                          >
+                            {conferindoLote ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                            Conferir selecionadas
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={conferindoLote}
+                            onClick={() => conferirEmLote(baixas.filter((b) => !b.conferencia_status).map((b) => b.id))}
+                          >
+                            {conferindoLote ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                            Conferir todas ({stats.aConferir})
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+
                   {!veiculoSel.prestacao_contas_em && (
                     <Card>
                       <CardContent className="pt-6 space-y-3">
