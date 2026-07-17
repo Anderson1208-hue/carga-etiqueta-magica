@@ -33,13 +33,18 @@ async function loadDashboard() {
   hoje.setHours(0, 0, 0, 0);
   const inicioHojeIso = hoje.toISOString();
   const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
-  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const ontem24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Base da roteirização = sessões criadas ontem (planejamento para operar hoje)
+  const ontemDate = new Date(hoje.getTime() - 86400000);
+  const inicioOntemIso = ontemDate.toISOString();
+  const fimOntemIso = new Date(ontemDate.getTime() + 86400000).toISOString();
 
   const [
     cargasAbertasRes,
     nfsHojeRes,
     aguardandoConfRes,
-    rotasHojeRes,
+    roteirizacoesRes,
     paradasPendRes,
     agendHojeStatusRes,
     alertasRes,
@@ -49,12 +54,12 @@ async function loadDashboard() {
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
     supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-    supabase.from("monitoramento_rotas").select("id, veiculo_id, status, total_paradas, paradas_concluidas").eq("data", hojeStr),
+    supabase.from("roteirizacoes").select("id, carga_id").gte("created_at", inicioOntemIso).lt("created_at", fimOntemIso),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
-    supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
+    supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem24h),
   ]);
 
   const alertasPorTipo: Record<string, number> = {};
