@@ -288,6 +288,28 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Ações rápidas */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold">Ações rápidas</h3>
+            </div>
+            <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+              <QuickAction to="/cargas" icon={Plus} label="Nova carga" />
+              <QuickAction to="/roteirizacao" icon={Map} label="Roteirizar" />
+              <QuickAction to="/torre-controle" icon={Radar} label="Torre" />
+              <QuickAction to="/relatorios/pendentes-baixa" icon={FileBarChart} label="Pendentes baixa" />
+              <QuickAction to="/integracoes/ibac" icon={Radio} label="IBAC" />
+              <QuickAction to="/destinatarios" icon={Users} label="Cadastros" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </MainLayout>
+  );
+}
+
+
 function QuickAction({ to, icon: Icon, label }: { to: string; icon: typeof Plus; label: string }) {
   return (
     <Link to={to}>
