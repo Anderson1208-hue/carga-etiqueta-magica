@@ -95,11 +95,12 @@ export function RecebidosPorDia() {
                 <th className="text-right font-medium py-2">Caixas</th>
                 <th className="text-right font-medium py-2">Peso (kg)</th>
                 <th className="text-right font-medium py-2">m³</th>
+                <th className="text-right font-medium py-2">Peso cubado (kg)</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Carregando…</td></tr>
+                <tr><td colSpan={7} className="py-4 text-center text-muted-foreground">Carregando…</td></tr>
               )}
               {!isLoading && (data ?? []).map((r) => (
                 <tr key={r.data} className="border-b last:border-0 hover:bg-muted/40">
@@ -109,6 +110,8 @@ export function RecebidosPorDia() {
                   <td className="py-2 text-right tabular-nums">{nf0.format(r.caixas)}</td>
                   <td className="py-2 text-right tabular-nums">{nf2.format(r.peso)}</td>
                   <td className="py-2 text-right tabular-nums">{nf2.format(r.m3)}</td>
+                  <td className="py-2 text-right tabular-nums">{nf2.format(r.m3 * 300)}</td>
+
                 </tr>
               ))}
             </tbody>
@@ -121,6 +124,8 @@ export function RecebidosPorDia() {
                   <td className="pt-3 text-right tabular-nums">{nf0.format(totais.caixas)}</td>
                   <td className="pt-3 text-right tabular-nums">{nf2.format(totais.peso)}</td>
                   <td className="pt-3 text-right tabular-nums">{nf2.format(totais.m3)}</td>
+                  <td className="pt-3 text-right tabular-nums">{nf2.format(totais.m3 * 300)}</td>
+
                 </tr>
               </tfoot>
             )}
