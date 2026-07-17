@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
   TooltipContent,
@@ -114,6 +115,8 @@ export default function PrestacaoContas() {
   const [obsEncerramento, setObsEncerramento] = useState("");
   const [encerrando, setEncerrando] = useState(false);
   const [pernoitando, setPernoitando] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [conferindoLote, setConferindoLote] = useState(false);
 
   async function marcarPernoite() {
     if (!veiculoSel) return;
@@ -254,6 +257,7 @@ export default function PrestacaoContas() {
 
       if (error) throw error;
       setBaixas((data as unknown as BaixaItem[]) || []);
+      setSelecionadas(new Set());
     } catch (err: any) {
       toast({ title: "Erro ao carregar baixas", description: err?.message, variant: "destructive" });
     } finally {
@@ -290,6 +294,50 @@ export default function PrestacaoContas() {
     
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
+
+  async function conferirEmLote(ids: string[]) {
+    if (ids.length === 0) return;
+    setConferindoLote(true);
+    try {
+      const { error } = await supabase
+        .from("baixas_entrega")
+        .update({
+          conferido_em: new Date().toISOString(),
+          conferido_por: user?.id,
+          conferencia_status: "ok",
+          conferencia_motivo: null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+      toast({ title: `${ids.length} baixa(s) conferida(s)` });
+      setSelecionadas(new Set());
+      if (veiculoSel) await carregarBaixas(veiculoSel);
+    } catch (err: any) {
+      toast({ title: "Erro ao conferir em lote", description: err?.message, variant: "destructive" });
+    } finally {
+      setConferindoLote(false);
+    }
+  }
+
+  function toggleSelecionada(id: string) {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelecionarTodasAConferir() {
+    const aConferirIds = baixas.filter((b) => !b.conferencia_status).map((b) => b.id);
+    const todasSelecionadas = aConferirIds.length > 0 && aConferirIds.every((id) => selecionadas.has(id));
+    if (todasSelecionadas) {
+      setSelecionadas(new Set());
+    } else {
+      setSelecionadas(new Set(aConferirIds));
+    }
+  }
+
 
   async function salvarPendencia() {
     if (!pendDialog) return;
@@ -598,6 +646,20 @@ export default function PrestacaoContas() {
                         <Table className="text-xs">
                           <TableHeader>
                             <TableRow className="[&>*]:py-1.5 [&>*]:px-2">
+                              <TableHead className="w-8">
+                                {(() => {
+                                  const aConferirIds = baixas.filter((b) => !b.conferencia_status).map((b) => b.id);
+                                  const allChecked = aConferirIds.length > 0 && aConferirIds.every((id) => selecionadas.has(id));
+                                  return (
+                                    <Checkbox
+                                      checked={allChecked}
+                                      disabled={!!veiculoSel?.prestacao_contas_em || aConferirIds.length === 0}
+                                      onCheckedChange={toggleSelecionarTodasAConferir}
+                                      aria-label="Selecionar todas a conferir"
+                                    />
+                                  );
+                                })()}
+                              </TableHead>
                               <TableHead className="w-12">NF</TableHead>
                               <TableHead>Cliente</TableHead>
                               <TableHead>Ocorr.</TableHead>
@@ -612,8 +674,17 @@ export default function PrestacaoContas() {
                           <TableBody>
                             {baixas.map((b) => {
                               const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
+                              const jaConferida = !!b.conferencia_status;
                               return (
                                 <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selecionadas.has(b.id)}
+                                      disabled={jaConferida || !!veiculoSel?.prestacao_contas_em}
+                                      onCheckedChange={() => toggleSelecionada(b.id)}
+                                      aria-label={`Selecionar NF ${b.nf?.numero_nf || ""}`}
+                                    />
+                                  </TableCell>
                                   <TableCell className="font-mono text-[11px] whitespace-nowrap">{b.nf?.numero_nf || "—"}</TableCell>
                                   <TableCell className="max-w-[160px]">
                                     <p className="truncate font-medium text-xs">{b.nf?.dest_razao_social || "—"}</p>
@@ -772,6 +843,36 @@ export default function PrestacaoContas() {
                       )}
                     </CardContent>
                   </Card>
+
+                  {!veiculoSel.prestacao_contas_em && stats.aConferir > 0 && (
+                    <Card className="border-primary/40 bg-primary/5">
+                      <CardContent className="py-3 flex items-center justify-between flex-wrap gap-2">
+                        <p className="text-sm">
+                          <span className="font-semibold">{selecionadas.size}</span> selecionada(s) de {stats.aConferir} a conferir
+                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={selecionadas.size === 0 || conferindoLote}
+                            onClick={() => conferirEmLote(Array.from(selecionadas))}
+                          >
+                            {conferindoLote ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                            Conferir selecionadas
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={conferindoLote}
+                            onClick={() => conferirEmLote(baixas.filter((b) => !b.conferencia_status).map((b) => b.id))}
+                          >
+                            {conferindoLote ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                            Conferir todas ({stats.aConferir})
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
 
                   {!veiculoSel.prestacao_contas_em && (
                     <Card>
