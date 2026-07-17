@@ -115,6 +115,8 @@ export default function PrestacaoContas() {
   const [obsEncerramento, setObsEncerramento] = useState("");
   const [encerrando, setEncerrando] = useState(false);
   const [pernoitando, setPernoitando] = useState(false);
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
+  const [conferindoLote, setConferindoLote] = useState(false);
 
   async function marcarPernoite() {
     if (!veiculoSel) return;
