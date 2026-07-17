@@ -139,11 +139,20 @@ export default function Dashboard() {
             loading={isLoading}
           />
           <KpiCard
-            title="Rotas em campo"
-            value={d?.rotasAtivas ?? 0}
-            subtitle={`${d?.paradasPendentes ?? 0} paradas pendentes`}
+            title="Veículos em rota"
+            value={d?.veiculosEmRota ?? 0}
+            subtitle={`${d?.rotasAtivas ?? 0} rotas ativas · ${d?.paradasPendentes ?? 0} paradas pendentes`}
             icon={Truck}
             to="/monitoramento-rotas"
+            tone="info"
+            loading={isLoading}
+          />
+          <KpiCard
+            title="Entregas em rota"
+            value={d?.nfsEmRota ?? 0}
+            subtitle="NFs a caminho do cliente"
+            icon={Radar}
+            to="/torre-controle"
             tone="info"
             loading={isLoading}
           />
