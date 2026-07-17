@@ -58,7 +58,10 @@ async function loadDashboard() {
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
-  ]);
+    supabase.from("veiculos").select("id", { count: "exact", head: true }).eq("status", "em_rota"),
+    supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).eq("status_entrega", "NF EM ROTA"),
+  ] as const);
+  const [veiculosEmRotaRes, nfsEmRotaRes] = [arguments, arguments]; // placeholder
 
   const alertasPorTipo: Record<string, number> = {};
   (alertasRes.data ?? []).forEach((a: { tipo: string }) => {
