@@ -220,11 +220,14 @@ Deno.serve(async (req) => {
     // Rota de monitoramento ativa (para o APK iniciar GPS em segundo plano).
     // Primeiro tenta pelo veículo exato; se não encontrar, cai para a placa.
     // Isso cobre placas com múltiplos cadastros/códigos gerados em dias diferentes.
+    // Aceita 'ativa' OU 'aguardando' — Torre pré-provisiona rotas em 'aguardando'
+    // e o primeiro ping GPS promove para 'ativa'. Se filtrarmos só 'ativa', o
+    // APK recebe monitoramento_rota_id=null e nunca começa a enviar GPS.
     const { data: rotaAtivaPorVeiculo } = await supabase
       .from("monitoramento_rotas")
       .select("id")
       .eq("veiculo_id", veiculo.id)
-      .eq("status", "ativa")
+      .in("status", ["ativa", "aguardando"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -235,7 +238,7 @@ Deno.serve(async (req) => {
         .from("monitoramento_rotas")
         .select("id")
         .eq("placa", veiculo.placa)
-        .eq("status", "ativa")
+        .in("status", ["ativa", "aguardando"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
