@@ -45,6 +45,8 @@ async function loadDashboard() {
     alertasRes,
     ibacQueueRes,
     ibacLog24hRes,
+    veiculosEmRotaRes,
+    nfsEmRotaRes,
   ] = await Promise.all([
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
@@ -58,6 +60,8 @@ async function loadDashboard() {
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
+    supabase.from("veiculos").select("id", { count: "exact", head: true }).eq("status", "em_rota"),
+    supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).eq("status_entrega", "NF EM ROTA"),
   ]);
 
   const alertasPorTipo: Record<string, number> = {};
@@ -92,6 +96,8 @@ async function loadDashboard() {
     ibacErros,
     ibacSucesso24h,
     ibacTotal24h,
+    veiculosEmRota: veiculosEmRotaRes.count ?? 0,
+    nfsEmRota: nfsEmRotaRes.count ?? 0,
   };
 }
 
@@ -122,7 +128,7 @@ export default function Dashboard() {
         />
 
         {/* KPIs do dia */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <KpiCard
             title="Entregas de hoje"
             value={`${d?.entreguesHoje ?? 0}${totalPlanejadoHoje > 0 ? ` / ${totalPlanejadoHoje}` : ""}`}
@@ -133,11 +139,20 @@ export default function Dashboard() {
             loading={isLoading}
           />
           <KpiCard
-            title="Rotas em campo"
-            value={d?.rotasAtivas ?? 0}
-            subtitle={`${d?.paradasPendentes ?? 0} paradas pendentes`}
+            title="Veículos em rota"
+            value={d?.veiculosEmRota ?? 0}
+            subtitle={`${d?.rotasAtivas ?? 0} rotas ativas · ${d?.paradasPendentes ?? 0} paradas pendentes`}
             icon={Truck}
             to="/monitoramento-rotas"
+            tone="info"
+            loading={isLoading}
+          />
+          <KpiCard
+            title="Entregas em rota"
+            value={d?.nfsEmRota ?? 0}
+            subtitle="NFs a caminho do cliente"
+            icon={Radar}
+            to="/torre-controle"
             tone="info"
             loading={isLoading}
           />
