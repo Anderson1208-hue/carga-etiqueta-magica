@@ -22,6 +22,7 @@ import { HealthBanner } from "@/components/dashboard/HealthBanner";
 import { FunilOperacional } from "@/components/dashboard/FunilOperacional";
 import { AlertasResumo } from "@/components/dashboard/AlertasResumo";
 import { IbacResumo } from "@/components/dashboard/IbacResumo";
+import { RecebidosPorDia } from "@/components/dashboard/RecebidosPorDia";
 
 const REFRESH_MS = 60_000;
 
@@ -166,6 +167,9 @@ export default function Dashboard() {
           entreguesHoje={d?.entreguesHoje ?? 0}
           loading={isLoading}
         />
+
+        {/* Recebidos por dia */}
+        <RecebidosPorDia />
 
         {/* Torre + IBAC */}
         <div className="grid gap-4 md:grid-cols-2">
