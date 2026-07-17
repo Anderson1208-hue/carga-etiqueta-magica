@@ -137,7 +137,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (rotaAtual?.status !== "ativa") {
+    // Auto-promoção: primeiro ping válido em rota 'aguardando' vira 'ativa'.
+    // Qualquer outro status não-operacional é ignorado.
+    if (rotaAtual?.status === "aguardando") {
+      const primeiroPos = validPositions.find((p) => !p.heartbeat) ?? validPositions[0];
+      await supabase
+        .from("monitoramento_rotas")
+        .update({
+          status: "ativa",
+          horario_saida_cd: primeiroPos.timestamp,
+        })
+        .eq("id", monitoramento_rota_id)
+        .eq("status", "aguardando");
+      rotaAtual.status = "ativa";
+    } else if (rotaAtual?.status !== "ativa") {
       return new Response(JSON.stringify({ status: "ok", events: [], ignored_inactive_route: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
