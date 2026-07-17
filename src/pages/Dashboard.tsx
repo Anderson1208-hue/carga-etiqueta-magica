@@ -153,7 +153,8 @@ async function loadDashboard() {
     ibacTotal24h,
     veiculosRoteirizados,
     veiculosEmRota,
-    veiculosFinalizados,
+    veiculosRetornados,
+
     nfsRoteirizadas,
     nfsEntregues,
     nfsOcorrencias,
