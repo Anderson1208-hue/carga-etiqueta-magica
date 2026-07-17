@@ -144,8 +144,8 @@ export default function Dashboard() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <KpiCard
             title="Entregas de hoje"
-            value={`${d?.entreguesHoje ?? 0}${totalPlanejadoHoje > 0 ? ` / ${totalPlanejadoHoje}` : ""}`}
-            subtitle={`${d?.ocorrenciasHoje ?? 0} ocorrências · ${d?.baixasHoje ?? 0} baixas registradas`}
+            value={d?.entreguesHoje ?? 0}
+            subtitle={`${d?.ocorrenciasHoje ?? 0} ocorrências`}
             icon={CheckCircle2}
             to="/torre-controle"
             tone="success"
@@ -154,16 +154,16 @@ export default function Dashboard() {
           <KpiCard
             title="Veículos em rota"
             value={d?.veiculosEmRota ?? 0}
-            subtitle={`${d?.rotasAtivas ?? 0} rotas ativas · ${d?.paradasPendentes ?? 0} paradas pendentes`}
+            subtitle={`${d?.rotasAtivas ?? 0} rotas ativas de ${d?.rotasTotalHoje ?? 0} roteirizadas hoje`}
             icon={Truck}
-            to="/monitoramento-rotas"
+            to="/torre-controle"
             tone="info"
             loading={isLoading}
           />
           <KpiCard
-            title="Entregas em rota"
-            value={d?.nfsEmRota ?? 0}
-            subtitle="NFs a caminho do cliente"
+            title="Paradas em rota"
+            value={d?.paradasRestantesRota ?? 0}
+            subtitle={`${(d?.paradasTotalRota ?? 0) - (d?.paradasRestantesRota ?? 0)} concluídas de ${d?.paradasTotalRota ?? 0} planejadas`}
             icon={Radar}
             to="/torre-controle"
             tone="info"
