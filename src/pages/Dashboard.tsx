@@ -210,14 +210,15 @@ export default function Dashboard() {
               loading={isLoading}
             />
             <KpiCard
-              title="Veículos finalizados"
-              value={d?.veiculosFinalizados ?? 0}
-              subtitle="Entregas do dia concluídas"
+              title="Veículos retornados"
+              value={d?.veiculosRetornados ?? 0}
+              subtitle="Prestação de contas encerrada"
               icon={PackageCheck}
-              to="/torre-controle"
+              to="/prestacao-contas"
               tone="success"
               loading={isLoading}
             />
+
           </div>
         </div>
 
