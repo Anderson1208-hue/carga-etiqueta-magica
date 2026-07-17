@@ -140,13 +140,9 @@ Deno.serve(async (req) => {
     // Auto-promoção: primeiro ping válido em rota 'aguardando' vira 'ativa'.
     // Qualquer outro status não-operacional é ignorado.
     if (rotaAtual?.status === "aguardando") {
-      const primeiroPos = validPositions.find((p) => !p.heartbeat) ?? validPositions[0];
       await supabase
         .from("monitoramento_rotas")
-        .update({
-          status: "ativa",
-          horario_saida_cd: primeiroPos.timestamp,
-        })
+        .update({ status: "ativa" })
         .eq("id", monitoramento_rota_id)
         .eq("status", "aguardando");
       rotaAtual.status = "ativa";
