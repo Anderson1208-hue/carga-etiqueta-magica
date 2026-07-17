@@ -33,13 +33,18 @@ async function loadDashboard() {
   hoje.setHours(0, 0, 0, 0);
   const inicioHojeIso = hoje.toISOString();
   const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
-  const ontem = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const ontem24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Base da roteirização = sessões criadas ontem (planejamento para operar hoje)
+  const ontemDate = new Date(hoje.getTime() - 86400000);
+  const inicioOntemIso = ontemDate.toISOString();
+  const fimOntemIso = new Date(ontemDate.getTime() + 86400000).toISOString();
 
   const [
     cargasAbertasRes,
     nfsHojeRes,
     aguardandoConfRes,
-    rotasHojeRes,
+    roteirizacoesRes,
     paradasPendRes,
     agendHojeStatusRes,
     alertasRes,
@@ -49,12 +54,12 @@ async function loadDashboard() {
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
     supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-    supabase.from("monitoramento_rotas").select("id, veiculo_id, status, total_paradas, paradas_concluidas").eq("data", hojeStr),
+    supabase.from("roteirizacoes").select("id, carga_id").gte("created_at", inicioOntemIso).lt("created_at", fimOntemIso),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
-    supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
+    supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem24h),
   ]);
 
   const alertasPorTipo: Record<string, number> = {};
@@ -72,47 +77,59 @@ async function loadDashboard() {
 
   const agendamentos = agendHojeStatusRes.data ?? [];
 
-  const rotasHoje = (rotasHojeRes.data ?? []) as Array<{
-    id: string;
-    veiculo_id: string | null;
-    status: string;
-    total_paradas: number | null;
-    paradas_concluidas: number | null;
-  }>;
+  // Roteirizações criadas ontem = planejamento para operar hoje
+  const roteirizacoes = (roteirizacoesRes.data ?? []) as Array<{ id: string; carga_id: string | null }>;
+  const cargaIds = Array.from(new Set(roteirizacoes.map((r) => r.carga_id).filter(Boolean))) as string[];
 
-  const veiculoIds = Array.from(new Set(rotasHoje.map((r) => r.veiculo_id).filter(Boolean))) as string[];
+  let veiculoIds: string[] = [];
+  let nfIds: string[] = [];
+
+  if (cargaIds.length > 0) {
+    const vnfRes = await supabase
+      .from("veiculo_nfs")
+      .select("veiculo_id, nf_id")
+      .in("carga_origem_id", cargaIds);
+    const rows = (vnfRes.data ?? []) as { veiculo_id: string; nf_id: string }[];
+    veiculoIds = Array.from(new Set(rows.map((r) => r.veiculo_id).filter(Boolean)));
+    nfIds = Array.from(new Set(rows.map((r) => r.nf_id).filter(Boolean)));
+  }
+
   const veiculosRoteirizados = veiculoIds.length;
-  const veiculosEmRota = new Set(
-    rotasHoje.filter((r) => r.status === "ativa" || r.status === "em_rota").map((r) => r.veiculo_id).filter(Boolean),
-  ).size;
-  const veiculosFinalizados = new Set(
-    rotasHoje.filter((r) => r.status === "finalizada").map((r) => r.veiculo_id).filter(Boolean),
-  ).size;
+  const nfsRoteirizadas = nfIds.length;
 
-  // NFs vinculadas aos veículos roteirizados hoje
-  let nfsRoteirizadas = 0;
+  // Execução: cruzar veículos planejados com monitoramento de hoje
+  let veiculosEmRota = 0;
+  let veiculosFinalizados = 0;
+  if (veiculoIds.length > 0) {
+    const mrRes = await supabase
+      .from("monitoramento_rotas")
+      .select("veiculo_id, status")
+      .eq("data", hojeStr)
+      .in("veiculo_id", veiculoIds);
+    const mrRows = (mrRes.data ?? []) as { veiculo_id: string; status: string }[];
+    veiculosEmRota = new Set(
+      mrRows.filter((r) => r.status === "ativa" || r.status === "em_rota" || r.status === "iniciada").map((r) => r.veiculo_id),
+    ).size;
+    veiculosFinalizados = new Set(mrRows.filter((r) => r.status === "finalizada").map((r) => r.veiculo_id)).size;
+  }
+
+  // Status das NFs planejadas
   let nfsEntregues = 0;
   let nfsOcorrencias = 0;
   let nfsEmRota = 0;
 
-  if (veiculoIds.length > 0) {
-    const vnfRes = await supabase.from("veiculo_nfs").select("nf_id").in("veiculo_id", veiculoIds);
-    const nfIds = Array.from(new Set((vnfRes.data ?? []).map((r: { nf_id: string }) => r.nf_id)));
-    nfsRoteirizadas = nfIds.length;
-
-    if (nfIds.length > 0) {
-      // Chunk in batches of 500 to avoid URL limits
-      const chunks: string[][] = [];
-      for (let i = 0; i < nfIds.length; i += 500) chunks.push(nfIds.slice(i, i + 500));
-      const statusRows: { status_entrega: string | null }[] = [];
-      for (const c of chunks) {
-        const r = await supabase.from("notas_fiscais").select("status_entrega").in("id", c);
-        statusRows.push(...((r.data ?? []) as { status_entrega: string | null }[]));
-      }
-      nfsEntregues = statusRows.filter((r) => r.status_entrega === "ENTREGUE").length;
-      nfsOcorrencias = statusRows.filter((r) => r.status_entrega === "RECUSADO").length;
-      nfsEmRota = statusRows.filter((r) => r.status_entrega === "NF EM ROTA").length;
+  if (nfIds.length > 0) {
+    // Chunk in batches of 500 to avoid URL limits
+    const chunks: string[][] = [];
+    for (let i = 0; i < nfIds.length; i += 500) chunks.push(nfIds.slice(i, i + 500));
+    const statusRows: { status_entrega: string | null }[] = [];
+    for (const c of chunks) {
+      const r = await supabase.from("notas_fiscais").select("status_entrega").in("id", c);
+      statusRows.push(...((r.data ?? []) as { status_entrega: string | null }[]));
     }
+    nfsEntregues = statusRows.filter((r) => r.status_entrega === "ENTREGUE").length;
+    nfsOcorrencias = statusRows.filter((r) => r.status_entrega === "RECUSADO").length;
+    nfsEmRota = statusRows.filter((r) => r.status_entrega === "NF EM ROTA").length;
   }
 
   return {
