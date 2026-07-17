@@ -295,6 +295,50 @@ export default function PrestacaoContas() {
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
 
+  async function conferirEmLote(ids: string[]) {
+    if (ids.length === 0) return;
+    setConferindoLote(true);
+    try {
+      const { error } = await supabase
+        .from("baixas_entrega")
+        .update({
+          conferido_em: new Date().toISOString(),
+          conferido_por: user?.id,
+          conferencia_status: "ok",
+          conferencia_motivo: null,
+        })
+        .in("id", ids);
+      if (error) throw error;
+      toast({ title: `${ids.length} baixa(s) conferida(s)` });
+      setSelecionadas(new Set());
+      if (veiculoSel) await carregarBaixas(veiculoSel);
+    } catch (err: any) {
+      toast({ title: "Erro ao conferir em lote", description: err?.message, variant: "destructive" });
+    } finally {
+      setConferindoLote(false);
+    }
+  }
+
+  function toggleSelecionada(id: string) {
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelecionarTodasAConferir() {
+    const aConferirIds = baixas.filter((b) => !b.conferencia_status).map((b) => b.id);
+    const todasSelecionadas = aConferirIds.length > 0 && aConferirIds.every((id) => selecionadas.has(id));
+    if (todasSelecionadas) {
+      setSelecionadas(new Set());
+    } else {
+      setSelecionadas(new Set(aConferirIds));
+    }
+  }
+
+
   async function salvarPendencia() {
     if (!pendDialog) return;
     if (!pendDialog.motivo.trim()) {
