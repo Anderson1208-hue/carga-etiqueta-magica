@@ -18,6 +18,7 @@ type: reference
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.
 - [XML Parser](mem://funcionalidades/xml-parser) — Weights extracted from <transp><vol> (header level).
+- [XML IBAC sem m³](mem://funcionalidades/xml-parser-ibac-nvol) — IBAC nunca lê m³ do XML; cubagem via planilha; vigente a partir de 06/07/2026.
 - [Importação de CT-e](mem://funcionalidades/operacao/importacao-cte) — Parse and link CT-e to Carga and NF.
 - [Documentos Transporte CTE+Minuta](mem://funcionalidades/operacao/documentos-transporte-cte-minuta) — Tabela ctes genérica: tipo_documento (CTE/MINUTA), MIN-{cnpj}-{num} para minuta sem chave, vínculo NF por chave→número.
 - [Importação de Cubagem](mem://funcionalidades/operacao/importacao-cubagem-excel) — Excel m3 import via regex.
