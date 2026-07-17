@@ -124,6 +124,8 @@ export function RecebidosPorDia() {
                   <td className="pt-3 text-right tabular-nums">{nf0.format(totais.caixas)}</td>
                   <td className="pt-3 text-right tabular-nums">{nf2.format(totais.peso)}</td>
                   <td className="pt-3 text-right tabular-nums">{nf2.format(totais.m3)}</td>
+                  <td className="pt-3 text-right tabular-nums">{nf2.format(totais.m3 * 300)}</td>
+
                 </tr>
               </tfoot>
             )}
