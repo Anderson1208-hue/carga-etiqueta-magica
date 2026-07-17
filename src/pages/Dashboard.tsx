@@ -104,19 +104,8 @@ async function loadDashboard() {
   // Retornados = prestação de contas encerrada
   const veiculosRetornados = veiculosValidos.filter((v) => !!v.prestacao_contas_em).length;
 
-  // Em rota = monitoramento_rotas ativa/em_rota hoje
-  let veiculosEmRota = 0;
-  if (veiculoIds.length > 0) {
-    const mrRes = await supabase
-      .from("monitoramento_rotas")
-      .select("veiculo_id, status")
-      .eq("data", hojeStr)
-      .in("veiculo_id", veiculoIds);
-    const mrRows = (mrRes.data ?? []) as { veiculo_id: string; status: string }[];
-    veiculosEmRota = new Set(
-      mrRows.filter((r) => r.status === "ativa" || r.status === "em_rota" || r.status === "iniciada").map((r) => r.veiculo_id),
-    ).size;
-  }
+  // Em rota = saíram e ainda não retornaram (roteirizados − retornados)
+  const veiculosEmRota = Math.max(0, veiculosRoteirizados - veiculosRetornados);
 
 
   // Status das NFs planejadas
