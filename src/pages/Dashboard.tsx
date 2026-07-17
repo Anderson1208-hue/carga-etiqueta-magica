@@ -54,13 +54,13 @@ async function loadDashboard() {
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).eq("status", "entregue").gte("registrado_em", inicioHojeIso),
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).neq("status", "entregue").gte("registrado_em", inicioHojeIso),
     supabase.from("baixas_entrega").select("id", { count: "exact", head: true }).gte("registrado_em", inicioHojeIso),
-    supabase.from("monitoramento_rotas").select("id", { count: "exact", head: true }).in("status", ["em_rota", "iniciada"]),
+    supabase.from("monitoramento_rotas").select("id", { count: "exact", head: true }).in("status", ["ativa", "em_rota", "iniciada"]),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
     supabase.from("ibac_eventos_queue").select("status"),
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem),
-    supabase.from("veiculos").select("id", { count: "exact", head: true }).eq("status", "em_rota"),
+    supabase.from("monitoramento_rotas").select("veiculo_id").in("status", ["ativa", "em_rota", "iniciada"]),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).eq("status_entrega", "NF EM ROTA"),
   ]);
 
@@ -96,7 +96,7 @@ async function loadDashboard() {
     ibacErros,
     ibacSucesso24h,
     ibacTotal24h,
-    veiculosEmRota: veiculosEmRotaRes.count ?? 0,
+    veiculosEmRota: new Set((veiculosEmRotaRes.data ?? []).map((r: { veiculo_id: string | null }) => r.veiculo_id).filter(Boolean)).size,
     nfsEmRota: nfsEmRotaRes.count ?? 0,
   };
 }
