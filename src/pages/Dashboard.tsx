@@ -96,7 +96,7 @@ async function loadDashboard() {
     ibacErros,
     ibacSucesso24h,
     ibacTotal24h,
-    veiculosEmRota: veiculosEmRotaRes.count ?? 0,
+    veiculosEmRota: new Set((veiculosEmRotaRes.data ?? []).map((r: { veiculo_id: string | null }) => r.veiculo_id).filter(Boolean)).size,
     nfsEmRota: nfsEmRotaRes.count ?? 0,
   };
 }
