@@ -22,7 +22,7 @@ export function IbacResumo({ pendentes, erros, sucesso24h, total24h, loading }: 
           <Radio className="h-4 w-4 text-primary" />
           Integração IBAC
         </CardTitle>
-        <Link to="/integracao-ibac" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
+        <Link to="/integracoes/ibac" className="text-xs text-muted-foreground hover:underline flex items-center gap-1">
           Abrir <ArrowRight className="h-3 w-3" />
         </Link>
       </CardHeader>
