@@ -646,6 +646,20 @@ export default function PrestacaoContas() {
                         <Table className="text-xs">
                           <TableHeader>
                             <TableRow className="[&>*]:py-1.5 [&>*]:px-2">
+                              <TableHead className="w-8">
+                                {(() => {
+                                  const aConferirIds = baixas.filter((b) => !b.conferencia_status).map((b) => b.id);
+                                  const allChecked = aConferirIds.length > 0 && aConferirIds.every((id) => selecionadas.has(id));
+                                  return (
+                                    <Checkbox
+                                      checked={allChecked}
+                                      disabled={!!veiculoSel?.prestacao_contas_em || aConferirIds.length === 0}
+                                      onCheckedChange={toggleSelecionarTodasAConferir}
+                                      aria-label="Selecionar todas a conferir"
+                                    />
+                                  );
+                                })()}
+                              </TableHead>
                               <TableHead className="w-12">NF</TableHead>
                               <TableHead>Cliente</TableHead>
                               <TableHead>Ocorr.</TableHead>
@@ -660,8 +674,17 @@ export default function PrestacaoContas() {
                           <TableBody>
                             {baixas.map((b) => {
                               const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
+                              const jaConferida = !!b.conferencia_status;
                               return (
                                 <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selecionadas.has(b.id)}
+                                      disabled={jaConferida || !!veiculoSel?.prestacao_contas_em}
+                                      onCheckedChange={() => toggleSelecionada(b.id)}
+                                      aria-label={`Selecionar NF ${b.nf?.numero_nf || ""}`}
+                                    />
+                                  </TableCell>
                                   <TableCell className="font-mono text-[11px] whitespace-nowrap">{b.nf?.numero_nf || "—"}</TableCell>
                                   <TableCell className="max-w-[160px]">
                                     <p className="truncate font-medium text-xs">{b.nf?.dest_razao_social || "—"}</p>
