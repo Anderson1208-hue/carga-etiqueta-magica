@@ -44,7 +44,7 @@ async function loadDashboard() {
     cargasAbertasRes,
     nfsHojeRes,
     aguardandoConfRes,
-    roteirizacoesRes,
+    veiculosDiaRes,
     paradasPendRes,
     agendHojeStatusRes,
     alertasRes,
@@ -54,7 +54,7 @@ async function loadDashboard() {
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
     supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-    supabase.from("roteirizacoes").select("id, carga_id").gte("created_at", inicioDiaIso).lt("created_at", fimDiaIso),
+    supabase.from("veiculos").select("id, prestacao_contas_em").eq("data", hojeStr),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
@@ -77,29 +77,35 @@ async function loadDashboard() {
 
   const agendamentos = agendHojeStatusRes.data ?? [];
 
-  // Roteirizações criadas ontem = planejamento para operar hoje
-  const roteirizacoes = (roteirizacoesRes.data ?? []) as Array<{ id: string; carga_id: string | null }>;
-  const cargaIds = Array.from(new Set(roteirizacoes.map((r) => r.carga_id).filter(Boolean))) as string[];
+  // Base = veículos da roteirização de hoje (mesma fonte de /roteirizacao)
+  const veiculosDia = (veiculosDiaRes.data ?? []) as Array<{ id: string; prestacao_contas_em: string | null }>;
+  const veiculoIdsDia = veiculosDia.map((v) => v.id);
 
-  let veiculoIds: string[] = [];
+  // Cruza com veiculo_nfs para: (a) filtrar veículos sem NFs; (b) coletar nf_ids
+  let veiculosComNfs = new Set<string>();
   let nfIds: string[] = [];
-
-  if (cargaIds.length > 0) {
-    const vnfRes = await supabase
-      .from("veiculo_nfs")
-      .select("veiculo_id, nf_id")
-      .in("carga_origem_id", cargaIds);
-    const rows = (vnfRes.data ?? []) as { veiculo_id: string; nf_id: string }[];
-    veiculoIds = Array.from(new Set(rows.map((r) => r.veiculo_id).filter(Boolean)));
-    nfIds = Array.from(new Set(rows.map((r) => r.nf_id).filter(Boolean)));
+  if (veiculoIdsDia.length > 0) {
+    const chunks: string[][] = [];
+    for (let i = 0; i < veiculoIdsDia.length; i += 200) chunks.push(veiculoIdsDia.slice(i, i + 200));
+    const vnfRows: { veiculo_id: string; nf_id: string }[] = [];
+    for (const c of chunks) {
+      const r = await supabase.from("veiculo_nfs").select("veiculo_id, nf_id").in("veiculo_id", c);
+      vnfRows.push(...((r.data ?? []) as { veiculo_id: string; nf_id: string }[]));
+    }
+    veiculosComNfs = new Set(vnfRows.map((r) => r.veiculo_id));
+    nfIds = Array.from(new Set(vnfRows.map((r) => r.nf_id).filter(Boolean)));
   }
 
-  const veiculosRoteirizados = veiculoIds.length;
+  const veiculosValidos = veiculosDia.filter((v) => veiculosComNfs.has(v.id));
+  const veiculoIds = veiculosValidos.map((v) => v.id);
+  const veiculosRoteirizados = veiculosValidos.length;
   const nfsRoteirizadas = nfIds.length;
 
-  // Execução: cruzar veículos planejados com monitoramento de hoje
+  // Retornados = prestação de contas encerrada
+  const veiculosRetornados = veiculosValidos.filter((v) => !!v.prestacao_contas_em).length;
+
+  // Em rota = monitoramento_rotas ativa/em_rota hoje
   let veiculosEmRota = 0;
-  let veiculosFinalizados = 0;
   if (veiculoIds.length > 0) {
     const mrRes = await supabase
       .from("monitoramento_rotas")
@@ -110,8 +116,8 @@ async function loadDashboard() {
     veiculosEmRota = new Set(
       mrRows.filter((r) => r.status === "ativa" || r.status === "em_rota" || r.status === "iniciada").map((r) => r.veiculo_id),
     ).size;
-    veiculosFinalizados = new Set(mrRows.filter((r) => r.status === "finalizada").map((r) => r.veiculo_id)).size;
   }
+
 
   // Status das NFs planejadas
   let nfsEntregues = 0;
