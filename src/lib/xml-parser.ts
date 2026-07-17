@@ -263,6 +263,14 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
   const seenScopes = new Set<Element>();
 
+  // IBAC: NUNCA usar m³ do XML. O layout do IBAC não traz cubagem
+  // confiável (nVol = qtd de volumes e texto livre gera falsos positivos).
+  // A cubagem é sempre incluída via planilha depois.
+  // Regra aplicada a partir de 06/07/2026.
+  if (isIbacXml(xmlDoc, emitente, getElementsByNames)) {
+    return 0;
+  }
+
   // Pandurata: <vol><nVol> SEMPRE é a cubagem m³ (posição fixa no layout
   // do emissor). Não importa se é inteiro ou decimal — usar como está.
   const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
@@ -329,6 +337,22 @@ function isPandurataXml(
   });
 
   return textos.some((texto) => /pandur(?:ata)?/i.test(texto));
+}
+
+function isIbacXml(
+  xmlDoc: Document,
+  emitente: string,
+  getElementsByNames: (root: ParentNode, names: string[]) => Element[]
+): boolean {
+  const textos = [emitente];
+  getElementsByNames(xmlDoc, ["marca", "xmarca", "xnome", "xfant"]).forEach((node) => {
+    if (node.textContent) textos.push(node.textContent);
+  });
+  // Bate por razão social / marca "IBAC" ou pela raiz do CNPJ 61.472.205
+  const emit = xmlDoc.querySelector("emit");
+  const cnpj = emit?.querySelector("CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
+  if (cnpj.startsWith("61472205")) return true;
+  return textos.some((t) => /\bibac\b/i.test(t));
 }
 
 /**

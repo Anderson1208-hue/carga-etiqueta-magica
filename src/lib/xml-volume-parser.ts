@@ -47,6 +47,20 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   const isPandur = /pandur(?:ata)?/i.test(fornecedor);
   const volNodes = getElementsByLocalName(xmlDoc, ["vol", "volume", "volumes"]);
 
+  // IBAC: nunca ler m³ do XML. Cubagem entra por planilha.
+  // Regra aplicada a partir de 06/07/2026.
+  const emitCnpj = xmlDoc
+    .querySelector("emit CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
+  let isIbac = /\bibac\b/i.test(fornecedor) || emitCnpj.startsWith("61472205");
+  if (!isIbac) {
+    for (const volNode of volNodes) {
+      const marca = getChildByLocalName(volNode, ["marca", "xmarca"])
+        ?.textContent?.trim() ?? "";
+      if (/\bibac\b/i.test(marca)) { isIbac = true; break; }
+    }
+  }
+  if (isIbac) return 0;
+
   // Pandurata: <vol><nVol> SEMPRE é a cubagem m³ no layout da Pandurata,
   // independente do valor ser inteiro ou decimal. Confirmado pelo cliente:
   // a posição no XML é sempre a mesma.
