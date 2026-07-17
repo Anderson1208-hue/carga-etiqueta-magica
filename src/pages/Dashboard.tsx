@@ -122,7 +122,7 @@ export default function Dashboard() {
   });
 
   const d = data;
-  const totalPlanejadoHoje = (d?.entreguesHoje ?? 0) + (d?.ocorrenciasHoje ?? 0);
+
 
   return (
     <MainLayout>
