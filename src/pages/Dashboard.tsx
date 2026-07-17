@@ -35,10 +35,10 @@ async function loadDashboard() {
   const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
   const ontem24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  // Base da roteirização = sessões criadas ontem (planejamento para operar hoje)
-  const ontemDate = new Date(hoje.getTime() - 86400000);
-  const inicioOntemIso = ontemDate.toISOString();
-  const fimOntemIso = new Date(ontemDate.getTime() + 86400000).toISOString();
+  // Base da roteirização = sessões criadas hoje (dia a dia)
+  const inicioDiaIso = inicioHojeIso;
+  const fimDiaIso = new Date(hoje.getTime() + 86400000).toISOString();
+
 
   const [
     cargasAbertasRes,
@@ -54,7 +54,7 @@ async function loadDashboard() {
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
     supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-    supabase.from("roteirizacoes").select("id, carga_id").gte("created_at", inicioOntemIso).lt("created_at", fimOntemIso),
+    supabase.from("roteirizacoes").select("id, carga_id").gte("created_at", inicioDiaIso).lt("created_at", fimDiaIso),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
     supabase.from("alertas_monitoramento").select("tipo").eq("lido", false),
