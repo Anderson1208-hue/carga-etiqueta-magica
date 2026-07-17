@@ -168,6 +168,9 @@ export default function Dashboard() {
           loading={isLoading}
         />
 
+        {/* Recebidos por dia */}
+        <RecebidosPorDia />
+
         {/* Torre + IBAC */}
         <div className="grid gap-4 md:grid-cols-2">
           <AlertasResumo
