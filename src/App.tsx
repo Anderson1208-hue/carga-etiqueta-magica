@@ -44,6 +44,9 @@ import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
 import ImportarOcoren from "./pages/ImportarOcoren";
 import FiscalConfiguracao from "./pages/FiscalConfiguracao";
+import MotoristasFiscal from "./pages/fiscal/Motoristas";
+import ConveniosFiscais from "./pages/fiscal/Convenios";
+import TabelasFrete from "./pages/fiscal/TabelasFrete";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -320,6 +323,9 @@ function AppRoutes() {
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
       <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
       <Route path="/fiscal/configuracao" element={<ProtectedRoute><FiscalConfiguracao /></ProtectedRoute>} />
+      <Route path="/fiscal/motoristas" element={<ProtectedRoute><MotoristasFiscal /></ProtectedRoute>} />
+      <Route path="/fiscal/convenios" element={<ProtectedRoute><ConveniosFiscais /></ProtectedRoute>} />
+      <Route path="/fiscal/tabelas-frete" element={<ProtectedRoute><TabelasFrete /></ProtectedRoute>} />
       <Route path="/motorista" element={<ErrorBoundary><MotoristaAcesso /></ErrorBoundary>} />
 
       <Route path="/motorista/diagnostico" element={<ErrorBoundary><MotoristaDiagnostico /></ErrorBoundary>} />
