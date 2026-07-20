@@ -386,6 +386,9 @@ Deno.serve(async (req) => {
           parada.horario_chegada
         ) {
           const chegada = new Date(parada.horario_chegada);
+          // Guard: ignora pings fora de ordem (mais antigos que a chegada) — evita
+          // registrar horario_saida < horario_chegada e marcar visita_inconsistente indevidamente.
+          if (eventAt.getTime() <= chegada.getTime()) continue;
           const permanencia = Math.max(0, Math.round((eventAt.getTime() - chegada.getTime()) / 60000));
 
           if (permanencia < tempo_min_atendimento) {
