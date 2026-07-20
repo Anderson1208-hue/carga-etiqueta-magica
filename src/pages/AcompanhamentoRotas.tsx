@@ -16,8 +16,10 @@ import {
   ChevronRight,
   Truck,
   WifiOff,
+  Wifi,
   MapPin,
   ArrowRight,
+  Radio,
 } from "lucide-react";
 import type {
   MonitoramentoRota,
