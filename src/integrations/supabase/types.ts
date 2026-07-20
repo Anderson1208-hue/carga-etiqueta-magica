@@ -2456,6 +2456,10 @@ export type Database = {
         Returns: Json
       }
       provisionar_torre_dia: { Args: { p_data?: string }; Returns: Json }
+      provisionar_torre_veiculo: {
+        Args: { p_veiculo_id: string }
+        Returns: Json
+      }
       registrar_chegada_cd_manual: {
         Args: { p_nf_id: string; p_observacao?: string }
         Returns: Json
