@@ -279,6 +279,37 @@ Deno.serve(async (req) => {
             .update({ status: "chegou_cliente", horario_chegada: parada.horario_chegada })
             .eq("id", parada.id);
 
+          // Fecha qualquer parada anterior ainda aberta usando a chegada desta como saída.
+          // Evita horario_saida da parada N-1 > horario_chegada da parada N quando o ping
+          // de "saída do raio" chega atrasado (batch offline, ordem invertida, raios amplos).
+          const abertasAnteriores = paradasState.filter(
+            (p: any) =>
+              p.ordem < parada.ordem &&
+              ["chegou_cliente", "em_atendimento", "parada_excessiva", "fora_sequencia"].includes(p.status) &&
+              p.horario_chegada &&
+              (!p.horario_saida || new Date(p.horario_saida).getTime() > eventAt.getTime())
+          );
+          for (const ant of abertasAnteriores) {
+            const chegadaAnt = new Date(ant.horario_chegada);
+            if (eventAt.getTime() <= chegadaAnt.getTime()) continue;
+            const permAnt = Math.max(0, Math.round((eventAt.getTime() - chegadaAnt.getTime()) / 60000));
+            const novoStatus = permAnt < tempo_min_atendimento ? "visita_inconsistente" : "finalizada";
+            ant.status = novoStatus;
+            ant.horario_saida = eventAt.toISOString();
+            ant.tempo_permanencia_min = permAnt;
+            ant.is_excecao = novoStatus === "visita_inconsistente";
+            await supabase
+              .from("monitoramento_paradas")
+              .update({
+                status: novoStatus,
+                horario_saida: ant.horario_saida,
+                tempo_permanencia_min: permAnt,
+                is_excecao: ant.is_excecao,
+              })
+              .eq("id", ant.id);
+            events.push(`${novoStatus}_${ant.id}_by_next_arrival`);
+          }
+
           // Check if out of sequence
           const anterioresNaoConcluidas = paradasState.filter(
             (p: any) => p.ordem < parada.ordem && !["finalizada", "pulada", "visita_inconsistente"].includes(p.status)
@@ -323,6 +354,7 @@ Deno.serve(async (req) => {
 
           events.push(`chegou_${parada.id}`);
         }
+
 
         // RULE: Check minimum time for "em_atendimento"
         if (
