@@ -469,9 +469,25 @@ export default function AcompanhamentoRotas() {
                   <div className="text-xs text-muted-foreground">
                     Progresso: {selectedRota.paradas_concluidas}/{selectedRota.total_paradas}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    GPS: {formatDateTime(selectedRota.ultima_atualizacao)}
-                  </div>
+                  {(() => {
+                    const gps = gpsStatus(selectedRota);
+                    const cls =
+                      gps.tone === "ok"
+                        ? "bg-success/15 text-success border-success/30"
+                        : gps.tone === "warn"
+                          ? "bg-warning/15 text-warning border-warning/30"
+                          : "bg-destructive/15 text-destructive border-destructive/30";
+                    return (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <Badge variant="outline" className={`h-5 px-1.5 gap-1 ${cls}`}>
+                          <Radio className="w-3 h-3" /> {gps.label}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {formatDateTime(selectedRota.ultima_atualizacao)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
               <Card className="md:col-span-2 border-primary/30 bg-primary/5">
