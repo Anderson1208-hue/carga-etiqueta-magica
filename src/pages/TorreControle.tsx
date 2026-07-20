@@ -179,7 +179,11 @@ export default function TorreControle() {
         () => loadRotas(dataSelecionada))
       .subscribe();
 
-    const interval = setInterval(() => loadRotas(dataSelecionada), 60000);
+    // Reprovisiona a cada 60s para capturar veículos adicionados à roteirização depois
+    const interval = setInterval(
+      () => provisionarSilencioso(dataSelecionada).then(() => loadRotas(dataSelecionada)),
+      60000
+    );
 
     return () => {
       supabase.removeChannel(channel);
