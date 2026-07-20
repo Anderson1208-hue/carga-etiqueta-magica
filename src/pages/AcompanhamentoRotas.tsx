@@ -285,6 +285,15 @@ export default function AcompanhamentoRotas() {
     return Math.floor((Date.now() - new Date(r.ultima_atualizacao).getTime()) / 60000);
   }
 
+  type GpsStatus = { label: string; tone: "ok" | "warn" | "down"; mins: number | null };
+  function gpsStatus(r: MonitoramentoRota): GpsStatus {
+    if (!r.ultima_atualizacao) return { label: "Sem GPS", tone: "down", mins: null };
+    const mins = Math.floor((Date.now() - new Date(r.ultima_atualizacao).getTime()) / 60000);
+    if (mins <= 3) return { label: "GPS ativo", tone: "ok", mins };
+    if (mins <= TOLERANCIA_SEM_SINAL_MIN) return { label: `Atraso ${mins}m`, tone: "warn", mins };
+    return { label: `Sem sinal ${mins}m`, tone: "down", mins };
+  }
+
   const proximaParada = useMemo(
     () => paradas.find((p) => !["finalizada", "pulada", "visita_inconsistente"].includes(p.status)),
     [paradas]
