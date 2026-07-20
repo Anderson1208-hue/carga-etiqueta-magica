@@ -140,22 +140,53 @@ export default function TorreControle() {
     }
   }, []);
 
-  // Provisionamento automático (silencioso) no load da data
+  // Provisionamento automático (silencioso). Estratégia por-veículo para
+  // evitar statement timeout do RPC em lote quando há muitos veículos.
   const provisionarSilencioso = useCallback(async (dataFiltro: string) => {
     try {
-      await supabase.rpc("provisionar_torre_dia", { p_data: dataFiltro });
+      const { data: veics } = await supabase
+        .from("veiculos")
+        .select("id")
+        .eq("data", dataFiltro)
+        .in("status", ["pendente", "em_rota"])
+        .is("prestacao_contas_em", null);
+      if (!veics || veics.length === 0) return { criadas: 0, ignoradas: 0 };
+      const ids = veics.map((v) => v.id);
+      const { data: rotasExist } = await supabase
+        .from("monitoramento_rotas")
+        .select("veiculo_id")
+        .in("veiculo_id", ids)
+        .in("status", ["aguardando", "ativa", "pausada"]);
+      const jaComRota = new Set((rotasExist ?? []).map((r) => r.veiculo_id));
+      const pendentes = ids.filter((id) => !jaComRota.has(id));
+      let criadas = 0;
+      let ignoradas = 0;
+      const CHUNK = 4;
+      for (let i = 0; i < pendentes.length; i += CHUNK) {
+        const slice = pendentes.slice(i, i + CHUNK);
+        const results = await Promise.all(
+          slice.map((id) =>
+            supabase.rpc("provisionar_torre_veiculo", { p_veiculo_id: id })
+          )
+        );
+        for (const r of results) {
+          const resp = r.data as { status?: string } | null;
+          if (resp?.status === "ok") criadas++;
+          else ignoradas++;
+        }
+      }
+      return { criadas, ignoradas };
     } catch (err) {
       console.warn("[torre] provisionamento automático falhou:", err);
+      return { criadas: 0, ignoradas: 0 };
     }
   }, []);
 
   const provisionarManual = useCallback(async () => {
     setProvisionando(true);
     try {
-      const { data, error } = await supabase.rpc("provisionar_torre_dia", { p_data: dataSelecionada });
-      if (error) throw error;
-      const resp = data as { criadas?: number; ignoradas?: number } | null;
-      toast.success(`Provisionamento: ${resp?.criadas ?? 0} novas rotas, ${resp?.ignoradas ?? 0} ignoradas`);
+      const resp = await provisionarSilencioso(dataSelecionada);
+      toast.success(`Provisionamento: ${resp.criadas} novas rotas, ${resp.ignoradas} ignoradas`);
       await loadRotas(dataSelecionada);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro ao provisionar";
@@ -163,7 +194,7 @@ export default function TorreControle() {
     } finally {
       setProvisionando(false);
     }
-  }, [dataSelecionada, loadRotas]);
+  }, [dataSelecionada, loadRotas, provisionarSilencioso]);
 
   useEffect(() => {
     setLoading(true);
