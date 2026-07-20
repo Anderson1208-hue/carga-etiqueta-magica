@@ -636,6 +636,10 @@ export type Database = {
           ativo: boolean
           bairro: string | null
           cep: string | null
+          cfop_inter: string | null
+          cfop_intra: string | null
+          ciot_api_key: string | null
+          ciot_provedor: string | null
           cnae: string | null
           cnpj: string
           codigo_municipio_ibge: string
@@ -652,11 +656,21 @@ export type Database = {
           nome_fantasia: string | null
           numero: string | null
           observacao_padrao: string | null
+          provedor_ambiente: string | null
+          provedor_api_key_homolog: string | null
+          provedor_api_key_prod: string | null
+          provedor_nome: string | null
           proximo_numero_cte: number
           proximo_numero_mdfe: number
           razao_social: string
           regime_tributario: string
           rntrc: string | null
+          seguradora_api_endpoint: string | null
+          seguradora_api_key: string | null
+          seguradora_apolice: string | null
+          seguradora_averbacao_mae: string | null
+          seguradora_cnpj: string | null
+          seguradora_razao: string | null
           serie_cte: number
           serie_mdfe: number
           telefone: string | null
@@ -669,6 +683,10 @@ export type Database = {
           ativo?: boolean
           bairro?: string | null
           cep?: string | null
+          cfop_inter?: string | null
+          cfop_intra?: string | null
+          ciot_api_key?: string | null
+          ciot_provedor?: string | null
           cnae?: string | null
           cnpj: string
           codigo_municipio_ibge: string
@@ -685,11 +703,21 @@ export type Database = {
           nome_fantasia?: string | null
           numero?: string | null
           observacao_padrao?: string | null
+          provedor_ambiente?: string | null
+          provedor_api_key_homolog?: string | null
+          provedor_api_key_prod?: string | null
+          provedor_nome?: string | null
           proximo_numero_cte?: number
           proximo_numero_mdfe?: number
           razao_social: string
           regime_tributario: string
           rntrc?: string | null
+          seguradora_api_endpoint?: string | null
+          seguradora_api_key?: string | null
+          seguradora_apolice?: string | null
+          seguradora_averbacao_mae?: string | null
+          seguradora_cnpj?: string | null
+          seguradora_razao?: string | null
           serie_cte?: number
           serie_mdfe?: number
           telefone?: string | null
@@ -702,6 +730,10 @@ export type Database = {
           ativo?: boolean
           bairro?: string | null
           cep?: string | null
+          cfop_inter?: string | null
+          cfop_intra?: string | null
+          ciot_api_key?: string | null
+          ciot_provedor?: string | null
           cnae?: string | null
           cnpj?: string
           codigo_municipio_ibge?: string
@@ -718,16 +750,83 @@ export type Database = {
           nome_fantasia?: string | null
           numero?: string | null
           observacao_padrao?: string | null
+          provedor_ambiente?: string | null
+          provedor_api_key_homolog?: string | null
+          provedor_api_key_prod?: string | null
+          provedor_nome?: string | null
           proximo_numero_cte?: number
           proximo_numero_mdfe?: number
           razao_social?: string
           regime_tributario?: string
           rntrc?: string | null
+          seguradora_api_endpoint?: string | null
+          seguradora_api_key?: string | null
+          seguradora_apolice?: string | null
+          seguradora_averbacao_mae?: string | null
+          seguradora_cnpj?: string | null
+          seguradora_razao?: string | null
           serie_cte?: number
           serie_mdfe?: number
           telefone?: string | null
           tomador_padrao?: string | null
           uf?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      convenios_fiscais: {
+        Row: {
+          aliquota_icms: number | null
+          ativo: boolean
+          base_legal: string | null
+          cfop_forcado: string | null
+          cnpj_root_embarcador: string | null
+          created_at: string
+          cst_icms: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          reducao_base: number | null
+          texto_infadfisco: string | null
+          texto_infcpl: string | null
+          uf_destino: string | null
+          uf_origem: string | null
+          updated_at: string
+        }
+        Insert: {
+          aliquota_icms?: number | null
+          ativo?: boolean
+          base_legal?: string | null
+          cfop_forcado?: string | null
+          cnpj_root_embarcador?: string | null
+          created_at?: string
+          cst_icms?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          reducao_base?: number | null
+          texto_infadfisco?: string | null
+          texto_infcpl?: string | null
+          uf_destino?: string | null
+          uf_origem?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aliquota_icms?: number | null
+          ativo?: boolean
+          base_legal?: string | null
+          cfop_forcado?: string | null
+          cnpj_root_embarcador?: string | null
+          created_at?: string
+          cst_icms?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          reducao_base?: number | null
+          texto_infadfisco?: string | null
+          texto_infcpl?: string | null
+          uf_destino?: string | null
+          uf_origem?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1007,6 +1106,7 @@ export type Database = {
         Row: {
           ativo: boolean
           centro_custo: string | null
+          cnae: string | null
           cnpj: string
           codigo_municipio_ibge: string | null
           contato_email: string | null
@@ -1026,12 +1126,16 @@ export type Database = {
           regime_tributario: string | null
           sla_padrao_horas: number | null
           suframa: string | null
+          tabela_frete_id: string | null
+          tipo_operacao_padrao: string | null
+          tomador_servico: number | null
           uf: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           centro_custo?: string | null
+          cnae?: string | null
           cnpj: string
           codigo_municipio_ibge?: string | null
           contato_email?: string | null
@@ -1051,12 +1155,16 @@ export type Database = {
           regime_tributario?: string | null
           sla_padrao_horas?: number | null
           suframa?: string | null
+          tabela_frete_id?: string | null
+          tipo_operacao_padrao?: string | null
+          tomador_servico?: number | null
           uf?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           centro_custo?: string | null
+          cnae?: string | null
           cnpj?: string
           codigo_municipio_ibge?: string | null
           contato_email?: string | null
@@ -1076,10 +1184,21 @@ export type Database = {
           regime_tributario?: string | null
           sla_padrao_horas?: number | null
           suframa?: string | null
+          tabela_frete_id?: string | null
+          tipo_operacao_padrao?: string | null
+          tomador_servico?: number | null
           uf?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "embarcadores_tabela_frete_id_fkey"
+            columns: ["tabela_frete_id"]
+            isOneToOne: false
+            referencedRelation: "tabelas_frete"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       etiquetas: {
         Row: {
@@ -1662,6 +1781,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      motoristas: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco: string | null
+          cnh_categoria: string | null
+          cnh_numero: string | null
+          cnh_validade: string | null
+          conta: string | null
+          cpf: string
+          created_at: string
+          created_by: string | null
+          eh_tac: boolean
+          email: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          pix_chave: string | null
+          pix_tipo: string | null
+          rntrc: string | null
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          cnh_categoria?: string | null
+          cnh_numero?: string | null
+          cnh_validade?: string | null
+          conta?: string | null
+          cpf: string
+          created_at?: string
+          created_by?: string | null
+          eh_tac?: boolean
+          email?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          pix_chave?: string | null
+          pix_tipo?: string | null
+          rntrc?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          cnh_categoria?: string | null
+          cnh_numero?: string | null
+          cnh_validade?: string | null
+          conta?: string | null
+          cpf?: string
+          created_at?: string
+          created_by?: string | null
+          eh_tac?: boolean
+          email?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          pix_chave?: string | null
+          pix_tipo?: string | null
+          rntrc?: string | null
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       nf_enderecamento: {
         Row: {
@@ -2260,6 +2448,118 @@ export type Database = {
           },
         ]
       }
+      tabelas_frete: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          embarcador_id: string
+          frete_minimo: number | null
+          id: string
+          moeda: string
+          nome: string
+          observacoes: string | null
+          updated_at: string
+          vigente_ate: string | null
+          vigente_de: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          embarcador_id: string
+          frete_minimo?: number | null
+          id?: string
+          moeda?: string
+          nome: string
+          observacoes?: string | null
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          embarcador_id?: string
+          frete_minimo?: number | null
+          id?: string
+          moeda?: string
+          nome?: string
+          observacoes?: string | null
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tabelas_frete_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tabelas_frete_faixas: {
+        Row: {
+          adicional_cte: number | null
+          advalorem_percentual: number | null
+          created_at: string
+          gris_percentual: number | null
+          id: string
+          observacoes: string | null
+          pedagio_por_100kg: number | null
+          peso_max_kg: number | null
+          peso_min_kg: number
+          tabela_id: string
+          tarifa_fixa: number | null
+          tarifa_por_ton: number | null
+          tipo_carga: string
+          zona: string
+        }
+        Insert: {
+          adicional_cte?: number | null
+          advalorem_percentual?: number | null
+          created_at?: string
+          gris_percentual?: number | null
+          id?: string
+          observacoes?: string | null
+          pedagio_por_100kg?: number | null
+          peso_max_kg?: number | null
+          peso_min_kg?: number
+          tabela_id: string
+          tarifa_fixa?: number | null
+          tarifa_por_ton?: number | null
+          tipo_carga: string
+          zona: string
+        }
+        Update: {
+          adicional_cte?: number | null
+          advalorem_percentual?: number | null
+          created_at?: string
+          gris_percentual?: number | null
+          id?: string
+          observacoes?: string | null
+          pedagio_por_100kg?: number | null
+          peso_max_kg?: number | null
+          peso_min_kg?: number
+          tabela_id?: string
+          tarifa_fixa?: number | null
+          tarifa_por_ton?: number | null
+          tipo_carga?: string
+          zona?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tabelas_frete_faixas_tabela_id_fkey"
+            columns: ["tabela_id"]
+            isOneToOne: false
+            referencedRelation: "tabelas_frete"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       veiculo_nfs: {
         Row: {
           carga_origem_id: string
@@ -2309,6 +2609,9 @@ export type Database = {
       veiculos: {
         Row: {
           access_code: string | null
+          capacidade_kg: number | null
+          capacidade_m3: number | null
+          combustivel: string | null
           created_at: string
           created_by: string | null
           data: string
@@ -2320,11 +2623,25 @@ export type Database = {
           prestacao_contas_em: string | null
           prestacao_contas_obs: string | null
           prestacao_contas_por: string | null
+          proprietario_cnpj_cpf: string | null
+          proprietario_ie: string | null
+          proprietario_razao: string | null
+          proprietario_rntrc: string | null
+          proprietario_tipo: string | null
+          proprietario_uf: string | null
+          renavam: string | null
           status: string
+          tara_kg: number | null
+          tipo_carroceria: string | null
+          tipo_rodado: string | null
+          uf_licenciamento: string | null
           updated_at: string
         }
         Insert: {
           access_code?: string | null
+          capacidade_kg?: number | null
+          capacidade_m3?: number | null
+          combustivel?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -2336,11 +2653,25 @@ export type Database = {
           prestacao_contas_em?: string | null
           prestacao_contas_obs?: string | null
           prestacao_contas_por?: string | null
+          proprietario_cnpj_cpf?: string | null
+          proprietario_ie?: string | null
+          proprietario_razao?: string | null
+          proprietario_rntrc?: string | null
+          proprietario_tipo?: string | null
+          proprietario_uf?: string | null
+          renavam?: string | null
           status?: string
+          tara_kg?: number | null
+          tipo_carroceria?: string | null
+          tipo_rodado?: string | null
+          uf_licenciamento?: string | null
           updated_at?: string
         }
         Update: {
           access_code?: string | null
+          capacidade_kg?: number | null
+          capacidade_m3?: number | null
+          combustivel?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -2352,10 +2683,65 @@ export type Database = {
           prestacao_contas_em?: string | null
           prestacao_contas_obs?: string | null
           prestacao_contas_por?: string | null
+          proprietario_cnpj_cpf?: string | null
+          proprietario_ie?: string | null
+          proprietario_razao?: string | null
+          proprietario_rntrc?: string | null
+          proprietario_tipo?: string | null
+          proprietario_uf?: string | null
+          renavam?: string | null
           status?: string
+          tara_kg?: number | null
+          tipo_carroceria?: string | null
+          tipo_rodado?: string | null
+          uf_licenciamento?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      zonas_entrega: {
+        Row: {
+          ativo: boolean
+          codigo_municipio_ibge: string | null
+          created_at: string
+          embarcador_id: string | null
+          id: string
+          municipio: string
+          uf: string
+          updated_at: string
+          zona: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_municipio_ibge?: string | null
+          created_at?: string
+          embarcador_id?: string | null
+          id?: string
+          municipio: string
+          uf: string
+          updated_at?: string
+          zona: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_municipio_ibge?: string | null
+          created_at?: string
+          embarcador_id?: string | null
+          id?: string
+          municipio?: string
+          uf?: string
+          updated_at?: string
+          zona?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zonas_entrega_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

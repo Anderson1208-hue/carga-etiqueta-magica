@@ -238,6 +238,19 @@ export function Sidebar() {
                   item={{ name: "Config. Fiscal", href: "/fiscal/configuracao", icon: Receipt }}
                   isActive={location.pathname === "/fiscal/configuracao"}
                 />
+                <NavItem
+                  item={{ name: "Motoristas (Fiscal)", href: "/fiscal/motoristas", icon: Receipt }}
+                  isActive={location.pathname === "/fiscal/motoristas"}
+                />
+                <NavItem
+                  item={{ name: "Convênios Fiscais", href: "/fiscal/convenios", icon: Receipt }}
+                  isActive={location.pathname === "/fiscal/convenios"}
+                />
+                <NavItem
+                  item={{ name: "Tabelas de Frete", href: "/fiscal/tabelas-frete", icon: Receipt }}
+                  isActive={location.pathname === "/fiscal/tabelas-frete"}
+                />
+
               </>
             )}
           </div>
