@@ -377,16 +377,21 @@ export default function AcompanhamentoRotas() {
                   {rotas.map((r, i) => {
                     const active = selectedRota?.id === r.id;
                     const alerts = alertasCount[r.id] || 0;
-                    const mSemSinal = minutosSemSinal(r);
-                    const inativo = mSemSinal !== null && mSemSinal > TOLERANCIA_SEM_SINAL_MIN;
+                    const gps = gpsStatus(r);
                     const progress = r.total_paradas
                       ? Math.round((r.paradas_concluidas / r.total_paradas) * 100)
                       : 0;
+                    const gpsClass =
+                      gps.tone === "ok"
+                        ? "bg-success/15 text-success border-success/30"
+                        : gps.tone === "warn"
+                          ? "bg-warning/15 text-warning border-warning/30"
+                          : "bg-destructive/15 text-destructive border-destructive/30";
                     return (
                       <button
                         key={r.id}
                         onClick={() => setSelectedRota(r)}
-                        className={`shrink-0 min-w-[180px] text-left rounded-lg border p-2 transition-colors ${
+                        className={`shrink-0 min-w-[190px] text-left rounded-lg border p-2 transition-colors ${
                           active
                             ? "border-primary bg-primary/10"
                             : "border-border hover:bg-muted/50"
@@ -400,12 +405,14 @@ export default function AcompanhamentoRotas() {
                                 {alerts}
                               </Badge>
                             )}
-                            {inativo && (
-                              <Badge variant="destructive" className="h-5 px-1.5 text-[10px] gap-0.5">
+                            <Badge variant="outline" className={`h-5 px-1.5 text-[10px] gap-0.5 ${gpsClass}`}>
+                              {gps.tone === "ok" ? (
+                                <Wifi className="w-2.5 h-2.5" />
+                              ) : (
                                 <WifiOff className="w-2.5 h-2.5" />
-                                {mSemSinal}m
-                              </Badge>
-                            )}
+                              )}
+                              {gps.tone === "ok" ? "GPS" : gps.mins != null ? `${gps.mins}m` : "—"}
+                            </Badge>
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
