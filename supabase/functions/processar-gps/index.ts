@@ -62,6 +62,48 @@ function normalizeDateOnly(value: unknown): string | null {
   return value.slice(0, 10);
 }
 
+async function findLastGpsInsideStop(
+  supabase: any,
+  monitoramento_rota_id: string,
+  parada: any,
+  beforeAt: Date,
+  raioPadrao: number,
+  toleranciaGps: number,
+): Promise<Date | null> {
+  if (!parada.horario_chegada || !parada.latitude || !parada.longitude) return null;
+
+  const { data, error } = await supabase
+    .from("posicoes_gps")
+    .select("registrado_em, latitude, longitude")
+    .eq("monitoramento_rota_id", monitoramento_rota_id)
+    .eq("heartbeat", false)
+    .gte("registrado_em", parada.horario_chegada)
+    .lt("registrado_em", beforeAt.toISOString())
+    .order("registrado_em", { ascending: false })
+    .limit(1000);
+
+  if (error) {
+    console.error("[processar-gps] erro ao buscar último GPS dentro da parada:", error);
+    return null;
+  }
+
+  const raio = (parada.raio_geofence_metros || raioPadrao) + toleranciaGps;
+  const stopLat = Number(parada.latitude);
+  const stopLng = Number(parada.longitude);
+
+  for (const pos of data || []) {
+    const posLat = Number(pos.latitude);
+    const posLng = Number(pos.longitude);
+    const eventAt = new Date(pos.registrado_em);
+    if (!Number.isFinite(posLat) || !Number.isFinite(posLng) || Number.isNaN(eventAt.getTime())) continue;
+
+    const dist = haversineDistance(posLat, posLng, stopLat, stopLng);
+    if (dist <= raio) return eventAt;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -279,9 +321,9 @@ Deno.serve(async (req) => {
             .update({ status: "chegou_cliente", horario_chegada: parada.horario_chegada })
             .eq("id", parada.id);
 
-          // Fecha qualquer parada anterior ainda aberta usando a chegada desta como saída.
-          // Evita horario_saida da parada N-1 > horario_chegada da parada N quando o ping
-          // de "saída do raio" chega atrasado (batch offline, ordem invertida, raios amplos).
+          // Fecha parada anterior aberta somente com evidência GPS dela mesma.
+          // Nunca usa a chegada da próxima parada como horário de saída: se não houver
+          // último ping comprovado dentro do cliente anterior, a parada continua aberta.
           const abertasAnteriores = paradasState.filter(
             (p: any) =>
               p.ordem < parada.ordem &&
@@ -292,10 +334,25 @@ Deno.serve(async (req) => {
           for (const ant of abertasAnteriores) {
             const chegadaAnt = new Date(ant.horario_chegada);
             if (eventAt.getTime() <= chegadaAnt.getTime()) continue;
-            const permAnt = Math.max(0, Math.round((eventAt.getTime() - chegadaAnt.getTime()) / 60000));
+
+            const lastInsideAnt = await findLastGpsInsideStop(
+              supabase,
+              monitoramento_rota_id,
+              ant,
+              eventAt,
+              raio_padrao,
+              tolerancia_gps,
+            );
+
+            if (!lastInsideAnt || lastInsideAnt.getTime() <= chegadaAnt.getTime()) {
+              events.push(`sem_saida_factual_${ant.id}`);
+              continue;
+            }
+
+            const permAnt = Math.max(0, Math.round((lastInsideAnt.getTime() - chegadaAnt.getTime()) / 60000));
             const novoStatus = permAnt < tempo_min_atendimento ? "visita_inconsistente" : "finalizada";
             ant.status = novoStatus;
-            ant.horario_saida = eventAt.toISOString();
+            ant.horario_saida = lastInsideAnt.toISOString();
             ant.tempo_permanencia_min = permAnt;
             ant.is_excecao = novoStatus === "visita_inconsistente";
             await supabase
