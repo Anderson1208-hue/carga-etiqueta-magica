@@ -83,7 +83,7 @@ async function findLastGpsInsideStop(
     .from("posicoes_gps")
     .select("registrado_em, latitude, longitude")
     .eq("monitoramento_rota_id", monitoramento_rota_id)
-    .eq("heartbeat", false)
+    .or("heartbeat.eq.false,heartbeat.is.null")
     .gte("registrado_em", parada.horario_chegada)
     .lt("registrado_em", beforeAt.toISOString())
     .order("registrado_em", { ascending: false })
@@ -393,6 +393,21 @@ Deno.serve(async (req) => {
           for (const ant of abertasAnteriores) {
             const chegadaAnt = new Date(ant.horario_chegada);
             if (eventAt.getTime() <= chegadaAnt.getTime()) {
+              bloqueiaChegada = true;
+              continue;
+            }
+
+            const antLat = Number(ant.latitude);
+            const antLng = Number(ant.longitude);
+            const raioAnt = (ant.raio_geofence_metros || raio_padrao) +
+              tolerancia_gps;
+            if (
+              Number.isFinite(antLat) && Number.isFinite(antLng) &&
+              haversineDistance(posLat, posLng, antLat, antLng) <= raioAnt
+            ) {
+              // Ainda está fisicamente dentro da parada anterior. Não há fato
+              // de saída; portanto não abre outra parada no mesmo local/raio.
+              events.push(`ainda_dentro_anterior_${ant.id}`);
               bloqueiaChegada = true;
               continue;
             }
