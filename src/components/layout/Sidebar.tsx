@@ -48,6 +48,7 @@ const topNav = [
 
 const depositoItems = [
   { name: "Romaneio", href: "/romaneio", icon: FileText },
+  { name: "Romaneio por NF", href: "/romaneio-por-nf", icon: FileText },
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
   { name: "Endereçamento", href: "/enderecamento", icon: MapPin },
   { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
@@ -61,7 +62,6 @@ const transporteItems = [
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
-  { name: "Totalizado por NF", href: "/totalizado-nf", icon: Calculator },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
