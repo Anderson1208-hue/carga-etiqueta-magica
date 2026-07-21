@@ -100,9 +100,17 @@ function isoHoje() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const EMAILS_PODE_DESFAZER = [
+  "yasmin.silva@tlmlogistica.com.br",
+  "julio.nogueira@tlmlogistica.com.br",
+];
+
 export default function PrestacaoContas() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
+  const podeDesfazer =
+    isAdmin ||
+    (profile?.email ? EMAILS_PODE_DESFAZER.includes(profile.email.toLowerCase()) : false);
   const [data, setData] = useState<string>(isoHoje());
   const [veiculos, setVeiculos] = useState<VeiculoLista[]>([]);
   const [veiculoSel, setVeiculoSel] = useState<VeiculoLista | null>(null);
@@ -818,20 +826,22 @@ export default function PrestacaoContas() {
                                           </Tooltip>
                                         </>
                                       )}
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            size="icon"
-                                            variant="outline"
-                                            className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-                                            disabled={!!veiculoSel.prestacao_contas_em}
-                                            onClick={() => desfazerBaixa(b)}
-                                          >
-                                            <Undo2 className="w-3.5 h-3.5" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
-                                      </Tooltip>
+                                      {podeDesfazer && (
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="outline"
+                                              className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                              disabled={!!veiculoSel.prestacao_contas_em}
+                                              onClick={() => desfazerBaixa(b)}
+                                            >
+                                              <Undo2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>Desfazer baixa — motorista poderá registrar a ocorrência correta</TooltipContent>
+                                        </Tooltip>
+                                      )}
                                     </div>
                                   </TableCell>
                                 </TableRow>
