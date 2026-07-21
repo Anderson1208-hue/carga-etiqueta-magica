@@ -326,6 +326,9 @@ function DestinatarioDialog({
         uf: e.uf || null,
         cep: (e.cep || "").replace(/\D/g, "") || null,
         principal: e.principal,
+        tipo_endereco: e.tipo_endereco || "fiscal",
+        ativo: e.ativo ?? true,
+        observacao: e.observacao || null,
       };
       let enderecoId = e.id;
       if (e.id) {
