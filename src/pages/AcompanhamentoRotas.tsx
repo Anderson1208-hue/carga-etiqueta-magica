@@ -67,7 +67,6 @@ export default function AcompanhamentoRotas() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
-  const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
   const [analisePorParada, setAnalisePorParada] = useState<Record<string, ParadaAnalise>>({});
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
@@ -174,29 +173,6 @@ export default function AcompanhamentoRotas() {
     setParadas(pars);
     setAlertas(alrts);
 
-    // Última baixa "entregue" por CNPJ + coords para análise off-site
-    let baixasComCoord: any[] = [];
-    if (veiculoId) {
-      baixasComCoord = await fetchAllPages<any>((from, to) =>
-        supabase
-          .from("baixas_entrega")
-          .select("registrado_em, nf_id, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
-          .eq("veiculo_id", veiculoId)
-          .eq("status", "entregue")
-          .order("registrado_em", { ascending: false })
-          .range(from, to)
-      );
-      const map: Record<string, string> = {};
-      baixasComCoord.forEach((b: any) => {
-        const cnpj = (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
-        if (!cnpj) return;
-        if (!map[cnpj]) map[cnpj] = b.registrado_em;
-      });
-      setBaixasPorCnpj(map);
-    } else {
-      setBaixasPorCnpj({});
-    }
-
     // GPS pings (sem heartbeats) para dwell "estilo mercado"
     const pings = await fetchAllPages<any>((from, to) =>
       supabase
@@ -208,14 +184,7 @@ export default function AcompanhamentoRotas() {
         .range(from, to)
     );
 
-    const baixasCoord = baixasComCoord.map((b: any) => ({
-      cnpj: (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""),
-      registrado_em: b.registrado_em,
-      latitude: b.latitude != null ? Number(b.latitude) : null,
-      longitude: b.longitude != null ? Number(b.longitude) : null,
-    }));
-
-    setAnalisePorParada(analisarParadasSequencial(pars, pings, baixasCoord, 30));
+    setAnalisePorParada(analisarParadasSequencial(pars, pings, [], 30));
   }, []);
 
 
@@ -540,7 +509,6 @@ export default function AcompanhamentoRotas() {
                 /* justificativa fica em Monitoramento detalhado */
               }}
               formatTime={formatTime}
-              baixasPorCnpj={baixasPorCnpj}
               analisePorParada={analisePorParada}
             />
           </>
