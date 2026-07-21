@@ -371,40 +371,6 @@ Deno.serve(async (req) => {
 
         // RULE: Vehicle entered geofence
         if (dentroGeofence && parada.status === "programada") {
-          const paradaAnteriorAberta = paradasState.some(
-            (p: any) =>
-              p.ordem < parada.ordem &&
-              [
-                "chegou_cliente",
-                "em_atendimento",
-                "parada_excessiva",
-                "fora_sequencia",
-              ].includes(p.status) &&
-              p.horario_chegada &&
-              !p.horario_saida,
-          );
-
-          // Um ping não pode iniciar duas paradas ao mesmo tempo. Se a parada
-          // anterior ainda está aberta, primeiro precisamos de um ping factual
-          // de saída dela; caso contrário os horários ficam artificiais.
-          if (paradaAnteriorAberta) {
-            events.push(`aguardando_saida_anterior_${parada.id}`);
-            continue;
-          }
-
-          parada.status = "chegou_cliente";
-          parada.horario_chegada = eventAt.toISOString();
-          await supabase
-            .from("monitoramento_paradas")
-            .update({
-              status: "chegou_cliente",
-              horario_chegada: parada.horario_chegada,
-            })
-            .eq("id", parada.id);
-
-          // Fecha parada anterior aberta somente com evidência GPS dela mesma.
-          // Nunca usa a chegada da próxima parada como horário de saída: se não houver
-          // último ping comprovado dentro do cliente anterior, a parada continua aberta.
           const abertasAnteriores = paradasState.filter(
             (p: any) =>
               p.ordem < parada.ordem &&
@@ -418,9 +384,18 @@ Deno.serve(async (req) => {
               (!p.horario_saida ||
                 new Date(p.horario_saida).getTime() > eventAt.getTime()),
           );
+
+          // Antes de abrir a próxima parada, fecha qualquer parada anterior
+          // aberta usando o último ping comprovado dentro do raio dela. Se não
+          // existir esse fato, a nova chegada é bloqueada para não inventar
+          // horário nem duplicar o mesmo ping em duas paradas.
+          let bloqueiaChegada = false;
           for (const ant of abertasAnteriores) {
             const chegadaAnt = new Date(ant.horario_chegada);
-            if (eventAt.getTime() <= chegadaAnt.getTime()) continue;
+            if (eventAt.getTime() <= chegadaAnt.getTime()) {
+              bloqueiaChegada = true;
+              continue;
+            }
 
             const lastInsideAnt = await findLastGpsInsideStop(
               supabase,
@@ -435,6 +410,7 @@ Deno.serve(async (req) => {
               !lastInsideAnt || lastInsideAnt.getTime() <= chegadaAnt.getTime()
             ) {
               events.push(`sem_saida_factual_${ant.id}`);
+              bloqueiaChegada = true;
               continue;
             }
 
@@ -460,8 +436,23 @@ Deno.serve(async (req) => {
                 is_excecao: ant.is_excecao,
               })
               .eq("id", ant.id);
-            events.push(`${novoStatus}_${ant.id}_by_next_arrival`);
+            events.push(`${novoStatus}_${ant.id}_saida_factual`);
           }
+
+          if (bloqueiaChegada) {
+            events.push(`chegada_bloqueada_sem_saida_anterior_${parada.id}`);
+            continue;
+          }
+
+          parada.status = "chegou_cliente";
+          parada.horario_chegada = eventAt.toISOString();
+          await supabase
+            .from("monitoramento_paradas")
+            .update({
+              status: "chegou_cliente",
+              horario_chegada: parada.horario_chegada,
+            })
+            .eq("id", parada.id);
 
           // Check if out of sequence
           const anterioresNaoConcluidas = paradasState.filter(
