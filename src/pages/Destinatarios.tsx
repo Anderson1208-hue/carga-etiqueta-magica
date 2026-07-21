@@ -595,9 +595,39 @@ function DestinatarioDialog({
                       <Label>UF</Label>
                       <Input maxLength={2} value={endForm.uf || ""} onChange={(e) => setEndForm({ ...endForm, uf: e.target.value.toUpperCase() })} />
                     </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Tipo de endereço</Label>
+                      <div className="flex gap-2 flex-wrap">
+                        {(["fiscal","entrega","doca","coleta"] as TipoEndereco[]).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setEndForm({ ...endForm, tipo_endereco: t })}
+                            className={`px-3 py-1.5 rounded-md text-sm border capitalize transition-colors ${
+                              (endForm.tipo_endereco || "fiscal") === t
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background hover:bg-accent"
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Fiscal</strong>: endereço da NF. <strong>Entrega</strong>: local físico onde o motorista descarrega (usado na roteirização quando existe). <strong>Doca</strong>: acesso específico dentro do CD. <strong>Coleta</strong>: ponto de retirada.
+                      </p>
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Observação</Label>
+                      <Textarea rows={2} placeholder="Ex: entrar pela lateral, doca 3..." value={endForm.observacao || ""} onChange={(e) => setEndForm({ ...endForm, observacao: e.target.value })} />
+                    </div>
                     <label className="flex items-center gap-2 col-span-2 text-sm">
                       <Switch checked={endForm.principal} onCheckedChange={(v) => setEndForm({ ...endForm, principal: v })} />
-                      Endereço principal
+                      Endereço principal (padrão da roteirização quando não há tipo entrega/doca)
+                    </label>
+                    <label className="flex items-center gap-2 col-span-2 text-sm">
+                      <Switch checked={endForm.ativo ?? true} onCheckedChange={(v) => setEndForm({ ...endForm, ativo: v })} />
+                      Ativo
                     </label>
                   </div>
                   <DialogFooter>
