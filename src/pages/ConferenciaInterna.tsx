@@ -122,6 +122,12 @@ export default function ConferenciaInterna() {
   const [etiquetasFaltantes, setEtiquetasFaltantes] = useState<{id: string; x_prod: string; c_prod: string; seq: number; total: number}[]>([]);
   const [loadingFaltantes, setLoadingFaltantes] = useState(false);
 
+  // Dupla checagem (bipe do cliente + bipe do nosso QR)
+  const [duplaChecagem, setDuplaChecagem] = useState(false);
+  const [codigoCliente, setCodigoCliente] = useState("");
+  const clienteInputRef = useRef<HTMLInputElement>(null);
+
+
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
   const [pendingEtiquetas, setPendingEtiquetas] = useState<any[]>([]);
