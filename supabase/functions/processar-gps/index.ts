@@ -371,6 +371,27 @@ Deno.serve(async (req) => {
 
         // RULE: Vehicle entered geofence
         if (dentroGeofence && parada.status === "programada") {
+          const paradaAnteriorAberta = paradasState.some(
+            (p: any) =>
+              p.ordem < parada.ordem &&
+              [
+                "chegou_cliente",
+                "em_atendimento",
+                "parada_excessiva",
+                "fora_sequencia",
+              ].includes(p.status) &&
+              p.horario_chegada &&
+              !p.horario_saida,
+          );
+
+          // Um ping não pode iniciar duas paradas ao mesmo tempo. Se a parada
+          // anterior ainda está aberta, primeiro precisamos de um ping factual
+          // de saída dela; caso contrário os horários ficam artificiais.
+          if (paradaAnteriorAberta) {
+            events.push(`aguardando_saida_anterior_${parada.id}`);
+            continue;
+          }
+
           parada.status = "chegou_cliente";
           parada.horario_chegada = eventAt.toISOString();
           await supabase
@@ -553,6 +574,9 @@ Deno.serve(async (req) => {
         }
 
         // RULE: Vehicle LEFT geofence
+        // Horário de saída precisa ser factual: o último ping ainda dentro do
+        // raio da parada. O primeiro ping fora prova que saiu, mas NÃO é o
+        // horário em que estava no cliente.
         if (
           !dentroGeofence &&
           [
@@ -567,14 +591,26 @@ Deno.serve(async (req) => {
           // Guard: ignora pings fora de ordem (mais antigos que a chegada) — evita
           // registrar horario_saida < horario_chegada e marcar visita_inconsistente indevidamente.
           if (eventAt.getTime() <= chegada.getTime()) continue;
+          const lastInside = await findLastGpsInsideStop(
+            supabase,
+            monitoramento_rota_id,
+            parada,
+            eventAt,
+            raio_padrao,
+            tolerancia_gps,
+          );
+          if (!lastInside || lastInside.getTime() <= chegada.getTime()) {
+            events.push(`sem_saida_factual_${parada.id}`);
+            continue;
+          }
           const permanencia = Math.max(
             0,
-            Math.round((eventAt.getTime() - chegada.getTime()) / 60000),
+            Math.round((lastInside.getTime() - chegada.getTime()) / 60000),
           );
 
           if (permanencia < tempo_min_atendimento) {
             parada.status = "visita_inconsistente";
-            parada.horario_saida = eventAt.toISOString();
+            parada.horario_saida = lastInside.toISOString();
             parada.tempo_permanencia_min = permanencia;
             parada.is_excecao = true;
             await supabase
@@ -598,7 +634,7 @@ Deno.serve(async (req) => {
             events.push(`visita_inconsistente_${parada.id}`);
           } else {
             parada.status = "finalizada";
-            parada.horario_saida = eventAt.toISOString();
+            parada.horario_saida = lastInside.toISOString();
             parada.tempo_permanencia_min = permanencia;
             parada.is_excecao = false;
             await supabase

@@ -59,17 +59,21 @@ export function ParadasTable({
           <TableBody>
             {paradas.map((parada) => {
               const baixaIso = baixasPorCnpj[normCnpj(parada.cnpj_destinatario)] || null;
-              let gapMin: number | null = null;
-              if (baixaIso && parada.horario_chegada) {
-                gapMin = Math.round(
-                  (new Date(baixaIso).getTime() - new Date(parada.horario_chegada).getTime()) / 60000
-                );
-              }
-              const gapSuspeito = gapMin !== null && Math.abs(gapMin) >= GAP_ALERTA_MIN;
               const analise = analisePorParada[parada.id];
-              const chegada = formatTime(parada.horario_chegada);
-              const saida = formatTime(parada.horario_saida);
+              const gpsFirst = analise?.firstIn || null;
+              const gpsLast = analise?.lastIn || null;
+              const chegada = formatTime(gpsFirst);
+              const saida = formatTime(gpsLast);
               const baixaFmt = formatTime(baixaIso);
+              let baixaGapMin: number | null = null;
+              if (baixaIso && gpsFirst && gpsLast) {
+                const baixaMs = new Date(baixaIso).getTime();
+                const firstMs = new Date(gpsFirst).getTime();
+                const lastMs = new Date(gpsLast).getTime();
+                if (baixaMs < firstMs) baixaGapMin = Math.round((baixaMs - firstMs) / 60000);
+                else if (baixaMs > lastMs) baixaGapMin = Math.round((baixaMs - lastMs) / 60000);
+                else baixaGapMin = 0;
+              }
 
               const dwellNode = analise && analise.dwellMin != null
                 ? (isPassagem(analise)
@@ -109,9 +113,13 @@ export function ParadasTable({
                   </TableCell>
 
                   <TableCell className="py-1 px-1.5 text-[11px] align-top whitespace-nowrap tabular-nums leading-tight">
-                    <div>
-                      {chegada} <span className="text-muted-foreground">→</span> {saida}
-                    </div>
+                    {gpsFirst && gpsLast ? (
+                      <div>
+                        {chegada} <span className="text-muted-foreground">→</span> {saida}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground">sem GPS no raio</div>
+                    )}
                     <div className="text-[10px]">{dwellNode}</div>
                   </TableCell>
 
@@ -126,16 +134,18 @@ export function ParadasTable({
                       )}
                     </div>
                     <div className="text-[10px]">
-                      {gapMin === null ? (
+                      {!baixaIso ? (
                         <span className="text-muted-foreground">—</span>
-                      ) : gapSuspeito ? (
+                      ) : !gpsFirst || !gpsLast ? (
+                        <span className="text-destructive font-medium">sem GPS</span>
+                      ) : baixaGapMin !== null && Math.abs(baixaGapMin) >= GAP_ALERTA_MIN ? (
                         <span className="inline-flex items-center gap-0.5 text-destructive font-medium">
                           <AlertTriangle className="w-2.5 h-2.5" />
-                          {gapMin > 0 ? "+" : ""}{gapMin}m
+                          {baixaGapMin > 0 ? "+" : ""}{baixaGapMin}m
                         </span>
                       ) : (
                         <span className="text-muted-foreground">
-                          {gapMin > 0 ? "+" : ""}{gapMin}m
+                          {baixaGapMin !== null ? `${baixaGapMin > 0 ? "+" : ""}${baixaGapMin}m` : "0m"}
                         </span>
                       )}
                     </div>
