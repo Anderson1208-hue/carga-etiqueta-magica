@@ -818,7 +818,7 @@ export default function ConferenciaInterna() {
                     disabled={duplaChecagem && !codigoCliente.trim()}
                   />
                   <Button
-                    onClick={handleManualScan}
+                    onClick={() => handleManualScan()}
                     disabled={scanning || !qrInput || (duplaChecagem && !codigoCliente.trim())}
                     size="sm"
                   >
