@@ -31,6 +31,8 @@ type Destinatario = {
   raio_geofence_metros: number | null;
 };
 
+type TipoEndereco = "fiscal" | "entrega" | "doca" | "coleta";
+
 type Endereco = {
   id?: string;
   destinatario_id?: string;
@@ -43,6 +45,9 @@ type Endereco = {
   uf: string | null;
   cep: string | null;
   principal: boolean;
+  tipo_endereco?: TipoEndereco;
+  ativo?: boolean;
+  observacao?: string | null;
 };
 
 type Restricao = {
