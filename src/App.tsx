@@ -33,6 +33,7 @@ import RelatorioBaixas from "./pages/RelatorioBaixas";
 import RelatorioPendentesBaixa from "./pages/RelatorioPendentesBaixa";
 import RelatorioAgendamentosFornecedor from "./pages/RelatorioAgendamentosFornecedor";
 import PrestacaoContas from "./pages/PrestacaoContas";
+import TotalizadoPorNf from "./pages/TotalizadoPorNf";
 
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
