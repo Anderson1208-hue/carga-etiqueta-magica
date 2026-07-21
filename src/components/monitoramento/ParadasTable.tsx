@@ -127,17 +127,34 @@ export function ParadasTable({
                     <div className="flex items-center gap-1">
                       <span>{baixaFmt}</span>
                       {analise?.offSite && analise.baixaDistM != null && (
-                        <Badge variant="destructive" className="h-4 text-[9px] px-1 gap-0.5">
-                          <MapPinOff className="w-2.5 h-2.5" />
-                          {analise.baixaDistM}m
-                        </Badge>
+                        gpsFirst && gpsLast ? (
+                          <Badge
+                            variant="destructive"
+                            className="h-4 text-[9px] px-1 gap-0.5"
+                            title="Motorista bateu baixa fora do raio da parada (off-site real, com GPS factual)"
+                          >
+                            <MapPinOff className="w-2.5 h-2.5" />
+                            {analise.baixaDistM}m
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="h-4 text-[9px] px-1 gap-0.5 border-amber-500 text-amber-600 dark:text-amber-400"
+                            title="Sem GPS factual no raio. Distância entre baixa e ponto cadastrado — provável divergência de cadastro, não de motorista."
+                          >
+                            <MapPinOff className="w-2.5 h-2.5" />
+                            {analise.baixaDistM}m
+                          </Badge>
+                        )
                       )}
                     </div>
                     <div className="text-[10px]">
                       {!baixaIso ? (
                         <span className="text-muted-foreground">—</span>
                       ) : !gpsFirst || !gpsLast ? (
-                        <span className="text-destructive font-medium">sem GPS</span>
+                        <span className="text-muted-foreground italic" title="Não há pings GPS dentro do raio da parada para comparar com o horário da baixa">
+                          sem GPS factual
+                        </span>
                       ) : baixaGapMin !== null && Math.abs(baixaGapMin) >= GAP_ALERTA_MIN ? (
                         <span className="inline-flex items-center gap-0.5 text-destructive font-medium">
                           <AlertTriangle className="w-2.5 h-2.5" />
@@ -176,8 +193,8 @@ export function ParadasTable({
           </TableBody>
         </Table>
         <p className="text-[10px] text-muted-foreground mt-1 px-1">
-          <strong>Dwell</strong> = tempo dentro do raio da parada (min/pings).
-          <em> *</em> valor legado sem GPS. <strong>Off-site</strong> = baixa fora do raio.
+          <strong>Dwell</strong> = tempo dentro do raio (min/pings).
+          <em> *</em> valor legado. Badge <span className="text-destructive font-medium">vermelho</span> = off-site real (com GPS). Badge <span className="text-amber-600 dark:text-amber-400 font-medium">âmbar</span> = distância cadastro↔baixa sem GPS factual (provável cadastro divergente).
         </p>
       </CardContent>
     </Card>
