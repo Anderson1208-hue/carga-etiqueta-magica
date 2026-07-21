@@ -30,6 +30,7 @@ import {
 import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { RotaStatusBadge, StatusBadge } from "@/components/monitoramento/StatusBadge";
 import type { MonitoramentoRota, MonitoramentoParada, Alerta } from "@/components/monitoramento/types";
+import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
 import { toast } from "sonner";
 
 const normalizePlate = (placa?: string | null) =>
@@ -79,6 +80,7 @@ export default function TorreControle() {
   // Detalhe da rota selecionada
   const [detailParadas, setDetailParadas] = useState<MonitoramentoParada[]>([]);
   const [detailAlertas, setDetailAlertas] = useState<Alerta[]>([]);
+  const [detailAnalise, setDetailAnalise] = useState<Record<string, ParadaAnalise>>({});
   const [detailLoading, setDetailLoading] = useState(false);
 
   const loadRotas = useCallback(async (dataFiltro: string) => {
@@ -227,12 +229,13 @@ export default function TorreControle() {
     if (!selectedRotaId) {
       setDetailParadas([]);
       setDetailAlertas([]);
+      setDetailAnalise({});
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
     (async () => {
-      const [{ data: paradas }, { data: alertas }] = await Promise.all([
+      const [{ data: paradas }, { data: alertas }, { data: pings }] = await Promise.all([
         supabase.from("monitoramento_paradas")
           .select("*")
           .eq("monitoramento_rota_id", selectedRotaId)
@@ -242,10 +245,18 @@ export default function TorreControle() {
           .eq("monitoramento_rota_id", selectedRotaId)
           .order("created_at", { ascending: false })
           .limit(50),
+        supabase.from("posicoes_gps")
+          .select("latitude, longitude, registrado_em")
+          .eq("monitoramento_rota_id", selectedRotaId)
+          .eq("heartbeat", false)
+          .order("registrado_em", { ascending: true })
+          .limit(5000),
       ]);
       if (cancelled) return;
-      setDetailParadas((paradas || []) as MonitoramentoParada[]);
+      const paradasRows = (paradas || []) as MonitoramentoParada[];
+      setDetailParadas(paradasRows);
       setDetailAlertas((alertas || []) as Alerta[]);
+      setDetailAnalise(analisarParadas(paradasRows, (pings || []) as any[], [], 30));
       setDetailLoading(false);
     })();
     return () => { cancelled = true; };
@@ -424,6 +435,7 @@ export default function TorreControle() {
                 rota={selectedRota}
                 paradas={detailParadas}
                 alertas={detailAlertas}
+                analisePorParada={detailAnalise}
                 loading={detailLoading}
                 onClose={() => setSelectedRotaId(null)}
                 onMarkAlertaLido={marcarAlertaLido}
@@ -546,11 +558,12 @@ function ListaCompactaRotas({
 
 // ─── Detalhe da rota (Opção B: embutido) ──────────────────
 function DetalheRotaPanel({
-  rota, paradas, alertas, loading, onClose, onMarkAlertaLido,
+  rota, paradas, alertas, analisePorParada, loading, onClose, onMarkAlertaLido,
 }: {
   rota: MonitoramentoRota;
   paradas: MonitoramentoParada[];
   alertas: Alerta[];
+  analisePorParada: Record<string, ParadaAnalise>;
   loading: boolean;
   onClose: () => void;
   onMarkAlertaLido: (id: string) => void;
@@ -626,8 +639,12 @@ function DetalheRotaPanel({
                             </p>
                           )}
                           <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-                            {p.horario_chegada && <span>🕒 {formatTime(p.horario_chegada)}</span>}
-                            {p.tempo_permanencia_min != null && <span>⏱ {p.tempo_permanencia_min}m</span>}
+                            {analisePorParada[p.id]?.firstIn && analisePorParada[p.id]?.lastIn ? (
+                              <span>GPS {formatTime(analisePorParada[p.id].firstIn)} → {formatTime(analisePorParada[p.id].lastIn)}</span>
+                            ) : (
+                              <span className="text-destructive">sem GPS no raio</span>
+                            )}
+                            {analisePorParada[p.id]?.dwellMin != null && <span>⏱ {analisePorParada[p.id].dwellMin}m</span>}
                             {p.total_nfs != null && <span>📦 {p.total_nfs} NF</span>}
                           </div>
                         </div>
