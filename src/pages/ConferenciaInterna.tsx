@@ -357,6 +357,39 @@ export default function ConferenciaInterna() {
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
 
+      // Dupla checagem: exige código do cliente bipado antes e confere com cProd
+      if (duplaChecagem) {
+        const cliente = codigoCliente.trim();
+        if (!cliente) {
+          const result: ScanResult = {
+            type: "warning",
+            message: "Bipe o código do cliente primeiro",
+            details: "Modo Dupla Checagem ativo",
+          };
+          setLastResult(result); addToHistory(result); playSound("warning");
+          setTimeout(() => clienteInputRef.current?.focus(), 50);
+          return;
+        }
+        const clienteNorm = cliente.replace(/^0+/, "");
+        const nossoNorm = (cProd || "").replace(/^0+/, "");
+        // Match direto pelo cProd (ou cProd contido no EAN-13, cobre GTIN que embute o código)
+        const match =
+          clienteNorm === nossoNorm ||
+          (clienteNorm.length >= 12 && clienteNorm.includes(nossoNorm) && nossoNorm.length >= 4);
+        if (!match) {
+          const result: ScanResult = {
+            type: "error",
+            message: "DIVERGÊNCIA — códigos não batem",
+            details: `Cliente: ${cliente}  ≠  Nosso cProd: ${nossoNorm}`,
+          };
+          setLastResult(result); addToHistory(result); playSound("error");
+          setCodigoCliente("");
+          setTimeout(() => clienteInputRef.current?.focus(), 50);
+          return;
+        }
+      }
+
+
       // Validate carga
       if (qrCargaId !== selectedCarga.id) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra carga", details: "Esta etiqueta pertence a outra carga" };
