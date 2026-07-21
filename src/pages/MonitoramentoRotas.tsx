@@ -43,7 +43,6 @@ export default function MonitoramentoRotas() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [selectedRota, setSelectedRota] = useState<MonitoramentoRota | null>(null);
   const [paradas, setParadas] = useState<MonitoramentoParada[]>([]);
-  const [baixasPorCnpj, setBaixasPorCnpj] = useState<Record<string, string>>({});
   const [analisePorParada, setAnalisePorParada] = useState<Record<string, ParadaAnalise>>({});
   const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,28 +139,8 @@ export default function MonitoramentoRotas() {
     setParadas(data);
   }, []);
 
-  const loadBaixas = useCallback(async (veiculoId: string) => {
-    const baixas = await fetchAllPages<any>((from, to) =>
-      supabase
-        .from("baixas_entrega")
-        .select("registrado_em, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
-        .eq("veiculo_id", veiculoId)
-        .eq("status", "entregue")
-        .order("registrado_em", { ascending: false })
-        .range(from, to)
-    );
-    const map: Record<string, string> = {};
-    baixas.forEach((b: any) => {
-      const cnpj = (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "");
-      if (!cnpj) return;
-      if (!map[cnpj]) map[cnpj] = b.registrado_em;
-    });
-    setBaixasPorCnpj(map);
-    return baixas;
-  }, []);
-
-  const loadAnalise = useCallback(async (rotaId: string, veiculoId: string | null) => {
-    const [pars, pings, baixasRaw] = await Promise.all([
+  const loadAnalise = useCallback(async (rotaId: string) => {
+    const [pars, pings] = await Promise.all([
       fetchAllPages<any>((from, to) =>
         supabase
           .from("monitoramento_paradas")
@@ -178,25 +157,8 @@ export default function MonitoramentoRotas() {
           .order("registrado_em", { ascending: true })
           .range(from, to)
       ),
-      veiculoId
-        ? fetchAllPages<any>((from, to) =>
-            supabase
-              .from("baixas_entrega")
-              .select("registrado_em, status, latitude, longitude, notas_fiscais!inner(cnpj_destinatario)")
-              .eq("veiculo_id", veiculoId)
-              .eq("status", "entregue")
-              .order("registrado_em", { ascending: false })
-              .range(from, to)
-          )
-        : Promise.resolve([] as any[]),
     ]);
-    const baixasCoord = (baixasRaw || []).map((b: any) => ({
-      cnpj: (b.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, ""),
-      registrado_em: b.registrado_em,
-      latitude: b.latitude != null ? Number(b.latitude) : null,
-      longitude: b.longitude != null ? Number(b.longitude) : null,
-    }));
-    setAnalisePorParada(analisarParadasSequencial(pars, pings, baixasCoord, 30));
+    setAnalisePorParada(analisarParadasSequencial(pars, pings, [], 30));
   }, []);
 
 
@@ -607,8 +569,7 @@ export default function MonitoramentoRotas() {
     if (!selectedRota) return;
     loadParadas(selectedRota.id);
     loadAlertas(selectedRota.id);
-    if (selectedRota.veiculo_id) loadBaixas(selectedRota.veiculo_id);
-    loadAnalise(selectedRota.id, selectedRota.veiculo_id);
+    loadAnalise(selectedRota.id);
 
     const channelParadas = supabase
       .channel(`mon-paradas-${selectedRota.id}`)
@@ -744,7 +705,6 @@ export default function MonitoramentoRotas() {
                   paradas={paradas}
                   onJustificar={(p) => setJustificativaParada(p)}
                   formatTime={formatTime}
-                  baixasPorCnpj={baixasPorCnpj}
                   analisePorParada={analisePorParada}
                 />
               </>
