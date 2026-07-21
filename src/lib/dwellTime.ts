@@ -1,8 +1,7 @@
-// Análise "estilo mercado" (Samsara/Trimble) de tempo em parada e entrega off-site.
+// Análise "estilo mercado" (Samsara/Trimble) de tempo em parada por GPS factual.
 // - Dwell time: tempo entre 1º e último ping GPS dentro do geofence da parada
 //   (padrão do mercado; simples e robusto a pings esparsos).
-// - Off-site: sinaliza quando a coordenada da baixa "entregue" está fora do raio
-//   da parada — indica entrega registrada longe do endereço cadastrado.
+// - A baixa operacional NÃO entra na análise de localização do veículo.
 
 export interface GpsPing {
   latitude: number | string;
@@ -28,10 +27,11 @@ export interface BaixaCoord {
 export interface ParadaAnalise {
   dwellMin: number | null;
   pingsDentro: number;
+  rawPingsDentro: number;
   firstIn: string | null;
   lastIn: string | null;
-  baixaDistM: number | null;
-  offSite: boolean;
+  minDistM: number | null;
+  closestAt: string | null;
 }
 
 const DWELL_MIN_THRESHOLD = 2; // < 2min = "passagem"
@@ -60,15 +60,6 @@ export function analisarParadas(
   toleranciaGpsM = 30
 ): Record<string, ParadaAnalise> {
   const out: Record<string, ParadaAnalise> = {};
-  const baixasPorCnpj = new Map<string, BaixaCoord>();
-  for (const b of baixas) {
-    if (!b.cnpj) continue;
-    const cur = baixasPorCnpj.get(b.cnpj);
-    if (!cur || new Date(b.registrado_em) > new Date(cur.registrado_em)) {
-      baixasPorCnpj.set(b.cnpj, b);
-    }
-  }
-
   for (const p of paradas) {
     const pLat = p.latitude == null ? null : Number(p.latitude);
     const pLng = p.longitude == null ? null : Number(p.longitude);
@@ -77,6 +68,9 @@ export function analisarParadas(
     let firstIn: string | null = null;
     let lastIn: string | null = null;
     let pingsDentro = 0;
+    let rawPingsDentro = 0;
+    let minDistM: number | null = null;
+    let closestAt: string | null = null;
 
     if (pLat != null && pLng != null && Number.isFinite(pLat) && Number.isFinite(pLng)) {
       for (const g of pings) {
@@ -84,8 +78,13 @@ export function analisarParadas(
         const gLng = Number(g.longitude);
         if (!Number.isFinite(gLat) || !Number.isFinite(gLng)) continue;
         const d = haversineM(pLat, pLng, gLat, gLng);
+        if (minDistM === null || d < minDistM) {
+          minDistM = Math.round(d);
+          closestAt = g.registrado_em;
+        }
         if (d <= raio) {
           pingsDentro++;
+          rawPingsDentro++;
           if (!firstIn || g.registrado_em < firstIn) firstIn = g.registrado_em;
           if (!lastIn || g.registrado_em > lastIn) lastIn = g.registrado_em;
         }
@@ -98,25 +97,14 @@ export function analisarParadas(
       dwellMin = Math.round(diffMs / 60000);
     }
 
-    // Off-site: baixa fora do raio da parada
-    const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
-    const baixa = cnpj ? baixasPorCnpj.get(cnpj) : undefined;
-    let baixaDistM: number | null = null;
-    let offSite = false;
-    if (baixa && baixa.latitude != null && baixa.longitude != null && pLat != null && pLng != null) {
-      baixaDistM = Math.round(
-        haversineM(pLat, pLng, Number(baixa.latitude), Number(baixa.longitude))
-      );
-      offSite = baixaDistM > raio;
-    }
-
     out[p.id] = {
       dwellMin,
       pingsDentro,
+      rawPingsDentro,
       firstIn,
       lastIn,
-      baixaDistM,
-      offSite,
+      minDistM,
+      closestAt,
     };
   }
 
@@ -130,16 +118,7 @@ export function analisarParadasSequencial(
   toleranciaGpsM = 30
 ): Record<string, ParadaAnalise> {
   const out: Record<string, ParadaAnalise> = {};
-  const baixasPorCnpj = new Map<string, BaixaCoord>();
   const pingsUsados = new Set<number>();
-
-  for (const b of baixas) {
-    if (!b.cnpj) continue;
-    const cur = baixasPorCnpj.get(b.cnpj);
-    if (!cur || new Date(b.registrado_em) > new Date(cur.registrado_em)) {
-      baixasPorCnpj.set(b.cnpj, b);
-    }
-  }
 
   for (const p of paradas) {
     const pLat = p.latitude == null ? null : Number(p.latitude);
@@ -149,15 +128,23 @@ export function analisarParadasSequencial(
     let firstIn: string | null = null;
     let lastIn: string | null = null;
     let pingsDentro = 0;
+    let rawPingsDentro = 0;
+    let minDistM: number | null = null;
+    let closestAt: string | null = null;
     const indicesDentro: number[] = [];
 
     if (pLat != null && pLng != null && Number.isFinite(pLat) && Number.isFinite(pLng)) {
       pings.forEach((g, index) => {
-        if (pingsUsados.has(index)) return;
         const gLat = Number(g.latitude);
         const gLng = Number(g.longitude);
         if (!Number.isFinite(gLat) || !Number.isFinite(gLng)) return;
         const d = haversineM(pLat, pLng, gLat, gLng);
+        if (minDistM === null || d < minDistM) {
+          minDistM = Math.round(d);
+          closestAt = g.registrado_em;
+        }
+        if (d <= raio) rawPingsDentro++;
+        if (pingsUsados.has(index)) return;
         if (d <= raio) {
           pingsDentro++;
           indicesDentro.push(index);
@@ -175,16 +162,7 @@ export function analisarParadasSequencial(
       dwellMin = Math.round(diffMs / 60000);
     }
 
-    const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
-    const baixa = cnpj ? baixasPorCnpj.get(cnpj) : undefined;
-    let baixaDistM: number | null = null;
-    let offSite = false;
-    if (baixa && baixa.latitude != null && baixa.longitude != null && pLat != null && pLng != null) {
-      baixaDistM = Math.round(haversineM(pLat, pLng, Number(baixa.latitude), Number(baixa.longitude)));
-      offSite = baixaDistM > raio;
-    }
-
-    out[p.id] = { dwellMin, pingsDentro, firstIn, lastIn, baixaDistM, offSite };
+    out[p.id] = { dwellMin, pingsDentro, rawPingsDentro, firstIn, lastIn, minDistM, closestAt };
   }
 
   return out;
