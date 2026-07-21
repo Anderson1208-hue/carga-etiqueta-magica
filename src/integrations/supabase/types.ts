@@ -934,6 +934,9 @@ export type Database = {
           cep: string | null
           cidade: string | null
           complemento: string | null
+          confianca_coordenada: number | null
+          coordenada_atualizada_em: string | null
+          coordenada_atualizada_por: string | null
           created_at: string
           destinatario_id: string
           id: string
@@ -941,6 +944,9 @@ export type Database = {
           logradouro: string | null
           longitude: number | null
           numero: string | null
+          origem_coordenada:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           principal: boolean
           uf: string | null
           updated_at: string
@@ -951,6 +957,9 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          confianca_coordenada?: number | null
+          coordenada_atualizada_em?: string | null
+          coordenada_atualizada_por?: string | null
           created_at?: string
           destinatario_id: string
           id?: string
@@ -958,6 +967,9 @@ export type Database = {
           logradouro?: string | null
           longitude?: number | null
           numero?: string | null
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           principal?: boolean
           uf?: string | null
           updated_at?: string
@@ -968,6 +980,9 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          confianca_coordenada?: number | null
+          coordenada_atualizada_em?: string | null
+          coordenada_atualizada_por?: string | null
           created_at?: string
           destinatario_id?: string
           id?: string
@@ -975,6 +990,9 @@ export type Database = {
           logradouro?: string | null
           longitude?: number | null
           numero?: string | null
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           principal?: boolean
           uf?: string | null
           updated_at?: string
@@ -1640,6 +1658,7 @@ export type Database = {
       monitoramento_paradas: {
         Row: {
           cnpj_destinatario: string | null
+          confianca_coordenada: number | null
           created_at: string
           endereco_completo: string | null
           horario_chegada: string | null
@@ -1655,6 +1674,9 @@ export type Database = {
           longitude: number | null
           monitoramento_rota_id: string
           ordem: number
+          origem_coordenada:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg: number | null
           raio_geofence_metros: number
           razao_social: string | null
@@ -1666,6 +1688,7 @@ export type Database = {
         }
         Insert: {
           cnpj_destinatario?: string | null
+          confianca_coordenada?: number | null
           created_at?: string
           endereco_completo?: string | null
           horario_chegada?: string | null
@@ -1681,6 +1704,9 @@ export type Database = {
           longitude?: number | null
           monitoramento_rota_id: string
           ordem: number
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg?: number | null
           raio_geofence_metros?: number
           razao_social?: string | null
@@ -1692,6 +1718,7 @@ export type Database = {
         }
         Update: {
           cnpj_destinatario?: string | null
+          confianca_coordenada?: number | null
           created_at?: string
           endereco_completo?: string | null
           horario_chegada?: string | null
@@ -1707,6 +1734,9 @@ export type Database = {
           longitude?: number | null
           monitoramento_rota_id?: string
           ordem?: number
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg?: number | null
           raio_geofence_metros?: number
           razao_social?: string | null
@@ -2339,12 +2369,16 @@ export type Database = {
       roteirizacao_paradas: {
         Row: {
           cnpj_destinatario: string
+          confianca_coordenada: number | null
           distancia_anterior_km: number | null
           endereco_completo: string | null
           id: string
           latitude: number | null
           longitude: number | null
           ordem: number
+          origem_coordenada:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg: number | null
           razao_social: string | null
           roteirizacao_id: string
@@ -2355,12 +2389,16 @@ export type Database = {
         }
         Insert: {
           cnpj_destinatario: string
+          confianca_coordenada?: number | null
           distancia_anterior_km?: number | null
           endereco_completo?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           ordem: number
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg?: number | null
           razao_social?: string | null
           roteirizacao_id: string
@@ -2371,12 +2409,16 @@ export type Database = {
         }
         Update: {
           cnpj_destinatario?: string
+          confianca_coordenada?: number | null
           distancia_anterior_km?: number | null
           endereco_completo?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           ordem?: number
+          origem_coordenada?:
+            | Database["public"]["Enums"]["origem_coordenada"]
+            | null
           peso_total_kg?: number | null
           razao_social?: string | null
           roteirizacao_id?: string
@@ -2841,6 +2883,13 @@ export type Database = {
         }
         Returns: Json
       }
+      pode_sobrescrever_coordenada: {
+        Args: {
+          origem_atual: Database["public"]["Enums"]["origem_coordenada"]
+          origem_nova: Database["public"]["Enums"]["origem_coordenada"]
+        }
+        Returns: boolean
+      }
       provisionar_torre_dia: { Args: { p_data?: string }; Returns: Json }
       provisionar_torre_veiculo: {
         Args: { p_veiculo_id: string }
@@ -2859,6 +2908,14 @@ export type Database = {
         | "conferido"
         | "divergencia"
       load_status: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida"
+      origem_coordenada:
+        | "manual"
+        | "google_places_nome"
+        | "google_geocode"
+        | "brasilapi_cep"
+        | "nominatim"
+        | "baixa_motorista"
+        | "legado_desconhecido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2994,6 +3051,15 @@ export const Constants = {
         "divergencia",
       ],
       load_status: ["aberta", "fechada", "em_rota", "entregue", "expedida"],
+      origem_coordenada: [
+        "manual",
+        "google_places_nome",
+        "google_geocode",
+        "brasilapi_cep",
+        "nominatim",
+        "baixa_motorista",
+        "legado_desconhecido",
+      ],
     },
   },
 } as const
