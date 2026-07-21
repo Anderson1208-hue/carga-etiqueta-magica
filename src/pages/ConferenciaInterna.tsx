@@ -720,28 +720,86 @@ export default function ConferenciaInterna() {
             </CardContent>
           </Card>
 
-          {/* Manual Input */}
+          {/* Manual Input + Dupla Checagem */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
+                    Dupla Checagem
+                  </label>
+                  <Switch
+                    id="dupla-check"
+                    checked={duplaChecagem}
+                    onCheckedChange={(v) => {
+                      setDuplaChecagem(v);
+                      setCodigoCliente("");
+                      setQrInput("");
+                      setTimeout(() => {
+                        (v ? clienteInputRef : inputRef).current?.focus();
+                      }, 50);
+                    }}
+                  />
+                </div>
+              </div>
+              {duplaChecagem && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  1) Bipe o código do cliente na caixa &nbsp;→&nbsp; 2) Bipe a nossa etiqueta (QR). Sistema bloqueia se não bater.
+                </p>
+              )}
             </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  placeholder="Escaneie ou digite..."
-                  value={qrInput}
-                  onChange={(e) => setQrInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleManualScan(); }}
-                  className="flex-1 font-mono text-sm"
-                  disabled={scanning}
-                />
-                <Button onClick={handleManualScan} disabled={scanning || !qrInput} size="sm">
-                  {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
-                </Button>
+            <CardContent className="space-y-2">
+              {duplaChecagem && (
+                <div>
+                  <label className="text-xs font-medium mb-1 block text-primary">
+                    1) Código do cliente (SKU / EAN)
+                  </label>
+                  <Input
+                    ref={clienteInputRef}
+                    placeholder="Bipe o código de barras do cliente..."
+                    value={codigoCliente}
+                    onChange={(e) => setCodigoCliente(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        inputRef.current?.focus();
+                      }
+                    }}
+                    className="flex-1 font-mono text-sm"
+                    disabled={scanning}
+                    autoFocus
+                  />
+                </div>
+              )}
+              <div>
+                {duplaChecagem && (
+                  <label className="text-xs font-medium mb-1 block text-primary">
+                    2) Nossa etiqueta (QR)
+                  </label>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    placeholder={duplaChecagem ? "Bipe o QR da nossa etiqueta..." : "Escaneie ou digite..."}
+                    value={qrInput}
+                    onChange={(e) => setQrInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleManualScan(); }}
+                    className="flex-1 font-mono text-sm"
+                    disabled={scanning || (duplaChecagem && !codigoCliente.trim())}
+                  />
+                  <Button
+                    onClick={handleManualScan}
+                    disabled={scanning || !qrInput || (duplaChecagem && !codigoCliente.trim())}
+                    size="sm"
+                  >
+                    {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
+
 
           {/* Last Result */}
           {lastResult && (
