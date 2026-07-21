@@ -33,7 +33,7 @@ import RelatorioBaixas from "./pages/RelatorioBaixas";
 import RelatorioPendentesBaixa from "./pages/RelatorioPendentesBaixa";
 import RelatorioAgendamentosFornecedor from "./pages/RelatorioAgendamentosFornecedor";
 import PrestacaoContas from "./pages/PrestacaoContas";
-import TotalizadoPorNf from "./pages/TotalizadoPorNf";
+import RomaneioPorNf from "./pages/RomaneioPorNf";
 
 import MotoristaAcesso from "./pages/MotoristaAcesso";
 import MotoristaDiagnostico from "./pages/MotoristaDiagnostico";
@@ -317,7 +317,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/totalizado-nf" element={<ProtectedRoute><TotalizadoPorNf /></ProtectedRoute>} />
+      <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
+      <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />

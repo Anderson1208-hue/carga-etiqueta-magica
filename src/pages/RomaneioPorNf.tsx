@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,10 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { generateRomaneioPDF, downloadBlob, printBlob } from "@/lib/pdf-generator";
 import { toast } from "sonner";
-import { Calculator, Loader2 } from "lucide-react";
+import { FileText, Loader2, Search, Download, Printer } from "lucide-react";
+import { format } from "date-fns";
 
 interface NfRow {
+  id: string;
   numero_nf: string;
   razao_social_emitente: string | null;
   dest_razao_social: string | null;
@@ -21,7 +24,7 @@ interface NfRow {
   valor_nf: number | null;
   carga_id: string | null;
   cargas: { placa: string | null; motorista: string | null; data: string | null } | null;
-  itens_nf: { q_com: number }[];
+  itens_nf: { c_prod: string; x_prod: string; q_com: number }[];
 }
 
 interface Resultado {
@@ -29,9 +32,16 @@ interface Resultado {
   naoEncontradas: string[];
 }
 
-export default function TotalizadoPorNf() {
+interface RomaneioItem {
+  cProd: string;
+  xProd: string;
+  quantidadeTotal: number;
+}
+
+export default function RomaneioPorNf() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gerando, setGerando] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
   const parseNfs = (raw: string): string[] => {
@@ -56,7 +66,7 @@ export default function TotalizadoPorNf() {
       const { data, error } = await supabase
         .from("notas_fiscais")
         .select(
-          "numero_nf,razao_social_emitente,dest_razao_social,dest_cidade,dest_uf,peso_bruto,volume_m3,valor_nf,carga_id,cargas(placa,motorista,data),itens_nf(q_com)"
+          "id,numero_nf,razao_social_emitente,dest_razao_social,dest_cidade,dest_uf,peso_bruto,volume_m3,valor_nf,carga_id,cargas(placa,motorista,data),itens_nf(c_prod,x_prod,q_com)"
         )
         .in("numero_nf", nfs);
       if (error) throw error;
@@ -64,6 +74,7 @@ export default function TotalizadoPorNf() {
       const found = new Set(rows.map((r) => r.numero_nf));
       const naoEncontradas = nfs.filter((n) => !found.has(n));
       setResultado({ encontradas: rows, naoEncontradas });
+      if (rows.length === 0) toast.warning("Nenhuma NF encontrada");
     } catch (e: any) {
       toast.error("Erro ao consultar: " + e.message);
     } finally {
@@ -76,29 +87,44 @@ export default function TotalizadoPorNf() {
     setResultado(null);
   };
 
-  // Agrupar por carga/placa
-  const grupos = resultado
-    ? Object.values(
-        resultado.encontradas.reduce<Record<string, { chave: string; placa: string; motorista: string; data: string; nfs: NfRow[] }>>(
-          (acc, nf) => {
-            const chave = nf.carga_id ?? "sem-carga";
-            const placa = nf.cargas?.placa ?? "—";
-            if (!acc[chave]) {
-              acc[chave] = {
-                chave,
-                placa,
-                motorista: nf.cargas?.motorista ?? "—",
-                data: nf.cargas?.data ?? "",
-                nfs: [],
-              };
-            }
-            acc[chave].nfs.push(nf);
-            return acc;
-          },
-          {}
-        )
-      ).sort((a, b) => a.placa.localeCompare(b.placa))
-    : [];
+  const grupos = useMemo(() => {
+    if (!resultado) return [];
+    return Object.values(
+      resultado.encontradas.reduce<Record<string, { chave: string; placa: string; motorista: string; data: string; nfs: NfRow[] }>>(
+        (acc, nf) => {
+          const chave = nf.carga_id ?? "sem-carga";
+          if (!acc[chave]) {
+            acc[chave] = {
+              chave,
+              placa: nf.cargas?.placa ?? "—",
+              motorista: nf.cargas?.motorista ?? "—",
+              data: nf.cargas?.data ?? "",
+              nfs: [],
+            };
+          }
+          acc[chave].nfs.push(nf);
+          return acc;
+        },
+        {}
+      )
+    ).sort((a, b) => a.placa.localeCompare(b.placa));
+  }, [resultado]);
+
+  const consolidar = (nfs: NfRow[]): RomaneioItem[] => {
+    const map = new Map<string, RomaneioItem>();
+    nfs.forEach((nf) => {
+      nf.itens_nf.forEach((it) => {
+        const key = it.c_prod;
+        const boxes = calculateBoxes(Number(it.q_com) || 0);
+        if (map.has(key)) {
+          map.get(key)!.quantidadeTotal += boxes;
+        } else {
+          map.set(key, { cProd: it.c_prod, xProd: it.x_prod, quantidadeTotal: boxes });
+        }
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.cProd.localeCompare(b.cProd, undefined, { numeric: true }));
+  };
 
   const totalizar = (nfs: NfRow[]) => ({
     qtdNfs: nfs.length,
@@ -110,15 +136,47 @@ export default function TotalizadoPorNf() {
 
   const totalGeral = resultado ? totalizar(resultado.encontradas) : null;
 
+  const gerarPDF = async (nfs: NfRow[], info: { data: string; placa: string; motorista: string }, tag: string, imprimir = false) => {
+    setGerando(tag + (imprimir ? "-print" : ""));
+    try {
+      const itens = consolidar(nfs);
+      const blob = await generateRomaneioPDF(info, itens);
+      if (imprimir) {
+        printBlob(blob);
+        toast.success("Enviado para impressão");
+      } else {
+        const dataFmt = info.data ? format(new Date(info.data + "T00:00:00"), "yyyyMMdd") : "sem-data";
+        downloadBlob(blob, `romaneio_${info.placa}_${dataFmt}_${tag}.pdf`);
+        toast.success("PDF gerado");
+      }
+    } catch (e: any) {
+      toast.error("Erro ao gerar PDF: " + e.message);
+    } finally {
+      setGerando(null);
+    }
+  };
+
+  const gerarConsolidado = async (imprimir = false) => {
+    if (!resultado || resultado.encontradas.length === 0) return;
+    const placas = Array.from(new Set(grupos.map((g) => g.placa))).join(" + ");
+    const motoristas = Array.from(new Set(grupos.map((g) => g.motorista))).join(" / ");
+    await gerarPDF(
+      resultado.encontradas,
+      { data: grupos[0]?.data ?? "", placa: placas || "—", motorista: motoristas || "—" },
+      "consolidado",
+      imprimir
+    );
+  };
+
   return (
     <MainLayout>
       <div className="space-y-4 max-w-6xl">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Calculator className="w-6 h-6" /> Totalizado por NF
+            <FileText className="w-6 h-6" /> Romaneio por NF
           </h1>
           <p className="text-muted-foreground text-sm">
-            Cole ou digite números de NF (de qualquer carreta). O sistema agrupa por placa e apresenta o totalizado.
+            Cole ou digite números de NF (de qualquer carreta). O sistema consolida os produtos e gera o romaneio em PDF — total ou por placa.
           </p>
         </div>
 
@@ -134,10 +192,10 @@ export default function TotalizadoPorNf() {
               rows={5}
               className="font-mono text-sm"
             />
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button onClick={consultar} disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Calculator className="w-4 h-4 mr-2" />}
-                Calcular Totalizado
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                Consultar NFs
               </Button>
               <Button variant="outline" onClick={limpar} disabled={loading}>
                 Limpar
@@ -153,7 +211,19 @@ export default function TotalizadoPorNf() {
           <>
             <Card className="border-primary">
               <CardHeader>
-                <CardTitle className="text-base">Total Geral</CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-base">Consolidado ({totalGeral.qtdNfs} NFs, {grupos.length} placa(s))</CardTitle>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => gerarConsolidado(false)} disabled={gerando !== null}>
+                      {gerando === "consolidado" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                      Romaneio Consolidado (PDF)
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => gerarConsolidado(true)} disabled={gerando !== null}>
+                      {gerando === "consolidado-print" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4 mr-2" />}
+                      Imprimir
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -174,6 +244,7 @@ export default function TotalizadoPorNf() {
 
             {grupos.map((g) => {
               const t = totalizar(g.nfs);
+              const tag = `placa-${g.placa}`;
               return (
                 <Card key={g.chave}>
                   <CardHeader className="pb-3">
@@ -184,12 +255,31 @@ export default function TotalizadoPorNf() {
                           {g.motorista} {g.data && `• ${g.data.split("-").reverse().join("/")}`}
                         </span>
                       </CardTitle>
-                      <div className="text-sm font-medium flex gap-4">
-                        <span>{t.qtdNfs} NFs</span>
-                        <span>{t.caixas} cx</span>
-                        <span>{t.peso.toFixed(2)} kg</span>
-                        <span>{t.volume.toFixed(3)} m³</span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => gerarPDF(g.nfs, { data: g.data, placa: g.placa, motorista: g.motorista }, tag, false)}
+                          disabled={gerando !== null}
+                        >
+                          {gerando === tag ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                          Romaneio da Placa
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => gerarPDF(g.nfs, { data: g.data, placa: g.placa, motorista: g.motorista }, tag, true)}
+                          disabled={gerando !== null}
+                        >
+                          {gerando === tag + "-print" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4" />}
+                        </Button>
                       </div>
+                    </div>
+                    <div className="text-sm font-medium flex gap-4 mt-1">
+                      <span>{t.qtdNfs} NFs</span>
+                      <span>{t.caixas} cx</span>
+                      <span>{t.peso.toFixed(2)} kg</span>
+                      <span>{t.volume.toFixed(3)} m³</span>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -203,7 +293,6 @@ export default function TotalizadoPorNf() {
                           <TableHead className="text-right">Cx</TableHead>
                           <TableHead className="text-right">Peso (kg)</TableHead>
                           <TableHead className="text-right">m³</TableHead>
-                          <TableHead className="text-right">Valor (R$)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -213,7 +302,7 @@ export default function TotalizadoPorNf() {
                           .map((nf) => {
                             const cx = nf.itens_nf.reduce((s, it) => s + calculateBoxes(Number(it.q_com) || 0), 0);
                             return (
-                              <TableRow key={nf.numero_nf + (nf.carga_id ?? "")}>
+                              <TableRow key={nf.id}>
                                 <TableCell className="font-mono font-medium">{nf.numero_nf}</TableCell>
                                 <TableCell className="text-xs">{nf.razao_social_emitente ?? "—"}</TableCell>
                                 <TableCell className="text-xs">{nf.dest_razao_social ?? "—"}</TableCell>
@@ -223,9 +312,6 @@ export default function TotalizadoPorNf() {
                                 <TableCell className="text-right">{cx}</TableCell>
                                 <TableCell className="text-right">{Number(nf.peso_bruto || 0).toFixed(2)}</TableCell>
                                 <TableCell className="text-right">{Number(nf.volume_m3 || 0).toFixed(3)}</TableCell>
-                                <TableCell className="text-right">
-                                  {Number(nf.valor_nf || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </TableCell>
                               </TableRow>
                             );
                           })}
