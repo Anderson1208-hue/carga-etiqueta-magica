@@ -101,6 +101,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "alertas_monitoramento_monitoramento_parada_id_fkey"
+            columns: ["monitoramento_parada_id"]
+            isOneToOne: false
+            referencedRelation: "vw_diagnostico_paradas_v3"
+            referencedColumns: ["parada_id"]
+          },
+          {
             foreignKeyName: "alertas_monitoramento_monitoramento_rota_id_fkey"
             columns: ["monitoramento_rota_id"]
             isOneToOne: false
@@ -930,6 +937,7 @@ export type Database = {
       destinatario_enderecos: {
         Row: {
           apelido: string | null
+          ativo: boolean
           bairro: string | null
           cep: string | null
           cidade: string | null
@@ -944,15 +952,18 @@ export type Database = {
           logradouro: string | null
           longitude: number | null
           numero: string | null
+          observacao: string | null
           origem_coordenada:
             | Database["public"]["Enums"]["origem_coordenada"]
             | null
           principal: boolean
+          tipo_endereco: Database["public"]["Enums"]["tipo_endereco"]
           uf: string | null
           updated_at: string
         }
         Insert: {
           apelido?: string | null
+          ativo?: boolean
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
@@ -967,15 +978,18 @@ export type Database = {
           logradouro?: string | null
           longitude?: number | null
           numero?: string | null
+          observacao?: string | null
           origem_coordenada?:
             | Database["public"]["Enums"]["origem_coordenada"]
             | null
           principal?: boolean
+          tipo_endereco?: Database["public"]["Enums"]["tipo_endereco"]
           uf?: string | null
           updated_at?: string
         }
         Update: {
           apelido?: string | null
+          ativo?: boolean
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
@@ -990,10 +1004,12 @@ export type Database = {
           logradouro?: string | null
           longitude?: number | null
           numero?: string | null
+          observacao?: string | null
           origem_coordenada?:
             | Database["public"]["Enums"]["origem_coordenada"]
             | null
           principal?: boolean
+          tipo_endereco?: Database["public"]["Enums"]["tipo_endereco"]
           uf?: string | null
           updated_at?: string
         }
@@ -2787,7 +2803,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      vw_diagnostico_paradas_v3: {
+        Row: {
+          classificacao_v3: string | null
+          monitoramento_rota_id: string | null
+          parada_id: string | null
+          pings_dentro: number | null
+          total_pings: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monitoramento_paradas_monitoramento_rota_id_fkey"
+            columns: ["monitoramento_rota_id"]
+            isOneToOne: false
+            referencedRelation: "monitoramento_rotas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
@@ -2870,6 +2903,10 @@ export type Database = {
       }
       get_conferencia_progress: { Args: { p_carga_id: string }; Returns: Json }
       has_profile: { Args: never; Returns: boolean }
+      haversine_metros: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
+      }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       is_active_operator: { Args: never; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
@@ -2903,6 +2940,21 @@ export type Database = {
         Args: { p_nf_id: string; p_observacao?: string }
         Returns: Json
       }
+      resolver_endereco_operacional: {
+        Args: { _destinatario_id: string }
+        Returns: {
+          confianca: number
+          endereco_id: string
+          latitude: number
+          longitude: number
+          origem: Database["public"]["Enums"]["origem_coordenada"]
+          tipo: Database["public"]["Enums"]["tipo_endereco"]
+        }[]
+      }
+      rota_baixa_aderencia: {
+        Args: { _min_pings?: number; _monitoramento_rota_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "operador"
@@ -2924,6 +2976,7 @@ export type Database = {
         | "google_geocode_range"
         | "dwell_factual_aprovado"
         | "amostra_insuficiente"
+      tipo_endereco: "fiscal" | "entrega" | "doca" | "coleta"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3072,6 +3125,7 @@ export const Constants = {
         "dwell_factual_aprovado",
         "amostra_insuficiente",
       ],
+      tipo_endereco: ["fiscal", "entrega", "doca", "coleta"],
     },
   },
 } as const
