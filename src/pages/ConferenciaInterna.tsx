@@ -478,6 +478,7 @@ export default function ConferenciaInterna() {
       setLastResult(result); addToHistory(result); playSound("error");
     } finally {
       setQrInput("");
+      if (duplaChecagem) setCodigoCliente("");
       setScanning(false);
     }
   }
@@ -494,8 +495,13 @@ export default function ConferenciaInterna() {
 
   async function handleManualScan() {
     await processScan(qrInput);
-    inputRef.current?.focus();
+    if (duplaChecagem) {
+      clienteInputRef.current?.focus();
+    } else {
+      inputRef.current?.focus();
+    }
   }
+
 
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
