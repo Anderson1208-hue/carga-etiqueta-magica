@@ -317,7 +317,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route path="/totalizado-nf" element={<ProtectedRoute><TotalizadoPorNf /></ProtectedRoute>} />
+      <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
+      <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
