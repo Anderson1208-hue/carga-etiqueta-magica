@@ -553,6 +553,15 @@ export default function PrestacaoContas() {
               <Button variant="outline" size="sm" onClick={carregarVeiculos}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
               </Button>
+              {podeDesfazer && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => (window.location.href = "/prestacao-contas/desfazer-baixa")}
+                >
+                  <Undo2 className="w-4 h-4 mr-1" /> Desfazer Baixa
+                </Button>
+              )}
             </div>
           </div>
 
