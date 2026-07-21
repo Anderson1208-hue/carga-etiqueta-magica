@@ -32,6 +32,7 @@ import {
   Contact,
   Upload,
   Receipt,
+  Calculator,
   
   
 } from "lucide-react";
@@ -60,7 +61,7 @@ const transporteItems = [
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
-  
+  { name: "Totalizado por NF", href: "/totalizado-nf", icon: Calculator },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
