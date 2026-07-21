@@ -495,11 +495,12 @@ export default function ConferenciaInterna() {
 
   async function handleManualScan() {
     await processScan(qrInput);
-    if (duplaChecagem) {
-      clienteInputRef.current?.focus();
-    } else {
-      inputRef.current?.focus();
-    }
+    // Aguarda o re-render (input fica disabled durante scanning) antes de focar
+    setTimeout(() => {
+      const target = duplaChecagem ? clienteInputRef.current : inputRef.current;
+      target?.focus();
+      target?.select?.();
+    }, 120);
   }
 
 
