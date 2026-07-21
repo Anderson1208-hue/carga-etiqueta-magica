@@ -31,7 +31,7 @@ import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento";
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
-import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
+import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
 
 const todayISO = () => {
   const d = new Date();
@@ -215,7 +215,7 @@ export default function AcompanhamentoRotas() {
       longitude: b.longitude != null ? Number(b.longitude) : null,
     }));
 
-    setAnalisePorParada(analisarParadas(pars, pings, baixasCoord, 30));
+    setAnalisePorParada(analisarParadasSequencial(pars, pings, baixasCoord, 30));
   }, []);
 
 

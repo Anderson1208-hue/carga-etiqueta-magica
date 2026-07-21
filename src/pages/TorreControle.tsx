@@ -30,7 +30,7 @@ import {
 import { MapaGeral } from "@/components/monitoramento/MapaGeral";
 import { RotaStatusBadge, StatusBadge } from "@/components/monitoramento/StatusBadge";
 import type { MonitoramentoRota, MonitoramentoParada, Alerta } from "@/components/monitoramento/types";
-import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
+import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
 import { toast } from "sonner";
 
 const normalizePlate = (placa?: string | null) =>
@@ -256,7 +256,7 @@ export default function TorreControle() {
       const paradasRows = (paradas || []) as MonitoramentoParada[];
       setDetailParadas(paradasRows);
       setDetailAlertas((alertas || []) as Alerta[]);
-      setDetailAnalise(analisarParadas(paradasRows, (pings || []) as any[], [], 30));
+      setDetailAnalise(analisarParadasSequencial(paradasRows, (pings || []) as any[], [], 30));
       setDetailLoading(false);
     })();
     return () => { cancelled = true; };
