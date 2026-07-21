@@ -239,6 +239,36 @@ export default function RomaneioPorNf() {
                     {resultado.naoEncontradas.join(", ")}
                   </div>
                 )}
+
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold mb-2">Totalizado por SKU ({consolidar(resultado.encontradas).length} SKUs)</h3>
+                  <div className="rounded-md border max-h-[500px] overflow-auto">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-background">
+                        <TableRow>
+                          <TableHead className="w-32">Cód. Produto</TableHead>
+                          <TableHead>Descrição</TableHead>
+                          <TableHead className="text-right w-28">Qtd Caixas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {consolidar(resultado.encontradas).map((it) => (
+                          <TableRow key={it.cProd}>
+                            <TableCell className="font-mono">{it.cProd.replace(/^0+/, "") || it.cProd}</TableCell>
+                            <TableCell className="text-xs">{it.xProd}</TableCell>
+                            <TableCell className="text-right font-medium">{it.quantidadeTotal}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-muted font-bold">
+                          <TableCell colSpan={2} className="text-right">Total</TableCell>
+                          <TableCell className="text-right">
+                            {consolidar(resultado.encontradas).reduce((s, it) => s + it.quantidadeTotal, 0)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
