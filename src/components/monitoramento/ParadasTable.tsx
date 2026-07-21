@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MapPin, AlertTriangle, MapPinOff } from "lucide-react";
+import { MapPin, AlertTriangle } from "lucide-react";
 import type { MonitoramentoParada } from "./types";
 import { StatusBadge } from "./StatusBadge";
 import type { ParadaAnalise } from "@/lib/dwellTime";
@@ -19,18 +19,13 @@ interface ParadasTableProps {
   paradas: MonitoramentoParada[];
   onJustificar: (parada: MonitoramentoParada) => void;
   formatTime: (iso: string | null) => string;
-  baixasPorCnpj?: Record<string, string>;
   analisePorParada?: Record<string, ParadaAnalise>;
 }
-
-const GAP_ALERTA_MIN = 10;
-const normCnpj = (c: string | null) => (c || "").replace(/\D/g, "");
 
 export function ParadasTable({
   paradas,
   onJustificar,
   formatTime,
-  baixasPorCnpj = {},
   analisePorParada = {},
 }: ParadasTableProps) {
   return (
@@ -52,28 +47,17 @@ export function ParadasTable({
               <TableHead className="h-7 px-1.5 text-[11px]">Cliente</TableHead>
               <TableHead className="h-7 px-1 text-[11px] w-[88px]">Status</TableHead>
               <TableHead className="h-7 px-1 text-[11px] w-[108px]">GPS</TableHead>
-              <TableHead className="h-7 px-1 text-[11px] w-[92px]">Baixa/Gap</TableHead>
+              <TableHead className="h-7 px-1 text-[11px] w-[92px]">Evidência GPS</TableHead>
               <TableHead className="h-7 px-1 text-[11px] w-[68px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paradas.map((parada) => {
-              const baixaIso = baixasPorCnpj[normCnpj(parada.cnpj_destinatario)] || null;
               const analise = analisePorParada[parada.id];
               const gpsFirst = analise?.firstIn || null;
               const gpsLast = analise?.lastIn || null;
               const chegada = formatTime(gpsFirst);
               const saida = formatTime(gpsLast);
-              const baixaFmt = formatTime(baixaIso);
-              let baixaGapMin: number | null = null;
-              if (baixaIso && gpsFirst && gpsLast) {
-                const baixaMs = new Date(baixaIso).getTime();
-                const firstMs = new Date(gpsFirst).getTime();
-                const lastMs = new Date(gpsLast).getTime();
-                if (baixaMs < firstMs) baixaGapMin = Math.round((baixaMs - firstMs) / 60000);
-                else if (baixaMs > lastMs) baixaGapMin = Math.round((baixaMs - lastMs) / 60000);
-                else baixaGapMin = 0;
-              }
 
               const dwellNode = analise && analise.dwellMin != null
                 ? (isPassagem(analise)
@@ -125,45 +109,38 @@ export function ParadasTable({
 
                   <TableCell className="py-1 px-1.5 text-[11px] align-top whitespace-nowrap tabular-nums leading-tight">
                     <div className="flex items-center gap-1">
-                      <span>{baixaFmt}</span>
-                      {analise?.offSite && analise.baixaDistM != null && (
-                        gpsFirst && gpsLast ? (
-                          <Badge
-                            variant="destructive"
-                            className="h-4 text-[9px] px-1 gap-0.5"
-                            title="Motorista bateu baixa fora do raio da parada (off-site real, com GPS factual)"
-                          >
-                            <MapPinOff className="w-2.5 h-2.5" />
-                            {analise.baixaDistM}m
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="h-4 text-[9px] px-1 gap-0.5 border-amber-500 text-amber-600 dark:text-amber-400"
-                            title="Sem GPS factual no raio. Distância entre baixa e ponto cadastrado — provável divergência de cadastro, não de motorista."
-                          >
-                            <MapPinOff className="w-2.5 h-2.5" />
-                            {analise.baixaDistM}m
-                          </Badge>
-                        )
+                      {analise?.pingsDentro ? (
+                        <Badge
+                          variant="outline"
+                          className="h-4 text-[9px] px-1 border-success/30 text-success"
+                          title="Há pings GPS factuais dentro do raio da parada"
+                        >
+                          dentro
+                        </Badge>
+                      ) : analise?.minDistM != null ? (
+                        <Badge
+                          variant="outline"
+                          className="h-4 text-[9px] px-1 border-warning/30 text-warning"
+                          title="Menor distância factual do GPS do veículo até o ponto da parada"
+                        >
+                          mín {analise.minDistM}m
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </div>
                     <div className="text-[10px]">
-                      {!baixaIso ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : !gpsFirst || !gpsLast ? (
-                        <span className="text-muted-foreground italic" title="Não há pings GPS dentro do raio da parada para comparar com o horário da baixa">
-                          sem GPS factual
+                      {analise?.pingsDentro ? (
+                        <span className="text-muted-foreground">
+                          {analise.pingsDentro} ping{analise.pingsDentro === 1 ? "" : "s"}
                         </span>
-                      ) : baixaGapMin !== null && Math.abs(baixaGapMin) >= GAP_ALERTA_MIN ? (
-                        <span className="inline-flex items-center gap-0.5 text-destructive font-medium">
+                      ) : analise?.minDistM != null ? (
+                        <span className="inline-flex items-center gap-0.5 text-warning font-medium" title="Sem ping dentro do raio configurado; mostra apenas a menor aproximação factual">
                           <AlertTriangle className="w-2.5 h-2.5" />
-                          {baixaGapMin > 0 ? "+" : ""}{baixaGapMin}m
+                          fora do raio
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">
-                          {baixaGapMin !== null ? `${baixaGapMin > 0 ? "+" : ""}${baixaGapMin}m` : "0m"}
-                        </span>
+                        <span className="text-muted-foreground italic">sem GPS</span>
                       )}
                     </div>
                   </TableCell>
@@ -193,8 +170,7 @@ export function ParadasTable({
           </TableBody>
         </Table>
         <p className="text-[10px] text-muted-foreground mt-1 px-1">
-          <strong>Dwell</strong> = tempo dentro do raio (min/pings).
-          <em> *</em> valor legado. Badge <span className="text-destructive font-medium">vermelho</span> = off-site real (com GPS). Badge <span className="text-amber-600 dark:text-amber-400 font-medium">âmbar</span> = distância cadastro↔baixa sem GPS factual (provável cadastro divergente).
+          <strong>Dwell</strong> = tempo dentro do raio por GPS factual. Baixa operacional não compõe localização, chegada, saída nem divergência da Torre.
         </p>
       </CardContent>
     </Card>
