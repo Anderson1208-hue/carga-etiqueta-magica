@@ -2916,6 +2916,10 @@ export type Database = {
         | "nominatim"
         | "baixa_motorista"
         | "legado_desconhecido"
+        | "google_geocode_rooftop"
+        | "google_geocode_range"
+        | "dwell_factual_aprovado"
+        | "amostra_insuficiente"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3059,6 +3063,10 @@ export const Constants = {
         "nominatim",
         "baixa_motorista",
         "legado_desconhecido",
+        "google_geocode_rooftop",
+        "google_geocode_range",
+        "dwell_factual_aprovado",
+        "amostra_insuficiente",
       ],
     },
   },
