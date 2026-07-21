@@ -193,8 +193,8 @@ export function ParadasTable({
           </TableBody>
         </Table>
         <p className="text-[10px] text-muted-foreground mt-1 px-1">
-          <strong>Dwell</strong> = tempo dentro do raio da parada (min/pings).
-          <em> *</em> valor legado sem GPS. <strong>Off-site</strong> = baixa fora do raio.
+          <strong>Dwell</strong> = tempo dentro do raio (min/pings).
+          <em> *</em> valor legado. Badge <span className="text-destructive font-medium">vermelho</span> = off-site real (com GPS). Badge <span className="text-amber-600 dark:text-amber-400 font-medium">âmbar</span> = distância cadastro↔baixa sem GPS factual (provável cadastro divergente).
         </p>
       </CardContent>
     </Card>
