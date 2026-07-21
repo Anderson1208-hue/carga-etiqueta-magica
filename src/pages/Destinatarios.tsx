@@ -505,26 +505,42 @@ function DestinatarioDialog({
               <p className="text-sm text-muted-foreground">{enderecos.length} endereço(s) cadastrado(s)</p>
               <Button size="sm" onClick={() => setEndForm({
                 apelido: "", logradouro: "", numero: "", complemento: "",
-                bairro: "", cidade: "", uf: "", cep: "", principal: enderecos.length === 0,
+                bairro: "", cidade: "", uf: "", cep: "",
+                principal: enderecos.length === 0,
+                tipo_endereco: "entrega", ativo: true, observacao: "",
               })}>
                 <Plus className="w-4 h-4 mr-1" /> Adicionar
               </Button>
             </div>
 
             <div className="space-y-2">
-              {enderecos.map((e) => (
-                <div key={e.id} className="border rounded-lg p-3 flex items-start justify-between gap-3">
+              {enderecos.map((e) => {
+                const tipo = e.tipo_endereco || "fiscal";
+                const tipoLabel: Record<string, { label: string; cls: string }> = {
+                  fiscal: { label: "Fiscal", cls: "bg-slate-100 text-slate-700 border-slate-300" },
+                  entrega: { label: "Entrega", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
+                  doca: { label: "Doca", cls: "bg-blue-100 text-blue-800 border-blue-300" },
+                  coleta: { label: "Coleta", cls: "bg-amber-100 text-amber-800 border-amber-300" },
+                };
+                const t = tipoLabel[tipo];
+                return (
+                <div key={e.id} className={`border rounded-lg p-3 flex items-start justify-between gap-3 ${e.ativo === false ? "opacity-60" : ""}`}>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
                       <span className="font-medium">{e.apelido || "Endereço"}</span>
+                      <Badge variant="outline" className={`text-xs ${t.cls}`}>{t.label}</Badge>
                       {e.principal && <Badge variant="default" className="text-xs">Principal</Badge>}
+                      {e.ativo === false && <Badge variant="secondary" className="text-xs">Inativo</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       {[e.logradouro, e.numero, e.complemento, e.bairro].filter(Boolean).join(", ")}
                       {e.cidade && ` — ${e.cidade}/${e.uf}`}
                       {e.cep && ` • CEP ${e.cep}`}
                     </p>
+                    {e.observacao && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">{e.observacao}</p>
+                    )}
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" onClick={() => setEndForm(e)}>
@@ -535,7 +551,8 @@ function DestinatarioDialog({
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {enderecos.length === 0 && (
                 <p className="text-center text-sm text-muted-foreground py-6">Nenhum endereço cadastrado</p>
               )}
