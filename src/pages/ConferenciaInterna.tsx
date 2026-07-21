@@ -126,6 +126,7 @@ export default function ConferenciaInterna() {
   const [duplaChecagem, setDuplaChecagem] = useState(false);
   const [codigoCliente, setCodigoCliente] = useState("");
   const clienteInputRef = useRef<HTMLInputElement>(null);
+  const processingScanRef = useRef(false);
 
 
   // Divergência management (admin only)
@@ -341,9 +342,33 @@ export default function ConferenciaInterna() {
     setQrInput("");
   }
 
-  async function processScan(qrData: string) {
-    if (!qrData.trim() || !selectedCarga || !selectedNf) return;
+  function focusClienteProximaLeitura() {
+    const applyFocus = () => {
+      const target = duplaChecagem ? clienteInputRef.current : inputRef.current;
+      if (!target) return;
+      target.focus({ preventScroll: true });
+      target.select();
+    };
 
+    requestAnimationFrame(applyFocus);
+    window.setTimeout(applyFocus, 80);
+    window.setTimeout(applyFocus, 250);
+  }
+
+  function focusNossaEtiqueta() {
+    const applyFocus = () => {
+      inputRef.current?.focus({ preventScroll: true });
+      inputRef.current?.select();
+    };
+
+    requestAnimationFrame(applyFocus);
+    window.setTimeout(applyFocus, 60);
+  }
+
+  async function processScan(qrData: string) {
+    if (processingScanRef.current || !qrData.trim() || !selectedCarga || !selectedNf) return;
+
+    processingScanRef.current = true;
     setScanning(true);
     setLastResult(null);
 
@@ -480,6 +505,7 @@ export default function ConferenciaInterna() {
       setQrInput("");
       if (duplaChecagem) setCodigoCliente("");
       setScanning(false);
+      processingScanRef.current = false;
     }
   }
 
@@ -493,14 +519,10 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function handleManualScan() {
-    await processScan(qrInput);
-    // Aguarda o re-render (input fica disabled durante scanning) antes de focar
-    setTimeout(() => {
-      const target = duplaChecagem ? clienteInputRef.current : inputRef.current;
-      target?.focus();
-      target?.select?.();
-    }, 120);
+  async function handleManualScan(value = qrInput) {
+    if (processingScanRef.current || !value.trim()) return;
+    await processScan(value);
+    focusClienteProximaLeitura();
   }
 
 
@@ -764,11 +786,11 @@ export default function ConferenciaInterna() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        inputRef.current?.focus();
+                        focusNossaEtiqueta();
                       }
                     }}
                     className="flex-1 font-mono text-sm"
-                    disabled={scanning}
+                    readOnly={scanning}
                     autoFocus
                   />
                 </div>
@@ -785,12 +807,18 @@ export default function ConferenciaInterna() {
                     placeholder={duplaChecagem ? "Bipe o QR da nossa etiqueta..." : "Escaneie ou digite..."}
                     value={qrInput}
                     onChange={(e) => setQrInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleManualScan(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleManualScan(e.currentTarget.value);
+                      }
+                    }}
                     className="flex-1 font-mono text-sm"
-                    disabled={scanning || (duplaChecagem && !codigoCliente.trim())}
+                    readOnly={scanning}
+                    disabled={duplaChecagem && !codigoCliente.trim()}
                   />
                   <Button
-                    onClick={handleManualScan}
+                    onClick={() => handleManualScan()}
                     disabled={scanning || !qrInput || (duplaChecagem && !codigoCliente.trim())}
                     size="sm"
                   >
