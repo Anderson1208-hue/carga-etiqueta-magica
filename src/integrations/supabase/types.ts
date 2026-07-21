@@ -2792,6 +2792,10 @@ export type Database = {
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      confianca_origem: {
+        Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
+        Returns: number
+      }
       detectar_paradas_suspeitas: {
         Args: { p_rota_id: string }
         Returns: {
