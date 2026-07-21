@@ -83,7 +83,7 @@ async function findLastGpsInsideStop(
     .from("posicoes_gps")
     .select("registrado_em, latitude, longitude")
     .eq("monitoramento_rota_id", monitoramento_rota_id)
-    .eq("heartbeat", false)
+    .or("heartbeat.eq.false,heartbeat.is.null")
     .gte("registrado_em", parada.horario_chegada)
     .lt("registrado_em", beforeAt.toISOString())
     .order("registrado_em", { ascending: false })
@@ -371,19 +371,6 @@ Deno.serve(async (req) => {
 
         // RULE: Vehicle entered geofence
         if (dentroGeofence && parada.status === "programada") {
-          parada.status = "chegou_cliente";
-          parada.horario_chegada = eventAt.toISOString();
-          await supabase
-            .from("monitoramento_paradas")
-            .update({
-              status: "chegou_cliente",
-              horario_chegada: parada.horario_chegada,
-            })
-            .eq("id", parada.id);
-
-          // Fecha parada anterior aberta somente com evidência GPS dela mesma.
-          // Nunca usa a chegada da próxima parada como horário de saída: se não houver
-          // último ping comprovado dentro do cliente anterior, a parada continua aberta.
           const abertasAnteriores = paradasState.filter(
             (p: any) =>
               p.ordem < parada.ordem &&
@@ -397,9 +384,33 @@ Deno.serve(async (req) => {
               (!p.horario_saida ||
                 new Date(p.horario_saida).getTime() > eventAt.getTime()),
           );
+
+          // Antes de abrir a próxima parada, fecha qualquer parada anterior
+          // aberta usando o último ping comprovado dentro do raio dela. Se não
+          // existir esse fato, a nova chegada é bloqueada para não inventar
+          // horário nem duplicar o mesmo ping em duas paradas.
+          let bloqueiaChegada = false;
           for (const ant of abertasAnteriores) {
             const chegadaAnt = new Date(ant.horario_chegada);
-            if (eventAt.getTime() <= chegadaAnt.getTime()) continue;
+            if (eventAt.getTime() <= chegadaAnt.getTime()) {
+              bloqueiaChegada = true;
+              continue;
+            }
+
+            const antLat = Number(ant.latitude);
+            const antLng = Number(ant.longitude);
+            const raioAnt = (ant.raio_geofence_metros || raio_padrao) +
+              tolerancia_gps;
+            if (
+              Number.isFinite(antLat) && Number.isFinite(antLng) &&
+              haversineDistance(posLat, posLng, antLat, antLng) <= raioAnt
+            ) {
+              // Ainda está fisicamente dentro da parada anterior. Não há fato
+              // de saída; portanto não abre outra parada no mesmo local/raio.
+              events.push(`ainda_dentro_anterior_${ant.id}`);
+              bloqueiaChegada = true;
+              continue;
+            }
 
             const lastInsideAnt = await findLastGpsInsideStop(
               supabase,
@@ -414,6 +425,7 @@ Deno.serve(async (req) => {
               !lastInsideAnt || lastInsideAnt.getTime() <= chegadaAnt.getTime()
             ) {
               events.push(`sem_saida_factual_${ant.id}`);
+              bloqueiaChegada = true;
               continue;
             }
 
@@ -439,8 +451,23 @@ Deno.serve(async (req) => {
                 is_excecao: ant.is_excecao,
               })
               .eq("id", ant.id);
-            events.push(`${novoStatus}_${ant.id}_by_next_arrival`);
+            events.push(`${novoStatus}_${ant.id}_saida_factual`);
           }
+
+          if (bloqueiaChegada) {
+            events.push(`chegada_bloqueada_sem_saida_anterior_${parada.id}`);
+            continue;
+          }
+
+          parada.status = "chegou_cliente";
+          parada.horario_chegada = eventAt.toISOString();
+          await supabase
+            .from("monitoramento_paradas")
+            .update({
+              status: "chegou_cliente",
+              horario_chegada: parada.horario_chegada,
+            })
+            .eq("id", parada.id);
 
           // Check if out of sequence
           const anterioresNaoConcluidas = paradasState.filter(
@@ -553,6 +580,9 @@ Deno.serve(async (req) => {
         }
 
         // RULE: Vehicle LEFT geofence
+        // Horário de saída precisa ser factual: o último ping ainda dentro do
+        // raio da parada. O primeiro ping fora prova que saiu, mas NÃO é o
+        // horário em que estava no cliente.
         if (
           !dentroGeofence &&
           [
@@ -567,14 +597,26 @@ Deno.serve(async (req) => {
           // Guard: ignora pings fora de ordem (mais antigos que a chegada) — evita
           // registrar horario_saida < horario_chegada e marcar visita_inconsistente indevidamente.
           if (eventAt.getTime() <= chegada.getTime()) continue;
+          const lastInside = await findLastGpsInsideStop(
+            supabase,
+            monitoramento_rota_id,
+            parada,
+            eventAt,
+            raio_padrao,
+            tolerancia_gps,
+          );
+          if (!lastInside || lastInside.getTime() <= chegada.getTime()) {
+            events.push(`sem_saida_factual_${parada.id}`);
+            continue;
+          }
           const permanencia = Math.max(
             0,
-            Math.round((eventAt.getTime() - chegada.getTime()) / 60000),
+            Math.round((lastInside.getTime() - chegada.getTime()) / 60000),
           );
 
           if (permanencia < tempo_min_atendimento) {
             parada.status = "visita_inconsistente";
-            parada.horario_saida = eventAt.toISOString();
+            parada.horario_saida = lastInside.toISOString();
             parada.tempo_permanencia_min = permanencia;
             parada.is_excecao = true;
             await supabase
@@ -598,7 +640,7 @@ Deno.serve(async (req) => {
             events.push(`visita_inconsistente_${parada.id}`);
           } else {
             parada.status = "finalizada";
-            parada.horario_saida = eventAt.toISOString();
+            parada.horario_saida = lastInside.toISOString();
             parada.tempo_permanencia_min = permanencia;
             parada.is_excecao = false;
             await supabase

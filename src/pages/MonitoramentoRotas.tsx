@@ -33,7 +33,7 @@ import { AuditoriaPercursoPanel } from "@/components/monitoramento/AuditoriaPerc
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { ConfigDialog } from "@/components/monitoramento/ConfigDialog";
 import { IniciarDialog } from "@/components/monitoramento/IniciarDialog";
-import { analisarParadas, type ParadaAnalise } from "@/lib/dwellTime";
+import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
 
 const normalizePlate = (placa?: string | null) =>
   (placa || "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
@@ -196,7 +196,7 @@ export default function MonitoramentoRotas() {
       latitude: b.latitude != null ? Number(b.latitude) : null,
       longitude: b.longitude != null ? Number(b.longitude) : null,
     }));
-    setAnalisePorParada(analisarParadas(pars, pings, baixasCoord, 30));
+    setAnalisePorParada(analisarParadasSequencial(pars, pings, baixasCoord, 30));
   }, []);
 
 
@@ -587,7 +587,7 @@ export default function MonitoramentoRotas() {
   // --- Helpers ---
   function formatTime(iso: string | null) {
     if (!iso) return "—";
-    return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
   }
 
   function formatDateTime(iso: string | null) {

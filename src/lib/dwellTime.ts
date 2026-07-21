@@ -123,6 +123,73 @@ export function analisarParadas(
   return out;
 }
 
+export function analisarParadasSequencial(
+  paradas: ParadaCoord[],
+  pings: GpsPing[],
+  baixas: BaixaCoord[],
+  toleranciaGpsM = 30
+): Record<string, ParadaAnalise> {
+  const out: Record<string, ParadaAnalise> = {};
+  const baixasPorCnpj = new Map<string, BaixaCoord>();
+  const pingsUsados = new Set<number>();
+
+  for (const b of baixas) {
+    if (!b.cnpj) continue;
+    const cur = baixasPorCnpj.get(b.cnpj);
+    if (!cur || new Date(b.registrado_em) > new Date(cur.registrado_em)) {
+      baixasPorCnpj.set(b.cnpj, b);
+    }
+  }
+
+  for (const p of paradas) {
+    const pLat = p.latitude == null ? null : Number(p.latitude);
+    const pLng = p.longitude == null ? null : Number(p.longitude);
+    const raio = (p.raio_geofence_metros || 100) + toleranciaGpsM;
+
+    let firstIn: string | null = null;
+    let lastIn: string | null = null;
+    let pingsDentro = 0;
+    const indicesDentro: number[] = [];
+
+    if (pLat != null && pLng != null && Number.isFinite(pLat) && Number.isFinite(pLng)) {
+      pings.forEach((g, index) => {
+        if (pingsUsados.has(index)) return;
+        const gLat = Number(g.latitude);
+        const gLng = Number(g.longitude);
+        if (!Number.isFinite(gLat) || !Number.isFinite(gLng)) return;
+        const d = haversineM(pLat, pLng, gLat, gLng);
+        if (d <= raio) {
+          pingsDentro++;
+          indicesDentro.push(index);
+          if (!firstIn || g.registrado_em < firstIn) firstIn = g.registrado_em;
+          if (!lastIn || g.registrado_em > lastIn) lastIn = g.registrado_em;
+        }
+      });
+    }
+
+    indicesDentro.forEach((index) => pingsUsados.add(index));
+
+    let dwellMin: number | null = null;
+    if (firstIn && lastIn) {
+      const diffMs = new Date(lastIn).getTime() - new Date(firstIn).getTime();
+      dwellMin = Math.round(diffMs / 60000);
+    }
+
+    const cnpj = (p.cnpj_destinatario || "").replace(/\D/g, "");
+    const baixa = cnpj ? baixasPorCnpj.get(cnpj) : undefined;
+    let baixaDistM: number | null = null;
+    let offSite = false;
+    if (baixa && baixa.latitude != null && baixa.longitude != null && pLat != null && pLng != null) {
+      baixaDistM = Math.round(haversineM(pLat, pLng, Number(baixa.latitude), Number(baixa.longitude)));
+      offSite = baixaDistM > raio;
+    }
+
+    out[p.id] = { dwellMin, pingsDentro, firstIn, lastIn, baixaDistM, offSite };
+  }
+
+  return out;
+}
+
 export function isPassagem(a: ParadaAnalise): boolean {
   return a.dwellMin != null && a.dwellMin < DWELL_MIN_THRESHOLD;
 }
