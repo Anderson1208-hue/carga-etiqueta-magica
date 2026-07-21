@@ -318,6 +318,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/prestacao-contas/desfazer-baixa"
+        element={
+          <ProtectedRoute>
+            <DesfazerBaixa />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
