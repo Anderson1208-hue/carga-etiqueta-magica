@@ -49,6 +49,7 @@ import FiscalConfiguracao from "./pages/FiscalConfiguracao";
 import MotoristasFiscal from "./pages/fiscal/Motoristas";
 import ConveniosFiscais from "./pages/fiscal/Convenios";
 import TabelasFrete from "./pages/fiscal/TabelasFrete";
+import RevisaoCoordenadas from "./pages/RevisaoCoordenadas";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -341,6 +342,7 @@ function AppRoutes() {
       <Route path="/motorista" element={<ErrorBoundary><MotoristaAcesso /></ErrorBoundary>} />
 
       <Route path="/motorista/diagnostico" element={<ErrorBoundary><MotoristaDiagnostico /></ErrorBoundary>} />
+      <Route path="/monitoramento/revisao-coordenadas" element={<ProtectedRoute><RevisaoCoordenadas /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
