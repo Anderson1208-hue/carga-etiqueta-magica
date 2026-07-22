@@ -2976,6 +2976,7 @@ export type Database = {
         | "google_geocode_range"
         | "dwell_factual_aprovado"
         | "amostra_insuficiente"
+        | "dwell_factual_sugerido"
       tipo_endereco: "fiscal" | "entrega" | "doca" | "coleta"
     }
     CompositeTypes: {
@@ -3124,6 +3125,7 @@ export const Constants = {
         "google_geocode_range",
         "dwell_factual_aprovado",
         "amostra_insuficiente",
+        "dwell_factual_sugerido",
       ],
       tipo_endereco: ["fiscal", "entrega", "doca", "coleta"],
     },
