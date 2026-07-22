@@ -13,11 +13,6 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
-const EMAILS_PODE_DESFAZER = [
-  "yasmin.silva@tlmlogistica.com.br",
-  "julio.nogueira@tlmlogistica.com.br",
-];
-
 const OCORRENCIA_LABEL: Record<string, string> = {
   entregue: "Entregue",
   recusado: "Recusado",
@@ -55,9 +50,8 @@ export default function DesfazerBaixa() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin, profile } = useAuth();
-  const autorizado =
-    isAdmin ||
-    (profile?.email ? EMAILS_PODE_DESFAZER.includes(profile.email.toLowerCase()) : false);
+  const autorizado = isAdmin || (profile?.ativo === true && profile?.role === "operador");
+
 
   const [numeroNf, setNumeroNf] = useState("");
   const [buscando, setBuscando] = useState(false);
