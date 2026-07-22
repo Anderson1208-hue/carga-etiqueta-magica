@@ -49,7 +49,35 @@ export default function Operadores() {
     },
     onError: () => toast.error("Erro ao atualizar operador"),
   });
+  const promoverMutation = useMutation({
+    mutationFn: async ({ id, dias }: { id: string; dias: number }) => {
+      const { error } = await supabase.rpc("promover_admin_temporario", {
+        _user_id: id,
+        _dias: dias,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operators"] });
+      toast.success("Operador promovido a Administrador temporário");
+      setPromoverAlvo(null);
+    },
+    onError: (e: any) => toast.error(e.message || "Erro ao promover"),
+  });
 
+  const revogarMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("revogar_admin_temporario", { _user_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operators"] });
+      toast.success("Permissão temporária revogada");
+    },
+    onError: (e: any) => toast.error(e.message || "Erro ao revogar"),
+  });
+
+  
   if (authLoading || !profile) {
     return (
       <MainLayout>
