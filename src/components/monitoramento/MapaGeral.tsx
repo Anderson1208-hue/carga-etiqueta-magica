@@ -12,6 +12,14 @@ const STATUS_COLORS: Record<string, string> = {
   pausada: "hsl(38, 92%, 50%)",
 };
 
+// CD de origem — Rua da Regeneração, 235 - Bonsucesso - RJ (CEP 21040-170)
+const CD_ORIGEM = {
+  lat: -22.860365,
+  lng: -43.248882,
+  nome: "CD Bonsucesso",
+  endereco: "Rua da Regeneração, 235 - Bonsucesso/RJ",
+};
+
 interface MapaGeralProps {
   rotas: MonitoramentoRota[];
   height?: string;
@@ -44,6 +52,25 @@ export function MapaGeral({ rotas, height = "250px", onSelectRota, showTitle = t
     });
 
     const bounds: L.LatLngTuple[] = [];
+
+    // Marcador fixo do CD de origem
+    const cdIcon = L.divIcon({
+      className: "cd-origem-icon",
+      html: `<div style="
+        background: hsl(0, 0%, 100%);
+        border: 3px solid hsl(215, 90%, 45%);
+        color: hsl(215, 90%, 45%);
+        width: 34px; height: 34px; border-radius: 6px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      ">🏭</div>`,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+    });
+    L.marker([CD_ORIGEM.lat, CD_ORIGEM.lng], { icon: cdIcon, zIndexOffset: -100 })
+      .bindPopup(`<div style="min-width:180px"><strong>${CD_ORIGEM.nome}</strong><br><span style="color:#666;font-size:12px">${CD_ORIGEM.endereco}</span></div>`)
+      .addTo(map);
+    bounds.push([CD_ORIGEM.lat, CD_ORIGEM.lng]);
 
     rotas.forEach((rota) => {
       if (!rota.ultima_lat || !rota.ultima_lng) return;
