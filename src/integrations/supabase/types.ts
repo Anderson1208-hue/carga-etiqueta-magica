@@ -3097,7 +3097,9 @@ export type Database = {
       }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       is_active_operator: { Args: never; Returns: boolean }
-      is_admin: { Args: never; Returns: boolean }
+      is_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { _user_id: string }; Returns: boolean }
       is_carga_operator: { Args: { p_carga_id: string }; Returns: boolean }
       listar_audit_log: {
         Args: {
