@@ -12,6 +12,14 @@ const STATUS_COLORS: Record<string, string> = {
   pausada: "hsl(38, 92%, 50%)",
 };
 
+// CD de origem — Rua da Regeneração, 235 - Bonsucesso - RJ (CEP 21040-170)
+const CD_ORIGEM = {
+  lat: -22.860365,
+  lng: -43.248882,
+  nome: "CD Bonsucesso",
+  endereco: "Rua da Regeneração, 235 - Bonsucesso/RJ",
+};
+
 interface MapaGeralProps {
   rotas: MonitoramentoRota[];
   height?: string;
