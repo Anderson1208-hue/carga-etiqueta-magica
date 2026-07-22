@@ -116,6 +116,48 @@ export type Database = {
           },
         ]
       }
+      apk_heartbeats: {
+        Row: {
+          app_version: string | null
+          bateria_pct: number | null
+          created_at: string
+          id: string
+          meta: Json | null
+          motorista_user_id: string | null
+          otimizacao_bateria: string | null
+          permissao_localizacao: string | null
+          placa: string
+          recebido_em: string
+          ultimo_gps_em: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          bateria_pct?: number | null
+          created_at?: string
+          id?: string
+          meta?: Json | null
+          motorista_user_id?: string | null
+          otimizacao_bateria?: string | null
+          permissao_localizacao?: string | null
+          placa: string
+          recebido_em?: string
+          ultimo_gps_em?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          bateria_pct?: number | null
+          created_at?: string
+          id?: string
+          meta?: Json | null
+          motorista_user_id?: string | null
+          otimizacao_bateria?: string | null
+          permissao_localizacao?: string | null
+          placa?: string
+          recebido_em?: string
+          ultimo_gps_em?: string | null
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -2506,6 +2548,90 @@ export type Database = {
           },
         ]
       }
+      sugestoes_coordenada: {
+        Row: {
+          cluster_lat: number
+          cluster_lng: number
+          confianca_atual: number | null
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          destinatario_id: string
+          distancia_atual_metros: number | null
+          endereco_id: string | null
+          id: string
+          motivo_rejeicao: string | null
+          num_pings: number
+          num_rotas_distintas: number
+          observacao: string | null
+          origem_atual: Database["public"]["Enums"]["origem_coordenada"] | null
+          primeira_visita: string
+          raio_cluster_metros: number
+          status: string
+          ultima_visita: string
+          updated_at: string
+        }
+        Insert: {
+          cluster_lat: number
+          cluster_lng: number
+          confianca_atual?: number | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          destinatario_id: string
+          distancia_atual_metros?: number | null
+          endereco_id?: string | null
+          id?: string
+          motivo_rejeicao?: string | null
+          num_pings: number
+          num_rotas_distintas: number
+          observacao?: string | null
+          origem_atual?: Database["public"]["Enums"]["origem_coordenada"] | null
+          primeira_visita: string
+          raio_cluster_metros: number
+          status?: string
+          ultima_visita: string
+          updated_at?: string
+        }
+        Update: {
+          cluster_lat?: number
+          cluster_lng?: number
+          confianca_atual?: number | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          destinatario_id?: string
+          distancia_atual_metros?: number | null
+          endereco_id?: string | null
+          id?: string
+          motivo_rejeicao?: string | null
+          num_pings?: number
+          num_rotas_distintas?: number
+          observacao?: string | null
+          origem_atual?: Database["public"]["Enums"]["origem_coordenada"] | null
+          primeira_visita?: string
+          raio_cluster_metros?: number
+          status?: string
+          ultima_visita?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sugestoes_coordenada_destinatario_id_fkey"
+            columns: ["destinatario_id"]
+            isOneToOne: false
+            referencedRelation: "destinatarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sugestoes_coordenada_endereco_id_fkey"
+            columns: ["endereco_id"]
+            isOneToOne: false
+            referencedRelation: "destinatario_enderecos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tabelas_frete: {
         Row: {
           ativo: boolean
@@ -2803,6 +2929,21 @@ export type Database = {
       }
     }
     Views: {
+      vw_apk_heartbeat_atual: {
+        Row: {
+          app_version: string | null
+          bateria_pct: number | null
+          estado: string | null
+          motorista_user_id: string | null
+          otimizacao_bateria: string | null
+          permissao_localizacao: string | null
+          placa: string | null
+          recebido_em: string | null
+          segundos_desde_ultimo: number | null
+          ultimo_gps_em: string | null
+        }
+        Relationships: []
+      }
       vw_diagnostico_paradas_v3: {
         Row: {
           classificacao_v3: string | null
