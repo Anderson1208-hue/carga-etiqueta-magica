@@ -2408,7 +2408,10 @@ export type Database = {
           full_name: string | null
           id: string
           pode_divergencia: boolean
+          promovido_por: string | null
           role: Database["public"]["Enums"]["app_role"]
+          role_anterior: Database["public"]["Enums"]["app_role"] | null
+          role_expira_em: string | null
           updated_at: string
         }
         Insert: {
@@ -2418,7 +2421,10 @@ export type Database = {
           full_name?: string | null
           id: string
           pode_divergencia?: boolean
+          promovido_por?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          role_anterior?: Database["public"]["Enums"]["app_role"] | null
+          role_expira_em?: string | null
           updated_at?: string
         }
         Update: {
@@ -2428,7 +2434,10 @@ export type Database = {
           full_name?: string | null
           id?: string
           pode_divergencia?: boolean
+          promovido_por?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          role_anterior?: Database["public"]["Enums"]["app_role"] | null
+          role_expira_em?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3119,6 +3128,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      promover_admin_temporario: {
+        Args: { _dias: number; _user_id: string }
+        Returns: undefined
+      }
       provisionar_torre_dia: { Args: { p_data?: string }; Returns: Json }
       provisionar_torre_veiculo: {
         Args: { p_veiculo_id: string }
@@ -3142,6 +3155,11 @@ export type Database = {
           origem: Database["public"]["Enums"]["origem_coordenada"]
           tipo: Database["public"]["Enums"]["tipo_endereco"]
         }[]
+      }
+      reverter_admins_expirados: { Args: never; Returns: number }
+      revogar_admin_temporario: {
+        Args: { _user_id: string }
+        Returns: undefined
       }
       rota_baixa_aderencia: {
         Args: { _min_pings?: number; _monitoramento_rota_id: string }

@@ -8,19 +8,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Shield, Users, UserCheck, UserX } from "lucide-react";
+import { Shield, Users, UserCheck, UserX, Clock, ShieldPlus } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function Operadores() {
   const { isAdmin, profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+
+  const [promoverAlvo, setPromoverAlvo] = useState<{ id: string; nome: string } | null>(null);
+  const [diasPromocao, setDiasPromocao] = useState(4);
 
   const { data: operators = [], isLoading } = useQuery({
     queryKey: ["operators"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, ativo, created_at")
+        .select("id, email, full_name, role, ativo, created_at, role_anterior, role_expira_em")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -42,7 +49,35 @@ export default function Operadores() {
     },
     onError: () => toast.error("Erro ao atualizar operador"),
   });
+  const promoverMutation = useMutation({
+    mutationFn: async ({ id, dias }: { id: string; dias: number }) => {
+      const { error } = await supabase.rpc("promover_admin_temporario", {
+        _user_id: id,
+        _dias: dias,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operators"] });
+      toast.success("Operador promovido a Administrador temporário");
+      setPromoverAlvo(null);
+    },
+    onError: (e: any) => toast.error(e.message || "Erro ao promover"),
+  });
 
+  const revogarMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("revogar_admin_temporario", { _user_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operators"] });
+      toast.success("Permissão temporária revogada");
+    },
+    onError: (e: any) => toast.error(e.message || "Erro ao revogar"),
+  });
+
+  
   if (authLoading || !profile) {
     return (
       <MainLayout>
@@ -121,15 +156,27 @@ export default function Operadores() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  operators.map((op) => (
+                  operators.map((op: any) => {
+                    const isTempAdmin = !!op.role_expira_em && !!op.role_anterior;
+                    const expiraEm = op.role_expira_em ? new Date(op.role_expira_em) : null;
+                    return (
                     <TableRow key={op.id}>
                       <TableCell className="font-medium">{op.full_name || "—"}</TableCell>
                       <TableCell>{op.email}</TableCell>
                       <TableCell>
-                        <Badge variant={op.role === "admin" ? "default" : "secondary"} className="gap-1">
-                          {op.role === "admin" && <Shield className="w-3 h-3" />}
-                          {op.role === "admin" ? "Admin" : "Operador"}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={op.role === "admin" ? "default" : "secondary"} className="gap-1 w-fit">
+                            {op.role === "admin" && <Shield className="w-3 h-3" />}
+                            {op.role === "admin" ? "Admin" : "Operador"}
+                            {isTempAdmin && " (temp)"}
+                          </Badge>
+                          {isTempAdmin && expiraEm && (
+                            <span className="text-xs text-amber-600 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              até {expiraEm.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={op.ativo ? "default" : "outline"} className={op.ativo ? "bg-emerald-600" : "text-amber-600 border-amber-400"}>
@@ -137,23 +184,92 @@ export default function Operadores() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {op.role !== "admin" && (
-                          <Switch
-                            checked={op.ativo}
-                            onCheckedChange={(checked) =>
-                              toggleMutation.mutate({ id: op.id, ativo: checked })
-                            }
-                          />
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {op.role !== "admin" && (
+                            <>
+                              <Switch
+                                checked={op.ativo}
+                                onCheckedChange={(checked) =>
+                                  toggleMutation.mutate({ id: op.id, ativo: checked })
+                                }
+                              />
+                              {op.ativo && op.id !== profile.id && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1"
+                                  onClick={() => {
+                                    setDiasPromocao(4);
+                                    setPromoverAlvo({ id: op.id, nome: op.full_name || op.email });
+                                  }}
+                                >
+                                  <ShieldPlus className="w-3.5 h-3.5" />
+                                  Promover
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          {isTempAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive"
+                              onClick={() => revogarMutation.mutate(op.id)}
+                            >
+                              Revogar
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!promoverAlvo} onOpenChange={(o) => !o && setPromoverAlvo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Promover a Administrador temporário</DialogTitle>
+            <DialogDescription>
+              <strong>{promoverAlvo?.nome}</strong> receberá acesso de administrador pelo prazo escolhido.
+              Ao expirar, o sistema volta automaticamente ao cargo de Operador.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="dias">Dias de acesso (1 a 30)</Label>
+            <Input
+              id="dias"
+              type="number"
+              min={1}
+              max={30}
+              value={diasPromocao}
+              onChange={(e) => setDiasPromocao(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Expira em:{" "}
+              <strong>
+                {new Date(Date.now() + diasPromocao * 86400000).toLocaleString("pt-BR", {
+                  day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+                })}
+              </strong>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromoverAlvo(null)}>Cancelar</Button>
+            <Button
+              onClick={() => promoverAlvo && promoverMutation.mutate({ id: promoverAlvo.id, dias: diasPromocao })}
+              disabled={promoverMutation.isPending}
+            >
+              Confirmar promoção
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
