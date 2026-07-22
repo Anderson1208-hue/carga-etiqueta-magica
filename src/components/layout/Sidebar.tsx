@@ -68,6 +68,7 @@ const transporteItems = [
 const torreControleItems = [
   { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
   { name: "Acompanhamento Rápido", href: "/acompanhamento-rotas", icon: Radio },
+  { name: "Revisão de Coordenadas", href: "/monitoramento/revisao-coordenadas", icon: Radar },
 ];
 
 const cadastrosItems = [
