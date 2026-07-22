@@ -124,7 +124,7 @@ export default function RevisaoCoordenadas() {
         .select("*")
         .eq("status", "pendente");
       if (error) throw error;
-      return data as Sugestao[];
+      return (data ?? []) as unknown as Sugestao[];
     },
   });
 
