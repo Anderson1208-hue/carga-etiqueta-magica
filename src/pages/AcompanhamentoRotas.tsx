@@ -31,7 +31,9 @@ import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento";
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
+import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
+import { toast } from "@/hooks/use-toast";
 
 const todayISO = () => {
   const d = new Date();
@@ -73,6 +75,7 @@ export default function AcompanhamentoRotas() {
   const [loading, setLoading] = useState(true);
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
   const [config, setConfig] = useState<MonitoramentoConfig | null>(null);
+  const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
 
   // Carrega apenas rotas ATIVAS de veículos que estão na roteirização da data
   // (veiculos.data é setada pela roteirização e reagendada no pernoite).
@@ -505,15 +508,34 @@ export default function AcompanhamentoRotas() {
 
             <ParadasTable
               paradas={paradas}
-              onJustificar={() => {
-                /* justificativa fica em Monitoramento detalhado */
-              }}
+              onJustificar={(p) => setJustificativaParada(p)}
               formatTime={formatTime}
               analisePorParada={analisePorParada}
             />
           </>
         )}
       </div>
+
+      <JustificativaDialog
+        parada={justificativaParada}
+        onClose={() => setJustificativaParada(null)}
+        onSave={async (paradaId, tipo, texto) => {
+          const { error } = await supabase
+            .from("monitoramento_paradas")
+            .update({
+              justificativa: texto || tipo,
+              justificativa_tipo: tipo,
+              justificativa_em: new Date().toISOString(),
+            })
+            .eq("id", paradaId);
+          if (error) {
+            toast({ title: "Erro ao salvar justificativa", variant: "destructive" });
+            throw error;
+          }
+          toast({ title: "Justificativa registrada" });
+          if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+        }}
+      />
     </MainLayout>
   );
 }
