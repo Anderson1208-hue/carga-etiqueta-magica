@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   AlertTriangle,
   ExternalLink,
+  ArrowLeft,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Circle, CircleMarker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -234,6 +236,11 @@ export default function RevisaoCoordenadas() {
 
   return (
     <div className="container max-w-6xl py-6 space-y-4">
+      <Button asChild variant="ghost" size="sm" className="mb-2">
+        <Link to="/">
+          <ArrowLeft className="w-4 h-4 mr-1" /> Voltar ao menu principal
+        </Link>
+      </Button>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Revisão de coordenadas — Frente A</h1>
