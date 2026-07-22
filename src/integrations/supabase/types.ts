@@ -2965,6 +2965,10 @@ export type Database = {
     }
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
+      aprovar_sugestao_coordenada: {
+        Args: { p_sugestao_id: string }
+        Returns: Json
+      }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
       confianca_origem: {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
@@ -3023,6 +3027,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      gerar_sugestoes_dwell_factual: {
+        Args: never
+        Returns: {
+          destinatario_id: string
+          distancia_m: number
+          num_pings: number
+          num_rotas: number
+          raio_m: number
+          sugestao_id: string
+        }[]
+      }
       get_cargas_com_contagens: {
         Args: never
         Returns: {
@@ -3080,6 +3095,10 @@ export type Database = {
       registrar_chegada_cd_manual: {
         Args: { p_nf_id: string; p_observacao?: string }
         Returns: Json
+      }
+      rejeitar_sugestao_coordenada: {
+        Args: { p_motivo: string; p_sugestao_id: string }
+        Returns: undefined
       }
       resolver_endereco_operacional: {
         Args: { _destinatario_id: string }
