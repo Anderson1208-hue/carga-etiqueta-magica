@@ -78,6 +78,7 @@ export default function AcompanhamentoRotas() {
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
   const [config, setConfig] = useState<MonitoramentoConfig | null>(null);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
+  const [alertaJustificar, setAlertaJustificar] = useState<Alerta | null>(null);
 
   // Carrega apenas rotas ATIVAS de veículos que estão na roteirização da data
   // (veiculos.data é setada pela roteirização e reagendada no pernoite).
