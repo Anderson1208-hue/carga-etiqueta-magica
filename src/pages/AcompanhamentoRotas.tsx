@@ -554,6 +554,57 @@ export default function AcompanhamentoRotas() {
           if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
         }}
       />
+
+      <ParadaNaoProgramadaDialog
+        alerta={alertaJustificar}
+        paradas={paradas}
+        onClose={() => setAlertaJustificar(null)}
+        onSave={async ({ alertaId, motivo, paradaId, observacao }) => {
+          // Se for "entrega no local", grava sugestão de coordenada para revisão
+          if (motivo === "entrega_no_local" && paradaId && alertaJustificar?.latitude && alertaJustificar?.longitude) {
+            const parada = paradas.find((p) => p.id === paradaId);
+            if (parada?.cnpj_destinatario) {
+              const { data: dest } = await supabase
+                .from("destinatarios")
+                .select("id")
+                .eq("cnpj", parada.cnpj_destinatario)
+                .maybeSingle();
+              if (dest?.id) {
+                await supabase.from("sugestoes_coordenada").insert({
+                  destinatario_id: dest.id,
+                  cluster_lat: alertaJustificar.latitude,
+                  cluster_lng: alertaJustificar.longitude,
+                  num_pings: alertaJustificar.metadata?.num_pings || 1,
+                  num_rotas_distintas: 1,
+                  primeira_visita: alertaJustificar.metadata?.inicio || alertaJustificar.created_at,
+                  ultima_visita: alertaJustificar.metadata?.fim || alertaJustificar.created_at,
+                  status: "pendente",
+                  observacao: `Confirmado pela torre em ${new Date().toLocaleString("pt-BR")} — ${observacao || "sem observação"}`,
+                });
+              }
+            }
+          }
+          // Marca o alerta como lido e grava metadado
+          const { error } = await supabase
+            .from("alertas_monitoramento")
+            .update({
+              lido: true,
+              lido_em: new Date().toISOString(),
+              metadata: {
+                ...(alertaJustificar?.metadata || {}),
+                justificativa: { motivo, paradaId, observacao, em: new Date().toISOString() },
+              },
+            })
+            .eq("id", alertaId);
+          if (error) {
+            toast({ title: "Erro ao registrar justificativa", variant: "destructive" });
+            throw error;
+          }
+          toast({ title: "Alerta justificado" });
+          if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+          loadRotas(dataSelecionada);
+        }}
+      />
     </MainLayout>
   );
 }
