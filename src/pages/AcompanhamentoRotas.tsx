@@ -497,6 +497,7 @@ export default function AcompanhamentoRotas() {
             <AlertasPanel
               alertas={alertas}
               onMarkRead={handleMarkAlertRead}
+              onJustificar={(a) => setAlertaJustificar(a)}
               formatDateTime={formatDateTime}
             />
 
