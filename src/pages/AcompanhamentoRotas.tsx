@@ -31,7 +31,9 @@ import { RotaStatusBadge } from "@/components/monitoramento/StatusBadge";
 import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento";
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
+import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
 import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
+import { toast } from "@/hooks/use-toast";
 
 const todayISO = () => {
   const d = new Date();
