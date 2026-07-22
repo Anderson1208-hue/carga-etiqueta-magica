@@ -337,7 +337,21 @@ export default function AcompanhamentoRotas() {
           </div>
         </div>
 
-        {/* Barra de chips (navegação rápida) */}
+
+        {/* Guia de atuação do operador */}
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-foreground/90 flex gap-2">
+          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-primary">Como agir quando aparecer um alerta "Parada não programada":</p>
+            <ol className="list-decimal ml-4 space-y-0.5">
+              <li>Ligue para o motorista e pergunte o que ele está fazendo naquele ponto.</li>
+              <li>Clique em <span className="font-semibold">Justificar</span> no alerta e selecione o motivo real.</li>
+              <li>Se for <span className="font-semibold">entrega no local</span>, escolha a parada correspondente — o sistema aprende o endereço correto para as próximas rotas.</li>
+              <li>Se for posto, trânsito ou ocorrência, registre o motivo — o alerta some e vira histórico da rota.</li>
+            </ol>
+          </div>
+        </div>
+
         <Card>
           <CardContent className="p-3">
             {rotas.length === 0 ? (
