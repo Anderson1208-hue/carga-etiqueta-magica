@@ -2550,6 +2550,7 @@ export type Database = {
       }
       sugestoes_coordenada: {
         Row: {
+          ambigua: boolean
           clientes_vizinhos_200m: Json | null
           cluster_lat: number
           cluster_lng: number
@@ -2561,6 +2562,7 @@ export type Database = {
           distancia_atual_metros: number | null
           endereco_id: string | null
           id: string
+          motivo_ambiguidade: string | null
           motivo_rejeicao: string | null
           num_pings: number
           num_placas_distintas: number | null
@@ -2574,6 +2576,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ambigua?: boolean
           clientes_vizinhos_200m?: Json | null
           cluster_lat: number
           cluster_lng: number
@@ -2585,6 +2588,7 @@ export type Database = {
           distancia_atual_metros?: number | null
           endereco_id?: string | null
           id?: string
+          motivo_ambiguidade?: string | null
           motivo_rejeicao?: string | null
           num_pings: number
           num_placas_distintas?: number | null
@@ -2598,6 +2602,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ambigua?: boolean
           clientes_vizinhos_200m?: Json | null
           cluster_lat?: number
           cluster_lng?: number
@@ -2609,6 +2614,7 @@ export type Database = {
           distancia_atual_metros?: number | null
           endereco_id?: string | null
           id?: string
+          motivo_ambiguidade?: string | null
           motivo_rejeicao?: string | null
           num_pings?: number
           num_placas_distintas?: number | null
@@ -3036,12 +3042,13 @@ export type Database = {
       gerar_sugestoes_dwell_factual: {
         Args: never
         Returns: {
-          destinatario_id: string
-          distancia_m: number
-          num_pings: number
-          num_rotas: number
-          raio_m: number
-          sugestao_id: string
+          ambiguas: number
+          descartadas_accuracy: number
+          descartadas_confianca: number
+          descartadas_consistencia: number
+          descartadas_dwell: number
+          descartadas_recorrencia: number
+          geradas: number
         }[]
       }
       get_cargas_com_contagens: {
