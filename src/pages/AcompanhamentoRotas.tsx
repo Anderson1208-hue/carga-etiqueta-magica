@@ -564,7 +564,7 @@ export default function AcompanhamentoRotas() {
           if (motivo === "entrega_no_local" && paradaId && alertaJustificar?.latitude && alertaJustificar?.longitude) {
             const parada = paradas.find((p) => p.id === paradaId);
             if (parada?.cnpj_destinatario) {
-              const { data: dest } = await supabase
+              const { data: dest } = await (supabase as any)
                 .from("destinatarios")
                 .select("id")
                 .eq("cnpj", parada.cnpj_destinatario)
