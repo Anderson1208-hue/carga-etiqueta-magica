@@ -100,17 +100,11 @@ function isoHoje() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const EMAILS_PODE_DESFAZER = [
-  "yasmin.silva@tlmlogistica.com.br",
-  "julio.nogueira@tlmlogistica.com.br",
-];
-
 export default function PrestacaoContas() {
   const { toast } = useToast();
   const { user, isAdmin, profile } = useAuth();
-  const podeDesfazer =
-    isAdmin ||
-    (profile?.email ? EMAILS_PODE_DESFAZER.includes(profile.email.toLowerCase()) : false);
+  const podeDesfazer = isAdmin || (profile?.ativo === true && profile?.role === "operador");
+
   const [data, setData] = useState<string>(isoHoje());
   const [veiculos, setVeiculos] = useState<VeiculoLista[]>([]);
   const [veiculoSel, setVeiculoSel] = useState<VeiculoLista | null>(null);
