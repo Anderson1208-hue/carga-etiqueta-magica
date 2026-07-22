@@ -2550,6 +2550,7 @@ export type Database = {
       }
       sugestoes_coordenada: {
         Row: {
+          clientes_vizinhos_200m: Json | null
           cluster_lat: number
           cluster_lng: number
           confianca_atual: number | null
@@ -2562,6 +2563,7 @@ export type Database = {
           id: string
           motivo_rejeicao: string | null
           num_pings: number
+          num_placas_distintas: number | null
           num_rotas_distintas: number
           observacao: string | null
           origem_atual: Database["public"]["Enums"]["origem_coordenada"] | null
@@ -2572,6 +2574,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          clientes_vizinhos_200m?: Json | null
           cluster_lat: number
           cluster_lng: number
           confianca_atual?: number | null
@@ -2584,6 +2587,7 @@ export type Database = {
           id?: string
           motivo_rejeicao?: string | null
           num_pings: number
+          num_placas_distintas?: number | null
           num_rotas_distintas: number
           observacao?: string | null
           origem_atual?: Database["public"]["Enums"]["origem_coordenada"] | null
@@ -2594,6 +2598,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          clientes_vizinhos_200m?: Json | null
           cluster_lat?: number
           cluster_lng?: number
           confianca_atual?: number | null
@@ -2606,6 +2611,7 @@ export type Database = {
           id?: string
           motivo_rejeicao?: string | null
           num_pings?: number
+          num_placas_distintas?: number | null
           num_rotas_distintas?: number
           observacao?: string | null
           origem_atual?: Database["public"]["Enums"]["origem_coordenada"] | null
@@ -3079,6 +3085,15 @@ export type Database = {
           p_user_id?: string
         }
         Returns: Json
+      }
+      pings_sugestao_coordenada: {
+        Args: { p_sugestao_id: string }
+        Returns: {
+          accuracy: number
+          lat: number
+          lng: number
+          registrado_em: string
+        }[]
       }
       pode_sobrescrever_coordenada: {
         Args: {
