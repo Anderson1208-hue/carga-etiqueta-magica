@@ -62,10 +62,13 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          latitude: number | null
           lido: boolean
           lido_em: string | null
           lido_por: string | null
+          longitude: number | null
           mensagem: string
+          metadata: Json | null
           monitoramento_parada_id: string | null
           monitoramento_rota_id: string
           tipo: string
@@ -73,10 +76,13 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          latitude?: number | null
           lido?: boolean
           lido_em?: string | null
           lido_por?: string | null
+          longitude?: number | null
           mensagem: string
+          metadata?: Json | null
           monitoramento_parada_id?: string | null
           monitoramento_rota_id: string
           tipo: string
@@ -84,10 +90,13 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          latitude?: number | null
           lido?: boolean
           lido_em?: string | null
           lido_por?: string | null
+          longitude?: number | null
           mensagem?: string
+          metadata?: Json | null
           monitoramento_parada_id?: string | null
           monitoramento_rota_id?: string
           tipo?: string
@@ -2986,6 +2995,7 @@ export type Database = {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
         Returns: number
       }
+      detectar_paradas_nao_programadas: { Args: never; Returns: Json }
       detectar_paradas_suspeitas: {
         Args: { p_rota_id: string }
         Returns: {

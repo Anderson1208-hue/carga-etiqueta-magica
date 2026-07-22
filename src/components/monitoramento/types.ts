@@ -44,6 +44,9 @@ export interface Alerta {
   mensagem: string;
   lido: boolean;
   created_at: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  metadata?: any;
 }
 
 export interface MonitoramentoConfig {

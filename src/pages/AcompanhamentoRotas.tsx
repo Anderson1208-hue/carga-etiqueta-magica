@@ -32,8 +32,10 @@ import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento"
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
+import { ParadaNaoProgramadaDialog } from "@/components/monitoramento/ParadaNaoProgramadaDialog";
 import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
 import { toast } from "@/hooks/use-toast";
+import { Info } from "lucide-react";
 
 const todayISO = () => {
   const d = new Date();
@@ -76,6 +78,7 @@ export default function AcompanhamentoRotas() {
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
   const [config, setConfig] = useState<MonitoramentoConfig | null>(null);
   const [justificativaParada, setJustificativaParada] = useState<MonitoramentoParada | null>(null);
+  const [alertaJustificar, setAlertaJustificar] = useState<Alerta | null>(null);
 
   // Carrega apenas rotas ATIVAS de veículos que estão na roteirização da data
   // (veiculos.data é setada pela roteirização e reagendada no pernoite).
@@ -334,7 +337,21 @@ export default function AcompanhamentoRotas() {
           </div>
         </div>
 
-        {/* Barra de chips (navegação rápida) */}
+
+        {/* Guia de atuação do operador */}
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-foreground/90 flex gap-2">
+          <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-primary">Como agir quando aparecer um alerta "Parada não programada":</p>
+            <ol className="list-decimal ml-4 space-y-0.5">
+              <li>Ligue para o motorista e pergunte o que ele está fazendo naquele ponto.</li>
+              <li>Clique em <span className="font-semibold">Justificar</span> no alerta e selecione o motivo real.</li>
+              <li>Se for <span className="font-semibold">entrega no local</span>, escolha a parada correspondente — o sistema aprende o endereço correto para as próximas rotas.</li>
+              <li>Se for posto, trânsito ou ocorrência, registre o motivo — o alerta some e vira histórico da rota.</li>
+            </ol>
+          </div>
+        </div>
+
         <Card>
           <CardContent className="p-3">
             {rotas.length === 0 ? (
@@ -494,6 +511,7 @@ export default function AcompanhamentoRotas() {
             <AlertasPanel
               alertas={alertas}
               onMarkRead={handleMarkAlertRead}
+              onJustificar={(a) => setAlertaJustificar(a)}
               formatDateTime={formatDateTime}
             />
 
@@ -534,6 +552,57 @@ export default function AcompanhamentoRotas() {
           }
           toast({ title: "Justificativa registrada" });
           if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+        }}
+      />
+
+      <ParadaNaoProgramadaDialog
+        alerta={alertaJustificar}
+        paradas={paradas}
+        onClose={() => setAlertaJustificar(null)}
+        onSave={async ({ alertaId, motivo, paradaId, observacao }) => {
+          // Se for "entrega no local", grava sugestão de coordenada para revisão
+          if (motivo === "entrega_no_local" && paradaId && alertaJustificar?.latitude && alertaJustificar?.longitude) {
+            const parada = paradas.find((p) => p.id === paradaId);
+            if (parada?.cnpj_destinatario) {
+              const { data: dest } = await (supabase as any)
+                .from("destinatarios")
+                .select("id")
+                .eq("cnpj", parada.cnpj_destinatario)
+                .maybeSingle();
+              if (dest?.id) {
+                await (supabase.from("sugestoes_coordenada") as any).insert({
+                  destinatario_id: dest.id,
+                  cluster_lat: alertaJustificar.latitude,
+                  cluster_lng: alertaJustificar.longitude,
+                  num_pings: alertaJustificar.metadata?.num_pings || 1,
+                  num_rotas_distintas: 1,
+                  primeira_visita: alertaJustificar.metadata?.inicio || alertaJustificar.created_at,
+                  ultima_visita: alertaJustificar.metadata?.fim || alertaJustificar.created_at,
+                  status: "pendente",
+                  observacao: `Confirmado pela torre em ${new Date().toLocaleString("pt-BR")} — ${observacao || "sem observação"}`,
+                });
+              }
+            }
+          }
+          // Marca o alerta como lido e grava metadado
+          const { error } = await supabase
+            .from("alertas_monitoramento")
+            .update({
+              lido: true,
+              lido_em: new Date().toISOString(),
+              metadata: {
+                ...(alertaJustificar?.metadata || {}),
+                justificativa: { motivo, paradaId, observacao, em: new Date().toISOString() },
+              },
+            })
+            .eq("id", alertaId);
+          if (error) {
+            toast({ title: "Erro ao registrar justificativa", variant: "destructive" });
+            throw error;
+          }
+          toast({ title: "Alerta justificado" });
+          if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+          loadRotas(dataSelecionada);
         }}
       />
     </MainLayout>
