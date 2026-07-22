@@ -32,8 +32,10 @@ import { MapaMonitoramento } from "@/components/monitoramento/MapaMonitoramento"
 import { ParadasTable } from "@/components/monitoramento/ParadasTable";
 import { AlertasPanel } from "@/components/monitoramento/AlertasPanel";
 import { JustificativaDialog } from "@/components/monitoramento/JustificativaDialog";
+import { ParadaNaoProgramadaDialog } from "@/components/monitoramento/ParadaNaoProgramadaDialog";
 import { analisarParadasSequencial, type ParadaAnalise } from "@/lib/dwellTime";
 import { toast } from "@/hooks/use-toast";
+import { Info } from "lucide-react";
 
 const todayISO = () => {
   const d = new Date();
