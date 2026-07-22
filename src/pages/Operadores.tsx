@@ -19,12 +19,15 @@ export default function Operadores() {
   const { isAdmin, profile, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
 
+  const [promoverAlvo, setPromoverAlvo] = useState<{ id: string; nome: string } | null>(null);
+  const [diasPromocao, setDiasPromocao] = useState(4);
+
   const { data: operators = [], isLoading } = useQuery({
     queryKey: ["operators"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, ativo, created_at")
+        .select("id, email, full_name, role, ativo, created_at, role_anterior, role_expira_em")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
