@@ -26,7 +26,7 @@ type Sugestao = {
   created_at: string;
 };
 
-type Destinatario = { id: string; razao_social: string; nome_fantasia: string | null; cnpj: string };
+type Destinatario = { id: string; razao_social: string; nome_fantasia: string | null; cnpj_cpf: string };
 
 export default function RevisaoCoordenadas() {
   const qc = useQueryClient();
@@ -54,7 +54,7 @@ export default function RevisaoCoordenadas() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("destinatarios")
-        .select("id, razao_social, nome_fantasia, cnpj")
+        .select("id, razao_social, nome_fantasia, cnpj_cpf")
         .in("id", destIds);
       if (error) throw error;
       const m = new Map<string, Destinatario>();
@@ -144,7 +144,7 @@ export default function RevisaoCoordenadas() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                   <span>{dest?.nome_fantasia || dest?.razao_social || "Destinatário"}</span>
-                  <Badge variant="outline" className="text-xs">{dest?.cnpj}</Badge>
+                  <Badge variant="outline" className="text-xs">{dest?.cnpj_cpf}</Badge>
                   <Badge className="text-xs">{s.num_pings} pings · {s.num_rotas_distintas} rotas</Badge>
                   <Badge variant="secondary" className="text-xs">raio {Math.round(s.raio_cluster_metros)}m</Badge>
                   {s.distancia_atual_metros != null && (
