@@ -508,15 +508,34 @@ export default function AcompanhamentoRotas() {
 
             <ParadasTable
               paradas={paradas}
-              onJustificar={() => {
-                /* justificativa fica em Monitoramento detalhado */
-              }}
+              onJustificar={(p) => setJustificativaParada(p)}
               formatTime={formatTime}
               analisePorParada={analisePorParada}
             />
           </>
         )}
       </div>
+
+      <JustificativaDialog
+        parada={justificativaParada}
+        onClose={() => setJustificativaParada(null)}
+        onSave={async (paradaId, tipo, texto) => {
+          const { error } = await supabase
+            .from("monitoramento_paradas")
+            .update({
+              justificativa: texto || tipo,
+              justificativa_tipo: tipo,
+              justificativa_em: new Date().toISOString(),
+            })
+            .eq("id", paradaId);
+          if (error) {
+            toast({ title: "Erro ao salvar justificativa", variant: "destructive" });
+            throw error;
+          }
+          toast({ title: "Justificativa registrada" });
+          if (selectedRota) loadDetalhe(selectedRota.id, selectedRota.veiculo_id);
+        }}
+      />
     </MainLayout>
   );
 }
