@@ -570,7 +570,7 @@ export default function AcompanhamentoRotas() {
                 .eq("cnpj", parada.cnpj_destinatario)
                 .maybeSingle();
               if (dest?.id) {
-                await supabase.from("sugestoes_coordenada").insert({
+                await (supabase.from("sugestoes_coordenada") as any).insert({
                   destinatario_id: dest.id,
                   cluster_lat: alertaJustificar.latitude,
                   cluster_lng: alertaJustificar.longitude,
