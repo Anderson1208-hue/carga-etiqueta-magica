@@ -8,8 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Shield, Users, UserCheck, UserX } from "lucide-react";
+import { Shield, Users, UserCheck, UserX, Clock, ShieldPlus } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function Operadores() {
   const { isAdmin, profile, isLoading: authLoading } = useAuth();
