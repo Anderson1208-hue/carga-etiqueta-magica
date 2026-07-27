@@ -909,7 +909,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27e
+                  {selectedCarga.placa} • Etapa 1 Separação • v2026.07.27e
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -1197,7 +1197,7 @@ export default function ConferenciaInterna() {
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : etiquetasFaltantes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-2">Todas conferidas!</p>
+                      <p className="text-sm text-muted-foreground text-center py-2">Todas separadas (Etapa 1)!</p>
                     ) : (
                       <div className="space-y-1 max-h-60 overflow-y-auto">
                         {etiquetasFaltantes.map((et) => (
