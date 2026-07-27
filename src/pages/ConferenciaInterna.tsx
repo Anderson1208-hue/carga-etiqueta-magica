@@ -176,6 +176,23 @@ export default function ConferenciaInterna() {
     hasOfflineData().then(setHasLocalData);
   }, []);
 
+  // Ao trocar de etapa: Etapa 2 é bipagem única (só QR) e recarrega o progresso
+  useEffect(() => {
+    if (etapa === 2) {
+      setDuplaChecagem(false);
+      setCodigoCliente("");
+      codigoClienteRef.current = "";
+      collectorStageRef.current = "qr";
+      setCollectorStage("qr");
+    }
+    if (selectedNf) {
+      void reloadNfProgress();
+      if (faltamAberto) void carregarFaltantes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa]);
+
+
   useEffect(() => {
     return () => {
       if (reloadProgressTimerRef.current) {
