@@ -118,7 +118,10 @@ export default function ConferenciaInterna() {
 
   // Scanning state
   const [selectedCarga, setSelectedCarga] = useState<CargaResumo | null>(null);
+  // Etapa da conferência interna: 1 = Separação (dupla bipagem) | 2 = Expedição/carregamento (só QR)
+  const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
+
   const [nfProgress, setNfProgress] = useState<NfProgress | null>(null);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
@@ -158,9 +161,37 @@ export default function ConferenciaInterna() {
     { value: "outros", label: "Outros" },
   ];
 
+  // Conta como "feita" apenas o que já passou pela etapa selecionada
+  function contaComoConferida(status: string) {
+    return etapa === 2
+      ? status === "conferido"
+      : status === "conferido_interno" || status === "conferido";
+  }
+
+  const etapaLabel = etapa === 2 ? "Etapa 2 • Expedição (só QR)" : "Etapa 1 • Separação (dupla bipagem)";
+
+
+
   useEffect(() => {
     hasOfflineData().then(setHasLocalData);
   }, []);
+
+  // Ao trocar de etapa: Etapa 2 é bipagem única (só QR) e recarrega o progresso
+  useEffect(() => {
+    if (etapa === 2) {
+      setDuplaChecagem(false);
+      setCodigoCliente("");
+      codigoClienteRef.current = "";
+      collectorStageRef.current = "qr";
+      setCollectorStage("qr");
+    }
+    if (selectedNf) {
+      void reloadNfProgress();
+      if (faltamAberto) void loadEtiquetasFaltantes();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa]);
+
 
   useEffect(() => {
     return () => {
@@ -191,7 +222,7 @@ export default function ConferenciaInterna() {
       const cargaId = etiquetas[0].carga_id;
       const divergencias = etiquetas.filter((e) => e.status === "divergencia").length;
       const total = etiquetas.length - divergencias;
-      const conferidas = etiquetas.filter((e) => e.status === "conferido_interno" || e.status === "conferido").length;
+      const conferidas = etiquetas.filter((e) => contaComoConferida(e.status)).length;
 
       const { data: cargaData } = await supabase
         .from("cargas")
@@ -512,7 +543,12 @@ export default function ConferenciaInterna() {
       }
 
       if (offlineMode || !isOnline) {
+        if (etapa === 2) {
+          const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
         const etiqueta = await findEtiquetaByQr(qrData.trim());
+
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
@@ -546,34 +582,46 @@ export default function ConferenciaInterna() {
         const cargaId = selectedCarga.id;
         const nfAtual = selectedNf;
         const usuarioId = user?.id;
+        const etapaAtual = etapa;
 
         // No coletor/Chrome lento, não segura o próximo bipe esperando a rede/banco.
         // As validações locais já passaram; a gravação confirma em segundo plano.
         releaseForNextScan();
 
-        // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver pendente.
+        // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver no status esperado.
         void (async () => {
           try {
+            const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
+            const patch =
+              etapaAtual === 2
+                ? {
+                    status: "conferido" as any,
+                    conferido_em: new Date().toISOString(),
+                    conferido_por: usuarioId,
+                  }
+                : {
+                    status: "conferido_interno" as any,
+                    conferido_interno_em: new Date().toISOString(),
+                    conferido_interno_por: usuarioId,
+                  };
+
             const { data: updated, error: updateError } = await supabase
               .from("etiquetas")
-              .update({
-                status: "conferido_interno" as any,
-                conferido_interno_em: new Date().toISOString(),
-                conferido_interno_por: usuarioId,
-              })
+              .update(patch)
               .eq("carga_id", cargaId)
               .eq("qr_payload", qrPayload)
-              .eq("status", "pendente")
+              .eq("status", statusEsperado)
               .select("id, x_prod")
               .maybeSingle();
 
             if (updateError) throw updateError;
 
             if (updated) {
-              const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
+              const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
               setLastResult(result); addToHistory(result); playSound("success");
               bumpProgressOtimista();
               scheduleReloadNfProgress();
+
             } else {
               // Caminho raro: descobre o motivo (não existe / divergência / já conferida)
               const { data: etiqueta } = await supabase
@@ -591,9 +639,14 @@ export default function ConferenciaInterna() {
                 const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
                 setLastResult(result); addToHistory(result); playSound("error"); return;
               }
-              const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+              if (etapaAtual === 2 && etiqueta.status === "pendente") {
+                const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+                setLastResult(result); addToHistory(result); playSound("error"); return;
+              }
+              const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
               setLastResult(result); addToHistory(result); playSound("warning");
               scheduleReloadNfProgress();
+
             }
           } catch (error) {
             console.error("Erro ao gravar scan interno:", error);
@@ -753,9 +806,7 @@ export default function ConferenciaInterna() {
 
       const divergencias = all.filter((e) => e.status === "divergencia").length;
       const total = all.length - divergencias;
-      const conferidas = all.filter(
-        (e) => e.status === "conferido_interno" || e.status === "conferido"
-      ).length;
+      const conferidas = all.filter((e) => contaComoConferida(e.status)).length;
 
       setNfProgress({ numeroNf: selectedNf, total, conferidas });
 
@@ -763,9 +814,14 @@ export default function ConferenciaInterna() {
         setTimeout(() => {
           const completeResult: ScanResult = {
             type: "success",
-            message: `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
-            details: `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
+            message: etapa === 2
+              ? `✅ ETAPA 2/2 concluída — NF ${selectedNf} expedida`
+              : `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
+            details: etapa === 2
+              ? `${total} etiquetas carregadas no veículo.`
+              : `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
           };
+
 
           setLastResult(completeResult);
           addToHistory(completeResult);
@@ -785,10 +841,11 @@ export default function ConferenciaInterna() {
     if (!selectedCarga || !selectedNf) return;
     setLoadingFaltantes(true);
     try {
+      const statusFaltante = etapa === 2 ? "conferido_interno" : "pendente";
       if (offlineMode || !isOnline) {
         const ets = await getOfflineEtiquetas(selectedCarga.id);
         const faltantes = ets
-          .filter((e) => e.numero_nf === selectedNf && e.status === "pendente")
+          .filter((e) => e.numero_nf === selectedNf && e.status === statusFaltante)
           .map((e) => ({ id: e.id, x_prod: e.x_prod, c_prod: e.c_prod, seq: e.seq, total: e.total }));
         setEtiquetasFaltantes(faltantes);
       } else {
@@ -797,9 +854,10 @@ export default function ConferenciaInterna() {
           .select("id, x_prod, c_prod, seq, total")
           .eq("carga_id", selectedCarga.id)
           .eq("numero_nf", selectedNf)
-          .eq("status", "pendente")
+          .eq("status", statusFaltante)
           .order("c_prod")
           .order("seq");
+
         if (error) throw error;
         setEtiquetasFaltantes(data || []);
       }
@@ -909,7 +967,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Etapa 1 Separação • v2026.07.27e
+                  {selectedCarga.placa} • {etapa === 2 ? "Etapa 2 Expedição" : "Etapa 1 Separação"} • v2026.07.27f
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -925,28 +983,61 @@ export default function ConferenciaInterna() {
             <CardContent className="pt-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-[11px]">ETAPA 1 de 2 • Separação (dupla bipagem)</Badge>
+                  <Badge variant="secondary" className="text-[11px]">
+                    {etapa === 2 ? "ETAPA 2 de 2 • Expedição (só QR)" : "ETAPA 1 de 2 • Separação (dupla bipagem)"}
+                  </Badge>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas separadas</span>
+                  <span className="text-muted-foreground">
+                    {nfProgress.conferidas} de {nfProgress.total} etiquetas {etapa === 2 ? "expedidas" : "separadas"}
+                  </span>
                   <span className="font-bold text-lg">{nfPercent}%</span>
                 </div>
                 <Progress value={nfPercent} className="h-4" />
                 {nfProgress.conferidas === nfProgress.total && (
-                  <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
-                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
-                      <CheckCircle2 className="w-5 h-5" />
-                      Etapa 1 concluída (separação)
+                  etapa === 2 ? (
+                    <div className="mt-2 rounded-md border border-success bg-success/10 p-2">
+                      <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Etapa 2 concluída — NF expedida
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Esta NF <strong>ainda não está expedida</strong>. Falta a ETAPA 2 — Expedição,
-                      com uma bipagem só no QR na Conferência Externa.
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
+                      <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Etapa 1 concluída (separação)
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Esta NF <strong>ainda não está expedida</strong>. Troque para a
+                        <strong> ETAPA 2 — Expedição</strong> no botão acima e bipe só o QR no carregamento.
+                      </p>
+                    </div>
+                  )
                 )}
               </div>
             </CardContent>
           </Card>
+
+
+          {/* Seletor de etapa */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={etapa === 1 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setEtapa(1)}
+            >
+              Etapa 1 • Separação
+            </Button>
+            <Button
+              variant={etapa === 2 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setEtapa(2)}
+            >
+              Etapa 2 • Expedição
+            </Button>
+          </div>
+
 
 
           {/* Camera Scanner */}
@@ -1197,7 +1288,7 @@ export default function ConferenciaInterna() {
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : etiquetasFaltantes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-2">Todas separadas (Etapa 1)!</p>
+                      <p className="text-sm text-muted-foreground text-center py-2">{etapa === 2 ? "Todas expedidas (Etapa 2)!" : "Todas separadas (Etapa 1)!"}</p>
                     ) : (
                       <div className="space-y-1 max-h-60 overflow-y-auto">
                         {etiquetasFaltantes.map((et) => (
