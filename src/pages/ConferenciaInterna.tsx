@@ -848,23 +848,42 @@ export default function ConferenciaInterna() {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
                 <div className="flex items-center gap-2">
-                  <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
-                    Dupla Checagem
-                  </label>
-                  <Switch
-                    id="dupla-check"
-                    checked={duplaChecagem}
-                    onCheckedChange={(v) => {
-                      setDuplaChecagem(v);
-                      codigoClienteRef.current = "";
-                      qrInputRef.current = "";
-                      setCodigoCliente("");
-                      setQrInput("");
-                      setTimeout(() => {
-                        (v ? clienteInputRef : inputRef).current?.focus();
-                      }, 50);
-                    }}
-                  />
+                <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="teclado-manual" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      Teclado
+                    </label>
+                    <Switch
+                      id="teclado-manual"
+                      checked={tecladoManual}
+                      onCheckedChange={(v) => {
+                        setTecladoManual(v);
+                        setTimeout(() => {
+                          (duplaChecagem ? clienteInputRef : inputRef).current?.focus();
+                        }, 50);
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      Dupla Checagem
+                    </label>
+                    <Switch
+                      id="dupla-check"
+                      checked={duplaChecagem}
+                      onCheckedChange={(v) => {
+                        setDuplaChecagem(v);
+                        codigoClienteRef.current = "";
+                        qrInputRef.current = "";
+                        setCodigoCliente("");
+                        setQrInput("");
+                        setTimeout(() => {
+                          (v ? clienteInputRef : inputRef).current?.focus();
+                        }, 50);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
               {duplaChecagem && (
@@ -872,7 +891,13 @@ export default function ConferenciaInterna() {
                   1) Bipe o código do cliente na caixa &nbsp;→&nbsp; 2) Bipe a nossa etiqueta (QR). Sistema bloqueia se não bater.
                 </p>
               )}
+              {!tecladoManual && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Teclado do celular desligado (bipagem bem mais rápida). Ligue só para digitar à mão.
+                </p>
+              )}
             </CardHeader>
+
             <CardContent className="space-y-2">
               {duplaChecagem && (
                 <div>
