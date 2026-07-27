@@ -917,6 +917,11 @@ export default function ConferenciaInterna() {
                       }
                     }}
                     className="flex-1 font-mono text-sm"
+                    inputMode={tecladoManual ? "text" : "none"}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     readOnly={scanning}
                     autoFocus
                   />
