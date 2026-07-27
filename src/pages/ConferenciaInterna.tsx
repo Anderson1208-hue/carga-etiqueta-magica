@@ -1288,7 +1288,7 @@ export default function ConferenciaInterna() {
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : etiquetasFaltantes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-2">Todas separadas (Etapa 1)!</p>
+                      <p className="text-sm text-muted-foreground text-center py-2">{etapa === 2 ? "Todas expedidas (Etapa 2)!" : "Todas separadas (Etapa 1)!"}</p>
                     ) : (
                       <div className="space-y-1 max-h-60 overflow-y-auto">
                         {etiquetasFaltantes.map((et) => (
