@@ -763,9 +763,10 @@ export default function ConferenciaInterna() {
         setTimeout(() => {
           const completeResult: ScanResult = {
             type: "success",
-            message: `✅ NF ${selectedNf} COMPLETA!`,
-            details: `Todas as ${total} etiquetas conferidas internamente.`,
+            message: `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
+            details: `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
           };
+
           setLastResult(completeResult);
           addToHistory(completeResult);
           playSound("success");
