@@ -187,7 +187,7 @@ export default function ConferenciaInterna() {
     }
     if (selectedNf) {
       void reloadNfProgress();
-      if (faltamAberto) void carregarFaltantes();
+      if (faltamAberto) void loadEtiquetasFaltantes();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa]);
