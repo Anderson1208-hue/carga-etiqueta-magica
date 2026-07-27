@@ -763,9 +763,10 @@ export default function ConferenciaInterna() {
         setTimeout(() => {
           const completeResult: ScanResult = {
             type: "success",
-            message: `✅ NF ${selectedNf} COMPLETA!`,
-            details: `Todas as ${total} etiquetas conferidas internamente.`,
+            message: `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
+            details: `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
           };
+
           setLastResult(completeResult);
           addToHistory(completeResult);
           playSound("success");
@@ -908,7 +909,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27e
+                  {selectedCarga.placa} • Etapa 1 Separação • v2026.07.27e
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -923,20 +924,30 @@ export default function ConferenciaInterna() {
           <Card>
             <CardContent className="pt-4">
               <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className="text-[11px]">ETAPA 1 de 2 • Separação (dupla bipagem)</Badge>
+                </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas</span>
+                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas separadas</span>
                   <span className="font-bold text-lg">{nfPercent}%</span>
                 </div>
                 <Progress value={nfPercent} className="h-4" />
                 {nfProgress.conferidas === nfProgress.total && (
-                  <div className="flex items-center gap-2 text-success font-semibold mt-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                    Conf. Interna Completa!
+                  <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
+                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                      <CheckCircle2 className="w-5 h-5" />
+                      Etapa 1 concluída (separação)
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Esta NF <strong>ainda não está expedida</strong>. Falta a ETAPA 2 — Expedição,
+                      com uma bipagem só no QR na Conferência Externa.
+                    </p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
+
 
           {/* Camera Scanner */}
           <Card>
@@ -1186,7 +1197,7 @@ export default function ConferenciaInterna() {
                         <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                       </div>
                     ) : etiquetasFaltantes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-2">Todas conferidas!</p>
+                      <p className="text-sm text-muted-foreground text-center py-2">Todas separadas (Etapa 1)!</p>
                     ) : (
                       <div className="space-y-1 max-h-60 overflow-y-auto">
                         {etiquetasFaltantes.map((et) => (
