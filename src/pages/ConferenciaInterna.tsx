@@ -365,7 +365,15 @@ export default function ConferenciaInterna() {
     window.setTimeout(applyFocus, 60);
   }
 
+  // Atualiza o contador na hora (sem esperar o servidor) — o reload confirma depois
+  function bumpProgressOtimista() {
+    setNfProgress((prev) =>
+      prev ? { ...prev, conferidas: Math.min(prev.conferidas + 1, prev.total) } : prev
+    );
+  }
+
   async function processScan(qrData: string) {
+
     if (processingScanRef.current || !qrData.trim() || !selectedCarga || !selectedNf) return;
 
     processingScanRef.current = true;
