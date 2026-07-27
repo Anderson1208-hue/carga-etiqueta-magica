@@ -693,10 +693,38 @@ export default function ConferenciaInterna() {
   }
 
   function playSound(type: "success" | "error" | "warning") {
-    if ((window as any).__cameraScannerPlaySound) {
-      (window as any).__cameraScannerPlaySound(type);
-    }
+    // Som próprio (não depende da câmera estar ligada)
+    try {
+      const w = window as any;
+      if (!w.__conferenciaAudioCtx) {
+        w.__conferenciaAudioCtx = new (window.AudioContext || w.webkitAudioContext)();
+      }
+      const ctx: AudioContext = w.__conferenciaAudioCtx;
+      if (ctx.state === "suspended") ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      if (type === "success") {
+        osc.type = "sine";
+        osc.frequency.value = 880;
+      } else if (type === "error") {
+        osc.type = "square";
+        osc.frequency.value = 200;
+      } else {
+        osc.type = "triangle";
+        osc.frequency.value = 440;
+      }
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + (type === "success" ? 0.12 : 0.25));
+    } catch {}
+    // Vibração como reforço no celular
+    try {
+      if (navigator.vibrate) navigator.vibrate(type === "success" ? 60 : [80, 60, 80]);
+    } catch {}
   }
+
 
   async function handleManualScan(value?: string) {
     const scanValue = value || qrInputRef.current || inputRef.current?.value || qrInput;
@@ -880,7 +908,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27d
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27e
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -1279,7 +1307,7 @@ export default function ConferenciaInterna() {
               {isOnline ? "Online" : "Offline"}
             </Badge>
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-              v2026.07.27d
+              v2026.07.27e
             </span>
           </div>
           <MobileLogoutButton />
