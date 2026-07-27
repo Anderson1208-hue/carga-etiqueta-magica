@@ -164,8 +164,9 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <HomeRoute />
           </ProtectedRoute>
+
         }
       />
       <Route
