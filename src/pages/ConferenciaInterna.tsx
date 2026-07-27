@@ -526,7 +526,12 @@ export default function ConferenciaInterna() {
       }
 
       if (offlineMode || !isOnline) {
+        if (etapa === 2) {
+          const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
+          setLastResult(result); addToHistory(result); playSound("error"); return;
+        }
         const etiqueta = await findEtiquetaByQr(qrData.trim());
+
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("error"); return;
