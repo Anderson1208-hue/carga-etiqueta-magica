@@ -669,9 +669,12 @@ Deno.serve(async (req) => {
       ["finalizada"].includes(p.status)
     ).length;
 
-    const allDone = (updatedParadas || []).every((p: any) =>
-      ["finalizada", "pulada", "visita_inconsistente"].includes(p.status)
-    );
+    // Rota só encerra quando TODAS as paradas foram efetivamente atendidas.
+    // 'pulada' e 'visita_inconsistente' são exceções operacionais (motorista não
+    // entrou no raio, baixa fora do local, GPS ruim) — não podem sumir da Torre.
+    const allDone = (updatedParadas || []).length > 0 &&
+      (updatedParadas || []).every((p: any) => p.status === "finalizada");
+
 
     await supabase
       .from("monitoramento_rotas")
