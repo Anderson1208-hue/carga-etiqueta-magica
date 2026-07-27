@@ -810,15 +810,31 @@ export default function ConferenciaInterna() {
           {/* Camera Scanner */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ScanLine className="w-4 h-4" />
-                Scanner de Câmera
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ScanLine className="w-4 h-4" />
+                  Scanner de Câmera
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="camera-ativa" className="text-xs text-muted-foreground cursor-pointer select-none">
+                    Câmera
+                  </label>
+                  <Switch id="camera-ativa" checked={cameraAtiva} onCheckedChange={setCameraAtiva} />
+                </div>
+              </div>
+              {!cameraAtiva && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Câmera desligada (recomendado com leitor USB/Bluetooth — deixa a bipagem bem mais rápida em aparelhos fracos).
+                </p>
+              )}
             </CardHeader>
-            <CardContent>
-              <CameraScanner onScan={processScan} enabled={true} />
-            </CardContent>
+            {cameraAtiva && (
+              <CardContent>
+                <CameraScanner onScan={processScan} enabled={true} />
+              </CardContent>
+            )}
           </Card>
+
 
           {/* Manual Input + Dupla Checagem */}
           <Card>
