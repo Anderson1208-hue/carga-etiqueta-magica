@@ -101,6 +101,7 @@ export default function ConferenciaInterna() {
     hasOfflineData,
   } = useOfflineConferencia();
   const [offlineMode, setOfflineMode] = useState(false);
+  const [cameraAtiva, setCameraAtiva] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
