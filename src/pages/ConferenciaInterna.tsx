@@ -595,9 +595,10 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function handleManualScan(value = qrInput) {
-    if (processingScanRef.current || !value.trim()) return;
-    await processScan(value, codigoClienteRef.current || clienteInputRef.current?.value || codigoCliente);
+  async function handleManualScan(value?: string) {
+    const scanValue = value || qrInputRef.current || inputRef.current?.value || qrInput;
+    if (processingScanRef.current || !scanValue.trim()) return;
+    await processScan(scanValue, codigoClienteRef.current || clienteInputRef.current?.value || codigoCliente);
   }
 
 
@@ -861,7 +862,6 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       codigoClienteRef.current = e.target.value;
-                      setCodigoCliente(e.target.value);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -889,7 +889,6 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       qrInputRef.current = e.target.value;
-                      setQrInput(e.target.value);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -900,11 +899,10 @@ export default function ConferenciaInterna() {
                     }}
                     className="flex-1 font-mono text-sm"
                     readOnly={scanning}
-                    disabled={duplaChecagem && !codigoCliente.trim()}
                   />
                   <Button
                     onClick={() => handleManualScan()}
-                    disabled={scanning || !qrInput || (duplaChecagem && !codigoCliente.trim())}
+                    disabled={scanning}
                     size="sm"
                   >
                     {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
