@@ -1002,9 +1002,25 @@ export default function ConferenciaInterna() {
             </CardContent>
           </Card>
 
-              </div>
-            </CardContent>
-          </Card>
+
+          {/* Seletor de etapa */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={etapa === 1 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setEtapa(1)}
+            >
+              Etapa 1 • Separação
+            </Button>
+            <Button
+              variant={etapa === 2 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setEtapa(2)}
+            >
+              Etapa 2 • Expedição
+            </Button>
+          </div>
+
 
 
           {/* Camera Scanner */}
