@@ -131,6 +131,24 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Operadores de galpão: sempre abrem direto na Conferência Interna.
+const CONFERENCIA_FIRST_EMAILS = [
+  "pedro.martins@tlmlogistica.com.br",
+  "deposito@tlmlogistica.com.br",
+  "arquivostlm@tlmlogistica.com.br",
+];
+
+function HomeRoute() {
+  const { profile } = useAuth();
+  const email = profile?.email?.toLowerCase() ?? "";
+
+  if (email && CONFERENCIA_FIRST_EMAILS.includes(email)) {
+    return <Navigate to="/conferencia-interna" replace />;
+  }
+
+  return <Dashboard />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
