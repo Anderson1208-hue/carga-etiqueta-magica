@@ -778,9 +778,10 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27b
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
+
               </div>
             </div>
             <MobileLogoutButton />
