@@ -126,6 +126,8 @@ export default function ConferenciaInterna() {
   const [duplaChecagem, setDuplaChecagem] = useState(false);
   const [codigoCliente, setCodigoCliente] = useState("");
   const clienteInputRef = useRef<HTMLInputElement>(null);
+  const codigoClienteRef = useRef("");
+  const qrInputRef = useRef("");
   const processingScanRef = useRef(false);
   const pendingOnlineScansRef = useRef<Set<string>>(new Set());
   const reloadProgressTimerRef = useRef<number | null>(null);
@@ -349,6 +351,8 @@ export default function ConferenciaInterna() {
     setNfProgress(null);
     setLastResult(null);
     setScanHistory([]);
+    qrInputRef.current = "";
+    codigoClienteRef.current = "";
     setQrInput("");
   }
 
@@ -392,7 +396,7 @@ export default function ConferenciaInterna() {
     );
   }
 
-  async function processScan(qrData: string) {
+  async function processScan(qrData: string, codigoClienteAtual?: string) {
 
     if (processingScanRef.current || !qrData.trim() || !selectedCarga || !selectedNf) return;
 
@@ -404,6 +408,10 @@ export default function ConferenciaInterna() {
     const releaseForNextScan = () => {
       if (releasedForNextScan) return;
       releasedForNextScan = true;
+      qrInputRef.current = "";
+      codigoClienteRef.current = "";
+      if (inputRef.current) inputRef.current.value = "";
+      if (clienteInputRef.current) clienteInputRef.current.value = "";
       setQrInput("");
       if (duplaChecagem) setCodigoCliente("");
       setScanning(false);
@@ -424,7 +432,7 @@ export default function ConferenciaInterna() {
 
       // Dupla checagem: exige código do cliente bipado antes e confere com cProd
       if (duplaChecagem) {
-        const cliente = codigoCliente.trim();
+        const cliente = (codigoClienteAtual || codigoClienteRef.current || codigoCliente).trim();
         if (!cliente) {
           const result: ScanResult = {
             type: "warning",
@@ -499,57 +507,68 @@ export default function ConferenciaInterna() {
         }
 
         pendingOnlineScansRef.current.add(qrPayload);
+        const cargaId = selectedCarga.id;
+        const nfAtual = selectedNf;
+        const usuarioId = user?.id;
 
         // No coletor/Chrome lento, não segura o próximo bipe esperando a rede/banco.
         // As validações locais já passaram; a gravação confirma em segundo plano.
         releaseForNextScan();
 
-        // Caminho rápido: 1 único round-trip. Atualiza direto se estiver pendente.
-        try {
-          const { data: updated, error: updateError } = await supabase
-            .from("etiquetas")
-            .update({
-              status: "conferido_interno" as any,
-              conferido_interno_em: new Date().toISOString(),
-              conferido_interno_por: user?.id,
-            })
-            .eq("carga_id", selectedCarga.id)
-            .eq("qr_payload", qrPayload)
-            .eq("status", "pendente")
-            .select("id, x_prod")
-            .maybeSingle();
-
-          if (updateError) throw updateError;
-
-          if (updated) {
-            const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("success");
-            bumpProgressOtimista();
-            scheduleReloadNfProgress();
-          } else {
-            // Caminho raro: descobre o motivo (não existe / divergência / já conferida)
-            const { data: etiqueta } = await supabase
+        // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver pendente.
+        void (async () => {
+          try {
+            const { data: updated, error: updateError } = await supabase
               .from("etiquetas")
-              .select("status, x_prod")
-              .eq("carga_id", selectedCarga.id)
+              .update({
+                status: "conferido_interno" as any,
+                conferido_interno_em: new Date().toISOString(),
+                conferido_interno_por: usuarioId,
+              })
+              .eq("carga_id", cargaId)
               .eq("qr_payload", qrPayload)
+              .eq("status", "pendente")
+              .select("id, x_prod")
               .maybeSingle();
 
-            if (!etiqueta) {
-              const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("error"); return;
+            if (updateError) throw updateError;
+
+            if (updated) {
+              const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
+              setLastResult(result); addToHistory(result); playSound("success");
+              bumpProgressOtimista();
+              scheduleReloadNfProgress();
+            } else {
+              // Caminho raro: descobre o motivo (não existe / divergência / já conferida)
+              const { data: etiqueta } = await supabase
+                .from("etiquetas")
+                .select("status, x_prod")
+                .eq("carga_id", cargaId)
+                .eq("qr_payload", qrPayload)
+                .maybeSingle();
+
+              if (!etiqueta) {
+                const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+                setLastResult(result); addToHistory(result); playSound("error"); return;
+              }
+              if (etiqueta.status === "divergencia") {
+                const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+                setLastResult(result); addToHistory(result); playSound("error"); return;
+              }
+              const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+              setLastResult(result); addToHistory(result); playSound("warning");
+              scheduleReloadNfProgress();
             }
-            if (etiqueta.status === "divergencia") {
-              const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("error"); return;
-            }
-            const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("warning");
-            scheduleReloadNfProgress();
+          } catch (error) {
+            console.error("Erro ao gravar scan interno:", error);
+            const result: ScanResult = { type: "error", message: "Erro ao gravar", details: `NF ${nfAtual} - Caixa ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error");
+          } finally {
+            pendingOnlineScansRef.current.delete(qrPayload);
           }
-        } finally {
-          pendingOnlineScansRef.current.delete(qrPayload);
-        }
+        })();
+
+        return;
       }
 
     } catch (error) {
@@ -576,10 +595,10 @@ export default function ConferenciaInterna() {
     }
   }
 
-  async function handleManualScan(value = qrInput) {
-    if (processingScanRef.current || !value.trim()) return;
-    await processScan(value);
-    focusClienteProximaLeitura();
+  async function handleManualScan(value?: string) {
+    const scanValue = value || qrInputRef.current || inputRef.current?.value || qrInput;
+    if (processingScanRef.current || !scanValue.trim()) return;
+    await processScan(scanValue, codigoClienteRef.current || clienteInputRef.current?.value || codigoCliente);
   }
 
 
@@ -814,6 +833,8 @@ export default function ConferenciaInterna() {
                     checked={duplaChecagem}
                     onCheckedChange={(v) => {
                       setDuplaChecagem(v);
+                      codigoClienteRef.current = "";
+                      qrInputRef.current = "";
                       setCodigoCliente("");
                       setQrInput("");
                       setTimeout(() => {
@@ -838,11 +859,14 @@ export default function ConferenciaInterna() {
                   <Input
                     ref={clienteInputRef}
                     placeholder="Bipe o código de barras do cliente..."
-                    value={codigoCliente}
-                    onChange={(e) => setCodigoCliente(e.target.value)}
+                    defaultValue=""
+                    onChange={(e) => {
+                      codigoClienteRef.current = e.target.value;
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
+                        codigoClienteRef.current = e.currentTarget.value;
                         focusNossaEtiqueta();
                       }
                     }}
@@ -862,21 +886,23 @@ export default function ConferenciaInterna() {
                   <Input
                     ref={inputRef}
                     placeholder={duplaChecagem ? "Bipe o QR da nossa etiqueta..." : "Escaneie ou digite..."}
-                    value={qrInput}
-                    onChange={(e) => setQrInput(e.target.value)}
+                    defaultValue=""
+                    onChange={(e) => {
+                      qrInputRef.current = e.target.value;
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
+                        qrInputRef.current = e.currentTarget.value;
                         handleManualScan(e.currentTarget.value);
                       }
                     }}
                     className="flex-1 font-mono text-sm"
                     readOnly={scanning}
-                    disabled={duplaChecagem && !codigoCliente.trim()}
                   />
                   <Button
                     onClick={() => handleManualScan()}
-                    disabled={scanning || !qrInput || (duplaChecagem && !codigoCliente.trim())}
+                    disabled={scanning}
                     size="sm"
                   >
                     {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : "OK"}
