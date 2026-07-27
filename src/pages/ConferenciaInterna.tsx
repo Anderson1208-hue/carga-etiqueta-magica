@@ -565,34 +565,46 @@ export default function ConferenciaInterna() {
         const cargaId = selectedCarga.id;
         const nfAtual = selectedNf;
         const usuarioId = user?.id;
+        const etapaAtual = etapa;
 
         // No coletor/Chrome lento, não segura o próximo bipe esperando a rede/banco.
         // As validações locais já passaram; a gravação confirma em segundo plano.
         releaseForNextScan();
 
-        // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver pendente.
+        // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver no status esperado.
         void (async () => {
           try {
+            const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
+            const patch =
+              etapaAtual === 2
+                ? {
+                    status: "conferido" as any,
+                    conferido_em: new Date().toISOString(),
+                    conferido_por: usuarioId,
+                  }
+                : {
+                    status: "conferido_interno" as any,
+                    conferido_interno_em: new Date().toISOString(),
+                    conferido_interno_por: usuarioId,
+                  };
+
             const { data: updated, error: updateError } = await supabase
               .from("etiquetas")
-              .update({
-                status: "conferido_interno" as any,
-                conferido_interno_em: new Date().toISOString(),
-                conferido_interno_por: usuarioId,
-              })
+              .update(patch)
               .eq("carga_id", cargaId)
               .eq("qr_payload", qrPayload)
-              .eq("status", "pendente")
+              .eq("status", statusEsperado)
               .select("id, x_prod")
               .maybeSingle();
 
             if (updateError) throw updateError;
 
             if (updated) {
-              const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
+              const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
               setLastResult(result); addToHistory(result); playSound("success");
               bumpProgressOtimista();
               scheduleReloadNfProgress();
+
             } else {
               // Caminho raro: descobre o motivo (não existe / divergência / já conferida)
               const { data: etiqueta } = await supabase
