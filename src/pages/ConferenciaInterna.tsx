@@ -847,8 +847,6 @@ export default function ConferenciaInterna() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
-                <div className="flex items-center gap-2">
-                <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="teclado-manual" className="text-xs text-muted-foreground cursor-pointer select-none">
