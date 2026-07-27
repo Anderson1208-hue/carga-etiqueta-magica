@@ -789,9 +789,7 @@ export default function ConferenciaInterna() {
 
       const divergencias = all.filter((e) => e.status === "divergencia").length;
       const total = all.length - divergencias;
-      const conferidas = all.filter(
-        (e) => e.status === "conferido_interno" || e.status === "conferido"
-      ).length;
+      const conferidas = all.filter((e) => contaComoConferida(e.status)).length;
 
       setNfProgress({ numeroNf: selectedNf, total, conferidas });
 
@@ -799,9 +797,14 @@ export default function ConferenciaInterna() {
         setTimeout(() => {
           const completeResult: ScanResult = {
             type: "success",
-            message: `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
-            details: `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
+            message: etapa === 2
+              ? `✅ ETAPA 2/2 concluída — NF ${selectedNf} expedida`
+              : `✅ ETAPA 1/2 concluída — NF ${selectedNf}`,
+            details: etapa === 2
+              ? `${total} etiquetas carregadas no veículo.`
+              : `${total} etiquetas separadas. Ainda falta a ETAPA 2 (Expedição, só QR).`,
           };
+
 
           setLastResult(completeResult);
           addToHistory(completeResult);
@@ -821,10 +824,11 @@ export default function ConferenciaInterna() {
     if (!selectedCarga || !selectedNf) return;
     setLoadingFaltantes(true);
     try {
+      const statusFaltante = etapa === 2 ? "conferido_interno" : "pendente";
       if (offlineMode || !isOnline) {
         const ets = await getOfflineEtiquetas(selectedCarga.id);
         const faltantes = ets
-          .filter((e) => e.numero_nf === selectedNf && e.status === "pendente")
+          .filter((e) => e.numero_nf === selectedNf && e.status === statusFaltante)
           .map((e) => ({ id: e.id, x_prod: e.x_prod, c_prod: e.c_prod, seq: e.seq, total: e.total }));
         setEtiquetasFaltantes(faltantes);
       } else {
@@ -833,9 +837,10 @@ export default function ConferenciaInterna() {
           .select("id, x_prod, c_prod, seq, total")
           .eq("carga_id", selectedCarga.id)
           .eq("numero_nf", selectedNf)
-          .eq("status", "pendente")
+          .eq("status", statusFaltante)
           .order("c_prod")
           .order("seq");
+
         if (error) throw error;
         setEtiquetasFaltantes(data || []);
       }
