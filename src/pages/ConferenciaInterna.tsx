@@ -908,7 +908,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27d
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27e
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -1307,7 +1307,7 @@ export default function ConferenciaInterna() {
               {isOnline ? "Online" : "Offline"}
             </Badge>
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-              v2026.07.27d
+              v2026.07.27e
             </span>
           </div>
           <MobileLogoutButton />
