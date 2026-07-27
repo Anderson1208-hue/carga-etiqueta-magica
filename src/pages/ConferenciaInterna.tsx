@@ -924,20 +924,30 @@ export default function ConferenciaInterna() {
           <Card>
             <CardContent className="pt-4">
               <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Badge variant="secondary" className="text-[11px]">ETAPA 1 de 2 • Separação (dupla bipagem)</Badge>
+                </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas</span>
+                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas separadas</span>
                   <span className="font-bold text-lg">{nfPercent}%</span>
                 </div>
                 <Progress value={nfPercent} className="h-4" />
                 {nfProgress.conferidas === nfProgress.total && (
-                  <div className="flex items-center gap-2 text-success font-semibold mt-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                    Conf. Interna Completa!
+                  <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
+                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                      <CheckCircle2 className="w-5 h-5" />
+                      Etapa 1 concluída (separação)
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Esta NF <strong>ainda não está expedida</strong>. Falta a ETAPA 2 — Expedição,
+                      com uma bipagem só no QR na Conferência Externa.
+                    </p>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
+
 
           {/* Camera Scanner */}
           <Card>
