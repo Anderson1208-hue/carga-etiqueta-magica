@@ -950,7 +950,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Etapa 1 Separação • v2026.07.27e
+                  {selectedCarga.placa} • {etapa === 2 ? "Etapa 2 Expedição" : "Etapa 1 Separação"} • v2026.07.27f
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -966,25 +966,42 @@ export default function ConferenciaInterna() {
             <CardContent className="pt-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-[11px]">ETAPA 1 de 2 • Separação (dupla bipagem)</Badge>
+                  <Badge variant="secondary" className="text-[11px]">
+                    {etapa === 2 ? "ETAPA 2 de 2 • Expedição (só QR)" : "ETAPA 1 de 2 • Separação (dupla bipagem)"}
+                  </Badge>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{nfProgress.conferidas} de {nfProgress.total} etiquetas separadas</span>
+                  <span className="text-muted-foreground">
+                    {nfProgress.conferidas} de {nfProgress.total} etiquetas {etapa === 2 ? "expedidas" : "separadas"}
+                  </span>
                   <span className="font-bold text-lg">{nfPercent}%</span>
                 </div>
                 <Progress value={nfPercent} className="h-4" />
                 {nfProgress.conferidas === nfProgress.total && (
-                  <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
-                    <div className="flex items-center gap-2 text-success font-semibold text-sm">
-                      <CheckCircle2 className="w-5 h-5" />
-                      Etapa 1 concluída (separação)
+                  etapa === 2 ? (
+                    <div className="mt-2 rounded-md border border-success bg-success/10 p-2">
+                      <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Etapa 2 concluída — NF expedida
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Esta NF <strong>ainda não está expedida</strong>. Falta a ETAPA 2 — Expedição,
-                      com uma bipagem só no QR na Conferência Externa.
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="mt-2 rounded-md border border-warning bg-warning/10 p-2">
+                      <div className="flex items-center gap-2 text-success font-semibold text-sm">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Etapa 1 concluída (separação)
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Esta NF <strong>ainda não está expedida</strong>. Troque para a
+                        <strong> ETAPA 2 — Expedição</strong> no botão acima e bipe só o QR no carregamento.
+                      </p>
+                    </div>
+                  )
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
               </div>
             </CardContent>
           </Card>
