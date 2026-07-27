@@ -102,6 +102,11 @@ export default function ConferenciaInterna() {
   } = useOfflineConferencia();
   const [offlineMode, setOfflineMode] = useState(false);
   const [cameraAtiva, setCameraAtiva] = useState(false);
+  // Teclado do Android (IME) desligado por padrão: com leitor USB/Bluetooth o
+  // Gboard tenta "compor" e sugerir cada caractere do QR (60+ chars), o que
+  // engasga a bipagem em aparelhos fracos. inputMode="none" mantém o leitor
+  // funcionando e elimina o IME. Ligue só para digitar à mão.
+  const [tecladoManual, setTecladoManual] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
