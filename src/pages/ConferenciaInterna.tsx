@@ -102,6 +102,11 @@ export default function ConferenciaInterna() {
   } = useOfflineConferencia();
   const [offlineMode, setOfflineMode] = useState(false);
   const [cameraAtiva, setCameraAtiva] = useState(false);
+  // Teclado do Android (IME) desligado por padrão: com leitor USB/Bluetooth o
+  // Gboard tenta "compor" e sugerir cada caractere do QR (60+ chars), o que
+  // engasga a bipagem em aparelhos fracos. inputMode="none" mantém o leitor
+  // funcionando e elimina o IME. Ligue só para digitar à mão.
+  const [tecladoManual, setTecladoManual] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -778,7 +783,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27b
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27c
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -842,24 +847,41 @@ export default function ConferenciaInterna() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-base">Entrada Manual / USB</CardTitle>
-                <div className="flex items-center gap-2">
-                  <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
-                    Dupla Checagem
-                  </label>
-                  <Switch
-                    id="dupla-check"
-                    checked={duplaChecagem}
-                    onCheckedChange={(v) => {
-                      setDuplaChecagem(v);
-                      codigoClienteRef.current = "";
-                      qrInputRef.current = "";
-                      setCodigoCliente("");
-                      setQrInput("");
-                      setTimeout(() => {
-                        (v ? clienteInputRef : inputRef).current?.focus();
-                      }, 50);
-                    }}
-                  />
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="teclado-manual" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      Teclado
+                    </label>
+                    <Switch
+                      id="teclado-manual"
+                      checked={tecladoManual}
+                      onCheckedChange={(v) => {
+                        setTecladoManual(v);
+                        setTimeout(() => {
+                          (duplaChecagem ? clienteInputRef : inputRef).current?.focus();
+                        }, 50);
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      Dupla Checagem
+                    </label>
+                    <Switch
+                      id="dupla-check"
+                      checked={duplaChecagem}
+                      onCheckedChange={(v) => {
+                        setDuplaChecagem(v);
+                        codigoClienteRef.current = "";
+                        qrInputRef.current = "";
+                        setCodigoCliente("");
+                        setQrInput("");
+                        setTimeout(() => {
+                          (v ? clienteInputRef : inputRef).current?.focus();
+                        }, 50);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
               {duplaChecagem && (
@@ -867,7 +889,13 @@ export default function ConferenciaInterna() {
                   1) Bipe o código do cliente na caixa &nbsp;→&nbsp; 2) Bipe a nossa etiqueta (QR). Sistema bloqueia se não bater.
                 </p>
               )}
+              {!tecladoManual && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Teclado do celular desligado (bipagem bem mais rápida). Ligue só para digitar à mão.
+                </p>
+              )}
             </CardHeader>
+
             <CardContent className="space-y-2">
               {duplaChecagem && (
                 <div>
@@ -889,6 +917,11 @@ export default function ConferenciaInterna() {
                       }
                     }}
                     className="flex-1 font-mono text-sm"
+                    inputMode={tecladoManual ? "text" : "none"}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     readOnly={scanning}
                     autoFocus
                   />
@@ -916,6 +949,11 @@ export default function ConferenciaInterna() {
                       }
                     }}
                     className="flex-1 font-mono text-sm"
+                    inputMode={tecladoManual ? "text" : "none"}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     readOnly={scanning}
                   />
                   <Button
@@ -1126,7 +1164,7 @@ export default function ConferenciaInterna() {
               {isOnline ? "Online" : "Offline"}
             </Badge>
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-              v2026.07.27b
+              v2026.07.27c
             </span>
           </div>
           <MobileLogoutButton />
