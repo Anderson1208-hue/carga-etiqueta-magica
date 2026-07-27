@@ -599,8 +599,12 @@ export default function ConferenciaExterna() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Truck className="w-5 h-5" />
-              <h1 className="text-lg font-semibold">Conf. Externa</h1>
+              <div>
+                <h1 className="text-lg font-semibold">Conf. Externa</h1>
+                <p className="text-xs opacity-70">Etapa 2 • Expedição (só QR)</p>
+              </div>
             </div>
+
             <MobileLogoutButton />
           </div>
         </header>
@@ -661,7 +665,8 @@ export default function ConferenciaExterna() {
               </Button>
               <div>
                 <h1 className="text-lg font-semibold">{selectedVeiculo?.placa}</h1>
-                <p className="text-xs opacity-70">{selectedVeiculo?.motorista}</p>
+                <p className="text-xs opacity-70">{selectedVeiculo?.motorista} • Etapa 2 Expedição</p>
+
               </div>
             </div>
             <MobileLogoutButton />
@@ -785,7 +790,7 @@ export default function ConferenciaExterna() {
               </Button>
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf.numero_nf}</h1>
-                <p className="text-xs opacity-70">{selectedVeiculo?.placa} • Conf. Externa</p>
+                <p className="text-xs opacity-70">{selectedVeiculo?.placa} • Etapa 2 • Expedição (só QR)</p>
               </div>
             </div>
             <MobileLogoutButton />
