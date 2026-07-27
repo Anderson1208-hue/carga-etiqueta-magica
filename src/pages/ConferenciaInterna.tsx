@@ -134,6 +134,9 @@ export default function ConferenciaInterna() {
   const clienteInputRef = useRef<HTMLInputElement>(null);
   const codigoClienteRef = useRef("");
   const qrInputRef = useRef("");
+  const collectorBufferRef = useRef("");
+  const collectorStageRef = useRef<"cliente" | "qr">("cliente");
+  const [collectorStage, setCollectorStage] = useState<"cliente" | "qr">("cliente");
   const processingScanRef = useRef(false);
   const pendingOnlineScansRef = useRef<Set<string>>(new Set());
   const reloadProgressTimerRef = useRef<number | null>(null);
@@ -349,6 +352,9 @@ export default function ConferenciaInterna() {
     setNfProgress({ numeroNf: nfItem.numeroNf, total: nfItem.total, conferidas: nfItem.conferidas });
     setLastResult(null);
     setScanHistory([]);
+    collectorBufferRef.current = "";
+    collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+    setCollectorStage(duplaChecagem ? "cliente" : "qr");
   }
 
   function voltarParaLista() {
@@ -359,10 +365,22 @@ export default function ConferenciaInterna() {
     setScanHistory([]);
     qrInputRef.current = "";
     codigoClienteRef.current = "";
+    collectorBufferRef.current = "";
+    collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+    setCollectorStage(duplaChecagem ? "cliente" : "qr");
     setQrInput("");
   }
 
   function focusClienteProximaLeitura() {
+    if (!tecladoManual) {
+      collectorBufferRef.current = "";
+      collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+      setCollectorStage(duplaChecagem ? "cliente" : "qr");
+      clienteInputRef.current?.blur();
+      inputRef.current?.blur();
+      return;
+    }
+
     const applyFocus = () => {
       const target = duplaChecagem ? clienteInputRef.current : inputRef.current;
       if (!target) return;
@@ -376,6 +394,15 @@ export default function ConferenciaInterna() {
   }
 
   function focusNossaEtiqueta() {
+    if (!tecladoManual) {
+      collectorBufferRef.current = "";
+      collectorStageRef.current = "qr";
+      setCollectorStage("qr");
+      clienteInputRef.current?.blur();
+      inputRef.current?.blur();
+      return;
+    }
+
     const applyFocus = () => {
       inputRef.current?.focus({ preventScroll: true });
       inputRef.current?.select();
@@ -420,6 +447,9 @@ export default function ConferenciaInterna() {
       if (clienteInputRef.current) clienteInputRef.current.value = "";
       setQrInput("");
       if (duplaChecagem) setCodigoCliente("");
+      collectorBufferRef.current = "";
+      collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+      setCollectorStage(duplaChecagem ? "cliente" : "qr");
       setScanning(false);
       processingScanRef.current = false;
       focusClienteProximaLeitura();
@@ -590,6 +620,73 @@ export default function ConferenciaInterna() {
       }
     }
   }
+
+  useEffect(() => {
+    if (tecladoManual || !selectedCarga || !selectedNf || !nfProgress) return;
+
+    const writeCollectorValue = () => {
+      const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
+      if (target) target.value = collectorBufferRef.current;
+    };
+
+    const handleCollectorKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+
+      const key = event.key;
+      const isScanChar = key.length === 1;
+      const isControl = key === "Enter" || key === "Tab" || key === "Backspace" || key === "Escape";
+      if (!isScanChar && !isControl) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (key === "Escape") {
+        collectorBufferRef.current = "";
+        writeCollectorValue();
+        return;
+      }
+
+      if (key === "Backspace") {
+        collectorBufferRef.current = collectorBufferRef.current.slice(0, -1);
+        writeCollectorValue();
+        return;
+      }
+
+      if (key === "Enter" || key === "Tab") {
+        const value = collectorBufferRef.current.trim();
+        collectorBufferRef.current = "";
+        writeCollectorValue();
+        if (!value) return;
+
+        if (duplaChecagem && collectorStageRef.current === "cliente") {
+          codigoClienteRef.current = value;
+          setCodigoCliente(value);
+          if (clienteInputRef.current) clienteInputRef.current.value = value;
+          collectorStageRef.current = "qr";
+          setCollectorStage("qr");
+          if (inputRef.current) inputRef.current.value = "";
+          qrInputRef.current = "";
+          return;
+        }
+
+        qrInputRef.current = value;
+        void processScan(value, duplaChecagem ? codigoClienteRef.current : "");
+        return;
+      }
+
+      collectorBufferRef.current += key;
+      writeCollectorValue();
+    };
+
+    collectorBufferRef.current = "";
+    collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+    setCollectorStage(duplaChecagem ? "cliente" : "qr");
+    clienteInputRef.current?.blur();
+    inputRef.current?.blur();
+
+    window.addEventListener("keydown", handleCollectorKeyDown, true);
+    return () => window.removeEventListener("keydown", handleCollectorKeyDown, true);
+  }, [tecladoManual, selectedCarga, selectedNf, nfProgress, duplaChecagem]);
 
   function addToHistory(result: ScanResult) {
     setScanHistory((prev) => [result, ...prev].slice(0, 10));
@@ -783,7 +880,7 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna • v2026.07.27c
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27d
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
 
@@ -857,8 +954,16 @@ export default function ConferenciaInterna() {
                       checked={tecladoManual}
                       onCheckedChange={(v) => {
                         setTecladoManual(v);
+                        collectorBufferRef.current = "";
+                        collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
+                        setCollectorStage(duplaChecagem ? "cliente" : "qr");
                         setTimeout(() => {
-                          (duplaChecagem ? clienteInputRef : inputRef).current?.focus();
+                          if (v) {
+                            (duplaChecagem ? clienteInputRef : inputRef).current?.focus();
+                          } else {
+                            clienteInputRef.current?.blur();
+                            inputRef.current?.blur();
+                          }
                         }, 50);
                       }}
                     />
@@ -876,8 +981,16 @@ export default function ConferenciaInterna() {
                         qrInputRef.current = "";
                         setCodigoCliente("");
                         setQrInput("");
+                        collectorBufferRef.current = "";
+                        collectorStageRef.current = v ? "cliente" : "qr";
+                        setCollectorStage(v ? "cliente" : "qr");
                         setTimeout(() => {
-                          (v ? clienteInputRef : inputRef).current?.focus();
+                          if (tecladoManual) {
+                            (v ? clienteInputRef : inputRef).current?.focus();
+                          } else {
+                            clienteInputRef.current?.blur();
+                            inputRef.current?.blur();
+                          }
                         }, 50);
                       }}
                     />
@@ -891,7 +1004,7 @@ export default function ConferenciaInterna() {
               )}
               {!tecladoManual && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Teclado do celular desligado (bipagem bem mais rápida). Ligue só para digitar à mão.
+                  Modo coletor ativo: teclado do celular fechado, aguardando {duplaChecagem && collectorStage === "cliente" ? "código do cliente" : "nossa etiqueta QR"}.
                 </p>
               )}
             </CardHeader>
@@ -922,7 +1035,8 @@ export default function ConferenciaInterna() {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    readOnly={scanning}
+                    readOnly={scanning || !tecladoManual}
+                    tabIndex={tecladoManual ? 0 : -1}
                     autoFocus
                   />
                 </div>
@@ -954,7 +1068,8 @@ export default function ConferenciaInterna() {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    readOnly={scanning}
+                    readOnly={scanning || !tecladoManual}
+                    tabIndex={tecladoManual ? 0 : -1}
                   />
                   <Button
                     onClick={() => handleManualScan()}
@@ -1164,7 +1279,7 @@ export default function ConferenciaInterna() {
               {isOnline ? "Online" : "Offline"}
             </Badge>
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-              v2026.07.27c
+              v2026.07.27d
             </span>
           </div>
           <MobileLogoutButton />
