@@ -365,7 +365,15 @@ export default function ConferenciaInterna() {
     window.setTimeout(applyFocus, 60);
   }
 
+  // Atualiza o contador na hora (sem esperar o servidor) — o reload confirma depois
+  function bumpProgressOtimista() {
+    setNfProgress((prev) =>
+      prev ? { ...prev, conferidas: Math.min(prev.conferidas + 1, prev.total) } : prev
+    );
+  }
+
   async function processScan(qrData: string) {
+
     if (processingScanRef.current || !qrData.trim() || !selectedCarga || !selectedNf) return;
 
     processingScanRef.current = true;
@@ -450,29 +458,10 @@ export default function ConferenciaInterna() {
         });
         const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
         setLastResult(result); addToHistory(result); playSound("success");
-        await reloadNfProgress();
+        bumpProgressOtimista();
+        void reloadNfProgress();
       } else {
-        const { data: etiqueta, error: findError } = await supabase
-          .from("etiquetas")
-          .select("*")
-          .eq("carga_id", selectedCarga.id)
-          .eq("qr_payload", qrData.trim())
-          .maybeSingle();
-
-        if (findError || !etiqueta) {
-          const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "divergencia") {
-          const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
-        }
-        if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
-          const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
-        }
-
-        // Race-safe: só atualiza se ainda estiver pendente (evita sobrescrever bipe simultâneo)
+        // Caminho rápido: 1 único round-trip. Atualiza direto se estiver pendente.
         const { data: updated, error: updateError } = await supabase
           .from("etiquetas")
           .update({
@@ -480,23 +469,42 @@ export default function ConferenciaInterna() {
             conferido_interno_em: new Date().toISOString(),
             conferido_interno_por: user?.id,
           })
-          .eq("id", etiqueta.id)
+          .eq("carga_id", selectedCarga.id)
+          .eq("qr_payload", qrData.trim())
           .eq("status", "pendente")
-          .select("id")
+          .select("id, x_prod")
           .maybeSingle();
 
         if (updateError) throw updateError;
-        if (!updated) {
+
+        if (updated) {
+          const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("success");
+          bumpProgressOtimista();
+          void reloadNfProgress();
+        } else {
+          // Caminho raro: descobre o motivo (não existe / divergência / já conferida)
+          const { data: etiqueta } = await supabase
+            .from("etiquetas")
+            .select("status, x_prod")
+            .eq("carga_id", selectedCarga.id)
+            .eq("qr_payload", qrData.trim())
+            .maybeSingle();
+
+          if (!etiqueta) {
+            const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
+          if (etiqueta.status === "divergencia") {
+            const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
           const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
           setLastResult(result); addToHistory(result); playSound("warning");
-          await reloadNfProgress();
-          return;
+          void reloadNfProgress();
         }
-
-        const result: ScanResult = { type: "success", message: "Conf. Interna ✓", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-        setLastResult(result); addToHistory(result); playSound("success");
-        await reloadNfProgress();
       }
+
     } catch (error) {
       console.error("Erro ao processar scan:", error);
       const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
