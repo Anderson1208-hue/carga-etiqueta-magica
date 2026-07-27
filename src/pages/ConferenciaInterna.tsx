@@ -832,6 +832,8 @@ export default function ConferenciaInterna() {
                     checked={duplaChecagem}
                     onCheckedChange={(v) => {
                       setDuplaChecagem(v);
+                      codigoClienteRef.current = "";
+                      qrInputRef.current = "";
                       setCodigoCliente("");
                       setQrInput("");
                       setTimeout(() => {
@@ -856,11 +858,15 @@ export default function ConferenciaInterna() {
                   <Input
                     ref={clienteInputRef}
                     placeholder="Bipe o código de barras do cliente..."
-                    value={codigoCliente}
-                    onChange={(e) => setCodigoCliente(e.target.value)}
+                    defaultValue=""
+                    onChange={(e) => {
+                      codigoClienteRef.current = e.target.value;
+                      setCodigoCliente(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
+                        codigoClienteRef.current = e.currentTarget.value;
                         focusNossaEtiqueta();
                       }
                     }}
@@ -880,11 +886,15 @@ export default function ConferenciaInterna() {
                   <Input
                     ref={inputRef}
                     placeholder={duplaChecagem ? "Bipe o QR da nossa etiqueta..." : "Escaneie ou digite..."}
-                    value={qrInput}
-                    onChange={(e) => setQrInput(e.target.value)}
+                    defaultValue=""
+                    onChange={(e) => {
+                      qrInputRef.current = e.target.value;
+                      setQrInput(e.target.value);
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
+                        qrInputRef.current = e.currentTarget.value;
                         handleManualScan(e.currentTarget.value);
                       }
                     }}
