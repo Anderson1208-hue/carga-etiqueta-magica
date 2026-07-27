@@ -161,6 +161,17 @@ export default function ConferenciaInterna() {
     { value: "outros", label: "Outros" },
   ];
 
+  // Conta como "feita" apenas o que já passou pela etapa selecionada
+  function contaComoConferida(status: string) {
+    return etapa === 2
+      ? status === "conferido"
+      : status === "conferido_interno" || status === "conferido";
+  }
+
+  const etapaLabel = etapa === 2 ? "Etapa 2 • Expedição (só QR)" : "Etapa 1 • Separação (dupla bipagem)";
+
+
+
   useEffect(() => {
     hasOfflineData().then(setHasLocalData);
   }, []);
