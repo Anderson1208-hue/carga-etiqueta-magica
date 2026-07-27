@@ -622,9 +622,14 @@ export default function ConferenciaInterna() {
                 const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
                 setLastResult(result); addToHistory(result); playSound("error"); return;
               }
-              const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+              if (etapaAtual === 2 && etiqueta.status === "pendente") {
+                const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
+                setLastResult(result); addToHistory(result); playSound("error"); return;
+              }
+              const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
               setLastResult(result); addToHistory(result); playSound("warning");
               scheduleReloadNfProgress();
+
             }
           } catch (error) {
             console.error("Erro ao gravar scan interno:", error);
