@@ -118,7 +118,10 @@ export default function ConferenciaInterna() {
 
   // Scanning state
   const [selectedCarga, setSelectedCarga] = useState<CargaResumo | null>(null);
+  // Etapa da conferência interna: 1 = Separação (dupla bipagem) | 2 = Expedição/carregamento (só QR)
+  const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
+
   const [nfProgress, setNfProgress] = useState<NfProgress | null>(null);
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
@@ -191,7 +194,7 @@ export default function ConferenciaInterna() {
       const cargaId = etiquetas[0].carga_id;
       const divergencias = etiquetas.filter((e) => e.status === "divergencia").length;
       const total = etiquetas.length - divergencias;
-      const conferidas = etiquetas.filter((e) => e.status === "conferido_interno" || e.status === "conferido").length;
+      const conferidas = etiquetas.filter((e) => contaComoConferida(e.status)).length;
 
       const { data: cargaData } = await supabase
         .from("cargas")
