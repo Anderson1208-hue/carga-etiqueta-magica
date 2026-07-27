@@ -1125,6 +1125,7 @@ export default function ConferenciaInterna() {
               {isOnline ? <Wifi className="w-3 h-3 mr-1" /> : <WifiOff className="w-3 h-3 mr-1" />}
               {isOnline ? "Online" : "Offline"}
             </Badge>
+            <span className="text-[10px] opacity-70">v2026.07.27b</span>
           </div>
           <MobileLogoutButton />
         </div>
