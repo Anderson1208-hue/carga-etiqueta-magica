@@ -101,6 +101,7 @@ export default function ConferenciaInterna() {
     hasOfflineData,
   } = useOfflineConferencia();
   const [offlineMode, setOfflineMode] = useState(false);
+  const [cameraAtiva, setCameraAtiva] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -777,9 +778,10 @@ export default function ConferenciaInterna() {
               <div>
                 <h1 className="text-lg font-semibold">NF {selectedNf}</h1>
                 <p className="text-xs opacity-70">
-                  {selectedCarga.placa} • Conf. Interna
+                  {selectedCarga.placa} • Conf. Interna • v2026.07.27b
                   {(offlineMode || !isOnline) && " (Offline)"}
                 </p>
+
               </div>
             </div>
             <MobileLogoutButton />
@@ -809,15 +811,31 @@ export default function ConferenciaInterna() {
           {/* Camera Scanner */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ScanLine className="w-4 h-4" />
-                Scanner de Câmera
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ScanLine className="w-4 h-4" />
+                  Scanner de Câmera
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="camera-ativa" className="text-xs text-muted-foreground cursor-pointer select-none">
+                    Câmera
+                  </label>
+                  <Switch id="camera-ativa" checked={cameraAtiva} onCheckedChange={setCameraAtiva} />
+                </div>
+              </div>
+              {!cameraAtiva && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Câmera desligada (recomendado com leitor USB/Bluetooth — deixa a bipagem bem mais rápida em aparelhos fracos).
+                </p>
+              )}
             </CardHeader>
-            <CardContent>
-              <CameraScanner onScan={processScan} enabled={true} />
-            </CardContent>
+            {cameraAtiva && (
+              <CardContent>
+                <CameraScanner onScan={processScan} enabled={true} />
+              </CardContent>
+            )}
           </Card>
+
 
           {/* Manual Input + Dupla Checagem */}
           <Card>
