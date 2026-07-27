@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
   let semFoto = 0;
   const erros: Array<{ baixa_id: string; erro: string }> = [];
 
-  for (const b of baixas ?? []) {
+  for (const b of elegiveis) {
     candidatos++;
     const nf = (b as any).notas_fiscais;
     if (!nf) continue;
