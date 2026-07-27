@@ -46,21 +46,17 @@ Deno.serve(async (req) => {
     );
   }
 
-  // OR de LIKE para cada prefixo (CNPJ raiz: 8 dígitos)
-  const orFilter = prefixos
-    .map((p) => `cnpj_destinatario.like.${p}%`)
-    .join(",");
-
   // 2. Buscar baixas candidatas
+  // OBS: cnpj_destinatario é gravado FORMATADO ("24.765.278/0001-18"), por isso o
+  // match por prefixo é feito em JS sobre os dígitos, não via LIKE no Postgres.
   const { data: baixas, error: bErr } = await supabase
     .from("baixas_entrega")
-    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
+    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
     .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
-    .or(orFilter, { foreignTable: "notas_fiscais" })
     .order("registrado_em", { ascending: true })
-    .limit(BATCH_SIZE);
+    .limit(BATCH_SIZE * 4);
 
   if (bErr) {
     return new Response(JSON.stringify({ error: bErr.message }), {
@@ -69,12 +65,18 @@ Deno.serve(async (req) => {
     });
   }
 
+  const elegiveis = (baixas ?? []).filter((b) => {
+    const cnpj = ((b as any).notas_fiscais?.cnpj_destinatario ?? "").replace(/\D/g, "");
+    return prefixos.some((p) => cnpj.startsWith(p));
+  }).slice(0, BATCH_SIZE);
+
+
   let candidatos = 0;
   let enfileirados = 0;
   let semFoto = 0;
   const erros: Array<{ baixa_id: string; erro: string }> = [];
 
-  for (const b of baixas ?? []) {
+  for (const b of elegiveis) {
     candidatos++;
     const nf = (b as any).notas_fiscais;
     if (!nf) continue;
