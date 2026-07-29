@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
   em_rota: "hsl(215, 70%, 45%)",
   chegou_cliente: "hsl(38, 92%, 50%)",
   em_atendimento: "hsl(185, 60%, 45%)",
+  visitada: "hsl(48, 90%, 45%)",
   finalizada: "hsl(142, 70%, 40%)",
   pulada: "hsl(0, 72%, 51%)",
   parada_excessiva: "hsl(25, 95%, 53%)",
@@ -114,7 +115,7 @@ export function MapaMonitoramento({ paradas, veiculoLat, veiculoLng, placa, rota
       const lat = parada.latitude!;
       const lng = parada.longitude!;
       const color = STATUS_COLORS[parada.status] || STATUS_COLORS.programada;
-      const isFinalizada = parada.status === "finalizada";
+      const isFinalizada = parada.status === "finalizada" || parada.status === "visitada";
       const isExcecao = parada.is_excecao;
 
       const markerIcon = L.divIcon({

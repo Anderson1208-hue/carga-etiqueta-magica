@@ -67,7 +67,7 @@ export function ParadaNaoProgramadaDialog({ alerta, paradas, onClose, onSave }: 
   }
 
   const pendentes = paradas.filter(
-    (p) => !["finalizada", "pulada", "visita_inconsistente"].includes(p.status),
+    (p) => !["visitada", "finalizada", "pulada", "visita_inconsistente"].includes(p.status),
   );
 
   return (

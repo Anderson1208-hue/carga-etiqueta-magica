@@ -271,7 +271,7 @@ export default function AcompanhamentoRotas() {
   }
 
   const proximaParada = useMemo(
-    () => paradas.find((p) => !["finalizada", "pulada", "visita_inconsistente"].includes(p.status)),
+    () => paradas.find((p) => !["visitada", "finalizada", "pulada", "visita_inconsistente"].includes(p.status)),
     [paradas]
   );
 
