@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<string, string> = {
   em_rota: "hsl(215, 70%, 45%)",
   chegou_cliente: "hsl(38, 92%, 50%)",
   em_atendimento: "hsl(185, 60%, 45%)",
+  visitada: "hsl(48, 90%, 45%)",
   finalizada: "hsl(142, 70%, 40%)",
   pulada: "hsl(0, 72%, 51%)",
   parada_excessiva: "hsl(25, 95%, 53%)",
