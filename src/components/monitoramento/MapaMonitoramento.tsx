@@ -115,7 +115,7 @@ export function MapaMonitoramento({ paradas, veiculoLat, veiculoLng, placa, rota
       const lat = parada.latitude!;
       const lng = parada.longitude!;
       const color = STATUS_COLORS[parada.status] || STATUS_COLORS.programada;
-      const isFinalizada = parada.status === "finalizada";
+      const isFinalizada = parada.status === "finalizada" || parada.status === "visitada";
       const isExcecao = parada.is_excecao;
 
       const markerIcon = L.divIcon({
