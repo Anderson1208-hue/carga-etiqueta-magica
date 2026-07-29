@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: string; icon: Reac
   em_rota: { label: "Em Rota", variant: "default", icon: Navigation },
   chegou_cliente: { label: "Chegou no Cliente", variant: "warning", icon: MapPin },
   em_atendimento: { label: "Em Atendimento", variant: "accent", icon: Timer },
+  visitada: { label: "Loja Visitada", variant: "pending", icon: MapPin },
   finalizada: { label: "Finalizada", variant: "success", icon: CheckCircle2 },
   pulada: { label: "Pulada", variant: "destructive", icon: SkipForward },
   parada_excessiva: { label: "Parada Excessiva", variant: "pending", icon: AlertTriangle },
