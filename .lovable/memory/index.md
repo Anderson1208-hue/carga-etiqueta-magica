@@ -48,6 +48,7 @@ type: reference
 - [Operação Geofence](mem://funcionalidades/monitoramento/operacao-e-geofence) — Automated geofence statuses.
 - [Torre GPS Factual](mem://logica/torre-controle-gps-factual) — Chegada/saída/permanência somente por ping GPS; baixa não inventa horário.
 - [Parada Finaliza por Baixa](mem://logica/parada-finalizada-por-baixa) — Trigger fecha monitoramento_paradas quando baixa entregue casa CNPJ, sem depender de GPS.
+- [Visitada x Finalizada](mem://logica/parada-visitada-vs-finalizada) — GPS marca "visitada"; só baixa com canhoto marca "finalizada".
 - [GPS Híbrido](mem://arquitetura/monitoramento/gps-tracking-hibrido) — PWA <-> Edge Function background sync.
 - [GPS Fila Offline](mem://arquitetura/monitoramento/gps-fila-offline-fase1) — IndexedDB queue + heartbeat 60s + auto-restart + dedup client_ts.
 - [GPS Tracker Capacitor](mem://arquitetura/monitoramento/gps-tracker-hibrido-capacitor) — useGpsTrackerHybrid: Foreground Service no APK, navigator.geolocation no web.
