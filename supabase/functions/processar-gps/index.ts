@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
             );
             const novoStatus = permAnt < tempo_min_atendimento
               ? "visita_inconsistente"
-              : "finalizada";
+              : "visitada";
             ant.status = novoStatus;
             ant.horario_saida = lastInsideAnt.toISOString();
             ant.tempo_permanencia_min = permAnt;
@@ -473,9 +473,8 @@ Deno.serve(async (req) => {
           const anterioresNaoConcluidas = paradasState.filter(
             (p: any) =>
               p.ordem < parada.ordem &&
-              !["finalizada", "pulada", "visita_inconsistente"].includes(
-                p.status,
-              ),
+              !["visitada", "finalizada", "pulada", "visita_inconsistente"]
+                .includes(p.status),
           );
 
           if (anterioresNaoConcluidas.length > 0) {
@@ -639,20 +638,23 @@ Deno.serve(async (req) => {
             });
             events.push(`visita_inconsistente_${parada.id}`);
           } else {
-            parada.status = "finalizada";
+            // GPS comprova apenas a VISITA. A parada só vira "finalizada"
+            // quando a baixa (canhoto) for registrada — trigger
+            // fn_sync_parada_from_baixa.
+            parada.status = "visitada";
             parada.horario_saida = lastInside.toISOString();
             parada.tempo_permanencia_min = permanencia;
             parada.is_excecao = false;
             await supabase
               .from("monitoramento_paradas")
               .update({
-                status: "finalizada",
+                status: "visitada",
                 horario_saida: parada.horario_saida,
                 tempo_permanencia_min: permanencia,
                 is_excecao: false,
               })
               .eq("id", parada.id);
-            events.push(`finalizada_${parada.id}`);
+            events.push(`visitada_${parada.id}`);
           }
         }
       }
