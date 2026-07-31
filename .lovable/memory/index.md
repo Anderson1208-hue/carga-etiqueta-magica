@@ -13,6 +13,8 @@ type: reference
 - **Core Logic:** Never modify the `calculateBoxes` logic (1 un = 1 box) or the 2-stage conference flow (Interna = Galpão, Externa = Motorista).
 - **Torre:** Chegada/saída/permanência só por GPS factual; baixa não cria horário. Sem ping no raio = “sem GPS no raio”.
 - **Dias úteis:** Liberação de agendamentos usa próximo dia útil RJ (exclui sáb/dom + feriados nacionais/estaduais) via `src/lib/feriados-rj.ts`.
+- **m³ por embarcador:** XML só é fonte de m³ para Pandurata/Bauducco. Docile/Arcor/IBAC por arquivo; Mars e demais pelo cadastro de produtos. Ver [mem://logica/regra-m3-por-embarcador].
+
 
 ## Memories
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
