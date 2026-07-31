@@ -254,27 +254,14 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   };
 
   const volumeBlocks = getElementsByNames(xmlDoc, ["vol", "volume", "volumes"]);
-  const transportBlocks = getElementsByNames(xmlDoc, [
-    "transp",
-    "transportador",
-    "transporte",
-  ]);
-  const scopes = [...volumeBlocks, ...transportBlocks, xmlDoc.documentElement];
-  const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
-  const seenScopes = new Set<Element>();
 
-  // IBAC: NUNCA usar m³ do XML. O layout do IBAC não traz cubagem
-  // confiável (nVol = qtd de volumes e texto livre gera falsos positivos).
-  // A cubagem é sempre incluída via planilha depois.
-  // Regra aplicada a partir de 06/07/2026.
-  if (isIbacXml(xmlDoc, emitente, getElementsByNames)) {
-    return 0;
-  }
-
-  // Pandurata: <vol><nVol> SEMPRE é a cubagem m³ (posição fixa no layout
-  // do emissor). Não importa se é inteiro ou decimal — usar como está.
-  const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
-  if (isPandurata) {
+  // REGRA DE m³ POR EMITENTE (31/07/2026):
+  //  - Pandurata/Bauducco: m³ vem do XML (<vol><nVol>, posição fixa no layout).
+  //  - IBAC, Docile, Arcor: m³ vem de planilha/arquivo importado depois.
+  //  - Mars e demais: m³ vem do cadastro de produtos (itens × cubagem da caixa).
+  // Qualquer outro emitente retorna 0 aqui para não gerar valores falsos
+  // (ex.: nVol = 4 volumes lido como 4 m³).
+  if (isPandurataXml(xmlDoc, emitente, getElementsByNames)) {
     for (const volBlock of volumeBlocks) {
       const nVolNode = Array.from(volBlock.querySelectorAll("*")).find(
         (el) => getLocalName(el) === "nvol"
@@ -282,48 +269,11 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
       const value = parseNumericText(nVolNode?.textContent);
       if (value > 0) return value;
     }
-    return 0;
   }
 
-  // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
-  // ignorando caixa da tag e possíveis namespaces.
-  for (const scope of scopes) {
-    if (seenScopes.has(scope)) continue;
-    seenScopes.add(scope);
-
-    const nodes = [scope, ...Array.from(scope.querySelectorAll("*"))];
-    for (const node of nodes) {
-      if (!m3FieldNames.includes(getLocalName(node))) continue;
-      const value = parseNumericText(node.textContent);
-      if (value > 0) return value;
-    }
-  }
-
-  // 1) Texto livre dentro do bloco de transporte/volumes
-  for (const scope of seenScopes) {
-    const fromText = parseM3FromText(scope.textContent);
-    if (fromText > 0) return fromText;
-  }
-
-  // 2) <infCpl>
-  const infCplNodes = getElementsByNames(xmlDoc, ["infcpl"]);
-  for (const node of infCplNodes) {
-    const fromCpl = parseM3FromText(node.textContent);
-    if (fromCpl > 0) return fromCpl;
-  }
-
-  // 3) Soma de <infAdProd> por item
-  const detList = getElementsByNames(xmlDoc, ["det"]);
-  let totalFromItems = 0;
-  detList.forEach((det) => {
-    const infAdProdNodes = getElementsByNames(det, ["infadprod"]);
-    infAdProdNodes.forEach((node) => {
-      totalFromItems += parseM3FromText(node.textContent);
-    });
-  });
-
-  return totalFromItems;
+  return 0;
 }
+
 
 function isPandurataXml(
   xmlDoc: Document,
@@ -339,46 +289,6 @@ function isPandurataXml(
   return textos.some((texto) => /pandur(?:ata)?/i.test(texto));
 }
 
-function isIbacXml(
-  xmlDoc: Document,
-  emitente: string,
-  getElementsByNames: (root: ParentNode, names: string[]) => Element[]
-): boolean {
-  const textos = [emitente];
-  getElementsByNames(xmlDoc, ["marca", "xmarca", "xnome", "xfant"]).forEach((node) => {
-    if (node.textContent) textos.push(node.textContent);
-  });
-  // Bate por razão social / marca "IBAC" ou pela raiz do CNPJ 61.472.205
-  const emit = xmlDoc.querySelector("emit");
-  const cnpj = emit?.querySelector("CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
-  if (cnpj.startsWith("61472205")) return true;
-  return textos.some((t) => /\bibac\b/i.test(t));
-}
-
-/**
- * Parses a cubic-meter value from free text. Handles BR/EN decimal separators
- * and patterns like "CUBAGEM: 0,025", "0.5 M3", "VOL CUBICO 1,2M³".
- */
-function parseM3FromText(text: string | null | undefined): number {
-  if (!text) return 0;
-  const normalized = text.toUpperCase().replace(/\s+/g, " ");
-
-  // Pattern A: explicit m3/m³/MC/CUBAGEM markers
-  const patterns = [
-    /CUBAGEM[^0-9-]*([0-9]+[.,]?[0-9]*)/,
-    /VOL(?:UME)?[\s.]*C[ÚU]BICO[^0-9-]*([0-9]+[.,]?[0-9]*)/,
-    /([0-9]+[.,]?[0-9]*)\s*M\s*[³3]/,
-    /M\s*[³3][^0-9-]*([0-9]+[.,]?[0-9]*)/,
-  ];
-  for (const re of patterns) {
-    const m = normalized.match(re);
-    if (m && m[1]) {
-      const v = parseFloat(m[1].replace(",", "."));
-      if (!isNaN(v) && v > 0) return v;
-    }
-  }
-  return 0;
-}
 
 function formatCNPJ(cnpj: string): string {
   const cleaned = cnpj.replace(/\D/g, "");
