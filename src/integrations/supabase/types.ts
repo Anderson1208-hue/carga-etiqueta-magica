@@ -1474,6 +1474,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ibac_config_envio: {
+        Row: {
+          codigo_evento_entrega: string
+          created_at: string
+          envio_ativo: boolean
+          id: boolean
+          max_imagem_kb: number
+          modo_imagem: string
+          updated_at: string
+          whitelist_nfs: string[]
+        }
+        Insert: {
+          codigo_evento_entrega?: string
+          created_at?: string
+          envio_ativo?: boolean
+          id?: boolean
+          max_imagem_kb?: number
+          modo_imagem?: string
+          updated_at?: string
+          whitelist_nfs?: string[]
+        }
+        Update: {
+          codigo_evento_entrega?: string
+          created_at?: string
+          envio_ativo?: boolean
+          id?: boolean
+          max_imagem_kb?: number
+          modo_imagem?: string
+          updated_at?: string
+          whitelist_nfs?: string[]
+        }
+        Relationships: []
+      }
       ibac_config_retry: {
         Row: {
           ativo: boolean
