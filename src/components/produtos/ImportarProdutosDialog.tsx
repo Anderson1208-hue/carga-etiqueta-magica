@@ -66,7 +66,10 @@ const NUMERIC = new Set([
 
 function toNum(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
-  const n = Number(String(v).replace(/\./g, (m, i, s) => (s.length - i <= 4 ? "." : "")).replace(",", "."));
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
 
