@@ -26,6 +26,19 @@ Deno.serve(async (req) => {
   // Modo dry-run: se IBAC ainda não respondeu URL/Key, apenas retorna status da fila
   const credenciaisConfiguradas = !!IBAC_API_URL && !!IBAC_API_KEY;
 
+  // Configuração de envio (kill switch + whitelist de NFs de teste + modo da imagem)
+  const { data: envioCfg } = await supabase
+    .from("ibac_config_envio")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle();
+
+  const envioAtivo = envioCfg?.envio_ativo ?? false;
+  const modoImagem = envioCfg?.modo_imagem ?? "url";
+  const whitelist: string[] = (envioCfg?.whitelist_nfs ?? []).map((v: string) => String(v).trim()).filter(Boolean);
+  const codigoEventoEntrega = (envioCfg?.codigo_evento_entrega ?? "01").trim();
+  const maxImagemKb = envioCfg?.max_imagem_kb ?? 1024;
+
   // Carrega política de retry configurável
   const { data: retryCfg } = await supabase
     .from("ibac_config_retry")
@@ -37,6 +50,7 @@ Deno.serve(async (req) => {
   const backoffBase = retryCfg?.backoff_base_segundos ?? 60;
   const backoffMax = retryCfg?.backoff_max_segundos ?? 3600;
   const backoffAtivo = retryCfg?.ativo ?? true;
+
 
   const { data: pendentesRaw, error: errSelect } = await supabase
     .from("ibac_eventos_queue")
