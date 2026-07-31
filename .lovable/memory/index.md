@@ -68,6 +68,7 @@ type: reference
 - [Agendamento Auto](mem://logica/agendamento/automacao-cnpj) — Specific CNPJs flagged automatically via triggers.
 - [Agendamento Auto CNPJ+Emitente](mem://funcionalidades/transporte/agendamento-automatico-cnpj-emitente) — Match por par CNPJ destinatário + razão social do emitente (LIKE). emitente NULL = wildcard.
 - [Reentrega libera veículo](mem://logica/reentrega-libera-veiculo) — REENTREGA (Baixa ou Agendamento) sempre apaga veiculo_nfs e reseta status_entrega para CARGA NO DEPOSITO.
+- [IBAC Envio Controlado](mem://funcionalidades/ibac-envio-controlado) — Kill switch, whitelist de NFs, imagem URL/base64, evento 01.
 - [Integração ERP Praxio](mem://arquitetura/integracao-erp/praxio-globus) — Status/occurrence push queue to Globus ERP.
 - [QR Code Etiquetas](mem://especificacoes/etiquetas-qr-code) — Payload structure for labels.
 - [Ordenação Etiquetas](mem://funcionalidades/pdf/etiquetas-ordenacao-operacional) — Hierarchical grouping for label printing.
