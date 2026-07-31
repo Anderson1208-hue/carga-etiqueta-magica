@@ -263,16 +263,13 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
   const seenScopes = new Set<Element>();
 
-  // IBAC: NUNCA usar m³ do XML. O layout do IBAC não traz cubagem
-  // confiável (nVol = qtd de volumes e texto livre gera falsos positivos).
-  // A cubagem é sempre incluída via planilha depois.
-  // Regra aplicada a partir de 06/07/2026.
-  if (isIbacXml(xmlDoc, emitente, getElementsByNames)) {
-    return 0;
-  }
-
-  // Pandurata: <vol><nVol> SEMPRE é a cubagem m³ (posição fixa no layout
-  // do emissor). Não importa se é inteiro ou decimal — usar como está.
+  // REGRA DE m³ POR EMITENTE (31/07/2026):
+  //  - Pandurata/Bauducco: m³ vem do XML (<vol><nVol>, posição fixa no layout).
+  //  - IBAC, Docile, Arcor: m³ vem de planilha/arquivo importado depois.
+  //  - Mars e demais: m³ vem do cadastro de produtos (itens × cubagem da caixa).
+  // Por isso o XML só é fonte de m³ para Pandurata/Bauducco. Qualquer outro
+  // emitente retorna 0 aqui para não gerar valores falsos (ex.: nVol = 4 volumes
+  // lido como 4 m³).
   const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
   if (isPandurata) {
     for (const volBlock of volumeBlocks) {
@@ -284,6 +281,11 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
     }
     return 0;
   }
+
+  return 0;
+
+  // eslint-disable-next-line no-unreachable
+
 
   // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
   // ignorando caixa da tag e possíveis namespaces.
