@@ -289,46 +289,6 @@ function isPandurataXml(
   return textos.some((texto) => /pandur(?:ata)?/i.test(texto));
 }
 
-function isIbacXml(
-  xmlDoc: Document,
-  emitente: string,
-  getElementsByNames: (root: ParentNode, names: string[]) => Element[]
-): boolean {
-  const textos = [emitente];
-  getElementsByNames(xmlDoc, ["marca", "xmarca", "xnome", "xfant"]).forEach((node) => {
-    if (node.textContent) textos.push(node.textContent);
-  });
-  // Bate por razão social / marca "IBAC" ou pela raiz do CNPJ 61.472.205
-  const emit = xmlDoc.querySelector("emit");
-  const cnpj = emit?.querySelector("CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
-  if (cnpj.startsWith("61472205")) return true;
-  return textos.some((t) => /\bibac\b/i.test(t));
-}
-
-/**
- * Parses a cubic-meter value from free text. Handles BR/EN decimal separators
- * and patterns like "CUBAGEM: 0,025", "0.5 M3", "VOL CUBICO 1,2M³".
- */
-function parseM3FromText(text: string | null | undefined): number {
-  if (!text) return 0;
-  const normalized = text.toUpperCase().replace(/\s+/g, " ");
-
-  // Pattern A: explicit m3/m³/MC/CUBAGEM markers
-  const patterns = [
-    /CUBAGEM[^0-9-]*([0-9]+[.,]?[0-9]*)/,
-    /VOL(?:UME)?[\s.]*C[ÚU]BICO[^0-9-]*([0-9]+[.,]?[0-9]*)/,
-    /([0-9]+[.,]?[0-9]*)\s*M\s*[³3]/,
-    /M\s*[³3][^0-9-]*([0-9]+[.,]?[0-9]*)/,
-  ];
-  for (const re of patterns) {
-    const m = normalized.match(re);
-    if (m && m[1]) {
-      const v = parseFloat(m[1].replace(",", "."));
-      if (!isNaN(v) && v > 0) return v;
-    }
-  }
-  return 0;
-}
 
 function formatCNPJ(cnpj: string): string {
   const cleaned = cnpj.replace(/\D/g, "");
