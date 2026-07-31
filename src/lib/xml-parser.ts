@@ -254,24 +254,14 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
   };
 
   const volumeBlocks = getElementsByNames(xmlDoc, ["vol", "volume", "volumes"]);
-  const transportBlocks = getElementsByNames(xmlDoc, [
-    "transp",
-    "transportador",
-    "transporte",
-  ]);
-  const scopes = [...volumeBlocks, ...transportBlocks, xmlDoc.documentElement];
-  const m3FieldNames = ["numero", "cubagem", "m3", "cub"];
-  const seenScopes = new Set<Element>();
 
   // REGRA DE m³ POR EMITENTE (31/07/2026):
   //  - Pandurata/Bauducco: m³ vem do XML (<vol><nVol>, posição fixa no layout).
   //  - IBAC, Docile, Arcor: m³ vem de planilha/arquivo importado depois.
   //  - Mars e demais: m³ vem do cadastro de produtos (itens × cubagem da caixa).
-  // Por isso o XML só é fonte de m³ para Pandurata/Bauducco. Qualquer outro
-  // emitente retorna 0 aqui para não gerar valores falsos (ex.: nVol = 4 volumes
-  // lido como 4 m³).
-  const isPandurata = isPandurataXml(xmlDoc, emitente, getElementsByNames);
-  if (isPandurata) {
+  // Qualquer outro emitente retorna 0 aqui para não gerar valores falsos
+  // (ex.: nVol = 4 volumes lido como 4 m³).
+  if (isPandurataXml(xmlDoc, emitente, getElementsByNames)) {
     for (const volBlock of volumeBlocks) {
       const nVolNode = Array.from(volBlock.querySelectorAll("*")).find(
         (el) => getLocalName(el) === "nvol"
@@ -279,53 +269,11 @@ function extractVolumeM3(xmlDoc: Document, emitente: string = ""): number {
       const value = parseNumericText(nVolNode?.textContent);
       if (value > 0) return value;
     }
-    return 0;
   }
 
   return 0;
-
-  // eslint-disable-next-line no-unreachable
-
-
-  // 0) Pandurata: procurar primeiro no bloco transportador/volumes,
-  // ignorando caixa da tag e possíveis namespaces.
-  for (const scope of scopes) {
-    if (seenScopes.has(scope)) continue;
-    seenScopes.add(scope);
-
-    const nodes = [scope, ...Array.from(scope.querySelectorAll("*"))];
-    for (const node of nodes) {
-      if (!m3FieldNames.includes(getLocalName(node))) continue;
-      const value = parseNumericText(node.textContent);
-      if (value > 0) return value;
-    }
-  }
-
-  // 1) Texto livre dentro do bloco de transporte/volumes
-  for (const scope of seenScopes) {
-    const fromText = parseM3FromText(scope.textContent);
-    if (fromText > 0) return fromText;
-  }
-
-  // 2) <infCpl>
-  const infCplNodes = getElementsByNames(xmlDoc, ["infcpl"]);
-  for (const node of infCplNodes) {
-    const fromCpl = parseM3FromText(node.textContent);
-    if (fromCpl > 0) return fromCpl;
-  }
-
-  // 3) Soma de <infAdProd> por item
-  const detList = getElementsByNames(xmlDoc, ["det"]);
-  let totalFromItems = 0;
-  detList.forEach((det) => {
-    const infAdProdNodes = getElementsByNames(det, ["infadprod"]);
-    infAdProdNodes.forEach((node) => {
-      totalFromItems += parseM3FromText(node.textContent);
-    });
-  });
-
-  return totalFromItems;
 }
+
 
 function isPandurataXml(
   xmlDoc: Document,
