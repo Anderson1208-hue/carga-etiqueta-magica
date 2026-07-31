@@ -2400,6 +2400,197 @@ export type Database = {
         }
         Relationships: []
       }
+      produtos: {
+        Row: {
+          altura_mm: number | null
+          altura_pallet_mm: number | null
+          ativo: boolean
+          caixas_por_pallet: number | null
+          camadas: number | null
+          categoria: string | null
+          cest: string | null
+          classe_risco: string | null
+          cnpj_embarcador: string | null
+          codigo: string
+          codigo_alternativo: string | null
+          comprimento_mm: number | null
+          controla_lote: boolean
+          controla_validade: boolean
+          created_at: string
+          created_by: string | null
+          descricao: string
+          dun14: string | null
+          ean_mcu: string | null
+          ean_rsu: string | null
+          ean_tdu: string | null
+          embarcador_id: string | null
+          empilhamento_max: number | null
+          empilhavel: boolean
+          faixa_temperatura: string
+          fragil: boolean
+          hierarquia_produto: string | null
+          id: string
+          largura_mm: number | null
+          lastro: number | null
+          marca: string | null
+          ncm: string | null
+          observacao: string | null
+          onu_numero: string | null
+          origem_cadastro: string
+          peso_bruto_cx_kg: number | null
+          peso_bruto_un_kg: number | null
+          peso_liquido_cx_kg: number | null
+          peso_pallet_kg: number | null
+          produto_perigoso: boolean
+          qtd_mcu_por_tdu: number | null
+          qtd_rsu_por_tdu: number | null
+          rascunho: boolean
+          regra_giro: string
+          segmento: string | null
+          sensivel_furto: boolean
+          shelf_life_dias: number | null
+          shelf_life_min_expedicao_dias: number | null
+          shelf_life_min_recebimento_dias: number | null
+          status_comercial: string | null
+          temperatura_max_c: number | null
+          temperatura_min_c: number | null
+          tipo_pallet: string | null
+          unidade: string | null
+          updated_at: string
+          valor_unitario_ref: number | null
+          volume_calculado: boolean
+          volume_m3: number | null
+        }
+        Insert: {
+          altura_mm?: number | null
+          altura_pallet_mm?: number | null
+          ativo?: boolean
+          caixas_por_pallet?: number | null
+          camadas?: number | null
+          categoria?: string | null
+          cest?: string | null
+          classe_risco?: string | null
+          cnpj_embarcador?: string | null
+          codigo: string
+          codigo_alternativo?: string | null
+          comprimento_mm?: number | null
+          controla_lote?: boolean
+          controla_validade?: boolean
+          created_at?: string
+          created_by?: string | null
+          descricao: string
+          dun14?: string | null
+          ean_mcu?: string | null
+          ean_rsu?: string | null
+          ean_tdu?: string | null
+          embarcador_id?: string | null
+          empilhamento_max?: number | null
+          empilhavel?: boolean
+          faixa_temperatura?: string
+          fragil?: boolean
+          hierarquia_produto?: string | null
+          id?: string
+          largura_mm?: number | null
+          lastro?: number | null
+          marca?: string | null
+          ncm?: string | null
+          observacao?: string | null
+          onu_numero?: string | null
+          origem_cadastro?: string
+          peso_bruto_cx_kg?: number | null
+          peso_bruto_un_kg?: number | null
+          peso_liquido_cx_kg?: number | null
+          peso_pallet_kg?: number | null
+          produto_perigoso?: boolean
+          qtd_mcu_por_tdu?: number | null
+          qtd_rsu_por_tdu?: number | null
+          rascunho?: boolean
+          regra_giro?: string
+          segmento?: string | null
+          sensivel_furto?: boolean
+          shelf_life_dias?: number | null
+          shelf_life_min_expedicao_dias?: number | null
+          shelf_life_min_recebimento_dias?: number | null
+          status_comercial?: string | null
+          temperatura_max_c?: number | null
+          temperatura_min_c?: number | null
+          tipo_pallet?: string | null
+          unidade?: string | null
+          updated_at?: string
+          valor_unitario_ref?: number | null
+          volume_calculado?: boolean
+          volume_m3?: number | null
+        }
+        Update: {
+          altura_mm?: number | null
+          altura_pallet_mm?: number | null
+          ativo?: boolean
+          caixas_por_pallet?: number | null
+          camadas?: number | null
+          categoria?: string | null
+          cest?: string | null
+          classe_risco?: string | null
+          cnpj_embarcador?: string | null
+          codigo?: string
+          codigo_alternativo?: string | null
+          comprimento_mm?: number | null
+          controla_lote?: boolean
+          controla_validade?: boolean
+          created_at?: string
+          created_by?: string | null
+          descricao?: string
+          dun14?: string | null
+          ean_mcu?: string | null
+          ean_rsu?: string | null
+          ean_tdu?: string | null
+          embarcador_id?: string | null
+          empilhamento_max?: number | null
+          empilhavel?: boolean
+          faixa_temperatura?: string
+          fragil?: boolean
+          hierarquia_produto?: string | null
+          id?: string
+          largura_mm?: number | null
+          lastro?: number | null
+          marca?: string | null
+          ncm?: string | null
+          observacao?: string | null
+          onu_numero?: string | null
+          origem_cadastro?: string
+          peso_bruto_cx_kg?: number | null
+          peso_bruto_un_kg?: number | null
+          peso_liquido_cx_kg?: number | null
+          peso_pallet_kg?: number | null
+          produto_perigoso?: boolean
+          qtd_mcu_por_tdu?: number | null
+          qtd_rsu_por_tdu?: number | null
+          rascunho?: boolean
+          regra_giro?: string
+          segmento?: string | null
+          sensivel_furto?: boolean
+          shelf_life_dias?: number | null
+          shelf_life_min_expedicao_dias?: number | null
+          shelf_life_min_recebimento_dias?: number | null
+          status_comercial?: string | null
+          temperatura_max_c?: number | null
+          temperatura_min_c?: number | null
+          tipo_pallet?: string | null
+          unidade?: string | null
+          updated_at?: string
+          valor_unitario_ref?: number | null
+          volume_calculado?: boolean
+          volume_m3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           ativo: boolean
@@ -3096,6 +3287,7 @@ export type Database = {
         Returns: number
       }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
+      importar_produtos_lote: { Args: { payload: Json }; Returns: Json }
       is_active_operator: { Args: never; Returns: boolean }
       is_admin:
         | { Args: never; Returns: boolean }

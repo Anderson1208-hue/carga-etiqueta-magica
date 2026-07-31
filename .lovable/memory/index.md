@@ -17,6 +17,7 @@ type: reference
 ## Memories
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
+- [Cadastro de Produtos](mem://funcionalidades/cadastros/produtos-masterdata) — Tabela produtos por embarcador: dimensões, cubagem automática, paletização, shelf life; import Masterdata.
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.
 - [XML Parser](mem://funcionalidades/xml-parser) — Weights extracted from <transp><vol> (header level).
 - [XML IBAC sem m³](mem://funcionalidades/xml-parser-ibac-nvol) — IBAC nunca lê m³ do XML; cubagem via planilha; vigente a partir de 06/07/2026.
