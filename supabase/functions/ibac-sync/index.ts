@@ -330,6 +330,10 @@ Deno.serve(async (req) => {
       sucessos: resultados.filter((r) => r.sucesso).length,
       falhas: resultados.filter((r) => !r.sucesso).length,
       adiados_por_backoff: adiados,
+      fora_da_whitelist: foraDaWhitelist,
+      modo_imagem: modoImagem,
+      whitelist_ativa: whitelist.length > 0,
+
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
   );
