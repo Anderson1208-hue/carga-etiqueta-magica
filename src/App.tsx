@@ -43,6 +43,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
 import Produtos from "./pages/Produtos";
+import ProdutosChegada from "./pages/ProdutosChegada";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import PreCte from "./pages/PreCte";
 import ImportarOcoren from "./pages/ImportarOcoren";
@@ -352,6 +353,7 @@ function AppRoutes() {
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
+      <Route path="/produtos/chegada" element={<ProtectedRoute><ProdutosChegada /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />

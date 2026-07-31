@@ -34,3 +34,22 @@ NCM, Validade, At Risk, Aged.
 ## Uso futuro
 Fonte de cubagem/peso para NFs sem informação adicional no XML (casar `itens_nf.c_prod` com
 `produtos.codigo` + CNPJ do emitente) e base para WMS (endereçamento por pallet, FEFO).
+
+## Cadastro na Chegada (`/produtos/chegada`)
+Fila de captura manual: RPC `produtos_pendentes_cadastro(p_dias, p_cnpj)` lista `c_prod` que já
+apareceram em `itens_nf` e **não existem** em `produtos` (match por CNPJ do emitente + código),
+com ocorrências e última data. Operador captura no recebimento (dimensões, peso, lastro/camadas,
+EAN, shelf life) e salva com `origem_cadastro='chegada_manual'`.
+
+## Cubagem automática nas NFs
+RPC `aplicar_cubagem_produtos_nf(p_dias, p_simular)` — para NFs com `volume_m3 = 0`:
+`volume_m3 = Σ(itens_nf.q_com × produtos.volume_m3)` e `peso_bruto = Σ(q_com × peso_bruto_cx_kg)`.
+Regra 1 un = 1 caixa (q_com = caixas). **Só grava quando TODOS os itens da NF têm produto
+cadastrado** — meia cubagem é pior que nenhuma. Nunca sobrescreve peso já existente.
+
+## Carga inicial feita (31/07/2026)
+- Mars (CNPJ 29737368003487) — 83 SKUs da planilha Masterdata, cadastro completo.
+- Bauducco/Pandurata (CNPJ 70940994008277) — 150 SKUs (dimensões da planilha em **cm**,
+  convertidas ×10 para mm); só os códigos já vistos em NFs, o restante da planilha (7.380 linhas)
+  entra por demanda.
+- Pendentes de cadastro concentrados em IBAC, Docile, Arcor, Bagley, Hershey.
