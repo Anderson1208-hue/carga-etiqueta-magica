@@ -3186,6 +3186,10 @@ export type Database = {
     }
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
+      aplicar_cubagem_produtos_nf: {
+        Args: { p_dias?: number; p_simular?: boolean }
+        Returns: Json
+      }
       aprovar_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: Json
@@ -3321,6 +3325,19 @@ export type Database = {
           origem_nova: Database["public"]["Enums"]["origem_coordenada"]
         }
         Returns: boolean
+      }
+      produtos_pendentes_cadastro: {
+        Args: { p_cnpj?: string; p_dias?: number }
+        Returns: {
+          c_prod: string
+          cnpj_emitente: string
+          ocorrencias: number
+          qtd_total: number
+          razao_social_emitente: string
+          u_com: string
+          ultima_data: string
+          x_prod: string
+        }[]
       }
       promover_admin_temporario: {
         Args: { _dias: number; _user_id: string }
