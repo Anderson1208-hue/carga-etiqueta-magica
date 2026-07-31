@@ -78,6 +78,20 @@ Deno.serve(async (req) => {
     );
   }
 
+  // KILL SWITCH: envio bloqueado até liberação manual (teste controlado)
+  if (!envioAtivo) {
+    return new Response(
+      JSON.stringify({
+        status: "envio_bloqueado",
+        mensagem: "Envio à IBAC desativado em Integração IBAC → Envio. A fila continua acumulando sem perda.",
+        pendentes_na_fila: pendentesRaw?.length ?? 0,
+        whitelist_nfs: whitelist,
+        modo_imagem: modoImagem,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   // Buscar de-para uma única vez
   const { data: deParaList } = await supabase
     .from("ibac_de_para_eventos")
@@ -91,12 +105,24 @@ Deno.serve(async (req) => {
 
   // Aplica backoff exponencial: pula itens cuja próxima janela ainda não chegou
   const agora = Date.now();
-  const pendentes = (pendentesRaw ?? []).filter((item) => {
+  let pendentes = (pendentesRaw ?? []).filter((item) => {
     if (!backoffAtivo || item.tentativas === 0 || !item.ultima_tentativa_em) return true;
     const espera = Math.min(backoffBase * Math.pow(2, item.tentativas - 1), backoffMax) * 1000;
     return agora - new Date(item.ultima_tentativa_em).getTime() >= espera;
   });
   const adiados = (pendentesRaw?.length ?? 0) - pendentes.length;
+
+  // Whitelist de NFs: se preenchida, só envia essas notas (teste controlado)
+  let foraDaWhitelist = 0;
+  if (whitelist.length > 0) {
+    const antes = pendentes.length;
+    pendentes = pendentes.filter((item) => {
+      const numero = String((item.payload as any)?.numero_nf ?? "").trim();
+      const chave = String(item.chave_acesso ?? "").trim();
+      return whitelist.includes(numero) || whitelist.includes(chave);
+    });
+    foraDaWhitelist = antes - pendentes.length;
+  }
 
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
@@ -116,10 +142,54 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const payload: Record<string, unknown> = { ...(item.payload as any) };
+    let erroPreparo: string | null = null;
+
+    // Canhoto: IBAC exige a imagem junto ao evento de entrega (cód. 01 por padrão).
+    if (item.evento_interno === "envio_canhoto") {
+      if (modoImagem === "base64" && payload.foto_path) {
+        const { data: file, error: dlErr } = await supabase.storage
+          .from("comprovantes")
+          .download(String(payload.foto_path));
+        if (dlErr || !file) {
+          erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
+        } else {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          if (bytes.byteLength > maxImagemKb * 1024) {
+            erroPreparo = `Imagem ${(bytes.byteLength / 1024).toFixed(0)} KB excede o limite de ${maxImagemKb} KB.`;
+          } else {
+            let bin = "";
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            payload.imagem_base64 = btoa(bin);
+            payload.imagem_nome = String(payload.foto_path).split("/").pop();
+            payload.imagem_mime = file.type || "image/jpeg";
+            delete payload.foto_url;
+            delete payload.foto_url_expira_em;
+          }
+        }
+      }
+    }
+
+    if (erroPreparo) {
+      const statusPreparo = item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
+      await supabase
+        .from("ibac_eventos_queue")
+        .update({
+          status: statusPreparo,
+          erro_mensagem: erroPreparo,
+          tentativas: item.tentativas + 1,
+          ultima_tentativa_em: new Date().toISOString(),
+        })
+        .eq("id", item.id);
+      resultados.push({ id: item.id, sucesso: false });
+      continue;
+    }
+
     const body = {
-      codigo_evento: codigoIbac,
-      ...item.payload,
+      codigo_evento: item.evento_interno === "envio_canhoto" ? codigoEventoEntrega : codigoIbac,
+      ...payload,
     };
+
 
     const t0 = Date.now();
     let respStatus = 0;
