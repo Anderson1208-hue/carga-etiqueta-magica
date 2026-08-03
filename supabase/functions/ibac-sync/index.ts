@@ -15,6 +15,9 @@ const IBAC_API_KEY = (Deno.env.get("IBAC_API_KEY") ?? "").trim();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
+// Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
+const MAX_LARGURA_PX = 1600;
+const JPEG_QUALIDADE = 72;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
