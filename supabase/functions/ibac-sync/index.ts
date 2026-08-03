@@ -55,13 +55,18 @@ Deno.serve(async (req) => {
   const backoffAtivo = retryCfg?.ativo ?? true;
 
 
+  // Com whitelist ativa, varre uma janela maior da fila para encontrar as notas de teste
+  // (elas podem estar atrás de muitos eventos antigos que ficarão bloqueados).
+  const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
+
   const { data: pendentesRaw, error: errSelect } = await supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
     .lt("tentativas", maxTentativas)
     .order("created_at", { ascending: true })
-    .limit(BATCH_SIZE);
+    .limit(janela);
+
 
   if (errSelect) {
     return new Response(JSON.stringify({ error: errSelect.message }), {
@@ -125,7 +130,9 @@ Deno.serve(async (req) => {
       return whitelist.includes(numero) || whitelist.includes(chave);
     });
     foraDaWhitelist = antes - pendentes.length;
+    pendentes = pendentes.slice(0, BATCH_SIZE);
   }
+
 
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
