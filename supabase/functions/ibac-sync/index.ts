@@ -130,7 +130,9 @@ Deno.serve(async (req) => {
       return whitelist.includes(numero) || whitelist.includes(chave);
     });
     foraDaWhitelist = antes - pendentes.length;
+    pendentes = pendentes.slice(0, BATCH_SIZE);
   }
+
 
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
