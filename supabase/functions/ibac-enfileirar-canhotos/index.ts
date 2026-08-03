@@ -25,6 +25,15 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+  // Filtro opcional por NFs específicas (teste controlado): { nfs: ["3897130", "chave..."] }
+  let nfsAlvo: string[] = [];
+  try {
+    const body = await req.json();
+    nfsAlvo = (body?.nfs ?? []).map((v: unknown) => String(v).trim()).filter(Boolean);
+  } catch {
+    nfsAlvo = [];
+  }
+
   // 1. CNPJs ativos
   const { data: cnpjsCfg, error: cnpjErr } = await supabase
     .from("cnpj_envio_canhoto_auto")
@@ -39,7 +48,7 @@ Deno.serve(async (req) => {
   }
 
   const prefixos = (cnpjsCfg ?? []).map((c) => (c.cnpj ?? "").replace(/\D/g, "")).filter(Boolean);
-  if (prefixos.length === 0) {
+  if (prefixos.length === 0 && nfsAlvo.length === 0) {
     return new Response(
       JSON.stringify({ status: "sem_cnpjs_configurados", enfileirados: 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -49,12 +58,21 @@ Deno.serve(async (req) => {
   // 2. Buscar baixas candidatas
   // OBS: cnpj_destinatario é gravado FORMATADO ("24.765.278/0001-18"), por isso o
   // match por prefixo é feito em JS sobre os dígitos, não via LIKE no Postgres.
-  const { data: baixas, error: bErr } = await supabase
+  let query = supabase
     .from("baixas_entrega")
     .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
-    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
+    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS);
+
+  if (nfsAlvo.length > 0) {
+    query = query.or(
+      `numero_nf.in.(${nfsAlvo.join(",")}),chave_acesso.in.(${nfsAlvo.join(",")})`,
+      { foreignTable: "notas_fiscais" },
+    );
+  }
+
+  const { data: baixas, error: bErr } = await query
     .order("registrado_em", { ascending: true })
     .limit(BATCH_SIZE * 4);
 
@@ -65,10 +83,21 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Evita duplicar itens que já estão pendentes na fila
+  const { data: jaNaFila } = await supabase
+    .from("ibac_eventos_queue")
+    .select("baixa_id")
+    .eq("evento_interno", "envio_canhoto")
+    .in("status", ["pendente", "enviado"]);
+  const baixasNaFila = new Set((jaNaFila ?? []).map((r) => r.baixa_id).filter(Boolean));
+
   const elegiveis = (baixas ?? []).filter((b) => {
+    if (baixasNaFila.has(b.id)) return false;
+    if (nfsAlvo.length > 0) return true;
     const cnpj = ((b as any).notas_fiscais?.cnpj_destinatario ?? "").replace(/\D/g, "");
     return prefixos.some((p) => cnpj.startsWith(p));
   }).slice(0, BATCH_SIZE);
+
 
 
   let candidatos = 0;
