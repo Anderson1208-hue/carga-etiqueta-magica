@@ -1,185 +1,29 @@
+# Retomar teste IBAC — envio do canhoto por API
 
-# Fluxo Fiscal Completo — Transporte Rodoviário de Cargas
+## Onde o teste parou (verificado agora no banco)
 
-Objetivo: sair da simulação e chegar num pipeline de documentos fiscais reais (ou fictícios calibrados) cobrindo **CT-e, MDF-e, Averbação de Seguro, CIOT** e insumos correlatos (DACTE, DAMDFE, encerramento).
+- `ibac_config_envio`: `envio_ativo = true`, `modo_imagem = base64`, `codigo_evento_entrega = 01`, `max_imagem_kb = 1024`, `whitelist_nfs = [3897130]`.
+- De-para: `envio_canhoto → 01` ativo. (Os outros eventos estão inativos — nada mais além do canário sai.)
+- Fila `envio_canhoto`: 5 eventos pendentes (3896307, 3896308, 3897255, 3897131, 3897130), todos com `foto_path`.
+- **A nota canário falhou 4 vezes** com: `Imagem 3425 KB excede o limite de 1024 KB.` Nenhuma requisição chegou à IBAC (nada em `ibac_log_envios` desde 12/06).
 
-Este plano lista **o quê precisa entrar no sistema** (dados, telas, integrações) e **a ordem lógica de emissão**. Serve tanto como roadmap interno quanto como briefing pra você validar com GPT / mercado.
+Causa raiz: a foto do canhoto é capturada em alta qualidade (largura 2000, quality 92) para leitura por IA dos clientes; em base64 ela ainda cresce ~33%. O limite de 1 MB foi conservador e barra o envio antes do POST. Não é erro da IBAC.
 
----
+## O que fazer
 
-## 1. Cadastros base (pré-requisitos por emitente)
+1. **Compactar a imagem no `ibac-sync` antes do base64** (não mexer na foto original armazenada):
+   - redimensionar para largura máx. 1600 px e recomprimir em JPEG (qualidade ~72) usando `ImageScript` (`https://deno.land/x/imagescript`), preservando legibilidade do canhoto;
+   - só falhar se, **após** a compressão, o payload continuar acima do limite;
+   - gravar no `erro_mensagem` o tamanho original e o comprimido, para diagnóstico.
+2. **Subir `max_imagem_kb` para 2048** na configuração de envio (margem para canhotos com muitas NFs), mantendo a compressão como primeira linha.
+3. **Zerar as tentativas** dos 5 eventos pendentes (o canário está com 4 de 5 e seria descartado no próximo ciclo).
+4. **Rodar o canário**: whitelist só com `3897130`, botão "Rodar sync agora" na aba **Envio** de `/integracao-ibac`. Conferir em `ibac_log_envios` o `response_status` e o corpo da resposta da IBAC.
+5. **Se o canário voltar 200/201**: incluir as 4 notas restantes na whitelist e rodar de novo; confirmar `baixas_entrega.imagem_ibac_enviada_em` preenchido.
+6. **Se a IBAC recusar o formato**: alternar `modo_imagem` para `url` (link assinado de 7 dias) e repetir o canário — nenhum código muda, é só o toggle da tela.
 
-Já temos o Ebenezer cadastrado. Faltam campos pra virar 100% operacional:
+## Detalhes técnicos
 
-**Emitente (expandir `configuracao_fiscal_emitente`)**
-- Certificado A1 + senha (já temos)
-- Séries: CT-e, CT-e OS, MDF-e (temos)
-- Ambiente (homolog / prod) por documento
-- Tomador padrão + CFOP padrão intra/inter
-- **Convênios / Regimes Especiais** (chave nova): lista de textos livres a serem colados em `<infAdFisco>` / `<infCpl>` por combinação `(embarcador, UF origem, UF destino)`. Ex: Pandurata MG→RJ → Decreto MG 46.266/2013.
-- Seguradora contratada (RCTR-C e RCF-DC): razão, CNPJ, nº apólice, nº averbação-mãe, endpoint API
-- Contratos ANTT (RNTRC) e faixa CIOT
-- Provedor de emissão (PlugNotas / Focus / TecnoSpeed) — chaves homolog e prod
-
-**Veículo (expandir `veiculos`)**
-- Placa, UF, RENAVAM, tara, capacidade (kg e m³)
-- Tipo rodado, tipo carroceria, proprietário (CNPJ/CPF + tipo: TAC / ETC / próprio)
-- RNTRC do proprietário
-- **Combustível** (obrigatório MDF-e 3.0)
-- Vínculos: reboque(s), condutor(es) habilitado(s)
-
-**Motorista (novo cadastro `motoristas` ou expandir profile)**
-- Nome, CPF, CNH, categoria, validade
-- Dados bancários (PIX) para CIOT / pagamento
-- Flag TAC (Transportador Autônomo) → obriga CIOT
-
-**Embarcador (expandir `embarcadores`)**
-- IE, regime tributário, CNAE
-- Convênios aplicáveis (FK pra tabela de convênios)
-- Tabela de frete vigente (FK)
-- Tipo de operação padrão (Seco=01 / Refrigerado=02 / outros)
-- Tomador do serviço (0=Remetente, 1=Expedidor, 2=Recebedor, 3=Destinatário, 4=Outros)
-
-**Destinatário (já cobre 95%)**
-- Confirmar IE, regime, endereço fiscal
-
----
-
-## 2. Tabelas fiscais paramétricas (novas)
-
-- `tabelas_frete` — versionadas por embarcador, com vigência (`vigente_de`, `vigente_ate`)
-- `tabelas_frete_faixas` — tarifa por (zona, tipo carga, faixa peso)
-- `zonas_entrega` — cidade/UF → zona (RJ Capital, Baixada, Interior, etc.)
-- `convenios_fiscais` — texto legal + regra de aplicação (UF origem, UF destino, CFOP, CST)
-- `tomadores_servico` — quem paga por embarcador
-- `componentes_frete` — GRIS, Ad Valorem, Pedágio, TAS, Despacho, etc. (fórmula + base)
-
----
-
-## 3. Fluxo operacional — ordem de emissão
-
-```text
-Roteirização confirmada
-        │
-        ▼
-┌───────────────────────────┐
-│ 1. Pré-CT-e (por NF)      │  ← código 01/02 por carga, calcula frete
-│    - Aplica tabela        │
-│    - Aplica convênio      │
-│    - Gera prévia DACTE    │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ 2. Emissão CT-e           │  ← 1 por NF (padrão Pandurata) ou agrupado
-│    - Assina XML           │
-│    - Envia SEFAZ          │
-│    - Guarda protocolo     │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ 3. Averbação Seguro       │  ← API seguradora, referencia chave CT-e
-│    - RCTR-C obrigatório   │
-│    - RCF-DC quando aplic. │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ 4. CIOT (se TAC)          │  ← Banco/IPEF, gera nº operação
-│    - Vincula CPF motor.   │
-│    - Vincula CT-es        │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ 5. MDF-e                  │  ← 1 por veículo/viagem
-│    - Lista TODOS CT-es    │
-│    - Lista NFes (bkp)     │
-│    - Percurso UFs         │
-│    - CIOT, seguro, ANTT   │
-│    - Vale-pedágio se aplic│
-└─────────────┬─────────────┘
-              ▼
-      ROTA ATIVA (torre)
-              │
-              ▼
-┌───────────────────────────┐
-│ 6. Eventos em rota        │
-│    - CT-e: entrega, EPEC  │
-│    - MDF-e: inclusão cond,│
-│      pagamento operação   │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ 7. Encerramento MDF-e     │  ← obrigatório em até 30 dias
-│    - Por UF de descarga   │
-└───────────────────────────┘
-```
-
----
-
-## 4. Telas novas / evoluções
-
-| Tela | Função |
-|---|---|
-| `/fiscal/emitentes` (evoluir) | Aba Convênios, aba Seguradora, aba Provedor |
-| `/fiscal/tabelas-frete` | CRUD + upload Excel + versionamento |
-| `/fiscal/zonas` | Cidade/UF → zona |
-| `/fiscal/veiculos-fiscal` | Complementar dados do MDF-e no veículo |
-| `/fiscal/motoristas` | CPF, CNH, TAC, dados bancários |
-| `/fiscal/emissao/cte` | Fila de NFs → gerar CT-e (com código 01/02 por carga) |
-| `/fiscal/emissao/mdfe` | Consolida CT-es do veículo → gera MDF-e |
-| `/fiscal/eventos` | Cancelar, carta correção, encerramento, inclusão condutor |
-| `/fiscal/monitor` | Painel único: CT-e emitido, Averbado, CIOT ok, MDF-e ok, Encerrado |
-
----
-
-## 5. Integrações externas a contratar/pesquisar
-
-Este é o bloco que faz sentido dividir com o GPT pra mapeamento de mercado:
-
-1. **Provedor de emissão fiscal** (CT-e + MDF-e + eventos)
-   - Candidatos: PlugNotas, TecnoSpeed, Focus NFe, Migrate, eNotas
-   - Critérios: preço por doc, sandbox, webhooks, suporte a eventos, SLA
-
-2. **Seguradora com API de averbação**
-   - Candidatos: Tokio Marine, Junto Seguros (ex-JMalucelli), Sompo, Pottencial
-   - Critérios: API REST, apólice-mãe, retorno de nº averbação síncrono
-
-3. **CIOT / Meio de pagamento eletrônico do frete (PEF)**
-   - Candidatos: Repom, Sem Parar Empresas, DBTrans, Ticket Log, Frete Fácil
-   - Critérios: geração de CIOT via API, integração com PIX, faixa de tarifa
-
-4. **Vale-pedágio obrigatório**
-   - Candidatos: Sem Parar, ConectCar, Repom
-   - Só obrigatório em rotas com pedágio interestadual > 4 eixos
-
-5. **Rastreamento veicular (opcional, calibra GPS APK)**
-   - Sascar, Ituran, Omnilink, Cobli — API de posição
-
----
-
-## 6. Compliance / obrigações que precisam existir no sistema
-
-- Guarda de XMLs por 5 anos (bucket dedicado, imutável)
-- Backup do certificado A1 + alerta 30 dias antes do vencimento
-- Alerta de MDF-e não encerrado > 25 dias
-- Alerta de CT-e sem averbação > 24h
-- Relatório SPED-Fiscal / EFD Contribuições (exportável)
-
----
-
-## 7. Fases sugeridas
-
-- **Fase A** (2 sprints): cadastros expandidos + tabela de frete + zonas + simulador comparativo (o que já estávamos fazendo)
-- **Fase B** (2 sprints): integração provedor fiscal em **homologação** → emite CT-e fictício assinado
-- **Fase C** (1 sprint): MDF-e homolog + eventos básicos
-- **Fase D** (2 sprints): Averbação + CIOT + Vale-pedágio
-- **Fase E** (1 sprint): Monitor unificado + alertas + produção
-
----
-
-## 8. O que preciso de você agora
-
-1. **Confirmar seguradora atual** da operação (RCTR-C) — já tem apólice?
-2. **Motoristas são CLT ou TAC?** (Define se CIOT é obrigatório sempre ou só em parte)
-3. **Provedor fiscal preferido** — já tem conta em algum (PlugNotas, TecnoSpeed)?
-4. **Convênios ativos hoje** além do Pandurata MG (temos outros embarcadores com regime especial?)
-5. Se quiser dividir com o GPT: mande esse plano inteiro e peça foco nos **itens 5.1 a 5.4** (comparativo de fornecedores brasileiros com API REST, preço médio, SLA e cases de transportadoras porte médio).
+- Arquivo alterado: `supabase/functions/ibac-sync/index.ts`, apenas no bloco `evento_interno === "envio_canhoto"` com `modo_imagem === "base64"`.
+- A compressão roda por item, com try/catch: se a lib falhar, usa os bytes originais e aplica a regra de limite atual (sem regressão).
+- Continua **1 requisição por NF** e as **duas etapas** (baixa sem imagem + canhoto no evento 01), como você definiu.
+- O kill switch e a whitelist seguem controlando tudo; fora da whitelist nada é postado.
