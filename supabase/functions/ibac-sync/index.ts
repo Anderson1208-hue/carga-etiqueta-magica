@@ -154,21 +154,52 @@ Deno.serve(async (req) => {
         if (dlErr || !file) {
           erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
         } else {
-          const bytes = new Uint8Array(await file.arrayBuffer());
+          const originais = new Uint8Array(await file.arrayBuffer());
+          const tamanhoOriginalKb = originais.byteLength / 1024;
+
+          // Compacta antes do base64 (não altera a foto armazenada no bucket).
+          // Largura máx. 1600px + JPEG q72: preserva legibilidade do canhoto para IA.
+          let bytes = originais;
+          let comprimida = false;
+          if (originais.byteLength > maxImagemKb * 1024) {
+            try {
+              const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
+              const img = await Image.decode(originais);
+              if (img.width > MAX_LARGURA_PX) {
+                img.resize(MAX_LARGURA_PX, Image.RESIZE_AUTO);
+              }
+              const jpeg = await img.encodeJPEG(JPEG_QUALIDADE);
+              if (jpeg.byteLength < originais.byteLength) {
+                bytes = jpeg;
+                comprimida = true;
+              }
+            } catch (e) {
+              console.error("[ibac-sync] Falha ao comprimir canhoto:", e);
+            }
+          }
+
+          const tamanhoFinalKb = bytes.byteLength / 1024;
+
           if (bytes.byteLength > maxImagemKb * 1024) {
-            erroPreparo = `Imagem ${(bytes.byteLength / 1024).toFixed(0)} KB excede o limite de ${maxImagemKb} KB.`;
+            erroPreparo = `Imagem ${tamanhoFinalKb.toFixed(0)} KB excede o limite de ${maxImagemKb} KB (original ${tamanhoOriginalKb.toFixed(0)} KB${comprimida ? ", já comprimida" : ", compressão indisponível"}).`;
           } else {
             let bin = "";
-            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            const CHUNK = 8192;
+            for (let i = 0; i < bytes.length; i += CHUNK) {
+              bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+            }
             payload.imagem_base64 = btoa(bin);
             payload.imagem_nome = String(payload.foto_path).split("/").pop();
-            payload.imagem_mime = file.type || "image/jpeg";
+            payload.imagem_mime = comprimida ? "image/jpeg" : (file.type || "image/jpeg");
+            payload.imagem_kb = Number(tamanhoFinalKb.toFixed(0));
+            payload.imagem_kb_original = Number(tamanhoOriginalKb.toFixed(0));
             delete payload.foto_url;
             delete payload.foto_url_expira_em;
           }
         }
       }
     }
+
 
     if (erroPreparo) {
       const statusPreparo = item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
