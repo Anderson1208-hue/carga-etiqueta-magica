@@ -1235,10 +1235,12 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       codigoClienteRef.current = e.target.value;
+                       armManualInputIdleCommit("cliente", e.target.value);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                       if (e.key === "Enter" || e.key === "Tab") {
                         e.preventDefault();
+                         clearManualInputIdleTimer();
                         codigoClienteRef.current = e.currentTarget.value;
                         focusNossaEtiqueta();
                       }
@@ -1268,10 +1270,12 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       qrInputRef.current = e.target.value;
+                       armManualInputIdleCommit("qr", e.target.value);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                       if (e.key === "Enter" || e.key === "Tab") {
                         e.preventDefault();
+                         clearManualInputIdleTimer();
                         qrInputRef.current = e.currentTarget.value;
                         handleManualScan(e.currentTarget.value);
                       }
