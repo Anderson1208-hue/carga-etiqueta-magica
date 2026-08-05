@@ -744,15 +744,18 @@ export default function ConferenciaInterna() {
     };
 
     // Fallback: alguns leitores USB/Bluetooth não enviam Enter/Tab no final,
-    // ou digitam muito devagar. Se o buffer parar de crescer e já tiver
-    // tamanho plausível, confirma sozinho.
+    // ou digitam muito devagar. A espera é ADAPTATIVA: mede o intervalo real
+    // entre caracteres do leitor e usa ~4x esse intervalo (90ms a 400ms),
+    // em vez de um valor fixo alto.
     const armIdleCommit = () => {
       clearIdleTimer();
       const isClienteStage = duplaChecagem && collectorStageRef.current === "cliente";
       const minLen = isClienteStage ? 4 : 12;
       if (collectorBufferRef.current.trim().length < minLen) return;
-      idleTimer = window.setTimeout(commitBuffer, 500);
+      const wait = Math.min(400, Math.max(90, Math.round(interCharMs * 4)));
+      idleTimer = window.setTimeout(commitBuffer, wait);
     };
+
 
     const handleCollectorKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
