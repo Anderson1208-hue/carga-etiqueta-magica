@@ -797,8 +797,23 @@ export default function ConferenciaInterna() {
         return;
       }
 
+      const now = performance.now();
+      if (lastCharTs) {
+        const delta = now - lastCharTs;
+        if (delta < 400) interCharMs = interCharMs * 0.7 + delta * 0.3;
+      }
+      lastCharTs = now;
+
       collectorBufferRef.current += key;
       writeCollectorValue();
+
+      // Commit instantâneo: QR completo (6 campos + chave de 44 dígitos) não espera pausa.
+      const isQrStage = !duplaChecagem || collectorStageRef.current === "qr";
+      if (isQrStage && isQrPayloadCompleto(collectorBufferRef.current)) {
+        commitBuffer();
+        return;
+      }
+
       armIdleCommit();
     };
 
