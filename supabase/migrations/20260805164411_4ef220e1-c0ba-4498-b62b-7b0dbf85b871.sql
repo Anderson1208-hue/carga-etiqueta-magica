@@ -1,0 +1,1 @@
+ALTER VIEW public.vw_diagnostico_paradas_v3 SET (security_invoker = true);
