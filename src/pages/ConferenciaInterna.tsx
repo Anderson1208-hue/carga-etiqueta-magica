@@ -888,9 +888,16 @@ export default function ConferenciaInterna() {
     const minLength = stage === "cliente" ? 4 : 12;
     if (normalized.length < minLength) return;
 
+    // Commit instantâneo quando o QR já está estruturalmente completo.
+    if (stage === "qr" && isQrPayloadCompleto(normalized)) {
+      if (!processingScanRef.current) void handleManualScan(normalized);
+      return;
+    }
+
     // Alguns leitores HID escrevem no campo via IME/input e não disparam Enter.
     // A pausa identifica o fim do código sem interferir nos leitores que enviam Enter.
     manualInputIdleTimerRef.current = window.setTimeout(() => {
+
       manualInputIdleTimerRef.current = null;
       if (stage === "cliente") {
         if (codigoClienteRef.current.trim() !== normalized) return;
