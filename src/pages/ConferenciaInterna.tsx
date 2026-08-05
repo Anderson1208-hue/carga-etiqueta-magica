@@ -447,7 +447,18 @@ export default function ConferenciaInterna() {
     window.setTimeout(applyFocus, 60);
   }
 
+  // O QR da etiqueta tem formato fixo: cargaId;nf;cProd;seq;total;chave(44 dígitos).
+  // Quando o buffer já está estruturalmente completo, não há motivo para esperar
+  // pausa nem Enter — confirma na hora (elimina a latência do leitor lento).
+  function isQrPayloadCompleto(value: string) {
+    const parts = value.trim().split(";");
+    if (parts.length !== 6) return false;
+    if (!/^[0-9a-fA-F-]{36}$/.test(parts[0])) return false;
+    return /^\d{44}$/.test(parts[5]);
+  }
+
   function scheduleReloadNfProgress() {
+
     if (reloadProgressTimerRef.current) {
       window.clearTimeout(reloadProgressTimerRef.current);
     }
@@ -683,6 +694,10 @@ export default function ConferenciaInterna() {
 
     let rafId = 0;
     let idleTimer = 0;
+    // Média móvel do intervalo entre caracteres do leitor (ms)
+    let interCharMs = 25;
+    let lastCharTs = 0;
+
 
     const writeCollectorValue = () => {
       // Agrupa a escrita em tela: 1 write por frame (leitores lentos digitam char a char)
@@ -733,15 +748,18 @@ export default function ConferenciaInterna() {
     };
 
     // Fallback: alguns leitores USB/Bluetooth não enviam Enter/Tab no final,
-    // ou digitam muito devagar. Se o buffer parar de crescer e já tiver
-    // tamanho plausível, confirma sozinho.
+    // ou digitam muito devagar. A espera é ADAPTATIVA: mede o intervalo real
+    // entre caracteres do leitor e usa ~4x esse intervalo (90ms a 400ms),
+    // em vez de um valor fixo alto.
     const armIdleCommit = () => {
       clearIdleTimer();
       const isClienteStage = duplaChecagem && collectorStageRef.current === "cliente";
       const minLen = isClienteStage ? 4 : 12;
       if (collectorBufferRef.current.trim().length < minLen) return;
-      idleTimer = window.setTimeout(commitBuffer, 500);
+      const wait = Math.min(400, Math.max(90, Math.round(interCharMs * 4)));
+      idleTimer = window.setTimeout(commitBuffer, wait);
     };
+
 
     const handleCollectorKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
@@ -779,8 +797,23 @@ export default function ConferenciaInterna() {
         return;
       }
 
+      const now = performance.now();
+      if (lastCharTs) {
+        const delta = now - lastCharTs;
+        if (delta < 400) interCharMs = interCharMs * 0.7 + delta * 0.3;
+      }
+      lastCharTs = now;
+
       collectorBufferRef.current += key;
       writeCollectorValue();
+
+      // Commit instantâneo: QR completo (6 campos + chave de 44 dígitos) não espera pausa.
+      const isQrStage = !duplaChecagem || collectorStageRef.current === "qr";
+      if (isQrStage && isQrPayloadCompleto(collectorBufferRef.current)) {
+        commitBuffer();
+        return;
+      }
+
       armIdleCommit();
     };
 
@@ -855,9 +888,16 @@ export default function ConferenciaInterna() {
     const minLength = stage === "cliente" ? 4 : 12;
     if (normalized.length < minLength) return;
 
+    // Commit instantâneo quando o QR já está estruturalmente completo.
+    if (stage === "qr" && isQrPayloadCompleto(normalized)) {
+      if (!processingScanRef.current) void handleManualScan(normalized);
+      return;
+    }
+
     // Alguns leitores HID escrevem no campo via IME/input e não disparam Enter.
     // A pausa identifica o fim do código sem interferir nos leitores que enviam Enter.
     manualInputIdleTimerRef.current = window.setTimeout(() => {
+
       manualInputIdleTimerRef.current = null;
       if (stage === "cliente") {
         if (codigoClienteRef.current.trim() !== normalized) return;
@@ -866,7 +906,7 @@ export default function ConferenciaInterna() {
       }
       if (qrInputRef.current.trim() !== normalized || processingScanRef.current) return;
       void handleManualScan(normalized);
-    }, 500);
+    }, 250);
   }
 
 
