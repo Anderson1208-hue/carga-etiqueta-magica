@@ -906,7 +906,7 @@ export default function ConferenciaInterna() {
       }
       if (qrInputRef.current.trim() !== normalized || processingScanRef.current) return;
       void handleManualScan(normalized);
-    }, 500);
+    }, 250);
   }
 
 
