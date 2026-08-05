@@ -447,7 +447,18 @@ export default function ConferenciaInterna() {
     window.setTimeout(applyFocus, 60);
   }
 
+  // O QR da etiqueta tem formato fixo: cargaId;nf;cProd;seq;total;chave(44 dígitos).
+  // Quando o buffer já está estruturalmente completo, não há motivo para esperar
+  // pausa nem Enter — confirma na hora (elimina a latência do leitor lento).
+  function isQrPayloadCompleto(value: string) {
+    const parts = value.trim().split(";");
+    if (parts.length !== 6) return false;
+    if (!/^[0-9a-fA-F-]{36}$/.test(parts[0])) return false;
+    return /^\d{44}$/.test(parts[5]);
+  }
+
   function scheduleReloadNfProgress() {
+
     if (reloadProgressTimerRef.current) {
       window.clearTimeout(reloadProgressTimerRef.current);
     }
