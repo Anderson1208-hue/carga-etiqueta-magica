@@ -677,58 +677,107 @@ export default function ConferenciaInterna() {
   useEffect(() => {
     if (tecladoManual || !selectedCarga || !selectedNf || !nfProgress) return;
 
+    let rafId = 0;
+    let idleTimer = 0;
+
     const writeCollectorValue = () => {
+      // Agrupa a escrita em tela: 1 write por frame (leitores lentos digitam char a char)
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
+        if (target) target.value = collectorBufferRef.current;
+      });
+    };
+
+    const flushWrite = () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
       const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
       if (target) target.value = collectorBufferRef.current;
+    };
+
+    const clearIdleTimer = () => {
+      if (idleTimer) {
+        window.clearTimeout(idleTimer);
+        idleTimer = 0;
+      }
+    };
+
+    const commitBuffer = () => {
+      clearIdleTimer();
+      const value = collectorBufferRef.current.trim();
+      collectorBufferRef.current = "";
+      flushWrite();
+      if (!value) return;
+
+      if (duplaChecagem && collectorStageRef.current === "cliente") {
+        codigoClienteRef.current = value;
+        setCodigoCliente(value);
+        if (clienteInputRef.current) clienteInputRef.current.value = value;
+        collectorStageRef.current = "qr";
+        setCollectorStage("qr");
+        if (inputRef.current) inputRef.current.value = "";
+        qrInputRef.current = "";
+        return;
+      }
+
+      qrInputRef.current = value;
+      void processScan(value, duplaChecagem ? codigoClienteRef.current : "");
+    };
+
+    // Fallback: alguns leitores USB/Bluetooth não enviam Enter/Tab no final,
+    // ou digitam muito devagar. Se o buffer parar de crescer e já tiver
+    // tamanho plausível, confirma sozinho.
+    const armIdleCommit = () => {
+      clearIdleTimer();
+      const isClienteStage = duplaChecagem && collectorStageRef.current === "cliente";
+      const minLen = isClienteStage ? 4 : 12;
+      if (collectorBufferRef.current.trim().length < minLen) return;
+      idleTimer = window.setTimeout(commitBuffer, 500);
     };
 
     const handleCollectorKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
 
       const key = event.key;
+      const isEnterLike =
+        key === "Enter" ||
+        key === "Tab" ||
+        event.keyCode === 13 ||
+        event.keyCode === 9 ||
+        ((key === "Unidentified" || key === "Process") && (event.keyCode === 13 || event.keyCode === 9));
       const isScanChar = key.length === 1;
-      const isControl = key === "Enter" || key === "Tab" || key === "Backspace" || key === "Escape";
+      const isControl = isEnterLike || key === "Backspace" || key === "Escape";
       if (!isScanChar && !isControl) return;
 
       event.preventDefault();
       event.stopPropagation();
 
       if (key === "Escape") {
+        clearIdleTimer();
         collectorBufferRef.current = "";
-        writeCollectorValue();
+        flushWrite();
         return;
       }
 
       if (key === "Backspace") {
+        clearIdleTimer();
         collectorBufferRef.current = collectorBufferRef.current.slice(0, -1);
-        writeCollectorValue();
+        flushWrite();
         return;
       }
 
-      if (key === "Enter" || key === "Tab") {
-        const value = collectorBufferRef.current.trim();
-        collectorBufferRef.current = "";
-        writeCollectorValue();
-        if (!value) return;
-
-        if (duplaChecagem && collectorStageRef.current === "cliente") {
-          codigoClienteRef.current = value;
-          setCodigoCliente(value);
-          if (clienteInputRef.current) clienteInputRef.current.value = value;
-          collectorStageRef.current = "qr";
-          setCollectorStage("qr");
-          if (inputRef.current) inputRef.current.value = "";
-          qrInputRef.current = "";
-          return;
-        }
-
-        qrInputRef.current = value;
-        void processScan(value, duplaChecagem ? codigoClienteRef.current : "");
+      if (isEnterLike) {
+        commitBuffer();
         return;
       }
 
       collectorBufferRef.current += key;
       writeCollectorValue();
+      armIdleCommit();
     };
 
     collectorBufferRef.current = "";
@@ -738,8 +787,13 @@ export default function ConferenciaInterna() {
     inputRef.current?.blur();
 
     window.addEventListener("keydown", handleCollectorKeyDown, true);
-    return () => window.removeEventListener("keydown", handleCollectorKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleCollectorKeyDown, true);
+      clearIdleTimer();
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [tecladoManual, selectedCarga, selectedNf, nfProgress, duplaChecagem]);
+
 
   function addToHistory(result: ScanResult) {
     setScanHistory((prev) => [result, ...prev].slice(0, 10));
