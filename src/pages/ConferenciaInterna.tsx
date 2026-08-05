@@ -143,6 +143,7 @@ export default function ConferenciaInterna() {
   const processingScanRef = useRef(false);
   const pendingOnlineScansRef = useRef<Set<string>>(new Set());
   const reloadProgressTimerRef = useRef<number | null>(null);
+  const manualInputIdleTimerRef = useRef<number | null>(null);
 
 
   // Divergência management (admin only)
@@ -197,6 +198,9 @@ export default function ConferenciaInterna() {
     return () => {
       if (reloadProgressTimerRef.current) {
         window.clearTimeout(reloadProgressTimerRef.current);
+      }
+      if (manualInputIdleTimerRef.current) {
+        window.clearTimeout(manualInputIdleTimerRef.current);
       }
     };
   }, []);
@@ -839,6 +843,32 @@ export default function ConferenciaInterna() {
     await processScan(scanValue, codigoClienteRef.current || clienteInputRef.current?.value || codigoCliente);
   }
 
+  function clearManualInputIdleTimer() {
+    if (!manualInputIdleTimerRef.current) return;
+    window.clearTimeout(manualInputIdleTimerRef.current);
+    manualInputIdleTimerRef.current = null;
+  }
+
+  function armManualInputIdleCommit(stage: "cliente" | "qr", value: string) {
+    clearManualInputIdleTimer();
+    const normalized = value.trim();
+    const minLength = stage === "cliente" ? 4 : 12;
+    if (normalized.length < minLength) return;
+
+    // Alguns leitores HID escrevem no campo via IME/input e não disparam Enter.
+    // A pausa identifica o fim do código sem interferir nos leitores que enviam Enter.
+    manualInputIdleTimerRef.current = window.setTimeout(() => {
+      manualInputIdleTimerRef.current = null;
+      if (stage === "cliente") {
+        if (codigoClienteRef.current.trim() !== normalized) return;
+        focusNossaEtiqueta();
+        return;
+      }
+      if (qrInputRef.current.trim() !== normalized || processingScanRef.current) return;
+      void handleManualScan(normalized);
+    }, 500);
+  }
+
 
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
@@ -1205,10 +1235,12 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       codigoClienteRef.current = e.target.value;
+                       armManualInputIdleCommit("cliente", e.target.value);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                       if (e.key === "Enter" || e.key === "Tab") {
                         e.preventDefault();
+                         clearManualInputIdleTimer();
                         codigoClienteRef.current = e.currentTarget.value;
                         focusNossaEtiqueta();
                       }
@@ -1238,10 +1270,12 @@ export default function ConferenciaInterna() {
                     defaultValue=""
                     onChange={(e) => {
                       qrInputRef.current = e.target.value;
+                       armManualInputIdleCommit("qr", e.target.value);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                       if (e.key === "Enter" || e.key === "Tab") {
                         e.preventDefault();
+                         clearManualInputIdleTimer();
                         qrInputRef.current = e.currentTarget.value;
                         handleManualScan(e.currentTarget.value);
                       }
