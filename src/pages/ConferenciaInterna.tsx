@@ -694,6 +694,10 @@ export default function ConferenciaInterna() {
 
     let rafId = 0;
     let idleTimer = 0;
+    // Média móvel do intervalo entre caracteres do leitor (ms)
+    let interCharMs = 25;
+    let lastCharTs = 0;
+
 
     const writeCollectorValue = () => {
       // Agrupa a escrita em tela: 1 write por frame (leitores lentos digitam char a char)
