@@ -51,6 +51,8 @@ import FiscalConfiguracao from "./pages/FiscalConfiguracao";
 import MotoristasFiscal from "./pages/fiscal/Motoristas";
 import ConveniosFiscais from "./pages/fiscal/Convenios";
 import TabelasFrete from "./pages/fiscal/TabelasFrete";
+import SlaFornecedor from "./pages/fiscal/SlaFornecedor";
+import TarifasRegiao from "./pages/fiscal/TarifasRegiao";
 import RevisaoCoordenadas from "./pages/RevisaoCoordenadas";
 
 const queryClient = new QueryClient({
@@ -362,6 +364,8 @@ function AppRoutes() {
       <Route path="/fiscal/motoristas" element={<ProtectedRoute><MotoristasFiscal /></ProtectedRoute>} />
       <Route path="/fiscal/convenios" element={<ProtectedRoute><ConveniosFiscais /></ProtectedRoute>} />
       <Route path="/fiscal/tabelas-frete" element={<ProtectedRoute><TabelasFrete /></ProtectedRoute>} />
+      <Route path="/comercial/sla-fornecedor" element={<ProtectedRoute><SlaFornecedor /></ProtectedRoute>} />
+      <Route path="/comercial/tarifas-regiao" element={<ProtectedRoute><TarifasRegiao /></ProtectedRoute>} />
       <Route path="/motorista" element={<ErrorBoundary><MotoristaAcesso /></ErrorBoundary>} />
 
       <Route path="/motorista/diagnostico" element={<ErrorBoundary><MotoristaDiagnostico /></ErrorBoundary>} />

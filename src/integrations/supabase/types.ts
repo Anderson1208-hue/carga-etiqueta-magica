@@ -1187,6 +1187,194 @@ export type Database = {
         }
         Relationships: []
       }
+      embarcador_regiao_cidades: {
+        Row: {
+          codigo_municipio_ibge: string | null
+          created_at: string
+          id: string
+          municipio: string
+          municipio_norm: string | null
+          regiao_id: string
+          uf: string
+        }
+        Insert: {
+          codigo_municipio_ibge?: string | null
+          created_at?: string
+          id?: string
+          municipio: string
+          municipio_norm?: string | null
+          regiao_id: string
+          uf: string
+        }
+        Update: {
+          codigo_municipio_ibge?: string | null
+          created_at?: string
+          id?: string
+          municipio?: string
+          municipio_norm?: string | null
+          regiao_id?: string
+          uf?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embarcador_regiao_cidades_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "embarcador_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      embarcador_regiao_sla: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          observacao: string | null
+          prazo_dias_uteis: number
+          regiao_id: string
+          updated_at: string
+          vigente_ate: string | null
+          vigente_de: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observacao?: string | null
+          prazo_dias_uteis: number
+          regiao_id: string
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          observacao?: string | null
+          prazo_dias_uteis?: number
+          regiao_id?: string
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embarcador_regiao_sla_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "embarcador_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      embarcador_regiao_tarifas: {
+        Row: {
+          adicional_cte: number | null
+          advalorem_percentual: number | null
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          frete_minimo: number | null
+          gris_percentual: number | null
+          id: string
+          observacao: string | null
+          pedagio_por_100kg: number | null
+          regiao_id: string
+          tarifa_fixa: number | null
+          tarifa_por_ton: number | null
+          updated_at: string
+          vigente_ate: string | null
+          vigente_de: string
+        }
+        Insert: {
+          adicional_cte?: number | null
+          advalorem_percentual?: number | null
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          frete_minimo?: number | null
+          gris_percentual?: number | null
+          id?: string
+          observacao?: string | null
+          pedagio_por_100kg?: number | null
+          regiao_id: string
+          tarifa_fixa?: number | null
+          tarifa_por_ton?: number | null
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Update: {
+          adicional_cte?: number | null
+          advalorem_percentual?: number | null
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          frete_minimo?: number | null
+          gris_percentual?: number | null
+          id?: string
+          observacao?: string | null
+          pedagio_por_100kg?: number | null
+          regiao_id?: string
+          tarifa_fixa?: number | null
+          tarifa_por_ton?: number | null
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embarcador_regiao_tarifas_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "embarcador_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      embarcador_regioes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          embarcador_id: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          embarcador_id: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          embarcador_id?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "embarcador_regioes_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       embarcadores: {
         Row: {
           ativo: boolean
@@ -3352,6 +3540,7 @@ export type Database = {
           registrado_em: string
         }[]
       }
+      pode_gestao_comercial: { Args: never; Returns: boolean }
       pode_sobrescrever_coordenada: {
         Args: {
           origem_atual: Database["public"]["Enums"]["origem_coordenada"]
@@ -3398,6 +3587,26 @@ export type Database = {
           longitude: number
           origem: Database["public"]["Enums"]["origem_coordenada"]
           tipo: Database["public"]["Enums"]["tipo_endereco"]
+        }[]
+      }
+      resolver_sla_tarifa: {
+        Args: {
+          p_data?: string
+          p_embarcador_id: string
+          p_municipio: string
+          p_uf: string
+        }
+        Returns: {
+          adicional_cte: number
+          advalorem_percentual: number
+          frete_minimo: number
+          gris_percentual: number
+          pedagio_por_100kg: number
+          prazo_dias_uteis: number
+          regiao_id: string
+          regiao_nome: string
+          tarifa_fixa: number
+          tarifa_por_ton: number
         }[]
       }
       reverter_admins_expirados: { Args: never; Returns: number }
