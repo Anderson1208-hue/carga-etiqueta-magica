@@ -19,6 +19,7 @@ type: reference
 ## Memories
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
+- [SLA e Tarifa por Região](mem://funcionalidades/comercial/sla-e-tarifa-por-regiao) — Regiões por fornecedor + cidades, SLA em dias úteis, tarifa única por região, acesso restrito.
 - [Cadastro de Produtos](mem://funcionalidades/cadastros/produtos-masterdata) — Tabela produtos por embarcador: dimensões, cubagem automática, paletização, shelf life; import Masterdata.
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.
 - [XML Parser](mem://funcionalidades/xml-parser) — Weights extracted from <transp><vol> (header level).
