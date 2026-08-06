@@ -688,6 +688,45 @@ export type Database = {
         }
         Relationships: []
       }
+      componentes_frete_catalogo: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          nome_dacte: string | null
+          ordem: number
+          tipo_calculo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          nome_dacte?: string | null
+          ordem?: number
+          tipo_calculo: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          nome_dacte?: string | null
+          ordem?: number
+          tipo_calculo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       configuracao_fiscal_emitente: {
         Row: {
           ambiente: string
@@ -1277,6 +1316,7 @@ export type Database = {
           adicional_cte: number | null
           advalorem_percentual: number | null
           ativo: boolean
+          componentes_extra: Json
           created_at: string
           created_by: string | null
           frete_minimo: number | null
@@ -1295,6 +1335,7 @@ export type Database = {
           adicional_cte?: number | null
           advalorem_percentual?: number | null
           ativo?: boolean
+          componentes_extra?: Json
           created_at?: string
           created_by?: string | null
           frete_minimo?: number | null
@@ -1313,6 +1354,7 @@ export type Database = {
           adicional_cte?: number | null
           advalorem_percentual?: number | null
           ativo?: boolean
+          componentes_extra?: Json
           created_at?: string
           created_by?: string | null
           frete_minimo?: number | null
