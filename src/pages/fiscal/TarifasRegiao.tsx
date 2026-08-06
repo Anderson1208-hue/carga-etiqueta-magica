@@ -15,6 +15,23 @@ import { SemPermissao } from "@/components/comercial/SemPermissao";
 
 type Embarcador = { id: string; razao_social: string; nome_fantasia: string | null };
 type Regiao = { id: string; nome: string; ativo: boolean };
+type CatalogoComponente = {
+  id: string;
+  codigo: string;
+  nome: string;
+  nome_dacte: string | null;
+  tipo_calculo: string;
+  descricao: string | null;
+  ordem: number;
+};
+type ComponenteExtra = {
+  codigo: string;
+  nome: string;
+  nome_dacte: string | null;
+  tipo_calculo: string;
+  valor: number | null;
+  embutido: boolean;
+};
 type Tarifa = {
   id?: string;
   regiao_id: string;
@@ -25,11 +42,22 @@ type Tarifa = {
   advalorem_percentual: number | null;
   pedagio_por_100kg: number | null;
   adicional_cte: number | null;
+  componentes_extra: ComponenteExtra[];
   vigente_de: string;
   vigente_ate: string | null;
   observacao: string | null;
   ativo: boolean;
 };
+
+const TIPO_LABEL: Record<string, string> = {
+  percentual_nf: "% sobre valor da NF",
+  percentual_frete: "% sobre o frete",
+  valor_por_ton: "R$ por tonelada",
+  valor_por_100kg: "R$ por 100 kg",
+  valor_fixo: "R$ fixo por CT-e",
+  valor_por_entrega: "R$ por entrega",
+};
+const isPercent = (tipo: string) => tipo.startsWith("percentual");
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 const num = (v: string) => (v === "" ? null : Number(v));
@@ -46,6 +74,7 @@ const novaTarifa = (regiao_id: string): Tarifa => ({
   advalorem_percentual: null,
   pedagio_por_100kg: null,
   adicional_cte: null,
+  componentes_extra: [],
   vigente_de: hoje(),
   vigente_ate: null,
   observacao: null,
