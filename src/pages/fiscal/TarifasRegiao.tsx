@@ -15,6 +15,23 @@ import { SemPermissao } from "@/components/comercial/SemPermissao";
 
 type Embarcador = { id: string; razao_social: string; nome_fantasia: string | null };
 type Regiao = { id: string; nome: string; ativo: boolean };
+type CatalogoComponente = {
+  id: string;
+  codigo: string;
+  nome: string;
+  nome_dacte: string | null;
+  tipo_calculo: string;
+  descricao: string | null;
+  ordem: number;
+};
+type ComponenteExtra = {
+  codigo: string;
+  nome: string;
+  nome_dacte: string | null;
+  tipo_calculo: string;
+  valor: number | null;
+  embutido: boolean;
+};
 type Tarifa = {
   id?: string;
   regiao_id: string;
@@ -25,11 +42,22 @@ type Tarifa = {
   advalorem_percentual: number | null;
   pedagio_por_100kg: number | null;
   adicional_cte: number | null;
+  componentes_extra: ComponenteExtra[];
   vigente_de: string;
   vigente_ate: string | null;
   observacao: string | null;
   ativo: boolean;
 };
+
+const TIPO_LABEL: Record<string, string> = {
+  percentual_nf: "% sobre valor da NF",
+  percentual_frete: "% sobre o frete",
+  valor_por_ton: "R$ por tonelada",
+  valor_por_100kg: "R$ por 100 kg",
+  valor_fixo: "R$ fixo por CT-e",
+  valor_por_entrega: "R$ por entrega",
+};
+const isPercent = (tipo: string) => tipo.startsWith("percentual");
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 const num = (v: string) => (v === "" ? null : Number(v));
@@ -46,6 +74,7 @@ const novaTarifa = (regiao_id: string): Tarifa => ({
   advalorem_percentual: null,
   pedagio_por_100kg: null,
   adicional_cte: null,
+  componentes_extra: [],
   vigente_de: hoje(),
   vigente_ate: null,
   observacao: null,
@@ -63,6 +92,8 @@ export default function TarifasRegiao() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Tarifa | null>(null);
   const [histRegiao, setHistRegiao] = useState<Regiao | null>(null);
+  const [catalogo, setCatalogo] = useState<CatalogoComponente[]>([]);
+  const [novoComponente, setNovoComponente] = useState("");
 
   useEffect(() => {
     supabase
@@ -71,6 +102,13 @@ export default function TarifasRegiao() {
       .eq("ativo", true)
       .order("razao_social")
       .then(({ data }) => setEmbarcadores((data as Embarcador[]) || []));
+
+    supabase
+      .from("componentes_frete_catalogo")
+      .select("id, codigo, nome, nome_dacte, tipo_calculo, descricao, ordem")
+      .eq("ativo", true)
+      .order("ordem")
+      .then(({ data }) => setCatalogo((data as CatalogoComponente[]) || []));
   }, []);
 
   const load = async (embId: string) => {
@@ -89,7 +127,14 @@ export default function TarifasRegiao() {
       .select("*")
       .in("regiao_id", list.map((r) => r.id))
       .order("vigente_de", { ascending: false });
-    setTarifas((tar as Tarifa[]) || []);
+    setTarifas(
+      ((tar as any[]) || []).map((t) => ({
+        ...t,
+        componentes_extra: Array.isArray(t.componentes_extra)
+          ? (t.componentes_extra as ComponenteExtra[])
+          : [],
+      })) as Tarifa[]
+    );
     setLoading(false);
   };
 
@@ -108,12 +153,46 @@ export default function TarifasRegiao() {
     return map;
   }, [tarifas]);
 
+  const addComponente = (codigo: string) => {
+    if (!form || !codigo) return;
+    const c = catalogo.find((x) => x.codigo === codigo);
+    if (!c) return;
+    if (form.componentes_extra.some((x) => x.codigo === codigo)) {
+      return toast.error("Componente já lançado nesta tarifa");
+    }
+    setForm({
+      ...form,
+      componentes_extra: [
+        ...form.componentes_extra,
+        { codigo: c.codigo, nome: c.nome, nome_dacte: c.nome_dacte, tipo_calculo: c.tipo_calculo, valor: null, embutido: false },
+      ],
+    });
+    setNovoComponente("");
+  };
+
+  const updComponente = (codigo: string, patch: Partial<ComponenteExtra>) => {
+    if (!form) return;
+    setForm({
+      ...form,
+      componentes_extra: form.componentes_extra.map((c) => (c.codigo === codigo ? { ...c, ...patch } : c)),
+    });
+  };
+
+  const delComponente = (codigo: string) => {
+    if (!form) return;
+    setForm({ ...form, componentes_extra: form.componentes_extra.filter((c) => c.codigo !== codigo) });
+  };
+
   const salvar = async () => {
     if (!form) return;
     if (form.tarifa_por_ton == null && form.tarifa_fixa == null) {
       return toast.error("Informe tarifa por tonelada ou tarifa fixa");
     }
-    const { id, ...payload } = form;
+    if (form.componentes_extra.some((c) => c.valor == null)) {
+      return toast.error("Preencha o valor de todos os componentes adicionais");
+    }
+    const { id, ...rest } = form;
+    const payload = { ...rest, componentes_extra: rest.componentes_extra as any };
     const { error } = id
       ? await supabase.from("embarcador_regiao_tarifas").update(payload).eq("id", id)
       : await supabase.from("embarcador_regiao_tarifas").insert(payload);
@@ -288,6 +367,63 @@ export default function TarifasRegiao() {
                 <Label>Observação</Label>
                 <Input value={form.observacao ?? ""}
                   onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
+              </div>
+
+              {/* Componentes adicionais (nomes do DACTE) */}
+              <div className="col-span-2 space-y-2 rounded-lg border p-3">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Componentes adicionais do frete</p>
+                    <p className="text-xs text-muted-foreground">
+                      Opções baseadas nos componentes do DACTE (FRETE PESO, FRETE VALOR, GRIS, CAT, PEDÁGIO, OUTROS) e nos acessórios usuais.
+                    </p>
+                  </div>
+                  <div className="w-64">
+                    <Select value={novoComponente} onValueChange={addComponente}>
+                      <SelectTrigger><SelectValue placeholder="Adicionar componente" /></SelectTrigger>
+                      <SelectContent>
+                        {catalogo
+                          .filter((c) => !form.componentes_extra.some((x) => x.codigo === c.codigo))
+                          .map((c) => (
+                            <SelectItem key={c.codigo} value={c.codigo}>
+                              {c.nome} · {TIPO_LABEL[c.tipo_calculo] ?? c.tipo_calculo}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {form.componentes_extra.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum componente adicional lançado.</p>
+                ) : (
+                  <div className="divide-y">
+                    {form.componentes_extra.map((c) => (
+                      <div key={c.codigo} className="flex flex-wrap items-end gap-2 py-2">
+                        <div className="min-w-40 flex-1">
+                          <p className="text-sm font-medium">{c.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {TIPO_LABEL[c.tipo_calculo] ?? c.tipo_calculo}
+                            {c.nome_dacte ? ` · DACTE: ${c.nome_dacte}` : ""}
+                          </p>
+                        </div>
+                        <div className="w-32">
+                          <Label className="text-xs">{isPercent(c.tipo_calculo) ? "%" : "R$"}</Label>
+                          <Input type="number" step="0.0001" value={c.valor ?? ""}
+                            onChange={(e) => updComponente(c.codigo, { valor: num(e.target.value) })} />
+                        </div>
+                        <label className="flex items-center gap-2 pb-2 text-xs">
+                          <input type="checkbox" checked={c.embutido}
+                            onChange={(e) => updComponente(c.codigo, { embutido: e.target.checked })} />
+                          A embutir
+                        </label>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => delComponente(c.codigo)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
