@@ -57,18 +57,36 @@ Deno.serve(async (req) => {
     );
 
     // Find vehicle by access code
-    const { data: veiculo, error: veiculoErr } = await supabase
+    const { data: veiculoBase, error: veiculoErr } = await supabase
       .from("veiculos")
       .select("id, placa, motorista, status, data")
       .eq("access_code", code.toUpperCase())
       .maybeSingle();
 
-    if (veiculoErr || !veiculo) {
+    if (veiculoErr || !veiculoBase) {
       return new Response(JSON.stringify({ error: "Código não encontrado" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // PERNOITE: quando o veículo pernoita, as NFs são movidas para um novo
+    // registro de veículo (dia seguinte) com outro access_code. O motorista
+    // continua usando o código antigo, então seguimos a cadeia de sucessores
+    // (pernoite_origem_id) até o último registro para não perder as NFs.
+    let veiculo = veiculoBase;
+    for (let i = 0; i < 10; i++) {
+      const { data: sucessor } = await supabase
+        .from("veiculos")
+        .select("id, placa, motorista, status, data")
+        .eq("pernoite_origem_id", veiculo.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!sucessor) break;
+      veiculo = sucessor;
+    }
+
 
     if (action === "registrar-baixa") {
       const {
