@@ -153,12 +153,46 @@ export default function TarifasRegiao() {
     return map;
   }, [tarifas]);
 
+  const addComponente = (codigo: string) => {
+    if (!form || !codigo) return;
+    const c = catalogo.find((x) => x.codigo === codigo);
+    if (!c) return;
+    if (form.componentes_extra.some((x) => x.codigo === codigo)) {
+      return toast.error("Componente já lançado nesta tarifa");
+    }
+    setForm({
+      ...form,
+      componentes_extra: [
+        ...form.componentes_extra,
+        { codigo: c.codigo, nome: c.nome, nome_dacte: c.nome_dacte, tipo_calculo: c.tipo_calculo, valor: null, embutido: false },
+      ],
+    });
+    setNovoComponente("");
+  };
+
+  const updComponente = (codigo: string, patch: Partial<ComponenteExtra>) => {
+    if (!form) return;
+    setForm({
+      ...form,
+      componentes_extra: form.componentes_extra.map((c) => (c.codigo === codigo ? { ...c, ...patch } : c)),
+    });
+  };
+
+  const delComponente = (codigo: string) => {
+    if (!form) return;
+    setForm({ ...form, componentes_extra: form.componentes_extra.filter((c) => c.codigo !== codigo) });
+  };
+
   const salvar = async () => {
     if (!form) return;
     if (form.tarifa_por_ton == null && form.tarifa_fixa == null) {
       return toast.error("Informe tarifa por tonelada ou tarifa fixa");
     }
-    const { id, ...payload } = form;
+    if (form.componentes_extra.some((c) => c.valor == null)) {
+      return toast.error("Preencha o valor de todos os componentes adicionais");
+    }
+    const { id, ...rest } = form;
+    const payload = { ...rest, componentes_extra: rest.componentes_extra as any };
     const { error } = id
       ? await supabase.from("embarcador_regiao_tarifas").update(payload).eq("id", id)
       : await supabase.from("embarcador_regiao_tarifas").insert(payload);
