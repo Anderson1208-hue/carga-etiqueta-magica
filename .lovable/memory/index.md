@@ -14,6 +14,7 @@ type: reference
 - **Torre:** Chegada/saída/permanência só por GPS factual; baixa não cria horário. Sem ping no raio = “sem GPS no raio”.
 - **Dias úteis:** Liberação de agendamentos usa próximo dia útil RJ (exclui sáb/dom + feriados nacionais/estaduais) via `src/lib/feriados-rj.ts`.
 - **m³ por embarcador:** XML só é fonte de m³ para Pandurata/Bauducco. Docile/Arcor/IBAC por arquivo; Mars e demais pelo cadastro de produtos. Ver [mem://logica/regra-m3-por-embarcador].
+- **DACTE:** manter exatamente o layout do DACTE atual do Praxio na emissão própria de CT-e. Ver [mem://fiscal/dacte-layout-referencia].
 
 
 ## Memories
