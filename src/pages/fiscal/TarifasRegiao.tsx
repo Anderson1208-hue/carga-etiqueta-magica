@@ -92,6 +92,8 @@ export default function TarifasRegiao() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Tarifa | null>(null);
   const [histRegiao, setHistRegiao] = useState<Regiao | null>(null);
+  const [catalogo, setCatalogo] = useState<CatalogoComponente[]>([]);
+  const [novoComponente, setNovoComponente] = useState("");
 
   useEffect(() => {
     supabase
@@ -100,6 +102,13 @@ export default function TarifasRegiao() {
       .eq("ativo", true)
       .order("razao_social")
       .then(({ data }) => setEmbarcadores((data as Embarcador[]) || []));
+
+    supabase
+      .from("componentes_frete_catalogo")
+      .select("id, codigo, nome, nome_dacte, tipo_calculo, descricao, ordem")
+      .eq("ativo", true)
+      .order("ordem")
+      .then(({ data }) => setCatalogo((data as CatalogoComponente[]) || []));
   }, []);
 
   const load = async (embId: string) => {
@@ -118,7 +127,14 @@ export default function TarifasRegiao() {
       .select("*")
       .in("regiao_id", list.map((r) => r.id))
       .order("vigente_de", { ascending: false });
-    setTarifas((tar as Tarifa[]) || []);
+    setTarifas(
+      ((tar as any[]) || []).map((t) => ({
+        ...t,
+        componentes_extra: Array.isArray(t.componentes_extra)
+          ? (t.componentes_extra as ComponenteExtra[])
+          : [],
+      })) as Tarifa[]
+    );
     setLoading(false);
   };
 
