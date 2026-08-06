@@ -368,6 +368,63 @@ export default function TarifasRegiao() {
                 <Input value={form.observacao ?? ""}
                   onChange={(e) => setForm({ ...form, observacao: e.target.value })} />
               </div>
+
+              {/* Componentes adicionais (nomes do DACTE) */}
+              <div className="col-span-2 space-y-2 rounded-lg border p-3">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Componentes adicionais do frete</p>
+                    <p className="text-xs text-muted-foreground">
+                      Opções baseadas nos componentes do DACTE (FRETE PESO, FRETE VALOR, GRIS, CAT, PEDÁGIO, OUTROS) e nos acessórios usuais.
+                    </p>
+                  </div>
+                  <div className="w-64">
+                    <Select value={novoComponente} onValueChange={addComponente}>
+                      <SelectTrigger><SelectValue placeholder="Adicionar componente" /></SelectTrigger>
+                      <SelectContent>
+                        {catalogo
+                          .filter((c) => !form.componentes_extra.some((x) => x.codigo === c.codigo))
+                          .map((c) => (
+                            <SelectItem key={c.codigo} value={c.codigo}>
+                              {c.nome} · {TIPO_LABEL[c.tipo_calculo] ?? c.tipo_calculo}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {form.componentes_extra.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhum componente adicional lançado.</p>
+                ) : (
+                  <div className="divide-y">
+                    {form.componentes_extra.map((c) => (
+                      <div key={c.codigo} className="flex flex-wrap items-end gap-2 py-2">
+                        <div className="min-w-40 flex-1">
+                          <p className="text-sm font-medium">{c.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {TIPO_LABEL[c.tipo_calculo] ?? c.tipo_calculo}
+                            {c.nome_dacte ? ` · DACTE: ${c.nome_dacte}` : ""}
+                          </p>
+                        </div>
+                        <div className="w-32">
+                          <Label className="text-xs">{isPercent(c.tipo_calculo) ? "%" : "R$"}</Label>
+                          <Input type="number" step="0.0001" value={c.valor ?? ""}
+                            onChange={(e) => updComponente(c.codigo, { valor: num(e.target.value) })} />
+                        </div>
+                        <label className="flex items-center gap-2 pb-2 text-xs">
+                          <input type="checkbox" checked={c.embutido}
+                            onChange={(e) => updComponente(c.codigo, { embutido: e.target.checked })} />
+                          A embutir
+                        </label>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => delComponente(c.codigo)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter><Button onClick={salvar}>Salvar</Button></DialogFooter>
