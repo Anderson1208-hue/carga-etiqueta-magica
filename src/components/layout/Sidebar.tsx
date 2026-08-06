@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import {
   Truck,
   FileText,
@@ -160,6 +161,7 @@ function NavGroupFlyout({
 export function Sidebar() {
   const location = useLocation();
   const { profile, signOut, isAdmin } = useAuth();
+  const { podeGestaoComercial } = useGestaoComercial();
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
@@ -220,6 +222,18 @@ export function Sidebar() {
             groupActive={relatoriosActive}
           />
           <div className="pt-2 space-y-0.5">
+            {podeGestaoComercial && (
+              <>
+                <NavItem
+                  item={{ name: "Regiões e SLA", href: "/comercial/sla-fornecedor", icon: Calculator }}
+                  isActive={location.pathname === "/comercial/sla-fornecedor"}
+                />
+                <NavItem
+                  item={{ name: "Tarifas por Região", href: "/comercial/tarifas-regiao", icon: HandCoins }}
+                  isActive={location.pathname === "/comercial/tarifas-regiao"}
+                />
+              </>
+            )}
             {isAdmin && (
               <>
                 <NavItem
