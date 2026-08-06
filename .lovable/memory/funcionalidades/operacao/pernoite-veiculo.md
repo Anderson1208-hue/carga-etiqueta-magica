@@ -22,3 +22,7 @@ type: feature
 ## Destaque UI
 - `Roteirizacao.tsx` aba **Veículos**: lê `pernoite` no select; aplica `border-blue-500 border-2 bg-blue-50/50` no Card e badge azul "PERNOITE" ao lado da placa.
 - Preparação (`Programacao.tsx`) NÃO destaca pernoite — as NFs continuam vinculadas ao novo veículo, então não aparecem como liberadas.
+
+## Acesso do motorista após pernoite
+- O novo veículo do pernoite recebe **outro `access_code`**, mas o motorista continua usando o código antigo.
+- `supabase/functions/motorista-acesso` resolve a **cadeia de sucessores** (`pernoite_origem_id`, até 10 níveis) e retorna sempre o último veículo — assim as NFs (e a baixa) continuam disponíveis no app com o código original.
