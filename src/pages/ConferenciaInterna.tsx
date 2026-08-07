@@ -1185,6 +1185,26 @@ export default function ConferenciaInterna() {
             </Button>
           </div>
 
+          {/* Limpar NF — apenas admin e operadora Gessica */}
+          {podeLimparNf && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={limparConferenciaNf}
+              disabled={limpando || offlineMode || !isOnline}
+            >
+              {limpando ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Eraser className="w-4 h-4 mr-2" />
+              )}
+              Limpar NF (voltar tudo para pendente)
+            </Button>
+          )}
+
+
+
 
 
           {/* Camera Scanner */}
