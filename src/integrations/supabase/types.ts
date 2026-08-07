@@ -3560,6 +3560,7 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { _user_id: string }; Returns: boolean }
       is_carga_operator: { Args: { p_carga_id: string }; Returns: boolean }
+      limpar_conferencia_nf: { Args: { p_numero_nf: string }; Returns: Json }
       listar_audit_log: {
         Args: {
           p_action?: string
@@ -3583,6 +3584,7 @@ export type Database = {
         }[]
       }
       pode_gestao_comercial: { Args: never; Returns: boolean }
+      pode_limpar_conferencia: { Args: never; Returns: boolean }
       pode_sobrescrever_coordenada: {
         Args: {
           origem_atual: Database["public"]["Enums"]["origem_coordenada"]
