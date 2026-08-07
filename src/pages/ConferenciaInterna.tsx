@@ -46,6 +46,7 @@ import {
   WifiOff,
   ChevronDown,
   ClipboardList,
+  Eraser,
 } from "lucide-react";
 
 interface CargaResumo {
@@ -121,6 +122,9 @@ export default function ConferenciaInterna() {
   // Etapa da conferência interna: 1 = Separação (dupla bipagem) | 2 = Expedição/carregamento (só QR)
   const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
+  const [limpando, setLimpando] = useState(false);
+  const podeLimparNf =
+    isAdmin || profile?.email?.toLowerCase() === "gessica.rodrigues@tlmlogistica.com.br";
 
   const [nfProgress, setNfProgress] = useState<NfProgress | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -910,6 +914,27 @@ export default function ConferenciaInterna() {
   }
 
 
+  async function limparConferenciaNf() {
+    if (!selectedNf || limpando) return;
+    if (!window.confirm(`Limpar a conferência da NF ${selectedNf}? Todas as etiquetas voltam para pendente.`)) return;
+
+    setLimpando(true);
+    try {
+      const { data, error } = await supabase.rpc("limpar_conferencia_nf", { p_numero_nf: selectedNf });
+      if (error) throw error;
+      const limpas = (data as any)?.etiquetas_limpas ?? 0;
+      toast({ title: "NF limpa", description: `${limpas} etiqueta(s) voltaram para pendente.` });
+      setScanHistory([]);
+      setLastResult(null);
+      await reloadNfProgress();
+    } catch (e: any) {
+      console.error("Erro ao limpar conferência:", e);
+      toast({ title: "Erro ao limpar NF", description: e?.message ?? "Sem permissão ou falha de rede.", variant: "destructive" });
+    } finally {
+      setLimpando(false);
+    }
+  }
+
   async function reloadNfProgress() {
     if (!selectedCarga || !selectedNf) return;
 
@@ -1161,6 +1186,26 @@ export default function ConferenciaInterna() {
               Etapa 2 • Expedição
             </Button>
           </div>
+
+          {/* Limpar NF — apenas admin e operadora Gessica */}
+          {podeLimparNf && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={limparConferenciaNf}
+              disabled={limpando || offlineMode || !isOnline}
+            >
+              {limpando ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Eraser className="w-4 h-4 mr-2" />
+              )}
+              Limpar NF (voltar tudo para pendente)
+            </Button>
+          )}
+
+
 
 
 
