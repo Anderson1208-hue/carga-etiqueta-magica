@@ -123,6 +123,8 @@ export default function ConferenciaInterna() {
   const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
   const [limpando, setLimpando] = useState(false);
+  const podeLimparNf =
+    isAdmin || profile?.email?.toLowerCase() === "gessica.rodrigues@tlmlogistica.com.br";
 
   const [nfProgress, setNfProgress] = useState<NfProgress | null>(null);
   const [scanning, setScanning] = useState(false);
