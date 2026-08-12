@@ -493,6 +493,77 @@ export default function SlaFornecedor() {
           <DialogFooter><Button onClick={salvarSla}>Salvar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog cadastro completo */}
+      <Dialog open={openCompleto} onOpenChange={setOpenCompleto}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Cadastro completo da região</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-8">
+              <Label>Nome da região</Label>
+              <Input
+                value={formCompleto.nome}
+                placeholder="ex.: Rio e Grande Rio, Interior 1, Interior 2"
+                onChange={(e) => setFormCompleto({ ...formCompleto, nome: e.target.value })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>UF padrão</Label>
+              <Input
+                value={formCompleto.uf}
+                maxLength={2}
+                onChange={(e) =>
+                  setFormCompleto({ ...formCompleto, uf: e.target.value.replace(/[^A-Za-z]/g, "").toUpperCase() })
+                }
+              />
+            </div>
+            <div className="col-span-12">
+              <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+              <Textarea
+                rows={8}
+                value={formCompleto.cidades}
+                onChange={(e) => setFormCompleto({ ...formCompleto, cidades: e.target.value })}
+                placeholder={"Rio de Janeiro\nNiterói\nSão Gonçalo\nDuque de Caxias\nCabo Frio/RJ"}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pode colar a lista direto do Excel — uma cidade por linha.
+              </p>
+            </div>
+            <div className="col-span-4">
+              <Label>Prazo (dias úteis)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={formCompleto.prazo_dias_uteis}
+                onChange={(e) => setFormCompleto({ ...formCompleto, prazo_dias_uteis: Number(e.target.value) })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>Vigente de</Label>
+              <Input
+                type="date"
+                value={formCompleto.vigente_de}
+                onChange={(e) => setFormCompleto({ ...formCompleto, vigente_de: e.target.value })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>Observação</Label>
+              <Input
+                value={formCompleto.observacao}
+                onChange={(e) => setFormCompleto({ ...formCompleto, observacao: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={salvarCompleto} disabled={salvandoCompleto}>
+              {salvandoCompleto && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Salvar região, cidades e SLA
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
