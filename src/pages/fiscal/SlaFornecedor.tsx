@@ -66,6 +66,17 @@ export default function SlaFornecedor() {
   const [openSla, setOpenSla] = useState(false);
   const [formSla, setFormSla] = useState<Partial<Sla>>({ prazo_dias_uteis: 1, vigente_de: hoje() });
 
+  const [openCompleto, setOpenCompleto] = useState(false);
+  const [salvandoCompleto, setSalvandoCompleto] = useState(false);
+  const [formCompleto, setFormCompleto] = useState({
+    nome: "",
+    uf: "RJ",
+    cidades: "",
+    prazo_dias_uteis: 1,
+    vigente_de: hoje(),
+    observacao: "",
+  });
+
   useEffect(() => {
     supabase
       .from("embarcadores")
@@ -206,6 +217,64 @@ export default function SlaFornecedor() {
     if (regiaoSel) loadDetalhe(regiaoSel);
   };
 
+  /** Cadastro completo: cria região + cidades + prazo (SLA) em uma única ação */
+  const salvarCompleto = async () => {
+    if (!embarcadorId) return toast.error("Selecione o fornecedor");
+    const nome = formCompleto.nome.trim();
+    if (!nome) return toast.error("Informe o nome da região");
+    const prazo = Number(formCompleto.prazo_dias_uteis);
+    if (!Number.isFinite(prazo) || prazo < 0) return toast.error("Prazo (dias úteis) inválido");
+
+    const parsed = formCompleto.cidades
+      .split(/\r?\n/)
+      .map((l) => parseLinhaCidade(l, formCompleto.uf))
+      .filter(Boolean) as { uf: string; municipio: string }[];
+    if (parsed.length === 0) return toast.error("Informe ao menos uma cidade");
+
+    setSalvandoCompleto(true);
+    try {
+      const { data: reg, error: eReg } = await supabase
+        .from("embarcador_regioes")
+        .insert({ embarcador_id: embarcadorId, nome })
+        .select("*")
+        .single();
+      if (eReg) throw eReg;
+
+      const chaves = new Set<string>();
+      const rows = parsed
+        .filter((p) => {
+          const k = `${p.uf}|${p.municipio.toUpperCase()}`;
+          if (chaves.has(k)) return false;
+          chaves.add(k);
+          return true;
+        })
+        .map((p) => ({ regiao_id: reg.id, uf: p.uf, municipio: p.municipio }));
+
+      const { error: eCid } = await supabase
+        .from("embarcador_regiao_cidades")
+        .upsert(rows, { onConflict: "regiao_id,uf,municipio_norm", ignoreDuplicates: true });
+      if (eCid) throw eCid;
+
+      const { error: eSla } = await supabase.from("embarcador_regiao_sla").insert({
+        regiao_id: reg.id,
+        prazo_dias_uteis: Math.trunc(prazo),
+        vigente_de: formCompleto.vigente_de || hoje(),
+        observacao: formCompleto.observacao.trim() || null,
+      });
+      if (eSla) throw eSla;
+
+      toast.success(`Região "${nome}" criada com ${rows.length} cidade(s) e SLA de ${Math.trunc(prazo)} dia(s) útil(eis)`);
+      setOpenCompleto(false);
+      setFormCompleto({ nome: "", uf: formCompleto.uf, cidades: "", prazo_dias_uteis: 1, vigente_de: hoje(), observacao: "" });
+      await loadRegioes(embarcadorId);
+      setRegiaoSel(reg as Regiao);
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao salvar cadastro completo");
+    } finally {
+      setSalvandoCompleto(false);
+    }
+  };
+
   if (authLoading) return <div className="p-6"><Loader2 className="animate-spin" /></div>;
   if (!podeGestaoComercial) return <SemPermissao />;
 
@@ -239,10 +308,22 @@ export default function SlaFornecedor() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Regiões */}
           <Card className="lg:col-span-1">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">Regiões ({regioes.length})</CardTitle>
-              <Button size="sm" onClick={() => { setFormRegiao({ nome: "" }); setOpenRegiao(true); }}>
-                <Plus className="w-4 h-4 mr-1" /> Nova
+            <CardHeader className="space-y-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Regiões ({regioes.length})</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => { setFormRegiao({ nome: "" }); setOpenRegiao(true); }}>
+                  <Plus className="w-4 h-4 mr-1" /> Só o nome
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setFormCompleto({ nome: "", uf: ufPadrao, cidades: "", prazo_dias_uteis: 1, vigente_de: hoje(), observacao: "" });
+                  setOpenCompleto(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Cadastro completo (região + cidades + SLA)
               </Button>
             </CardHeader>
             <CardContent className="space-y-1">
@@ -410,6 +491,77 @@ export default function SlaFornecedor() {
             </div>
           </div>
           <DialogFooter><Button onClick={salvarSla}>Salvar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog cadastro completo */}
+      <Dialog open={openCompleto} onOpenChange={setOpenCompleto}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Cadastro completo da região</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-8">
+              <Label>Nome da região</Label>
+              <Input
+                value={formCompleto.nome}
+                placeholder="ex.: Rio e Grande Rio, Interior 1, Interior 2"
+                onChange={(e) => setFormCompleto({ ...formCompleto, nome: e.target.value })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>UF padrão</Label>
+              <Input
+                value={formCompleto.uf}
+                maxLength={2}
+                onChange={(e) =>
+                  setFormCompleto({ ...formCompleto, uf: e.target.value.replace(/[^A-Za-z]/g, "").toUpperCase() })
+                }
+              />
+            </div>
+            <div className="col-span-12">
+              <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+              <Textarea
+                rows={8}
+                value={formCompleto.cidades}
+                onChange={(e) => setFormCompleto({ ...formCompleto, cidades: e.target.value })}
+                placeholder={"Rio de Janeiro\nNiterói\nSão Gonçalo\nDuque de Caxias\nCabo Frio/RJ"}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pode colar a lista direto do Excel — uma cidade por linha.
+              </p>
+            </div>
+            <div className="col-span-4">
+              <Label>Prazo (dias úteis)</Label>
+              <Input
+                type="number"
+                min={0}
+                value={formCompleto.prazo_dias_uteis}
+                onChange={(e) => setFormCompleto({ ...formCompleto, prazo_dias_uteis: Number(e.target.value) })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>Vigente de</Label>
+              <Input
+                type="date"
+                value={formCompleto.vigente_de}
+                onChange={(e) => setFormCompleto({ ...formCompleto, vigente_de: e.target.value })}
+              />
+            </div>
+            <div className="col-span-4">
+              <Label>Observação</Label>
+              <Input
+                value={formCompleto.observacao}
+                onChange={(e) => setFormCompleto({ ...formCompleto, observacao: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={salvarCompleto} disabled={salvandoCompleto}>
+              {salvandoCompleto && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}
+              Salvar região, cidades e SLA
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
