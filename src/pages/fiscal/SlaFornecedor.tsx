@@ -206,6 +206,64 @@ export default function SlaFornecedor() {
     if (regiaoSel) loadDetalhe(regiaoSel);
   };
 
+  /** Cadastro completo: cria região + cidades + prazo (SLA) em uma única ação */
+  const salvarCompleto = async () => {
+    if (!embarcadorId) return toast.error("Selecione o fornecedor");
+    const nome = formCompleto.nome.trim();
+    if (!nome) return toast.error("Informe o nome da região");
+    const prazo = Number(formCompleto.prazo_dias_uteis);
+    if (!Number.isFinite(prazo) || prazo < 0) return toast.error("Prazo (dias úteis) inválido");
+
+    const parsed = formCompleto.cidades
+      .split(/\r?\n/)
+      .map((l) => parseLinhaCidade(l, formCompleto.uf))
+      .filter(Boolean) as { uf: string; municipio: string }[];
+    if (parsed.length === 0) return toast.error("Informe ao menos uma cidade");
+
+    setSalvandoCompleto(true);
+    try {
+      const { data: reg, error: eReg } = await supabase
+        .from("embarcador_regioes")
+        .insert({ embarcador_id: embarcadorId, nome })
+        .select("*")
+        .single();
+      if (eReg) throw eReg;
+
+      const chaves = new Set<string>();
+      const rows = parsed
+        .filter((p) => {
+          const k = `${p.uf}|${p.municipio.toUpperCase()}`;
+          if (chaves.has(k)) return false;
+          chaves.add(k);
+          return true;
+        })
+        .map((p) => ({ regiao_id: reg.id, uf: p.uf, municipio: p.municipio }));
+
+      const { error: eCid } = await supabase
+        .from("embarcador_regiao_cidades")
+        .upsert(rows, { onConflict: "regiao_id,uf,municipio_norm", ignoreDuplicates: true });
+      if (eCid) throw eCid;
+
+      const { error: eSla } = await supabase.from("embarcador_regiao_sla").insert({
+        regiao_id: reg.id,
+        prazo_dias_uteis: Math.trunc(prazo),
+        vigente_de: formCompleto.vigente_de || hoje(),
+        observacao: formCompleto.observacao.trim() || null,
+      });
+      if (eSla) throw eSla;
+
+      toast.success(`Região "${nome}" criada com ${rows.length} cidade(s) e SLA de ${Math.trunc(prazo)} dia(s) útil(eis)`);
+      setOpenCompleto(false);
+      setFormCompleto({ nome: "", uf: formCompleto.uf, cidades: "", prazo_dias_uteis: 1, vigente_de: hoje(), observacao: "" });
+      await loadRegioes(embarcadorId);
+      setRegiaoSel(reg as Regiao);
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao salvar cadastro completo");
+    } finally {
+      setSalvandoCompleto(false);
+    }
+  };
+
   if (authLoading) return <div className="p-6"><Loader2 className="animate-spin" /></div>;
   if (!podeGestaoComercial) return <SemPermissao />;
 
