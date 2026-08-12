@@ -308,10 +308,22 @@ export default function SlaFornecedor() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Regiões */}
           <Card className="lg:col-span-1">
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">Regiões ({regioes.length})</CardTitle>
-              <Button size="sm" onClick={() => { setFormRegiao({ nome: "" }); setOpenRegiao(true); }}>
-                <Plus className="w-4 h-4 mr-1" /> Nova
+            <CardHeader className="space-y-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Regiões ({regioes.length})</CardTitle>
+                <Button size="sm" variant="outline" onClick={() => { setFormRegiao({ nome: "" }); setOpenRegiao(true); }}>
+                  <Plus className="w-4 h-4 mr-1" /> Só o nome
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setFormCompleto({ nome: "", uf: ufPadrao, cidades: "", prazo_dias_uteis: 1, vigente_de: hoje(), observacao: "" });
+                  setOpenCompleto(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Cadastro completo (região + cidades + SLA)
               </Button>
             </CardHeader>
             <CardContent className="space-y-1">
