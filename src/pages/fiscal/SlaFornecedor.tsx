@@ -66,6 +66,17 @@ export default function SlaFornecedor() {
   const [openSla, setOpenSla] = useState(false);
   const [formSla, setFormSla] = useState<Partial<Sla>>({ prazo_dias_uteis: 1, vigente_de: hoje() });
 
+  const [openCompleto, setOpenCompleto] = useState(false);
+  const [salvandoCompleto, setSalvandoCompleto] = useState(false);
+  const [formCompleto, setFormCompleto] = useState({
+    nome: "",
+    uf: "RJ",
+    cidades: "",
+    prazo_dias_uteis: 1,
+    vigente_de: hoje(),
+    observacao: "",
+  });
+
   useEffect(() => {
     supabase
       .from("embarcadores")
