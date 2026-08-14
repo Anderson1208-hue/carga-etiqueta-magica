@@ -32,6 +32,7 @@ import AuditoriaLog from "./pages/AuditoriaLog";
 import RelatorioBaixas from "./pages/RelatorioBaixas";
 import RelatorioPendentesBaixa from "./pages/RelatorioPendentesBaixa";
 import RelatorioAgendamentosFornecedor from "./pages/RelatorioAgendamentosFornecedor";
+import RelatorioPeriodo from "./pages/RelatorioPeriodo";
 import PrestacaoContas from "./pages/PrestacaoContas";
 import DesfazerBaixa from "./pages/DesfazerBaixa";
 import RomaneioPorNf from "./pages/RomaneioPorNf";
@@ -311,6 +312,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/relatorios/periodo"
+        element={
+          <ProtectedRoute>
+            <RelatorioPeriodo />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/relatorios/baixas"
         element={
           <ProtectedRoute>
@@ -318,6 +327,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/relatorios/pendentes-baixa"
         element={

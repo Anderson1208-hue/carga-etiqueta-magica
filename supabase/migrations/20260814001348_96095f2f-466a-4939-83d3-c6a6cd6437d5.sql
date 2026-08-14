@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.relatorio_periodo(date, date, text, text, text, text, text, text) TO service_role, postgres;

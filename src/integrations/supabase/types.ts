@@ -3622,6 +3622,31 @@ export type Database = {
         Args: { p_motivo: string; p_sugestao_id: string }
         Returns: undefined
       }
+      relatorio_periodo: {
+        Args: {
+          p_cidade?: string
+          p_destinatario?: string
+          p_dimensao?: string
+          p_embarcador?: string
+          p_fim: string
+          p_inicio: string
+          p_placa?: string
+          p_uf?: string
+        }
+        Returns: {
+          caixas: number
+          cargas: number
+          densidade: number
+          destinatarios: number
+          dimensao: string
+          entregues: number
+          nfs: number
+          pendentes: number
+          peso_kg: number
+          recusados: number
+          volume_m3: number
+        }[]
+      }
       resolver_endereco_operacional: {
         Args: { _destinatario_id: string }
         Returns: {
