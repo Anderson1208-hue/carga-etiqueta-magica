@@ -2393,6 +2393,7 @@ export type Database = {
         Row: {
           ambiente: string
           cnpj_transportadora: string | null
+          cnpjs_emitente: string[]
           created_at: string
           entregador_id_homolog: number | null
           entregador_id_producao: number | null
@@ -2406,6 +2407,7 @@ export type Database = {
         Insert: {
           ambiente?: string
           cnpj_transportadora?: string | null
+          cnpjs_emitente?: string[]
           created_at?: string
           entregador_id_homolog?: number | null
           entregador_id_producao?: number | null
@@ -2419,6 +2421,7 @@ export type Database = {
         Update: {
           ambiente?: string
           cnpj_transportadora?: string | null
+          cnpjs_emitente?: string[]
           created_at?: string
           entregador_id_homolog?: number | null
           entregador_id_producao?: number | null
