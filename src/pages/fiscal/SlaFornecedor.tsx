@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2, Pencil, MapPin, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, MapPin, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
 import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { SemPermissao } from "@/components/comercial/SemPermissao";
 
