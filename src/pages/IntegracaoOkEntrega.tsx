@@ -569,8 +569,9 @@ export default function IntegracaoOkEntrega() {
                 <div>
                   <CardTitle>Mensagem para a OK Entrega</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Explica o retorno
-                    "51 - NF nao encontrada" e pede o cadastro das chaves da Pandurata na base de homologação.
+                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Já atualizado com a
+                    orientação da OK Entrega: status HTTP 200 = comunicação OK; "51 - NF nao encontrada" em
+                    homologação é apenas aviso de que a nota não está cadastrada na base de testes.
                   </p>
                 </div>
                 <Button
