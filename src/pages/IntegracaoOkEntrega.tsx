@@ -123,6 +123,26 @@ export default function IntegracaoOkEntrega() {
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
+  const toggleEnvio = useMutation({
+    mutationFn: async (valor: boolean) => {
+      const { error } = await supabase
+        .from("okentrega_config")
+        .update({ envio_ativo: valor, updated_at: new Date().toISOString() })
+        .eq("id", true);
+      if (error) throw error;
+      return valor;
+    },
+    onSuccess: (valor) => {
+      toast.success(valor ? "Envio ativo salvo" : "Envio bloqueado salvo");
+      qc.invalidateQueries({ queryKey: ["okentrega-config"] });
+    },
+    onError: (e: any, valor) => {
+      setEnvioAtivo(!valor);
+      toast.error(`Erro ao salvar kill switch: ${e.message}`);
+    },
+  });
+
+
   const enfileirar = useMutation({
     mutationFn: async () => {
       const nfs = whitelist.split(/[\n,;]/).map((v) => v.trim()).filter(Boolean);
