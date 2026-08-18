@@ -533,7 +533,29 @@ export default function IntegracaoOkEntrega() {
           </TabsContent>
 
           <TabsContent value="teste">
-            <Card>
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle>Entendendo o retorno da homologação</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  <strong>Status HTTP 200:</strong> a comunicação sistêmica está OK. O payload chegou, foi autenticado
+                  e processado pela OK Entrega.
+                </p>
+                <p>
+                  <strong>statusbaixa "51 - NF nao encontrada":</strong> em homologação esse retorno é apenas um aviso
+                  de que a chave da NF-e enviada não está cadastrada na base de testes da OK Entrega. Não indica erro
+                  no nosso payload.
+                </p>
+                <p>
+                  <strong>Próximo passo:</strong> enviar o JSON de requisição/resposta para{" "}
+                  <code>okentrega1@stilsolucoes.com.br</code> e aguardar a análise para liberação em produção. Use o
+                  botão <strong>Copiar mensagem</strong> abaixo para gerar o email pronto.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-4">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>JSON / retorno da API</CardTitle>
