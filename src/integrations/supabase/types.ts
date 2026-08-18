@@ -473,6 +473,10 @@ export type Database = {
           nf_id: string
           observacao: string | null
           ocorrencia: string | null
+          okentrega_enviada_em: string | null
+          okentrega_queue_id: string | null
+          okentrega_tentativas: number
+          okentrega_ultimo_erro: string | null
           recebedor_nome: string | null
           registrado_em: string | null
           registrado_por: string | null
@@ -505,6 +509,10 @@ export type Database = {
           nf_id: string
           observacao?: string | null
           ocorrencia?: string | null
+          okentrega_enviada_em?: string | null
+          okentrega_queue_id?: string | null
+          okentrega_tentativas?: number
+          okentrega_ultimo_erro?: string | null
           recebedor_nome?: string | null
           registrado_em?: string | null
           registrado_por?: string | null
@@ -537,6 +545,10 @@ export type Database = {
           nf_id?: string
           observacao?: string | null
           ocorrencia?: string | null
+          okentrega_enviada_em?: string | null
+          okentrega_queue_id?: string | null
+          okentrega_tentativas?: number
+          okentrega_ultimo_erro?: string | null
           recebedor_nome?: string | null
           registrado_em?: string | null
           registrado_por?: string | null
@@ -2376,6 +2388,171 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      okentrega_config: {
+        Row: {
+          ambiente: string
+          cnpj_transportadora: string | null
+          created_at: string
+          entregador_id_homolog: number | null
+          entregador_id_producao: number | null
+          envio_ativo: boolean
+          id: boolean
+          max_tentativas: number
+          modo_imagem: string
+          updated_at: string
+          whitelist_nfs: string[]
+        }
+        Insert: {
+          ambiente?: string
+          cnpj_transportadora?: string | null
+          created_at?: string
+          entregador_id_homolog?: number | null
+          entregador_id_producao?: number | null
+          envio_ativo?: boolean
+          id?: boolean
+          max_tentativas?: number
+          modo_imagem?: string
+          updated_at?: string
+          whitelist_nfs?: string[]
+        }
+        Update: {
+          ambiente?: string
+          cnpj_transportadora?: string | null
+          created_at?: string
+          entregador_id_homolog?: number | null
+          entregador_id_producao?: number | null
+          envio_ativo?: boolean
+          id?: boolean
+          max_tentativas?: number
+          modo_imagem?: string
+          updated_at?: string
+          whitelist_nfs?: string[]
+        }
+        Relationships: []
+      }
+      okentrega_log_envios: {
+        Row: {
+          created_at: string
+          duracao_ms: number | null
+          endpoint: string | null
+          id: string
+          queue_id: string | null
+          request_body: Json | null
+          response_body: Json | null
+          response_status: number | null
+          sucesso: boolean
+        }
+        Insert: {
+          created_at?: string
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean
+        }
+        Update: {
+          created_at?: string
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean
+        }
+        Relationships: []
+      }
+      okentrega_queue: {
+        Row: {
+          ambiente: string
+          baixa_id: string | null
+          chave_acesso: string | null
+          created_at: string
+          enviado_em: string | null
+          erro_mensagem: string | null
+          id: string
+          motivo_recusa: string | null
+          nf_id: string | null
+          numero_nf: string | null
+          ocorrencia_entrega_id: string | null
+          payload: Json
+          status: string
+          status_baixa: string | null
+          status_comprovante: string | null
+          tentativas: number
+          tipo_entrega: string
+          tipo_ocorrencia_id: number
+          ultima_tentativa_em: string | null
+        }
+        Insert: {
+          ambiente?: string
+          baixa_id?: string | null
+          chave_acesso?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          motivo_recusa?: string | null
+          nf_id?: string | null
+          numero_nf?: string | null
+          ocorrencia_entrega_id?: string | null
+          payload?: Json
+          status?: string
+          status_baixa?: string | null
+          status_comprovante?: string | null
+          tentativas?: number
+          tipo_entrega?: string
+          tipo_ocorrencia_id?: number
+          ultima_tentativa_em?: string | null
+        }
+        Update: {
+          ambiente?: string
+          baixa_id?: string | null
+          chave_acesso?: string | null
+          created_at?: string
+          enviado_em?: string | null
+          erro_mensagem?: string | null
+          id?: string
+          motivo_recusa?: string | null
+          nf_id?: string | null
+          numero_nf?: string | null
+          ocorrencia_entrega_id?: string | null
+          payload?: Json
+          status?: string
+          status_baixa?: string | null
+          status_comprovante?: string | null
+          tentativas?: number
+          tipo_entrega?: string
+          tipo_ocorrencia_id?: number
+          ultima_tentativa_em?: string | null
+        }
+        Relationships: []
+      }
+      okentrega_token: {
+        Row: {
+          ambiente: string
+          created_at: string
+          expira_em: string
+          token: string
+        }
+        Insert: {
+          ambiente: string
+          created_at?: string
+          expira_em: string
+          token: string
+        }
+        Update: {
+          ambiente?: string
+          created_at?: string
+          expira_em?: string
+          token?: string
+        }
+        Relationships: []
       }
       posicoes_gps: {
         Row: {
