@@ -319,11 +319,19 @@ export default function IntegracaoOkEntrega() {
                   <div>
                     <Label className="text-sm">Envio ativo</Label>
                     <p className="text-xs text-muted-foreground">
-                      Kill switch. Desligado, a fila acumula sem enviar nada à OK Entrega.
+                      Kill switch. Desligado, a fila acumula sem enviar nada à OK Entrega. Salva na hora.
                     </p>
                   </div>
-                  <Switch checked={envioAtivo} onCheckedChange={setEnvioAtivo} />
+                  <Switch
+                    checked={envioAtivo}
+                    disabled={toggleEnvio.isPending}
+                    onCheckedChange={(v) => {
+                      setEnvioAtivo(v);
+                      toggleEnvio.mutate(v);
+                    }}
+                  />
                 </div>
+
 
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
