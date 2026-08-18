@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
+import { prepararCanhotoOkEntrega } from "@/lib/okentrega-canhoto";
+
 
 const STATUS_BAIXA_LABEL: Record<string, string> = {
   "01": "Comprovante em análise",
@@ -176,12 +178,60 @@ export default function IntegracaoOkEntrega() {
   });
 
   const sincronizar = useMutation({
-
+    // A imagem 1536x240 @150dpi é preparada aqui no navegador e enviada pronta,
+    // item por item — decodificar fotos de 12 MP na função estoura a CPU do worker.
     mutationFn: async (dryRun: boolean) => {
-      const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
-      if (error) throw error;
-      return data;
+      const { data: pendentes, error: errFila } = await supabase
+        .from("okentrega_queue")
+        .select("id, numero_nf, payload, tentativas")
+        .eq("status", "pendente")
+        .order("created_at", { ascending: true })
+        .limit(30);
+      if (errFila) throw errFila;
+
+      let ultimo: any = null;
+      let sucessos = 0;
+      let falhas = 0;
+      let processados = 0;
+      const logs: any[] = [];
+
+      if (!pendentes || pendentes.length === 0) {
+        const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
+        if (error) throw error;
+        return data;
+      }
+
+      for (const item of pendentes) {
+        let imagem_base64: string | undefined;
+        const fotoPath = (item.payload as any)?.foto_path;
+        if (fotoPath) {
+          try {
+            const { data: blob, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
+            if (dlErr || !blob) throw dlErr ?? new Error("arquivo vazio");
+            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any);
+            imagem_base64 = base64;
+          } catch (e: any) {
+            toast.error(`NF ${item.numero_nf}: falha ao preparar canhoto — ${e.message ?? e}`);
+            falhas += 1;
+            continue;
+          }
+        }
+
+        const { data, error } = await supabase.functions.invoke("okentrega-sync", {
+          body: { dry_run: dryRun, queue_id: item.id, imagem_base64 },
+        });
+        if (error) throw error;
+        ultimo = data;
+        logs.push(data);
+        if (data?.status === "envio_bloqueado" || data?.status === "erro_login" || data?.status === "config_incompleta") break;
+        processados += data?.processados ?? 0;
+        sucessos += data?.sucessos ?? 0;
+        falhas += data?.falhas ?? 0;
+      }
+
+      return { ...(ultimo ?? {}), processados, sucessos, falhas, execucoes: logs.length, logs };
     },
+
     onSuccess: (d: any) => {
       setDryRunJson(JSON.stringify(d, null, 2));
       if (d?.status === "envio_bloqueado") toast.warning(d.mensagem);
@@ -192,6 +242,7 @@ export default function IntegracaoOkEntrega() {
     },
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
+
 
   if (isLoading) {
     return (

@@ -24,7 +24,9 @@ const BASES = {
   producao: "https://www.okentrega.com.br/assets/ws",
 } as const;
 
-const BATCH_SIZE = 20;
+// 1 item por invocação: o preparo da imagem (decode + resize) é pesado em memória
+// e o worker estoura o limite de recursos se acumular mais de um canhoto por run.
+const BATCH_SIZE = 1;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -93,7 +95,15 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  let opts: { dry_run?: boolean; limite?: number; queue_id?: string; testar_login?: boolean } = {};
+  let opts: {
+    dry_run?: boolean;
+    limite?: number;
+    queue_id?: string;
+    testar_login?: boolean;
+    // Imagem já ajustada (1536x240 @150dpi) pelo cliente. Evita decodificar
+    // fotos de 12 MP aqui dentro, o que estoura o limite de CPU do worker.
+    imagem_base64?: string;
+  } = {};
   try {
     opts = (await req.json()) ?? {};
   } catch {
@@ -202,7 +212,16 @@ Deno.serve(async (req) => {
     let erroPreparo: string | null = null;
     const fotos: Array<Record<string, string>> = [];
 
-    if (p.foto_path) {
+    if (opts.imagem_base64) {
+      fotos.push({
+        tipofoto: "C",
+        foto: opts.imagem_base64.startsWith("data:")
+          ? opts.imagem_base64
+          : `data:image/jpeg;base64,${opts.imagem_base64}`,
+        mime: "data:image/jpeg;base64",
+        extensao: "jpeg",
+      });
+    } else if (p.foto_path) {
       const { data: file, error: dlErr } = await supabase.storage
         .from("comprovantes")
         .download(String(p.foto_path));
@@ -360,6 +379,7 @@ Deno.serve(async (req) => {
     sucessos: resultados.filter((r) => r.sucesso).length,
     falhas: resultados.filter((r) => !r.sucesso).length,
     fora_da_whitelist: foraDaWhitelist,
+    restantes: Math.max(0, (pendentesRaw?.length ?? 0) - resultados.length - foraDaWhitelist),
     modo_imagem: modoImagem,
     resultados,
     ...(dryRun ? { amostras } : {}),
