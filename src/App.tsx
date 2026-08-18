@@ -368,6 +368,8 @@ function AppRoutes() {
       <Route path="/produtos/chegada" element={<ProtectedRoute><ProdutosChegada /></ProtectedRoute>} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
+      <Route path="/integracoes/okentrega" element={<ProtectedRoute><IntegracaoOkEntrega /></ProtectedRoute>} />
+
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
       <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
       <Route path="/fiscal/configuracao" element={<ProtectedRoute><FiscalConfiguracao /></ProtectedRoute>} />
