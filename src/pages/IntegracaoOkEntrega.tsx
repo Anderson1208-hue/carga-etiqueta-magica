@@ -326,6 +326,10 @@ export default function IntegracaoOkEntrega() {
                   <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
                     Salvar configuração
                   </Button>
+                  <Button variant="outline" onClick={() => testarLogin.mutate()} disabled={testarLogin.isPending}>
+                    <KeyRound className="w-4 h-4 mr-2" /> Testar login / token
+                  </Button>
+
                   <Button variant="outline" onClick={() => enfileirar.mutate()} disabled={enfileirar.isPending}>
                     <ListPlus className="w-4 h-4 mr-2" /> Enfileirar baixas
                   </Button>
