@@ -128,6 +128,7 @@ export default function IntegracaoOkEntrega() {
       return data ?? [];
     },
     refetchInterval: 30_000,
+
   });
 
   const { data: stats } = useQuery({
