@@ -37,7 +37,7 @@ const EMAIL_HOMOLOGACAO = `Assunto: Homologação API Ocorrência de Entrega + C
 
 Boa tarde,
 
-Concluímos a implementação da API de ocorrência de entrega com envio de comprovante (POD) no ambiente de homologação e precisamos da validação de vocês em um ponto.
+Concluímos a implementação da API de ocorrência de entrega com envio de comprovante (POD) no ambiente de homologação e seguimos conforme orientação recebida: qualquer nota do cliente pode ser enviada para teste, o retorno "NF-e não encontrada" é apenas um aviso de que a nota não existe na base de homologação, e status HTTP 200 indica que a comunicação sistêmica está OK.
 
 1) Ambiente e credenciais
 - Endpoint: https://hml.okentrega.com.br/assets/ws/ws.0.ocorrenciaentregacache_api.php
@@ -61,17 +61,17 @@ Concluímos a implementação da API de ocorrência de entrega com envio de comp
   "motivorecusa": null
 }
 
-4) Dúvida / solicitação
-A chamada foi aceita (HTTP 200 e ocorrenciaentregaId gerado), porém o retorno é "51 - NF nao encontrada". As notas são reais do embarcador Pandurata/Bauducco (emitente 70.940.994/0082-77) e foram entregues por nós, mas entendemos que a base de homologação de vocês não possui essas chaves cadastradas.
+4) Solicitação de validação
+Como a comunicação retornou HTTP 200 e o ocorrenciaentregaId foi gerado, entendemos que a integração está tecnicamente OK e o status 51 é o comportamento esperado em homologação para notas não cadastradas na base de testes.
 
-Podem, por favor:
-a) Confirmar se o status 51 em homologação é apenas reflexo de a NF não existir na base de teste;
-b) Cadastrar/liberar na base de homologação as chaves abaixo, ou nos informar chaves de teste válidas para concluirmos a validação do statusbaixa e do statuscomprovante:
-   - 31260870940994008277550200007538011756329242 (NF 753801)
-   - 31260770940994008277550200007535571866771174 (NF 753557)
-c) Confirmar se o vínculo entre o entregadorId 29668, o CNPJ da transportadora 31598974000142 e o embarcador Pandurata está correto em homologação.
+Segue abaixo o JSON completo de requisição e resposta para análise de vocês. Pedimos a validação necessária para liberação em produção:
 
-Assim que as notas estiverem disponíveis, reenviamos e encaminhamos o JSON de requisição e resposta para liberação em produção.
+<COLE AQUI O JSON DA ABA "Teste / JSON">
+
+Ficamos no aguardo do retorno sobre:
+a) Confirmação de que o JSON está correto para prosseguimento;
+b) Qualquer ajuste necessário no payload antes da liberação em produção;
+c) Confirmação do vínculo entre entregadorId 29668, CNPJ transportadora 31598974000142 e embarcador Pandurata/Bauducco em produção.
 
 Atenciosamente,
 Orkestria Logística`;
@@ -533,7 +533,29 @@ export default function IntegracaoOkEntrega() {
           </TabsContent>
 
           <TabsContent value="teste">
-            <Card>
+            <Card className="border-l-4 border-l-blue-500">
+              <CardHeader>
+                <CardTitle>Entendendo o retorno da homologação</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  <strong>Status HTTP 200:</strong> a comunicação sistêmica está OK. O payload chegou, foi autenticado
+                  e processado pela OK Entrega.
+                </p>
+                <p>
+                  <strong>statusbaixa "51 - NF nao encontrada":</strong> em homologação esse retorno é apenas um aviso
+                  de que a chave da NF-e enviada não está cadastrada na base de testes da OK Entrega. Não indica erro
+                  no nosso payload.
+                </p>
+                <p>
+                  <strong>Próximo passo:</strong> enviar o JSON de requisição/resposta para{" "}
+                  <code>okentrega1@stilsolucoes.com.br</code> e aguardar a análise para liberação em produção. Use o
+                  botão <strong>Copiar mensagem</strong> abaixo para gerar o email pronto.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="mt-4">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>JSON / retorno da API</CardTitle>
@@ -569,8 +591,9 @@ export default function IntegracaoOkEntrega() {
                 <div>
                   <CardTitle>Mensagem para a OK Entrega</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Explica o retorno
-                    "51 - NF nao encontrada" e pede o cadastro das chaves da Pandurata na base de homologação.
+                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Já atualizado com a
+                    orientação da OK Entrega: status HTTP 200 = comunicação OK; "51 - NF nao encontrada" em
+                    homologação é apenas aviso de que a nota não está cadastrada na base de testes.
                   </p>
                 </div>
                 <Button
