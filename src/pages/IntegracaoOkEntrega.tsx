@@ -33,6 +33,50 @@ function rotuloStatusBaixa(valor?: string | null) {
   return STATUS_BAIXA_LABEL[cod] ? `${cod} - ${STATUS_BAIXA_LABEL[cod]}` : valor;
 }
 
+const EMAIL_HOMOLOGACAO = `Assunto: Homologação API Ocorrência de Entrega + Canhoto — Transportadora Orkestria (CNPJ 31.598.974/0001-42) — embarcador Pandurata/Bauducco
+
+Boa tarde,
+
+Concluímos a implementação da API de ocorrência de entrega com envio de comprovante (POD) no ambiente de homologação e precisamos da validação de vocês em um ponto.
+
+1) Ambiente e credenciais
+- Endpoint: https://hml.okentrega.com.br/assets/ws/ws.0.ocorrenciaentregacache_api.php
+- Login/token: OK (token gerado e renovado automaticamente, validade de 14 dias)
+- entregadorId homologação: 29668
+- cnpjtransportadora: 31598974000142
+
+2) Envio realizado (HTTP 200)
+- documento (chave NF-e): 31260870940994008277550200007538011756329242 (NF 753801, série 020, emitente Pandurata 70.940.994/0082-77)
+- tipoentrada: I | tipoentrega: F | tipoocorrenciaId: 1
+- dtentrega / dtregistro: 2026-08-18T14:23:40Z
+- latitude/longitude: -22.8366717 / -43.2627494
+- ocorrenciaentregafoto: 1 imagem, tipofoto "C", extensão jpeg, mime "data:image/jpeg;base64", JPEG 1536 x 240 px @ 150 dpi, ~38 KB (dentro do limite de 1 MB do manual)
+
+3) Retorno recebido
+{
+  "documento": "31260870940994008277550200007538011756329242",
+  "ocorrenciaentregaId": 3237255,
+  "statusbaixa": "51 - NF nao encontrada",
+  "statuscomprovante": null,
+  "motivorecusa": null
+}
+
+4) Dúvida / solicitação
+A chamada foi aceita (HTTP 200 e ocorrenciaentregaId gerado), porém o retorno é "51 - NF nao encontrada". As notas são reais do embarcador Pandurata/Bauducco (emitente 70.940.994/0082-77) e foram entregues por nós, mas entendemos que a base de homologação de vocês não possui essas chaves cadastradas.
+
+Podem, por favor:
+a) Confirmar se o status 51 em homologação é apenas reflexo de a NF não existir na base de teste;
+b) Cadastrar/liberar na base de homologação as chaves abaixo, ou nos informar chaves de teste válidas para concluirmos a validação do statusbaixa e do statuscomprovante:
+   - 31260870940994008277550200007538011756329242 (NF 753801)
+   - 31260770940994008277550200007535571866771174 (NF 753557)
+c) Confirmar se o vínculo entre o entregadorId 29668, o CNPJ da transportadora 31598974000142 e o embarcador Pandurata está correto em homologação.
+
+Assim que as notas estiverem disponíveis, reenviamos e encaminhamos o JSON de requisição e resposta para liberação em produção.
+
+Atenciosamente,
+Orkestria Logística`;
+
+
 export default function IntegracaoOkEntrega() {
   const { isAdmin, isLoading } = useAuth();
   const qc = useQueryClient();
