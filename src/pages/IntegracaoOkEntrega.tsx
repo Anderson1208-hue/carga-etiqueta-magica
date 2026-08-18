@@ -176,11 +176,28 @@ export default function IntegracaoOkEntrega() {
   });
 
   const sincronizar = useMutation({
-
+    // A função processa 1 canhoto por execução (limite de memória do worker),
+    // então repetimos as chamadas até a fila esvaziar.
     mutationFn: async (dryRun: boolean) => {
-      const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
-      if (error) throw error;
-      return data;
+      let ultimo: any = null;
+      let sucessos = 0;
+      let falhas = 0;
+      let processados = 0;
+      const logs: any[] = [];
+
+      for (let i = 0; i < 30; i++) {
+        const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
+        if (error) throw error;
+        ultimo = data;
+        logs.push(data);
+        if (data?.status === "envio_bloqueado" || data?.status === "erro_login" || data?.status === "config_incompleta") break;
+        processados += data?.processados ?? 0;
+        sucessos += data?.sucessos ?? 0;
+        falhas += data?.falhas ?? 0;
+        if ((data?.processados ?? 0) === 0 || (data?.restantes ?? 0) === 0) break;
+      }
+
+      return { ...ultimo, processados, sucessos, falhas, execucoes: logs.length, logs };
     },
     onSuccess: (d: any) => {
       setDryRunJson(JSON.stringify(d, null, 2));
@@ -192,6 +209,7 @@ export default function IntegracaoOkEntrega() {
     },
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
+
 
   if (isLoading) {
     return (
