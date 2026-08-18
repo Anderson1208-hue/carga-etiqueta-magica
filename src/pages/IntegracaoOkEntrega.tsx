@@ -297,11 +297,14 @@ export default function IntegracaoOkEntrega() {
                       rows={4}
                       value={cnpjsEmitente}
                       onChange={(e) => setCnpjsEmitente(e.target.value)}
-                      placeholder="61472205"
+                      placeholder="70940994"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Match por prefixo do CNPJ do emitente da NF-e. Sem CNPJ aqui, nada é enfileirado.
+                      Match por prefixo do CNPJ do emitente da NF-e. Esta integração é da{" "}
+                      <strong>Pandurata (Bauducco)</strong> — prefixo <code>70940994</code>. Sem CNPJ aqui, nada é
+                      enfileirado.
                     </p>
+
                   </div>
                   <div className="space-y-1">
                     <Label>Whitelist de NFs para teste (um por linha)</Label>
