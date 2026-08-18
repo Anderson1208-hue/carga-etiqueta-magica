@@ -635,27 +635,34 @@ export default function IntegracaoOkEntrega() {
             <Card className="mt-4">
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <CardTitle>Mensagem para a OK Entrega</CardTitle>
+                  <CardTitle>Mensagem para a OK Entrega (pronta para enviar)</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Já atualizado com a
-                    orientação da OK Entrega: status HTTP 200 = comunicação OK; "51 - NF nao encontrada" em
-                    homologação é apenas aviso de que a nota não está cadastrada na base de testes.
+                    O JSON de requisição/resposta já vem <strong>embutido automaticamente</strong> no texto — não é
+                    preciso colar nada. Clique em <strong>Copiar mensagem</strong> e cole no email para{" "}
+                    <code>okentrega1@stilsolucoes.com.br</code>.
+                    {!jsonParaEmail && (
+                      <span className="block text-amber-600 mt-1">
+                        Nenhum envio/prévia encontrado ainda — clique em "Enviar agora" ou "Gerar prévia (dry-run)" na
+                        aba "Envio e configuração" para preencher o JSON.
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    navigator.clipboard.writeText(EMAIL_HOMOLOGACAO);
-                    toast.success("Mensagem copiada");
+                    navigator.clipboard.writeText(mensagemFinal);
+                    toast.success("Mensagem copiada (com o JSON incluído)");
                   }}
                 >
                   <Copy className="w-4 h-4 mr-2" /> Copiar mensagem
                 </Button>
               </CardHeader>
               <CardContent>
-                <Textarea readOnly rows={26} className="text-xs" value={EMAIL_HOMOLOGACAO} />
+                <Textarea readOnly rows={30} className="text-xs" value={mensagemFinal} />
               </CardContent>
+
             </Card>
           </TabsContent>
 
