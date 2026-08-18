@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  let opts: { dry_run?: boolean; limite?: number; queue_id?: string } = {};
+  let opts: { dry_run?: boolean; limite?: number; queue_id?: string; testar_login?: boolean } = {};
   try {
     opts = (await req.json()) ?? {};
   } catch {
@@ -117,6 +117,30 @@ Deno.serve(async (req) => {
   const whitelist: string[] = (cfg?.whitelist_nfs ?? []).map((v: string) => String(v).trim()).filter(Boolean);
 
   const dryRun = !!opts.dry_run;
+
+  // Teste isolado de credenciais: faz login e informa só se obteve token (nunca expõe o valor)
+  if (opts.testar_login) {
+    try {
+      const t = await obterToken(supabase, ambiente);
+      const { data: cache } = await supabase
+        .from("okentrega_token")
+        .select("expira_em")
+        .eq("ambiente", ambiente)
+        .maybeSingle();
+      return json({
+        status: "login_ok",
+        ambiente,
+        token_renovado: t.renovado,
+        token_expira_em: cache?.expira_em ?? null,
+      });
+    } catch (e) {
+      return json(
+        { status: "login_falhou", ambiente, mensagem: e instanceof Error ? e.message : String(e) },
+        502,
+      );
+    }
+  }
+
 
   if (!entregadorId) {
     return json({ status: "config_incompleta", mensagem: `Informe o entregadorId de ${ambiente}.` }, 400);

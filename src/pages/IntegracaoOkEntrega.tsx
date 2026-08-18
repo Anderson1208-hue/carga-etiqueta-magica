@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy } from "lucide-react";
+import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
 
 const STATUS_BAIXA_LABEL: Record<string, string> = {
   "01": "Comprovante em análise",
@@ -140,7 +140,23 @@ export default function IntegracaoOkEntrega() {
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
+  const testarLogin = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { testar_login: true } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (d: any) => {
+      setDryRunJson(JSON.stringify(d, null, 2));
+      if (d?.status === "login_ok")
+        toast.success(`Login OK (${d.ambiente}) — token válido até ${new Date(d.token_expira_em).toLocaleDateString("pt-BR")}`);
+      else toast.error(d?.mensagem ?? "Login falhou");
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
   const sincronizar = useMutation({
+
     mutationFn: async (dryRun: boolean) => {
       const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
       if (error) throw error;
@@ -310,6 +326,10 @@ export default function IntegracaoOkEntrega() {
                   <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
                     Salvar configuração
                   </Button>
+                  <Button variant="outline" onClick={() => testarLogin.mutate()} disabled={testarLogin.isPending}>
+                    <KeyRound className="w-4 h-4 mr-2" /> Testar login / token
+                  </Button>
+
                   <Button variant="outline" onClick={() => enfileirar.mutate()} disabled={enfileirar.isPending}>
                     <ListPlus className="w-4 h-4 mr-2" /> Enfileirar baixas
                   </Button>
