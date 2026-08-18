@@ -220,6 +220,9 @@ export default function TarifasRegiao() {
     <div className="container mx-auto p-4 max-w-7xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <Button variant="ghost" size="sm" className="mb-1 -ml-3 h-8" asChild>
+            <Link to="/"><ArrowLeft className="w-4 h-4 mr-1" /> Voltar ao menu</Link>
+          </Button>
           <h1 className="text-2xl font-bold">Tarifas por Fornecedor e Região</h1>
           <p className="text-sm text-muted-foreground">
             Valor único por região (sem faixa de peso). As regiões são cadastradas na tela de Regiões e SLA.
