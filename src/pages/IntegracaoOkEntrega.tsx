@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
+import { prepararCanhotoOkEntrega } from "@/lib/okentrega-canhoto";
+
 
 const STATUS_BAIXA_LABEL: Record<string, string> = {
   "01": "Comprovante em análise",
