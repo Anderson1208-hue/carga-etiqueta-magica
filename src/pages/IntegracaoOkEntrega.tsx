@@ -66,7 +66,7 @@ Como a comunicação retornou HTTP 200 e o ocorrenciaentregaId foi gerado, enten
 
 Segue abaixo o JSON completo de requisição e resposta para análise de vocês. Pedimos a validação necessária para liberação em produção:
 
-<COLE AQUI O JSON DA ABA "Teste / JSON">
+__JSON__
 
 Ficamos no aguardo do retorno sobre:
 a) Confirmação de que o JSON está correto para prosseguimento;
