@@ -46,6 +46,8 @@ import Destinatarios from "./pages/Destinatarios";
 import Produtos from "./pages/Produtos";
 import ProdutosChegada from "./pages/ProdutosChegada";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
+import IntegracaoOkEntrega from "./pages/IntegracaoOkEntrega";
+
 import PreCte from "./pages/PreCte";
 import ImportarOcoren from "./pages/ImportarOcoren";
 import FiscalConfiguracao from "./pages/FiscalConfiguracao";
