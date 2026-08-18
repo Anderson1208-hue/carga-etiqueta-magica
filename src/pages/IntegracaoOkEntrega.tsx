@@ -144,6 +144,51 @@ export default function IntegracaoOkEntrega() {
     refetchInterval: 30_000,
   });
 
+  // Último envio real registrado — usado para preencher o JSON da mensagem automaticamente
+  const { data: ultimoLog } = useQuery({
+    queryKey: ["okentrega-ultimo-log"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("okentrega_log_envios")
+        .select("created_at, endpoint, response_status, request_body, response_body")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 30_000,
+  });
+
+  const jsonParaEmail = useMemo(() => {
+    if (dryRunJson) return dryRunJson;
+    if (ultimoLog) {
+      return JSON.stringify(
+        {
+          endpoint: ultimoLog.endpoint,
+          http_status: ultimoLog.response_status,
+          enviado_em: ultimoLog.created_at,
+          request: ultimoLog.request_body,
+          response: ultimoLog.response_body,
+        },
+        null,
+        2,
+      );
+    }
+    return "";
+  }, [dryRunJson, ultimoLog]);
+
+  const mensagemFinal = useMemo(
+    () =>
+      EMAIL_HOMOLOGACAO.replace(
+        "__JSON__",
+        jsonParaEmail || '<Clique em "Enviar agora" ou "Gerar prévia (dry-run)" para preencher o JSON automaticamente>',
+      ),
+    [jsonParaEmail],
+  );
+
+
+
   const salvar = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
