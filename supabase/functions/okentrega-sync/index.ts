@@ -118,6 +118,30 @@ Deno.serve(async (req) => {
 
   const dryRun = !!opts.dry_run;
 
+  // Teste isolado de credenciais: faz login e informa só se obteve token (nunca expõe o valor)
+  if (opts.testar_login) {
+    try {
+      const t = await obterToken(supabase, ambiente);
+      const { data: cache } = await supabase
+        .from("okentrega_token")
+        .select("expira_em")
+        .eq("ambiente", ambiente)
+        .maybeSingle();
+      return json({
+        status: "login_ok",
+        ambiente,
+        token_renovado: t.renovado,
+        token_expira_em: cache?.expira_em ?? null,
+      });
+    } catch (e) {
+      return json(
+        { status: "login_falhou", ambiente, mensagem: e instanceof Error ? e.message : String(e) },
+        502,
+      );
+    }
+  }
+
+
   if (!entregadorId) {
     return json({ status: "config_incompleta", mensagem: `Informe o entregadorId de ${ambiente}.` }, 400);
   }
