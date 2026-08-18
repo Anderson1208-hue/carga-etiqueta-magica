@@ -24,7 +24,9 @@ const BASES = {
   producao: "https://www.okentrega.com.br/assets/ws",
 } as const;
 
-const BATCH_SIZE = 20;
+// 1 item por invocação: o preparo da imagem (decode + resize) é pesado em memória
+// e o worker estoura o limite de recursos se acumular mais de um canhoto por run.
+const BATCH_SIZE = 1;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -360,6 +362,7 @@ Deno.serve(async (req) => {
     sucessos: resultados.filter((r) => r.sucesso).length,
     falhas: resultados.filter((r) => !r.sucesso).length,
     fora_da_whitelist: foraDaWhitelist,
+    restantes: Math.max(0, (pendentesRaw?.length ?? 0) - resultados.length - foraDaWhitelist),
     modo_imagem: modoImagem,
     resultados,
     ...(dryRun ? { amostras } : {}),
