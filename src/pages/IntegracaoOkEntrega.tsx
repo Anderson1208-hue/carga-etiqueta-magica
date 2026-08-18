@@ -140,7 +140,23 @@ export default function IntegracaoOkEntrega() {
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
+  const testarLogin = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { testar_login: true } });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (d: any) => {
+      setDryRunJson(JSON.stringify(d, null, 2));
+      if (d?.status === "login_ok")
+        toast.success(`Login OK (${d.ambiente}) — token válido até ${new Date(d.token_expira_em).toLocaleDateString("pt-BR")}`);
+      else toast.error(d?.mensagem ?? "Login falhou");
+    },
+    onError: (e: any) => toast.error(`Erro: ${e.message}`),
+  });
+
   const sincronizar = useMutation({
+
     mutationFn: async (dryRun: boolean) => {
       const { data, error } = await supabase.functions.invoke("okentrega-sync", { body: { dry_run: dryRun } });
       if (error) throw error;
