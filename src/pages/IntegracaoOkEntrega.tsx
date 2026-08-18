@@ -308,7 +308,7 @@ export default function IntegracaoOkEntrega() {
                   </div>
                   <div className="space-y-1">
                     <Label>Whitelist de NFs para teste (um por linha)</Label>
-                    <Textarea rows={4} value={whitelist} onChange={(e) => setWhitelist(e.target.value)} placeholder="3934679" />
+                    <Textarea rows={4} value={whitelist} onChange={(e) => setWhitelist(e.target.value)} placeholder="754899" />
                     <p className="text-xs text-muted-foreground">
                       Com a whitelist preenchida, somente essas notas são enviadas — ideal para a homologação.
                     </p>
