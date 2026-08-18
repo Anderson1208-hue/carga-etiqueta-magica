@@ -563,7 +563,33 @@ export default function IntegracaoOkEntrega() {
                 />
               </CardContent>
             </Card>
+
+            <Card className="mt-4">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Mensagem para a OK Entrega</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Explica o retorno
+                    "51 - NF nao encontrada" e pede o cadastro das chaves da Pandurata na base de homologação.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(EMAIL_HOMOLOGACAO);
+                    toast.success("Mensagem copiada");
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-2" /> Copiar mensagem
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Textarea readOnly rows={26} className="text-xs" value={EMAIL_HOMOLOGACAO} />
+              </CardContent>
+            </Card>
           </TabsContent>
+
         </Tabs>
       </div>
     </MainLayout>
