@@ -123,6 +123,26 @@ export default function IntegracaoOkEntrega() {
     onError: (e: any) => toast.error(`Erro: ${e.message}`),
   });
 
+  const toggleEnvio = useMutation({
+    mutationFn: async (valor: boolean) => {
+      const { error } = await supabase
+        .from("okentrega_config")
+        .update({ envio_ativo: valor, updated_at: new Date().toISOString() })
+        .eq("id", true);
+      if (error) throw error;
+      return valor;
+    },
+    onSuccess: (valor) => {
+      toast.success(valor ? "Envio ativo salvo" : "Envio bloqueado salvo");
+      qc.invalidateQueries({ queryKey: ["okentrega-config"] });
+    },
+    onError: (e: any, valor) => {
+      setEnvioAtivo(!valor);
+      toast.error(`Erro ao salvar kill switch: ${e.message}`);
+    },
+  });
+
+
   const enfileirar = useMutation({
     mutationFn: async () => {
       const nfs = whitelist.split(/[\n,;]/).map((v) => v.trim()).filter(Boolean);
@@ -319,11 +339,19 @@ export default function IntegracaoOkEntrega() {
                   <div>
                     <Label className="text-sm">Envio ativo</Label>
                     <p className="text-xs text-muted-foreground">
-                      Kill switch. Desligado, a fila acumula sem enviar nada à OK Entrega.
+                      Kill switch. Desligado, a fila acumula sem enviar nada à OK Entrega. Salva na hora.
                     </p>
                   </div>
-                  <Switch checked={envioAtivo} onCheckedChange={setEnvioAtivo} />
+                  <Switch
+                    checked={envioAtivo}
+                    disabled={toggleEnvio.isPending}
+                    onCheckedChange={(v) => {
+                      setEnvioAtivo(v);
+                      toggleEnvio.mutate(v);
+                    }}
+                  />
                 </div>
+
 
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
