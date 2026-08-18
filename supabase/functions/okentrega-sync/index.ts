@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-  let opts: { dry_run?: boolean; limite?: number; queue_id?: string } = {};
+  let opts: { dry_run?: boolean; limite?: number; queue_id?: string; testar_login?: boolean } = {};
   try {
     opts = (await req.json()) ?? {};
   } catch {
