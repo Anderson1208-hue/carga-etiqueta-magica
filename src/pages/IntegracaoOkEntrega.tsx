@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +66,7 @@ Como a comunicação retornou HTTP 200 e o ocorrenciaentregaId foi gerado, enten
 
 Segue abaixo o JSON completo de requisição e resposta para análise de vocês. Pedimos a validação necessária para liberação em produção:
 
-<COLE AQUI O JSON DA ABA "Teste / JSON">
+__JSON__
 
 Ficamos no aguardo do retorno sobre:
 a) Confirmação de que o JSON está correto para prosseguimento;
@@ -128,6 +128,7 @@ export default function IntegracaoOkEntrega() {
       return data ?? [];
     },
     refetchInterval: 30_000,
+
   });
 
   const { data: stats } = useQuery({
@@ -142,6 +143,51 @@ export default function IntegracaoOkEntrega() {
     },
     refetchInterval: 30_000,
   });
+
+  // Último envio real registrado — usado para preencher o JSON da mensagem automaticamente
+  const { data: ultimoLog } = useQuery({
+    queryKey: ["okentrega-ultimo-log"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("okentrega_log_envios")
+        .select("created_at, endpoint, response_status, request_body, response_body")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: 30_000,
+  });
+
+  const jsonParaEmail = useMemo(() => {
+    if (dryRunJson) return dryRunJson;
+    if (ultimoLog) {
+      return JSON.stringify(
+        {
+          endpoint: ultimoLog.endpoint,
+          http_status: ultimoLog.response_status,
+          enviado_em: ultimoLog.created_at,
+          request: ultimoLog.request_body,
+          response: ultimoLog.response_body,
+        },
+        null,
+        2,
+      );
+    }
+    return "";
+  }, [dryRunJson, ultimoLog]);
+
+  const mensagemFinal = useMemo(
+    () =>
+      EMAIL_HOMOLOGACAO.replace(
+        "__JSON__",
+        jsonParaEmail || '<Clique em "Enviar agora" ou "Gerar prévia (dry-run)" para preencher o JSON automaticamente>',
+      ),
+    [jsonParaEmail],
+  );
+
+
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -589,27 +635,34 @@ export default function IntegracaoOkEntrega() {
             <Card className="mt-4">
               <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <CardTitle>Mensagem para a OK Entrega</CardTitle>
+                  <CardTitle>Mensagem para a OK Entrega (pronta para enviar)</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Texto pronto para enviar a <code>okentrega1@stilsolucoes.com.br</code>. Já atualizado com a
-                    orientação da OK Entrega: status HTTP 200 = comunicação OK; "51 - NF nao encontrada" em
-                    homologação é apenas aviso de que a nota não está cadastrada na base de testes.
+                    O JSON de requisição/resposta já vem <strong>embutido automaticamente</strong> no texto — não é
+                    preciso colar nada. Clique em <strong>Copiar mensagem</strong> e cole no email para{" "}
+                    <code>okentrega1@stilsolucoes.com.br</code>.
+                    {!jsonParaEmail && (
+                      <span className="block text-amber-600 mt-1">
+                        Nenhum envio/prévia encontrado ainda — clique em "Enviar agora" ou "Gerar prévia (dry-run)" na
+                        aba "Envio e configuração" para preencher o JSON.
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    navigator.clipboard.writeText(EMAIL_HOMOLOGACAO);
-                    toast.success("Mensagem copiada");
+                    navigator.clipboard.writeText(mensagemFinal);
+                    toast.success("Mensagem copiada (com o JSON incluído)");
                   }}
                 >
                   <Copy className="w-4 h-4 mr-2" /> Copiar mensagem
                 </Button>
               </CardHeader>
               <CardContent>
-                <Textarea readOnly rows={26} className="text-xs" value={EMAIL_HOMOLOGACAO} />
+                <Textarea readOnly rows={30} className="text-xs" value={mensagemFinal} />
               </CardContent>
+
             </Card>
           </TabsContent>
 
