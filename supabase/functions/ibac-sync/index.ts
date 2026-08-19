@@ -253,8 +253,17 @@ Deno.serve(async (req) => {
       numeroNota: numeroNf,
       codigoEvento: codigoFinal,
       codigoOcorrencia: codigoFinal,
+      evento: codigoFinal,
+      codigo: codigoFinal,
+      tipoEvento: codigoFinal,
+      codigoEventoOcorrencia: codigoFinal,
       dataOcorrencia: dataBr,
       dataEvento: dataBr,
+      data: dataBr,
+      dataHora: dataBr,
+      dataHoraOcorrencia: dataBr,
+      dataHoraEvento: dataBr,
+
     };
 
 
