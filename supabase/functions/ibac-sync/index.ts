@@ -55,17 +55,25 @@ Deno.serve(async (req) => {
   const backoffAtivo = retryCfg?.ativo ?? true;
 
 
-  // Com whitelist ativa, varre uma janela maior da fila para encontrar as notas de teste
-  // (elas podem estar atrás de muitos eventos antigos que ficarão bloqueados).
+  // Com whitelist ativa, filtra direto no banco pelas notas de teste
+  // (evita que fiquem fora da janela por trás de eventos antigos).
   const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
 
-  const { data: pendentesRaw, error: errSelect } = await supabase
+  let query = supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
-    .lt("tentativas", maxTentativas)
+    .lt("tentativas", maxTentativas);
+
+  if (whitelist.length > 0) {
+    const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
+    query = query.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
+  }
+
+  const { data: pendentesRaw, error: errSelect } = await query
     .order("created_at", { ascending: true })
     .limit(janela);
+
 
 
   if (errSelect) {
@@ -226,10 +234,53 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const codigoFinal = item.evento_interno === "envio_canhoto" ? codigoEventoEntrega : codigoIbac;
+    const dataOcorrencia = String((payload as any).registrado_em ?? new Date().toISOString());
+
+    const chaveNfe = String((payload as any).chave_acesso ?? item.chave_acesso ?? "");
+    const numeroNf = String((payload as any).numero_nf ?? "");
+    // A IBAC valida data no padrão brasileiro dd/MM/yyyy HH:mm:ss (fuso de São Paulo)
+    const dt = new Date(dataOcorrencia);
+    const partes = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(dt);
+    const p = (t: string) => partes.find((x) => x.type === t)?.value ?? "00";
+    const dataBr = `${p("day")}/${p("month")}/${p("year")} ${p("hour")}:${p("minute")}:${p("second")}`;
+
+
     const body = {
-      codigo_evento: item.evento_interno === "envio_canhoto" ? codigoEventoEntrega : codigoIbac,
+      codigo_evento: codigoFinal,
       ...payload,
+      // Aliases para atender a validação da IBAC (variações de nomenclatura)
+      chaveAcessoNfe: chaveNfe,
+      chaveAcesso: chaveNfe,
+      chaveNfe: chaveNfe,
+      numeroNotaFiscal: numeroNf,
+      numeroNf: numeroNf,
+      numeroNota: numeroNf,
+      codigoEvento: codigoFinal,
+      codigoOcorrencia: codigoFinal,
+      evento: codigoFinal,
+      codigo: codigoFinal,
+      tipoEvento: codigoFinal,
+      codigoEventoOcorrencia: codigoFinal,
+      dataOcorrencia: dataBr,
+      dataEvento: dataBr,
+      data: dataBr,
+      dataHora: dataBr,
+      dataHoraOcorrencia: dataBr,
+      dataHoraEvento: dataBr,
+
     };
+
+
 
 
     const t0 = Date.now();
