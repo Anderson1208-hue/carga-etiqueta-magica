@@ -1,0 +1,1 @@
+update public.ibac_config_envio set max_imagem_kb = 2048, modo_imagem = 'base64', codigo_evento_entrega = '01', envio_ativo = false where id = true;
