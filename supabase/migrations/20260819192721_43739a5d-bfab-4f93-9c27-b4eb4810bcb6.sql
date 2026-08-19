@@ -1,0 +1,1 @@
+update public.ibac_eventos_queue set tentativas = 0, ultima_tentativa_em = null, status='pendente' where evento_interno='entrega_realizada' and (payload->>'numero_nf') = '3993806' and status in ('pendente','erro');
