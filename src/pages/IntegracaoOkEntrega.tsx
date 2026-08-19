@@ -557,61 +557,101 @@ export default function IntegracaoOkEntrega() {
                   )}
 
                   {modoImagem === "recibo" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Posição vertical da tira ({Math.round(ajuste.offsetY * 100)}%)</Label>
-                        <Slider
-                          min={0}
-                          max={100}
-                          step={1}
-                          value={[Math.round(ajuste.offsetY * 100)]}
-                          onValueChange={([v]) => setAjuste((a) => ({ ...a, offsetY: v / 100 }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Altura da tira ({Math.round(ajuste.altura * 100)}%)</Label>
-                        <Slider
-                          min={8}
-                          max={60}
-                          step={1}
-                          value={[Math.round(ajuste.altura * 100)]}
-                          onValueChange={([v]) => setAjuste((a) => ({ ...a, altura: v / 100 }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Recorte lateral ({Math.round(ajuste.margemX * 100)}%)</Label>
-                        <Slider
-                          min={0}
-                          max={40}
-                          step={1}
-                          value={[Math.round(ajuste.margemX * 100)]}
-                          onValueChange={([v]) => setAjuste((a) => ({ ...a, margemX: v / 100 }))}
-                        />
-                      </div>
-                      <div className="flex items-end gap-4">
-                        <div className="space-y-1 flex-1">
-                          <Label className="text-xs">Rotação</Label>
-                          <Select
-                            value={String(ajuste.rotacao)}
-                            onValueChange={(v) => setAjuste((a) => ({ ...a, rotacao: Number(v) as 0 | 90 | 180 | 270 }))}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          Ajuste os controles até a assinatura, carimbo e nº da NF ficarem legíveis na faixa acima.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {ajusteConfirmado && (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+                              Ajuste confirmado
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            variant={ajusteConfirmado ? "outline" : "default"}
+                            onClick={() => {
+                              setAjusteConfirmado(true);
+                              toast.success("Prévia confirmada. O recorte será aplicado no envio.");
+                            }}
                           >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">0°</SelectItem>
-                              <SelectItem value="90">90°</SelectItem>
-                              <SelectItem value="180">180°</SelectItem>
-                              <SelectItem value="270">270°</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            Confirmar prévia
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-2 pb-2">
-                          <Switch
-                            checked={ajuste.realce}
-                            onCheckedChange={(v) => setAjuste((a) => ({ ...a, realce: v }))}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Posição vertical da tira ({Math.round(ajuste.offsetY * 100)}%)</Label>
+                          <Slider
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={[Math.round(ajuste.offsetY * 100)]}
+                            onValueChange={([v]) => {
+                              setAjuste((a) => ({ ...a, offsetY: v / 100 }));
+                              setAjusteConfirmado(false);
+                            }}
                           />
-                          <Label className="text-xs">Realce P&B</Label>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Altura da tira ({Math.round(ajuste.altura * 100)}%)</Label>
+                          <Slider
+                            min={8}
+                            max={60}
+                            step={1}
+                            value={[Math.round(ajuste.altura * 100)]}
+                            onValueChange={([v]) => {
+                              setAjuste((a) => ({ ...a, altura: v / 100 }));
+                              setAjusteConfirmado(false);
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Recorte lateral ({Math.round(ajuste.margemX * 100)}%)</Label>
+                          <Slider
+                            min={0}
+                            max={40}
+                            step={1}
+                            value={[Math.round(ajuste.margemX * 100)]}
+                            onValueChange={([v]) => {
+                              setAjuste((a) => ({ ...a, margemX: v / 100 }));
+                              setAjusteConfirmado(false);
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-end gap-4">
+                          <div className="space-y-1 flex-1">
+                            <Label className="text-xs">Rotação</Label>
+                            <Select
+                              value={String(ajuste.rotacao)}
+                              onValueChange={(v) => {
+                                setAjuste((a) => ({ ...a, rotacao: Number(v) as 0 | 90 | 180 | 270 }));
+                                setAjusteConfirmado(false);
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">0°</SelectItem>
+                                <SelectItem value="90">90°</SelectItem>
+                                <SelectItem value="180">180°</SelectItem>
+                                <SelectItem value="270">270°</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center gap-2 pb-2">
+                            <Switch
+                              checked={ajuste.realce}
+                              onCheckedChange={(v) => {
+                                setAjuste((a) => ({ ...a, realce: v }));
+                                setAjusteConfirmado(false);
+                              }}
+                            />
+                            <Label className="text-xs">Realce P&B</Label>
+                          </div>
                         </div>
                       </div>
                     </div>
