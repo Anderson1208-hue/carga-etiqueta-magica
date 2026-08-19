@@ -349,7 +349,7 @@ export default function IntegracaoOkEntrega() {
           try {
             const { data: blob, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
             if (dlErr || !blob) throw dlErr ?? new Error("arquivo vazio");
-            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any);
+            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any, ajuste);
             imagem_base64 = base64;
           } catch (e: any) {
             toast.error(`NF ${item.numero_nf}: falha ao preparar canhoto — ${e.message ?? e}`);
