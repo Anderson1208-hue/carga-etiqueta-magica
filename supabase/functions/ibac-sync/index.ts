@@ -239,7 +239,21 @@ Deno.serve(async (req) => {
 
     const chaveNfe = String((payload as any).chave_acesso ?? item.chave_acesso ?? "");
     const numeroNf = String((payload as any).numero_nf ?? "");
-    const dataBr = dataOcorrencia.slice(0, 19).replace("T", " ");
+    // A IBAC valida data no padrão brasileiro dd/MM/yyyy HH:mm:ss (fuso de São Paulo)
+    const dt = new Date(dataOcorrencia);
+    const partes = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(dt);
+    const p = (t: string) => partes.find((x) => x.type === t)?.value ?? "00";
+    const dataBr = `${p("day")}/${p("month")}/${p("year")} ${p("hour")}:${p("minute")}:${p("second")}`;
+
 
     const body = {
       codigo_evento: codigoFinal,
