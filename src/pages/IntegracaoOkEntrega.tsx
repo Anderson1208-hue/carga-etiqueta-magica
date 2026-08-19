@@ -124,7 +124,7 @@ export default function IntegracaoOkEntrega() {
     setCnpjTransportadora(cfg.cnpj_transportadora ?? "");
     setCnpjsEmitente((cfg.cnpjs_emitente ?? []).join("\n"));
     setWhitelist((cfg.whitelist_nfs ?? []).join("\n"));
-    setModoImagem(cfg.modo_imagem ?? "contain");
+    setModoImagem(cfg.modo_imagem ?? "recibo");
     setMaxTentativas(String(cfg.max_tentativas ?? 5));
   }, [cfg]);
 
