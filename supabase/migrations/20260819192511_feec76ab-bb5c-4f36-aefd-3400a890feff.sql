@@ -1,0 +1,2 @@
+update public.ibac_config_envio set whitelist_nfs = array['3993806'] where id = true;
+update public.ibac_eventos_queue set tentativas = 0, ultima_tentativa_em = null where status='pendente' and evento_interno='entrega_realizada' and (payload->>'numero_nf') = '3993806';
