@@ -90,6 +90,25 @@ async function obterToken(supabase: any, ambiente: "homolog" | "producao") {
   return { token: body.id as string, renovado: true };
 }
 
+/** Converte uma data ISO/Date para o fuso America/Sao_Paulo no formato ISO com offset -03:00.
+ *  Evita que o painel OK Entrega exiba horário UTC (3h à frente). */
+function toSaoPauloISO(input: string | Date | null | undefined): string {
+  const d = input ? new Date(input) : new Date();
+  if (Number.isNaN(d.getTime())) return new Date().toISOString();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}-03:00`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
