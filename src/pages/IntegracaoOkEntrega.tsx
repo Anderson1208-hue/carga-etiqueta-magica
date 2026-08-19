@@ -490,6 +490,7 @@ export default function IntegracaoOkEntrega() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="recibo">Recortar a tira do recibo (recomendado)</SelectItem>
                         <SelectItem value="contain">Encaixar sem distorcer (fundo branco)</SelectItem>
                         <SelectItem value="cover">Preencher e recortar</SelectItem>
                         <SelectItem value="stretch">Esticar até 1536 × 240</SelectItem>
