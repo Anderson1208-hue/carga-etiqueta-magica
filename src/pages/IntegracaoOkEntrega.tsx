@@ -100,6 +100,7 @@ export default function IntegracaoOkEntrega() {
   const [modoImagem, setModoImagem] = useState("recibo");
   const [maxTentativas, setMaxTentativas] = useState("5");
   const [ajuste, setAjuste] = useState<AjusteCanhoto>(AJUSTE_PADRAO);
+  const [ajusteConfirmado, setAjusteConfirmado] = useState(false);
   const [fotoBlob, setFotoBlob] = useState<Blob | null>(null);
   const [fotoNf, setFotoNf] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState<string>("");
