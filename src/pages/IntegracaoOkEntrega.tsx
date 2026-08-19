@@ -97,8 +97,14 @@ export default function IntegracaoOkEntrega() {
   const [cnpjTransportadora, setCnpjTransportadora] = useState("");
   const [cnpjsEmitente, setCnpjsEmitente] = useState("");
   const [whitelist, setWhitelist] = useState("");
-  const [modoImagem, setModoImagem] = useState("contain");
+  const [modoImagem, setModoImagem] = useState("recibo");
   const [maxTentativas, setMaxTentativas] = useState("5");
+  const [ajuste, setAjuste] = useState<AjusteCanhoto>(AJUSTE_PADRAO);
+  const [fotoBlob, setFotoBlob] = useState<Blob | null>(null);
+  const [fotoNf, setFotoNf] = useState<string>("");
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [previewKb, setPreviewKb] = useState<number>(0);
+
 
   const { data: cfg } = useQuery({
     queryKey: ["okentrega-config"],
