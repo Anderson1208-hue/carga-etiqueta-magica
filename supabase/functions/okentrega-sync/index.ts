@@ -270,16 +270,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const dtEntregaLocal = toSaoPauloISO(p.dtentrega ?? p.registrado_em ?? item.created_at);
+    const dtRegistroLocal = toSaoPauloISO(p.registrado_em ?? item.created_at);
+
     const body = {
       documento: String(item.chave_acesso ?? p.documento ?? "").replace(/\D/g, ""),
       tipoocorrenciaId: item.tipo_ocorrencia_id ?? 1,
       tipoentrega: item.tipo_entrega ?? "F",
       cnpjtransportadora: cnpjTransportadora,
       entregadorId: Number(entregadorId),
-      dtentrega: new Date(p.dtentrega ?? p.registrado_em ?? item.created_at).toISOString(),
+      dtentrega: dtEntregaLocal,
       dtreentrega: null,
       dtsinistro: null,
-      dtregistro: new Date(p.registrado_em ?? item.created_at).toISOString(),
+      dtregistro: dtRegistroLocal,
       tipoentrada: "I",
       latitude: p.latitude ?? null,
       longitude: p.longitude ?? null,
