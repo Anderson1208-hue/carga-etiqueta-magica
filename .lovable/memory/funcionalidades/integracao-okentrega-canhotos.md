@@ -20,3 +20,11 @@ Elegibilidade por prefixo do CNPJ do emitente da NF-e: `70940994` (Pandurata Ali
 **Ambientes:** homolog `https://hml.okentrega.com.br/assets/ws`, produção `https://www.okentrega.com.br/assets/ws`. Endpoints: `ws.0.loginapp.php` e `ws.0.ocorrenciaentregacache_api.php?access_token=`.
 
 Credenciais em secrets (`OKENTREGA_EMAIL_*`, `OKENTREGA_PASSWORD_*`) — nunca no código.
+
+**Legibilidade (retorno OK Entrega 19/08/2026: "comunicação OK, imagem ilegível"):** as fotos do
+motorista são retrato (ex. 3072 × 4096). Encaixar a foto inteira (`contain`) na faixa 1536 × 240
+reduz tudo a 180 × 240 px → texto inaproveitável e recusa no cartório. Regra definitiva: modo
+`recibo` (padrão) em `src/lib/okentrega-canhoto.ts` — recorta **somente a tira do recibo da DANFE**
+(assinatura, carimbo, data, nº da NF; padrão centro em 24% da altura, tira de 22%), estica para
+1536 × 240 e aplica realce P&B (contraste 145%, brilho 106%), qualidade 0,92. Preparo roda no
+navegador (12 MP estoura a CPU da Edge Function). Sempre conferir a prévia da tela antes de transmitir.

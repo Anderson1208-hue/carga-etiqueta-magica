@@ -16,7 +16,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
-import { prepararCanhotoOkEntrega } from "@/lib/okentrega-canhoto";
+import { Slider } from "@/components/ui/slider";
+import {
+  prepararCanhotoOkEntrega,
+  previewCanhotoOkEntrega,
+  AJUSTE_PADRAO,
+  type AjusteCanhoto,
+} from "@/lib/okentrega-canhoto";
 
 
 const STATUS_BAIXA_LABEL: Record<string, string> = {
@@ -91,8 +97,14 @@ export default function IntegracaoOkEntrega() {
   const [cnpjTransportadora, setCnpjTransportadora] = useState("");
   const [cnpjsEmitente, setCnpjsEmitente] = useState("");
   const [whitelist, setWhitelist] = useState("");
-  const [modoImagem, setModoImagem] = useState("contain");
+  const [modoImagem, setModoImagem] = useState("recibo");
   const [maxTentativas, setMaxTentativas] = useState("5");
+  const [ajuste, setAjuste] = useState<AjusteCanhoto>(AJUSTE_PADRAO);
+  const [fotoBlob, setFotoBlob] = useState<Blob | null>(null);
+  const [fotoNf, setFotoNf] = useState<string>("");
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [previewKb, setPreviewKb] = useState<number>(0);
+
 
   const { data: cfg } = useQuery({
     queryKey: ["okentrega-config"],
@@ -112,7 +124,7 @@ export default function IntegracaoOkEntrega() {
     setCnpjTransportadora(cfg.cnpj_transportadora ?? "");
     setCnpjsEmitente((cfg.cnpjs_emitente ?? []).join("\n"));
     setWhitelist((cfg.whitelist_nfs ?? []).join("\n"));
-    setModoImagem(cfg.modo_imagem ?? "contain");
+    setModoImagem(cfg.modo_imagem ?? "recibo");
     setMaxTentativas(String(cfg.max_tentativas ?? 5));
   }, [cfg]);
 
@@ -130,6 +142,45 @@ export default function IntegracaoOkEntrega() {
     refetchInterval: 30_000,
 
   });
+
+  // Baixa a foto do primeiro item pendente com canhoto para servir de amostra do recorte.
+  useEffect(() => {
+    const item = (fila as any[]).find((i) => i.status === "pendente" && i.payload?.foto_path)
+      ?? (fila as any[]).find((i) => i.payload?.foto_path);
+    if (!item || item.numero_nf === fotoNf) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await supabase.storage.from("comprovantes").download(String(item.payload.foto_path));
+      if (cancelado || error || !data) return;
+      setFotoBlob(data);
+      setFotoNf(String(item.numero_nf ?? ""));
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [fila, fotoNf]);
+
+  // Pré-visualização 1536x240 conforme o ajuste atual.
+  useEffect(() => {
+    if (!fotoBlob) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const { dataUrl, bytes } = await previewCanhotoOkEntrega(fotoBlob, modoImagem as any, ajuste);
+        if (!cancelado) {
+          setPreviewUrl(dataUrl);
+          setPreviewKb(Math.round(bytes / 1024));
+        }
+      } catch {
+        /* preview é opcional */
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [fotoBlob, modoImagem, ajuste]);
+
+
 
   const { data: stats } = useQuery({
     queryKey: ["okentrega-stats"],
@@ -298,7 +349,7 @@ export default function IntegracaoOkEntrega() {
           try {
             const { data: blob, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
             if (dlErr || !blob) throw dlErr ?? new Error("arquivo vazio");
-            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any);
+            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any, ajuste);
             imagem_base64 = base64;
           } catch (e: any) {
             toast.error(`NF ${item.numero_nf}: falha ao preparar canhoto — ${e.message ?? e}`);
@@ -439,6 +490,7 @@ export default function IntegracaoOkEntrega() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="recibo">Recortar a tira do recibo (recomendado)</SelectItem>
                         <SelectItem value="contain">Encaixar sem distorcer (fundo branco)</SelectItem>
                         <SelectItem value="cover">Preencher e recortar</SelectItem>
                         <SelectItem value="stretch">Esticar até 1536 × 240</SelectItem>
@@ -475,6 +527,97 @@ export default function IntegracaoOkEntrega() {
                     </p>
                   </div>
                 </div>
+
+                <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                  <div>
+                    <Label className="text-sm">Recorte do canhoto — prévia real (1536 × 240 @ 150 dpi)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      A OK Entrega recusa comprovante ilegível. A foto do motorista é retrato (ex.: 3072 × 4096), então
+                      encaixá-la inteira na faixa deixa o texto minúsculo. Aqui recortamos a{" "}
+                      <strong>tira do recibo</strong> (assinatura, carimbo, data e nº da NF) e esticamos até a largura
+                      total. Ajuste até ler a assinatura na prévia abaixo.
+                      {fotoNf && <span className="block mt-1">Amostra: NF {fotoNf}</span>}
+                    </p>
+                  </div>
+
+                  {previewUrl ? (
+                    <div className="space-y-1">
+                      <img
+                        src={previewUrl}
+                        alt={`Prévia do canhoto da NF ${fotoNf} em 1536 por 240 pixels`}
+                        className="w-full border rounded bg-white"
+                      />
+                      <p className="text-xs text-muted-foreground">JPEG final: ~{previewKb} KB (limite 1 MB)</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Sem amostra disponível — enfileire uma baixa com foto de canhoto para ver a prévia.
+                    </p>
+                  )}
+
+                  {modoImagem === "recibo" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Posição vertical da tira ({Math.round(ajuste.offsetY * 100)}%)</Label>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={[Math.round(ajuste.offsetY * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, offsetY: v / 100 }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Altura da tira ({Math.round(ajuste.altura * 100)}%)</Label>
+                        <Slider
+                          min={8}
+                          max={60}
+                          step={1}
+                          value={[Math.round(ajuste.altura * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, altura: v / 100 }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Recorte lateral ({Math.round(ajuste.margemX * 100)}%)</Label>
+                        <Slider
+                          min={0}
+                          max={40}
+                          step={1}
+                          value={[Math.round(ajuste.margemX * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, margemX: v / 100 }))}
+                        />
+                      </div>
+                      <div className="flex items-end gap-4">
+                        <div className="space-y-1 flex-1">
+                          <Label className="text-xs">Rotação</Label>
+                          <Select
+                            value={String(ajuste.rotacao)}
+                            onValueChange={(v) => setAjuste((a) => ({ ...a, rotacao: Number(v) as 0 | 90 | 180 | 270 }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">0°</SelectItem>
+                              <SelectItem value="90">90°</SelectItem>
+                              <SelectItem value="180">180°</SelectItem>
+                              <SelectItem value="270">270°</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2 pb-2">
+                          <Switch
+                            checked={ajuste.realce}
+                            onCheckedChange={(v) => setAjuste((a) => ({ ...a, realce: v }))}
+                          />
+                          <Label className="text-xs">Realce P&B</Label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+
 
                 <div className="flex items-center justify-between border rounded-md p-3 bg-muted/30">
                   <div>
