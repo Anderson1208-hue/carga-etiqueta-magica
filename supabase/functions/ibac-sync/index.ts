@@ -55,17 +55,25 @@ Deno.serve(async (req) => {
   const backoffAtivo = retryCfg?.ativo ?? true;
 
 
-  // Com whitelist ativa, varre uma janela maior da fila para encontrar as notas de teste
-  // (elas podem estar atrás de muitos eventos antigos que ficarão bloqueados).
+  // Com whitelist ativa, filtra direto no banco pelas notas de teste
+  // (evita que fiquem fora da janela por trás de eventos antigos).
   const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
 
-  const { data: pendentesRaw, error: errSelect } = await supabase
+  let query = supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
-    .lt("tentativas", maxTentativas)
+    .lt("tentativas", maxTentativas);
+
+  if (whitelist.length > 0) {
+    const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
+    query = query.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
+  }
+
+  const { data: pendentesRaw, error: errSelect } = await query
     .order("created_at", { ascending: true })
     .limit(janela);
+
 
 
   if (errSelect) {
