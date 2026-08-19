@@ -234,10 +234,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const codigoFinal = item.evento_interno === "envio_canhoto" ? codigoEventoEntrega : codigoIbac;
+    const dataOcorrencia = String((payload as any).registrado_em ?? new Date().toISOString());
+
     const body = {
-      codigo_evento: item.evento_interno === "envio_canhoto" ? codigoEventoEntrega : codigoIbac,
+      codigo_evento: codigoFinal,
       ...payload,
+      // Aliases exigidos pela validação da IBAC (nomes camelCase)
+      chaveAcessoNfe: (payload as any).chave_acesso ?? item.chave_acesso ?? null,
+      numeroNotaFiscal: (payload as any).numero_nf ?? null,
+      codigoEvento: codigoFinal,
+      dataOcorrencia,
     };
+
 
 
     const t0 = Date.now();
