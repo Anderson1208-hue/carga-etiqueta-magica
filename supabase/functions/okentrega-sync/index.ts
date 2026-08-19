@@ -90,6 +90,25 @@ async function obterToken(supabase: any, ambiente: "homolog" | "producao") {
   return { token: body.id as string, renovado: true };
 }
 
+/** Converte uma data ISO/Date para o fuso America/Sao_Paulo no formato ISO com offset -03:00.
+ *  Evita que o painel OK Entrega exiba horário UTC (3h à frente). */
+function toSaoPauloISO(input: string | Date | null | undefined): string {
+  const d = input ? new Date(input) : new Date();
+  if (Number.isNaN(d.getTime())) return new Date().toISOString();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}-03:00`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -270,16 +289,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    const dtEntregaLocal = toSaoPauloISO(p.dtentrega ?? p.registrado_em ?? item.created_at);
+    const dtRegistroLocal = toSaoPauloISO(p.registrado_em ?? item.created_at);
+
     const body = {
       documento: String(item.chave_acesso ?? p.documento ?? "").replace(/\D/g, ""),
       tipoocorrenciaId: item.tipo_ocorrencia_id ?? 1,
       tipoentrega: item.tipo_entrega ?? "F",
       cnpjtransportadora: cnpjTransportadora,
       entregadorId: Number(entregadorId),
-      dtentrega: new Date(p.dtentrega ?? p.registrado_em ?? item.created_at).toISOString(),
+      dtentrega: dtEntregaLocal,
       dtreentrega: null,
       dtsinistro: null,
-      dtregistro: new Date(p.registrado_em ?? item.created_at).toISOString(),
+      dtregistro: dtRegistroLocal,
       tipoentrada: "I",
       latitude: p.latitude ?? null,
       longitude: p.longitude ?? null,
