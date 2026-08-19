@@ -528,6 +528,97 @@ export default function IntegracaoOkEntrega() {
                   </div>
                 </div>
 
+                <div className="border rounded-md p-3 space-y-3 bg-muted/20">
+                  <div>
+                    <Label className="text-sm">Recorte do canhoto — prévia real (1536 × 240 @ 150 dpi)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      A OK Entrega recusa comprovante ilegível. A foto do motorista é retrato (ex.: 3072 × 4096), então
+                      encaixá-la inteira na faixa deixa o texto minúsculo. Aqui recortamos a{" "}
+                      <strong>tira do recibo</strong> (assinatura, carimbo, data e nº da NF) e esticamos até a largura
+                      total. Ajuste até ler a assinatura na prévia abaixo.
+                      {fotoNf && <span className="block mt-1">Amostra: NF {fotoNf}</span>}
+                    </p>
+                  </div>
+
+                  {previewUrl ? (
+                    <div className="space-y-1">
+                      <img
+                        src={previewUrl}
+                        alt={`Prévia do canhoto da NF ${fotoNf} em 1536 por 240 pixels`}
+                        className="w-full border rounded bg-white"
+                      />
+                      <p className="text-xs text-muted-foreground">JPEG final: ~{previewKb} KB (limite 1 MB)</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Sem amostra disponível — enfileire uma baixa com foto de canhoto para ver a prévia.
+                    </p>
+                  )}
+
+                  {modoImagem === "recibo" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Posição vertical da tira ({Math.round(ajuste.offsetY * 100)}%)</Label>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={[Math.round(ajuste.offsetY * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, offsetY: v / 100 }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Altura da tira ({Math.round(ajuste.altura * 100)}%)</Label>
+                        <Slider
+                          min={8}
+                          max={60}
+                          step={1}
+                          value={[Math.round(ajuste.altura * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, altura: v / 100 }))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Recorte lateral ({Math.round(ajuste.margemX * 100)}%)</Label>
+                        <Slider
+                          min={0}
+                          max={40}
+                          step={1}
+                          value={[Math.round(ajuste.margemX * 100)]}
+                          onValueChange={([v]) => setAjuste((a) => ({ ...a, margemX: v / 100 }))}
+                        />
+                      </div>
+                      <div className="flex items-end gap-4">
+                        <div className="space-y-1 flex-1">
+                          <Label className="text-xs">Rotação</Label>
+                          <Select
+                            value={String(ajuste.rotacao)}
+                            onValueChange={(v) => setAjuste((a) => ({ ...a, rotacao: Number(v) as 0 | 90 | 180 | 270 }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">0°</SelectItem>
+                              <SelectItem value="90">90°</SelectItem>
+                              <SelectItem value="180">180°</SelectItem>
+                              <SelectItem value="270">270°</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2 pb-2">
+                          <Switch
+                            checked={ajuste.realce}
+                            onCheckedChange={(v) => setAjuste((a) => ({ ...a, realce: v }))}
+                          />
+                          <Label className="text-xs">Realce P&B</Label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+
+
                 <div className="flex items-center justify-between border rounded-md p-3 bg-muted/30">
                   <div>
                     <Label className="text-sm">Envio ativo</Label>
