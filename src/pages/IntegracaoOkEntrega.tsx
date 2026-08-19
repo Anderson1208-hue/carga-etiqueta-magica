@@ -143,6 +143,45 @@ export default function IntegracaoOkEntrega() {
 
   });
 
+  // Baixa a foto do primeiro item pendente com canhoto para servir de amostra do recorte.
+  useEffect(() => {
+    const item = (fila as any[]).find((i) => i.status === "pendente" && i.payload?.foto_path)
+      ?? (fila as any[]).find((i) => i.payload?.foto_path);
+    if (!item || item.numero_nf === fotoNf) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await supabase.storage.from("comprovantes").download(String(item.payload.foto_path));
+      if (cancelado || error || !data) return;
+      setFotoBlob(data);
+      setFotoNf(String(item.numero_nf ?? ""));
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [fila, fotoNf]);
+
+  // Pré-visualização 1536x240 conforme o ajuste atual.
+  useEffect(() => {
+    if (!fotoBlob) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const { dataUrl, bytes } = await previewCanhotoOkEntrega(fotoBlob, modoImagem as any, ajuste);
+        if (!cancelado) {
+          setPreviewUrl(dataUrl);
+          setPreviewKb(Math.round(bytes / 1024));
+        }
+      } catch {
+        /* preview é opcional */
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [fotoBlob, modoImagem, ajuste]);
+
+
+
   const { data: stats } = useQuery({
     queryKey: ["okentrega-stats"],
     queryFn: async () => {
