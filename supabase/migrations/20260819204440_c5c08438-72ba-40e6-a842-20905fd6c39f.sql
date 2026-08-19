@@ -1,0 +1,1 @@
+update public.okentrega_config set whitelist_nfs='{754862}', envio_ativo=true where id=true;
