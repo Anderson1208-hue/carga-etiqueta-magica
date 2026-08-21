@@ -564,12 +564,28 @@ export default function ConferenciaInterna() {
     if (!selectedCarga || !selectedNf) {
       nfCacheRef.current = new Map();
       nfCprodsRef.current = new Set();
+      setNfEhIbac(null);
       setCacheReady(false);
       return;
     }
     void carregarCacheNf(selectedCarga.id, selectedNf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCarga?.id, selectedNf, etapa, offlineMode, isOnline]);
+
+  // Regra: Etapa 1 de NF da IBAC = dupla bipagem obrigatória. Demais emitentes
+  // (etiqueta QR sem pareamento por caixa) seguem bipagem única.
+  useEffect(() => {
+    if (etapa !== 1 || nfEhIbac === null) return;
+    setDuplaChecagem(nfEhIbac);
+    setCodigoCliente("");
+    codigoClienteRef.current = "";
+    qrInputRef.current = "";
+    collectorBufferRef.current = "";
+    collectorStageRef.current = nfEhIbac ? "cliente" : "qr";
+    setCollectorStage(nfEhIbac ? "cliente" : "qr");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nfEhIbac, etapa, selectedNf]);
+
 
   // Código do cliente casa com algum cProd da NF? (usado para commit instantâneo)
   function clienteBateComNf(valor: string): boolean {
