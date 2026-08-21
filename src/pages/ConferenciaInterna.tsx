@@ -137,6 +137,10 @@ export default function ConferenciaInterna() {
 
   // Dupla checagem (bipe do cliente + bipe do nosso QR)
   const [duplaChecagem, setDuplaChecagem] = useState(false);
+  // Dupla bipagem é regra de negócio exclusiva da IBAC (única com etiqueta QR
+  // pareada por caixa). null = emitente ainda desconhecido (ex.: offline).
+  const CNPJ_IBAC = "61472205000407";
+  const [nfEhIbac, setNfEhIbac] = useState<boolean | null>(null);
   const [codigoCliente, setCodigoCliente] = useState("");
   const clienteInputRef = useRef<HTMLInputElement>(null);
   const codigoClienteRef = useRef("");
@@ -532,6 +536,20 @@ export default function ConferenciaInterna() {
       nfCprodsRef.current = cprods;
       setCacheReady(map.size > 0);
 
+      // Emitente da NF define se a dupla bipagem é obrigatória (IBAC).
+      if (offlineMode || !isOnline) {
+        setNfEhIbac(null);
+      } else {
+        const { data: nfRow } = await supabase
+          .from("notas_fiscais")
+          .select("cnpj_emitente")
+          .eq("carga_id", cargaId)
+          .eq("numero_nf", numeroNf)
+          .maybeSingle();
+        const digitos = ((nfRow as any)?.cnpj_emitente || "").replace(/\D/g, "");
+        setNfEhIbac(digitos ? digitos === CNPJ_IBAC : null);
+      }
+
       const divergencias = rows.filter((r) => r.status === "divergencia").length;
       const total = rows.length - divergencias;
       const conferidas = rows.filter((r) => contaComoConferida(r.status)).length;
@@ -546,12 +564,28 @@ export default function ConferenciaInterna() {
     if (!selectedCarga || !selectedNf) {
       nfCacheRef.current = new Map();
       nfCprodsRef.current = new Set();
+      setNfEhIbac(null);
       setCacheReady(false);
       return;
     }
     void carregarCacheNf(selectedCarga.id, selectedNf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCarga?.id, selectedNf, etapa, offlineMode, isOnline]);
+
+  // Regra: Etapa 1 de NF da IBAC = dupla bipagem obrigatória. Demais emitentes
+  // (etiqueta QR sem pareamento por caixa) seguem bipagem única.
+  useEffect(() => {
+    if (etapa !== 1 || nfEhIbac === null) return;
+    setDuplaChecagem(nfEhIbac);
+    setCodigoCliente("");
+    codigoClienteRef.current = "";
+    qrInputRef.current = "";
+    collectorBufferRef.current = "";
+    collectorStageRef.current = nfEhIbac ? "cliente" : "qr";
+    setCollectorStage(nfEhIbac ? "cliente" : "qr");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nfEhIbac, etapa, selectedNf]);
+
 
   // Código do cliente casa com algum cProd da NF? (usado para commit instantâneo)
   function clienteBateComNf(valor: string): boolean {
@@ -1504,10 +1538,12 @@ export default function ConferenciaInterna() {
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
                       Dupla Checagem
+                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC)</span>}
                     </label>
                     <Switch
                       id="dupla-check"
                       checked={duplaChecagem}
+                      disabled={etapa === 2 || nfEhIbac !== null}
                       onCheckedChange={(v) => {
                         setDuplaChecagem(v);
                         codigoClienteRef.current = "";
@@ -1530,6 +1566,16 @@ export default function ConferenciaInterna() {
                   </div>
                 </div>
               </div>
+              {etapa === 1 && nfEhIbac === true && (
+                <p className="text-xs text-primary mt-1">
+                  NF da IBAC: dupla bipagem obrigatória (definida pelo emitente).
+                </p>
+              )}
+              {etapa === 1 && nfEhIbac === false && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Emitente sem etiqueta QR pareada: bipagem única (só nossa etiqueta).
+                </p>
+              )}
               {duplaChecagem && (
                 <p className="text-xs text-muted-foreground mt-1">
                   1) Bipe o código do cliente na caixa &nbsp;→&nbsp; 2) Bipe a nossa etiqueta (QR). Sistema bloqueia se não bater.
