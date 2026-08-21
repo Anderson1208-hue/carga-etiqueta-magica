@@ -153,7 +153,8 @@ export default function ConferenciaInterna() {
   type EtiquetaCache = { id: string; status: string; x_prod: string; c_prod: string };
   const nfCacheRef = useRef<Map<string, EtiquetaCache>>(new Map());
   const nfCprodsRef = useRef<Set<string>>(new Set());
-  const [cacheReady, setCacheReady] = useState(false);
+  const cacheReadyRef = useRef(false);
+  const setCacheReady = (v: boolean) => { cacheReadyRef.current = v; };
 
   // ---- Fila de gravação em lote (1 request para N bipes) ----
   type WriteItem = { qrPayload: string; cargaId: string; etapa: 1 | 2; usuarioId?: string };
@@ -778,7 +779,7 @@ export default function ConferenciaInterna() {
         const etapaAtual = etapa;
 
         // ---- CAMINHO INSTANTÂNEO: valida no cache local e grava em lote ----
-        if (cacheReady) {
+        if (cacheReadyRef.current) {
           const cached = nfCacheRef.current.get(qrPayload);
           if (!cached) {
             const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
