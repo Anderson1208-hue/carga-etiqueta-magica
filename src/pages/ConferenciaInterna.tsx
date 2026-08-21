@@ -1538,10 +1538,12 @@ export default function ConferenciaInterna() {
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
                       Dupla Checagem
+                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC)</span>}
                     </label>
                     <Switch
                       id="dupla-check"
                       checked={duplaChecagem}
+                      disabled={etapa === 2 || nfEhIbac !== null}
                       onCheckedChange={(v) => {
                         setDuplaChecagem(v);
                         codigoClienteRef.current = "";
@@ -1564,6 +1566,16 @@ export default function ConferenciaInterna() {
                   </div>
                 </div>
               </div>
+              {etapa === 1 && nfEhIbac === true && (
+                <p className="text-xs text-primary mt-1">
+                  NF da IBAC: dupla bipagem obrigatória (definida pelo emitente).
+                </p>
+              )}
+              {etapa === 1 && nfEhIbac === false && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Emitente sem etiqueta QR pareada: bipagem única (só nossa etiqueta).
+                </p>
+              )}
               {duplaChecagem && (
                 <p className="text-xs text-muted-foreground mt-1">
                   1) Bipe o código do cliente na caixa &nbsp;→&nbsp; 2) Bipe a nossa etiqueta (QR). Sistema bloqueia se não bater.
