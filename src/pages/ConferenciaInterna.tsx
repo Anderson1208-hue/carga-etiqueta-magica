@@ -149,6 +149,19 @@ export default function ConferenciaInterna() {
   const reloadProgressTimerRef = useRef<number | null>(null);
   const manualInputIdleTimerRef = useRef<number | null>(null);
 
+  // ---- Cache local da NF em conferência (validação 0ms, sem round-trip) ----
+  type EtiquetaCache = { id: string; status: string; x_prod: string; c_prod: string };
+  const nfCacheRef = useRef<Map<string, EtiquetaCache>>(new Map());
+  const nfCprodsRef = useRef<Set<string>>(new Set());
+  const cacheReadyRef = useRef(false);
+  const setCacheReady = (v: boolean) => { cacheReadyRef.current = v; };
+
+  // ---- Fila de gravação em lote (1 request para N bipes) ----
+  type WriteItem = { qrPayload: string; cargaId: string; etapa: 1 | 2; usuarioId?: string };
+  const writeQueueRef = useRef<WriteItem[]>([]);
+  const writeTimerRef = useRef<number | null>(null);
+
+
 
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
@@ -397,7 +410,9 @@ export default function ConferenciaInterna() {
   }
 
   function voltarParaLista() {
+    void flushWrites();
     setSelectedCarga(null);
+
     setSelectedNf(null);
     setNfProgress(null);
     setLastResult(null);
@@ -478,6 +493,167 @@ export default function ConferenciaInterna() {
       prev ? { ...prev, conferidas: Math.min(prev.conferidas + 1, prev.total) } : prev
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Cache local: carrega TODAS as etiquetas da NF uma única vez. A partir daí
+  // toda validação do bipe (existe / status / divergência / cProd do cliente)
+  // é resolvida em memória — resposta instantânea, sem esperar o banco.
+  // ---------------------------------------------------------------------------
+  const normalizaCodigo = (v: string) => v.trim().replace(/^0+/, "");
+
+  async function carregarCacheNf(cargaId: string, numeroNf: string) {
+    setCacheReady(false);
+    nfCacheRef.current = new Map();
+    nfCprodsRef.current = new Set();
+    try {
+      let rows: { qr_payload: string; id: string; status: string; x_prod: string; c_prod: string }[] = [];
+      if (offlineMode || !isOnline) {
+        const ets = await getOfflineEtiquetas(cargaId);
+        rows = ets
+          .filter((e) => e.numero_nf === numeroNf)
+          .map((e) => ({ qr_payload: e.qr_payload, id: e.id, status: e.status, x_prod: e.x_prod, c_prod: e.c_prod }));
+      } else {
+        const { data, error } = await supabase
+          .from("etiquetas")
+          .select("qr_payload, id, status, x_prod, c_prod")
+          .eq("carga_id", cargaId)
+          .eq("numero_nf", numeroNf)
+          .limit(5000);
+        if (error) throw error;
+        rows = (data as any[]) || [];
+      }
+      const map = new Map<string, EtiquetaCache>();
+      const cprods = new Set<string>();
+      for (const r of rows) {
+        map.set(r.qr_payload, { id: r.id, status: r.status, x_prod: r.x_prod, c_prod: r.c_prod });
+        if (r.c_prod) cprods.add(normalizaCodigo(r.c_prod));
+      }
+      nfCacheRef.current = map;
+      nfCprodsRef.current = cprods;
+      setCacheReady(map.size > 0);
+
+      const divergencias = rows.filter((r) => r.status === "divergencia").length;
+      const total = rows.length - divergencias;
+      const conferidas = rows.filter((r) => contaComoConferida(r.status)).length;
+      setNfProgress({ numeroNf, total, conferidas });
+    } catch (e) {
+      console.error("[ConferenciaInterna] Falha ao montar cache da NF:", e);
+      setCacheReady(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedCarga || !selectedNf) {
+      nfCacheRef.current = new Map();
+      nfCprodsRef.current = new Set();
+      setCacheReady(false);
+      return;
+    }
+    void carregarCacheNf(selectedCarga.id, selectedNf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCarga?.id, selectedNf, etapa, offlineMode, isOnline]);
+
+  // Código do cliente casa com algum cProd da NF? (usado para commit instantâneo)
+  function clienteBateComNf(valor: string): boolean {
+    const norm = normalizaCodigo(valor);
+    if (!norm) return false;
+    if (nfCprodsRef.current.has(norm)) return true;
+    if (/^\d{13}$/.test(norm)) {
+      for (const c of nfCprodsRef.current) {
+        if (c.length >= 4 && norm.includes(c)) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fila de gravação em lote: N bipes → 1 UPDATE. O operador nunca espera rede.
+  // ---------------------------------------------------------------------------
+  function enqueueWrite(item: WriteItem) {
+    writeQueueRef.current.push(item);
+    if (writeQueueRef.current.length >= 25) {
+      void flushWrites();
+      return;
+    }
+    if (!writeTimerRef.current) {
+      writeTimerRef.current = window.setTimeout(() => {
+        writeTimerRef.current = null;
+        void flushWrites();
+      }, 400);
+    }
+  }
+
+  async function flushWrites() {
+    if (writeTimerRef.current) {
+      window.clearTimeout(writeTimerRef.current);
+      writeTimerRef.current = null;
+    }
+    const items = writeQueueRef.current.splice(0, writeQueueRef.current.length);
+    if (!items.length) return;
+
+    // Agrupa por carga + etapa + usuário (mesmo patch = 1 request)
+    const grupos = new Map<string, WriteItem[]>();
+    for (const it of items) {
+      const k = `${it.cargaId}|${it.etapa}|${it.usuarioId ?? ""}`;
+      const arr = grupos.get(k) || [];
+      arr.push(it);
+      grupos.set(k, arr);
+    }
+
+    for (const arr of grupos.values()) {
+      const { cargaId, etapa: etapaAtual, usuarioId } = arr[0];
+      const qrs = Array.from(new Set(arr.map((a) => a.qrPayload)));
+      const agora = new Date().toISOString();
+      const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
+      const patch =
+        etapaAtual === 2
+          ? { status: "conferido" as any, conferido_em: agora, conferido_por: usuarioId }
+          : { status: "conferido_interno" as any, conferido_interno_em: agora, conferido_interno_por: usuarioId };
+
+      try {
+        const { data, error } = await supabase
+          .from("etiquetas")
+          .update(patch)
+          .eq("carga_id", cargaId)
+          .in("qr_payload", qrs)
+          .eq("status", statusEsperado)
+          .select("qr_payload");
+        if (error) throw error;
+        const gravadas = new Set(((data as any[]) || []).map((d) => d.qr_payload));
+        const naoGravadas = qrs.filter((q) => !gravadas.has(q));
+        if (naoGravadas.length) {
+          // Outro operador bipou antes (ou status mudou): reconcilia com o servidor.
+          console.warn("[ConferenciaInterna] etiquetas não gravadas no lote:", naoGravadas.length);
+          scheduleReloadNfProgress();
+        }
+      } catch (e) {
+        console.error("[ConferenciaInterna] Erro ao gravar lote de bipes:", e);
+        // Devolve para a fila e tenta novamente no próximo ciclo
+        writeQueueRef.current.push(...arr);
+        toast({
+          title: "Falha ao gravar bipes",
+          description: "Sem conexão estável — tentando novamente.",
+          variant: "destructive",
+        });
+        if (!writeTimerRef.current) {
+          writeTimerRef.current = window.setTimeout(() => {
+            writeTimerRef.current = null;
+            void flushWrites();
+          }, 2000);
+        }
+      }
+    }
+  }
+
+  // Garante que nada fica na fila ao sair da NF / desmontar
+  useEffect(() => {
+    return () => {
+      void flushWrites();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
   async function processScan(qrData: string, codigoClienteAtual?: string) {
 
@@ -597,15 +773,61 @@ export default function ConferenciaInterna() {
           setLastResult(result); addToHistory(result); playSound("warning"); return;
         }
 
-        pendingOnlineScansRef.current.add(qrPayload);
         const cargaId = selectedCarga.id;
         const nfAtual = selectedNf;
         const usuarioId = user?.id;
         const etapaAtual = etapa;
 
+        // ---- CAMINHO INSTANTÂNEO: valida no cache local e grava em lote ----
+        if (cacheReadyRef.current) {
+          const cached = nfCacheRef.current.get(qrPayload);
+          if (!cached) {
+            const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
+          if (cached.status === "divergencia") {
+            const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
+          const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
+          if (cached.status !== statusEsperado) {
+            if (etapaAtual === 2 && cached.status === "pendente") {
+              const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+              setLastResult(result); addToHistory(result); playSound("error"); return;
+            }
+            const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("warning"); return;
+          }
+
+          // Confirma na hora: som, contador e liberação do próximo bipe.
+          nfCacheRef.current.set(qrPayload, {
+            ...cached,
+            status: etapaAtual === 2 ? "conferido" : "conferido_interno",
+          });
+          const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("success");
+          bumpProgressOtimista();
+          releaseForNextScan();
+          enqueueWrite({ qrPayload, cargaId, etapa: etapaAtual, usuarioId });
+
+          // NF fechou? confirma com o servidor (e dispara o aviso de etapa concluída)
+          let faltam = 0;
+          for (const e of nfCacheRef.current.values()) {
+            if (e.status !== "divergencia" && !contaComoConferida(e.status)) faltam++;
+          }
+          if (faltam === 0) {
+            void flushWrites().then(() => scheduleReloadNfProgress());
+          }
+          return;
+
+        }
+
+        pendingOnlineScansRef.current.add(qrPayload);
+
         // No coletor/Chrome lento, não segura o próximo bipe esperando a rede/banco.
         // As validações locais já passaram; a gravação confirma em segundo plano.
         releaseForNextScan();
+
 
         // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver no status esperado.
         void (async () => {
@@ -818,7 +1040,19 @@ export default function ConferenciaInterna() {
         return;
       }
 
+      // Commit instantâneo do 1º bipe (código do cliente): assim que o valor casa
+      // exatamente com um cProd da NF (ou é um EAN-13 completo que contém o cProd),
+      // não há motivo para esperar pausa/Enter — elimina 90–400ms por caixa.
+      if (!isQrStage) {
+        const buf = collectorBufferRef.current.trim();
+        if (buf.length >= 4 && clienteBateComNf(buf)) {
+          commitBuffer();
+          return;
+        }
+      }
+
       armIdleCommit();
+
     };
 
     collectorBufferRef.current = "";
