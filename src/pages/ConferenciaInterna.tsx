@@ -806,7 +806,17 @@ export default function ConferenciaInterna() {
           bumpProgressOtimista();
           releaseForNextScan();
           enqueueWrite({ qrPayload, cargaId, etapa: etapaAtual, usuarioId });
+
+          // NF fechou? confirma com o servidor (e dispara o aviso de etapa concluída)
+          let faltam = 0;
+          for (const e of nfCacheRef.current.values()) {
+            if (e.status !== "divergencia" && !contaComoConferida(e.status)) faltam++;
+          }
+          if (faltam === 0) {
+            void flushWrites().then(() => scheduleReloadNfProgress());
+          }
           return;
+
         }
 
         pendingOnlineScansRef.current.add(qrPayload);
