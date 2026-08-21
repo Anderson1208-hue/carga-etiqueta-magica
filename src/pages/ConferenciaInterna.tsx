@@ -993,10 +993,10 @@ export default function ConferenciaInterna() {
       addToHistory(reportResult(result)); playSound("error");
     } finally {
       if (!releasedForNextScan) {
-        setQrInput("");
-        if (duplaChecagem) setCodigoCliente("");
-        setScanning(false);
-        processingScanRef.current = false;
+        // Erros e avisos também precisam encerrar completamente o par atual.
+        // Antes apenas o estado React era limpo; refs, campos DOM e a etapa do
+        // coletor permaneciam presos no QR, impedindo a próxima bipagem.
+        releaseForNextScan();
       }
     }
   }
