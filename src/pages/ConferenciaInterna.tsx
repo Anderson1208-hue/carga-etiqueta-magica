@@ -77,7 +77,11 @@ interface ScanResult {
   type: "success" | "error" | "warning";
   message: string;
   details?: string;
+  codigo?: string;
+  caixa?: string;
+  pendencia?: string;
 }
+
 
 export default function ConferenciaInterna() {
   const { user, isAdmin, profile } = useAuth();
