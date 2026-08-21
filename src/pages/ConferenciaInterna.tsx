@@ -992,6 +992,28 @@ export default function ConferenciaInterna() {
       flushWrite();
       if (!value) return;
 
+      // ---- Reassembly de QR quebrado pelo leitor ----
+      // Alguns leitores/teclados Android enviam o ";" do payload como Tab/Enter,
+      // partindo o QR (cargaId;nf;cProd;seq;total;chave) em 6 leituras separadas.
+      // Detectamos o início pelo UUID da carga e remontamos o payload completo.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      if (isUuid) {
+        qrSegmentsRef.current = [value];
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+      if (qrSegmentsRef.current.length > 0) {
+        qrSegmentsRef.current.push(value);
+        if (qrSegmentsRef.current.length >= 6) {
+          const full = qrSegmentsRef.current.slice(0, 6).join(";");
+          qrSegmentsRef.current = [];
+          qrInputRef.current = full;
+          if (inputRef.current) inputRef.current.value = full;
+          void processScan(full, duplaChecagem ? codigoClienteRef.current : "");
+        }
+        return;
+      }
+
       if (duplaChecagem && collectorStageRef.current === "cliente") {
         codigoClienteRef.current = value;
         setCodigoCliente(value);
