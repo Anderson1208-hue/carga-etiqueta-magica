@@ -434,6 +434,7 @@ export default function ConferenciaInterna() {
   function focusClienteProximaLeitura() {
     if (!tecladoManual) {
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
       setCollectorStage(duplaChecagem ? "cliente" : "qr");
       clienteInputRef.current?.blur();
@@ -456,6 +457,7 @@ export default function ConferenciaInterna() {
   function focusNossaEtiqueta() {
     if (!tecladoManual) {
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = "qr";
       setCollectorStage("qr");
       clienteInputRef.current?.blur();
@@ -710,6 +712,7 @@ export default function ConferenciaInterna() {
       setQrInput("");
       if (duplaChecagem) setCodigoCliente("");
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
       setCollectorStage(duplaChecagem ? "cliente" : "qr");
       setScanning(false);
@@ -991,6 +994,7 @@ export default function ConferenciaInterna() {
       clearIdleTimer();
       const value = collectorBufferRef.current.trim();
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       flushWrite();
       if (!value) return;
 
@@ -1065,6 +1069,7 @@ export default function ConferenciaInterna() {
       if (key === "Escape") {
         clearIdleTimer();
         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
         flushWrite();
         return;
       }
@@ -1546,6 +1551,7 @@ export default function ConferenciaInterna() {
                       onCheckedChange={(v) => {
                         setTecladoManual(v);
                         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
                         collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
                         setCollectorStage(duplaChecagem ? "cliente" : "qr");
                         setTimeout(() => {
@@ -1575,6 +1581,7 @@ export default function ConferenciaInterna() {
                         setCodigoCliente("");
                         setQrInput("");
                         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
                         collectorStageRef.current = v ? "cliente" : "qr";
                         setCollectorStage(v ? "cliente" : "qr");
                         setTimeout(() => {
