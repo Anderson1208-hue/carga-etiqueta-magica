@@ -134,7 +134,11 @@ export default function ConferenciaInterna() {
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
+  // Último erro/aviso fica FIXO na tela até o próximo erro (ou até limpar),
+  // para o operador não perder qual caixa falhou quando bipa rápido.
+  const [lastError, setLastError] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+
   const [faltamAberto, setFaltamAberto] = useState(false);
   const [etiquetasFaltantes, setEtiquetasFaltantes] = useState<{id: string; x_prod: string; c_prod: string; seq: number; total: number}[]>([]);
   const [loadingFaltantes, setLoadingFaltantes] = useState(false);
