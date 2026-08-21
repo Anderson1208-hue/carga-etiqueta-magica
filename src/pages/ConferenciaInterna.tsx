@@ -1027,7 +1027,19 @@ export default function ConferenciaInterna() {
         return;
       }
 
+      // Commit instantâneo do 1º bipe (código do cliente): assim que o valor casa
+      // exatamente com um cProd da NF (ou é um EAN-13 completo que contém o cProd),
+      // não há motivo para esperar pausa/Enter — elimina 90–400ms por caixa.
+      if (!isQrStage) {
+        const buf = collectorBufferRef.current.trim();
+        if (buf.length >= 4 && clienteBateComNf(buf)) {
+          commitBuffer();
+          return;
+        }
+      }
+
       armIdleCommit();
+
     };
 
     collectorBufferRef.current = "";
