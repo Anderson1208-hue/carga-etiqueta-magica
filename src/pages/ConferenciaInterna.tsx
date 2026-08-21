@@ -1811,6 +1811,9 @@ export default function ConferenciaInterna() {
                     >
                       {item.type === "success" ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                       <span className="font-medium">{item.message}</span>
+                      {(item.codigo || item.caixa) && (
+                        <span className="font-mono font-bold">{item.codigo}{item.caixa ? ` CX ` : ""}</span>
+                      )}
                       {item.details && <span className="opacity-70 truncate">- {item.details}</span>}
                     </div>
                   ))}
