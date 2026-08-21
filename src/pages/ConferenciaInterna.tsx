@@ -149,6 +149,18 @@ export default function ConferenciaInterna() {
   const reloadProgressTimerRef = useRef<number | null>(null);
   const manualInputIdleTimerRef = useRef<number | null>(null);
 
+  // ---- Cache local da NF em conferência (validação 0ms, sem round-trip) ----
+  type EtiquetaCache = { id: string; status: string; x_prod: string; c_prod: string };
+  const nfCacheRef = useRef<Map<string, EtiquetaCache>>(new Map());
+  const nfCprodsRef = useRef<Set<string>>(new Set());
+  const [cacheReady, setCacheReady] = useState(false);
+
+  // ---- Fila de gravação em lote (1 request para N bipes) ----
+  type WriteItem = { qrPayload: string; cargaId: string; etapa: 1 | 2; usuarioId?: string };
+  const writeQueueRef = useRef<WriteItem[]>([]);
+  const writeTimerRef = useRef<number | null>(null);
+
+
 
   // Divergência management (admin only)
   const [showDivergencia, setShowDivergencia] = useState(false);
