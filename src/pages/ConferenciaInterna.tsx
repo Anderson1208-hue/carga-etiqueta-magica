@@ -994,7 +994,6 @@ export default function ConferenciaInterna() {
       clearIdleTimer();
       const value = collectorBufferRef.current.trim();
       collectorBufferRef.current = "";
-      qrSegmentsRef.current = [];
       flushWrite();
       if (!value) return;
 
