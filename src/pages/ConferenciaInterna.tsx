@@ -706,6 +706,21 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     let releasedForNextScan = false;
 
+    // Contexto da leitura atual (código do produto + nº da caixa) para que
+    // qualquer erro na tela mostre EXATAMENTE qual etiqueta falhou.
+    const scanCtx: { cProd?: string; seq?: string; total?: string } = {};
+    const reportResult = (result: ScanResult): ScanResult => {
+      const codigo = result.codigo ?? (scanCtx.cProd ? scanCtx.cProd.replace(/^0+/, "") : undefined);
+      const caixa =
+        result.caixa ??
+        (scanCtx.seq && scanCtx.total ? `${Number(scanCtx.seq)} de ${Number(scanCtx.total)}` : undefined);
+      const enriched: ScanResult = { ...result, codigo, caixa, pendencia: pendenciaDoCodigo(scanCtx.cProd) };
+      setLastResult(enriched);
+      if (enriched.type !== "success") setLastError(enriched);
+      return enriched;
+    };
+
+
     const releaseForNextScan = () => {
       if (releasedForNextScan) return;
       releasedForNextScan = true;
