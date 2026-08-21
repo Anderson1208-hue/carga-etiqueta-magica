@@ -492,6 +492,24 @@ export default function ConferenciaInterna() {
     return /^\d{44}$/.test(parts[5]);
   }
 
+  // "1 de 2 bipadas" do código específico — lido do cache em RAM (0ms).
+  function pendenciaDoCodigo(cProd?: string): string | undefined {
+    if (!cProd || !cacheReadyRef.current) return undefined;
+    const alvo = cProd.replace(/^0+/, "");
+    const statusFeito = etapa === 2 ? "conferido" : "conferido_interno";
+    let total = 0;
+    let feitas = 0;
+    nfCacheRef.current.forEach((et) => {
+      if ((et.c_prod || "").replace(/^0+/, "") !== alvo) return;
+      total += 1;
+      if (et.status === statusFeito || (etapa === 1 && et.status === "conferido")) feitas += 1;
+    });
+    if (!total) return undefined;
+    return `Código ${alvo}: ${feitas} de ${total} bipadas — faltam ${total - feitas}`;
+  }
+
+
+
   function scheduleReloadNfProgress() {
 
     if (reloadProgressTimerRef.current) {
