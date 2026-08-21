@@ -417,6 +417,7 @@ export default function ConferenciaInterna() {
     setSelectedNf(nfItem.numeroNf);
     setNfProgress({ numeroNf: nfItem.numeroNf, total: nfItem.total, conferidas: nfItem.conferidas });
     setLastResult(null);
+    setLastError(null);
     setScanHistory([]);
     collectorBufferRef.current = "";
     collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
@@ -430,6 +431,7 @@ export default function ConferenciaInterna() {
     setSelectedNf(null);
     setNfProgress(null);
     setLastResult(null);
+    setLastError(null);
     setScanHistory([]);
     qrInputRef.current = "";
     codigoClienteRef.current = "";
