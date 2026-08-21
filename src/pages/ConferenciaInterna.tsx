@@ -1753,10 +1753,39 @@ export default function ConferenciaInterna() {
               {lastResult.type === "success" ? <CheckCircle2 className="w-6 h-6 shrink-0" /> : <AlertCircle className="w-6 h-6 shrink-0" />}
               <div>
                 <p className="font-bold text-lg">{lastResult.message}</p>
+                {(lastResult.codigo || lastResult.caixa) && (
+                  <p className="font-mono font-bold text-xl leading-tight">
+                    {lastResult.codigo ?? "—"}
+                    {lastResult.caixa && <span className="ml-2">· CX {lastResult.caixa}</span>}
+                  </p>
+                )}
                 {lastResult.details && <p className="text-sm opacity-80">{lastResult.details}</p>}
               </div>
             </div>
           )}
+
+          {/* Último erro — permanece fixo até o próximo erro */}
+          {lastError && (!lastResult || lastResult.type === "success") && (
+            <div className="p-4 rounded-lg border-2 border-destructive bg-destructive/10 text-destructive">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-6 h-6 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold uppercase opacity-70">Último erro (não resolvido)</p>
+                  <p className="font-bold">{lastError.message}</p>
+                  <p className="font-mono font-bold text-2xl leading-tight">
+                    {lastError.codigo ?? "—"}
+                    {lastError.caixa && <span className="ml-2">· CX {lastError.caixa}</span>}
+                  </p>
+                  {lastError.pendencia && <p className="text-sm font-medium">{lastError.pendencia}</p>}
+                  {lastError.details && <p className="text-xs opacity-80">{lastError.details}</p>}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setLastError(null)}>
+                  OK
+                </Button>
+              </div>
+            </div>
+          )}
+
 
           {/* Scan History */}
           {scanHistory.length > 0 && (
