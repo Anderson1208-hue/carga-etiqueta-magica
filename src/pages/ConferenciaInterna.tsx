@@ -1009,15 +1009,11 @@ export default function ConferenciaInterna() {
     let lastCharTs = 0;
 
 
-    const writeCollectorValue = () => {
-      // Agrupa a escrita em tela: 1 write por frame (leitores lentos digitam char a char)
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0;
-        const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
-        if (target) target.value = collectorBufferRef.current;
-      });
-    };
+    // No modo coletor NÃO espelhamos caractere a caractere no input: cada write
+    // no DOM por caractere (60+ por etiqueta) é o que fazia a leitura "aparecer
+    // aos poucos" e engasgar em aparelhos fracos. O buffer fica só em RAM e o
+    // input é limpo apenas nos commits.
+    const writeCollectorValue = () => {};
 
     const flushWrite = () => {
       if (rafId) {
@@ -1025,8 +1021,9 @@ export default function ConferenciaInterna() {
         rafId = 0;
       }
       const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
-      if (target) target.value = collectorBufferRef.current;
+      if (target && target.value) target.value = "";
     };
+
 
     const clearIdleTimer = () => {
       if (idleTimer) {
