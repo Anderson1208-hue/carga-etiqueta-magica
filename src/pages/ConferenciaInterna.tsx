@@ -137,6 +137,10 @@ export default function ConferenciaInterna() {
 
   // Dupla checagem (bipe do cliente + bipe do nosso QR)
   const [duplaChecagem, setDuplaChecagem] = useState(false);
+  // Dupla bipagem é regra de negócio exclusiva da IBAC (única com etiqueta QR
+  // pareada por caixa). null = emitente ainda desconhecido (ex.: offline).
+  const CNPJ_IBAC = "61472205000407";
+  const [nfEhIbac, setNfEhIbac] = useState<boolean | null>(null);
   const [codigoCliente, setCodigoCliente] = useState("");
   const clienteInputRef = useRef<HTMLInputElement>(null);
   const codigoClienteRef = useRef("");
