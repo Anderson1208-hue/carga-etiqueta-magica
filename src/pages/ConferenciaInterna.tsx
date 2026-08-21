@@ -409,7 +409,9 @@ export default function ConferenciaInterna() {
   }
 
   function voltarParaLista() {
+    void flushWrites();
     setSelectedCarga(null);
+
     setSelectedNf(null);
     setNfProgress(null);
     setLastResult(null);
