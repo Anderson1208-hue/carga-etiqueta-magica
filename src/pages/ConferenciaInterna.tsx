@@ -770,15 +770,51 @@ export default function ConferenciaInterna() {
           setLastResult(result); addToHistory(result); playSound("warning"); return;
         }
 
-        pendingOnlineScansRef.current.add(qrPayload);
         const cargaId = selectedCarga.id;
         const nfAtual = selectedNf;
         const usuarioId = user?.id;
         const etapaAtual = etapa;
 
+        // ---- CAMINHO INSTANTÂNEO: valida no cache local e grava em lote ----
+        if (cacheReady) {
+          const cached = nfCacheRef.current.get(qrPayload);
+          if (!cached) {
+            const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
+          if (cached.status === "divergencia") {
+            const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("error"); return;
+          }
+          const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
+          if (cached.status !== statusEsperado) {
+            if (etapaAtual === 2 && cached.status === "pendente") {
+              const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+              setLastResult(result); addToHistory(result); playSound("error"); return;
+            }
+            const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+            setLastResult(result); addToHistory(result); playSound("warning"); return;
+          }
+
+          // Confirma na hora: som, contador e liberação do próximo bipe.
+          nfCacheRef.current.set(qrPayload, {
+            ...cached,
+            status: etapaAtual === 2 ? "conferido" : "conferido_interno",
+          });
+          const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
+          setLastResult(result); addToHistory(result); playSound("success");
+          bumpProgressOtimista();
+          releaseForNextScan();
+          enqueueWrite({ qrPayload, cargaId, etapa: etapaAtual, usuarioId });
+          return;
+        }
+
+        pendingOnlineScansRef.current.add(qrPayload);
+
         // No coletor/Chrome lento, não segura o próximo bipe esperando a rede/banco.
         // As validações locais já passaram; a gravação confirma em segundo plano.
         releaseForNextScan();
+
 
         // Caminho rápido em background: 1 único round-trip. Atualiza direto se estiver no status esperado.
         void (async () => {
