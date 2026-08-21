@@ -77,7 +77,11 @@ interface ScanResult {
   type: "success" | "error" | "warning";
   message: string;
   details?: string;
+  codigo?: string;
+  caixa?: string;
+  pendencia?: string;
 }
+
 
 export default function ConferenciaInterna() {
   const { user, isAdmin, profile } = useAuth();
@@ -130,7 +134,11 @@ export default function ConferenciaInterna() {
   const [scanning, setScanning] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
+  // Último erro/aviso fica FIXO na tela até o próximo erro (ou até limpar),
+  // para o operador não perder qual caixa falhou quando bipa rápido.
+  const [lastError, setLastError] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanResult[]>([]);
+
   const [faltamAberto, setFaltamAberto] = useState(false);
   const [etiquetasFaltantes, setEtiquetasFaltantes] = useState<{id: string; x_prod: string; c_prod: string; seq: number; total: number}[]>([]);
   const [loadingFaltantes, setLoadingFaltantes] = useState(false);
@@ -409,6 +417,7 @@ export default function ConferenciaInterna() {
     setSelectedNf(nfItem.numeroNf);
     setNfProgress({ numeroNf: nfItem.numeroNf, total: nfItem.total, conferidas: nfItem.conferidas });
     setLastResult(null);
+    setLastError(null);
     setScanHistory([]);
     collectorBufferRef.current = "";
     collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
@@ -422,6 +431,7 @@ export default function ConferenciaInterna() {
     setSelectedNf(null);
     setNfProgress(null);
     setLastResult(null);
+    setLastError(null);
     setScanHistory([]);
     qrInputRef.current = "";
     codigoClienteRef.current = "";
@@ -483,6 +493,24 @@ export default function ConferenciaInterna() {
     if (!/^[0-9a-fA-F-]{36}$/.test(parts[0])) return false;
     return /^\d{44}$/.test(parts[5]);
   }
+
+  // "1 de 2 bipadas" do código específico — lido do cache em RAM (0ms).
+  function pendenciaDoCodigo(cProd?: string): string | undefined {
+    if (!cProd || !cacheReadyRef.current) return undefined;
+    const alvo = cProd.replace(/^0+/, "");
+    const statusFeito = etapa === 2 ? "conferido" : "conferido_interno";
+    let total = 0;
+    let feitas = 0;
+    nfCacheRef.current.forEach((et) => {
+      if ((et.c_prod || "").replace(/^0+/, "") !== alvo) return;
+      total += 1;
+      if (et.status === statusFeito || (etapa === 1 && et.status === "conferido")) feitas += 1;
+    });
+    if (!total) return undefined;
+    return `Código ${alvo}: ${feitas} de ${total} bipadas — faltam ${total - feitas}`;
+  }
+
+
 
   function scheduleReloadNfProgress() {
 
@@ -702,6 +730,21 @@ export default function ConferenciaInterna() {
     setLastResult(null);
     let releasedForNextScan = false;
 
+    // Contexto da leitura atual (código do produto + nº da caixa) para que
+    // qualquer erro na tela mostre EXATAMENTE qual etiqueta falhou.
+    const scanCtx: { cProd?: string; seq?: string; total?: string } = {};
+    const reportResult = (result: ScanResult): ScanResult => {
+      const codigo = result.codigo ?? (scanCtx.cProd ? scanCtx.cProd.replace(/^0+/, "") : undefined);
+      const caixa =
+        result.caixa ??
+        (scanCtx.seq && scanCtx.total ? `${Number(scanCtx.seq)} de ${Number(scanCtx.total)}` : undefined);
+      const enriched: ScanResult = { ...result, codigo, caixa, pendencia: pendenciaDoCodigo(scanCtx.cProd) };
+      setLastResult(enriched);
+      if (enriched.type !== "success") setLastError(enriched);
+      return enriched;
+    };
+
+
     const releaseForNextScan = () => {
       if (releasedForNextScan) return;
       releasedForNextScan = true;
@@ -726,10 +769,14 @@ export default function ConferenciaInterna() {
 
       if (parts.length < 6) {
         const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
-        setLastResult(result); addToHistory(result); playSound("error"); return;
+        addToHistory(reportResult(result)); playSound("error"); return;
       }
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
+      scanCtx.cProd = cProd;
+      scanCtx.seq = seqStr;
+      scanCtx.total = totalStr;
+
 
       // Dupla checagem: exige código do cliente bipado antes e confere com cProd
       if (duplaChecagem) {
@@ -740,7 +787,7 @@ export default function ConferenciaInterna() {
             message: "Bipe o código do cliente primeiro",
             details: "Modo Dupla Checagem ativo",
           };
-          setLastResult(result); addToHistory(result); playSound("warning");
+          addToHistory(reportResult(result)); playSound("warning");
           setTimeout(() => clienteInputRef.current?.focus(), 50);
           return;
         }
@@ -756,7 +803,7 @@ export default function ConferenciaInterna() {
             message: "DIVERGÊNCIA — códigos não batem",
             details: `Cliente: ${cliente}  ≠  Nosso cProd: ${nossoNorm}`,
           };
-          setLastResult(result); addToHistory(result); playSound("error");
+          addToHistory(reportResult(result)); playSound("error");
           setCodigoCliente("");
           setTimeout(() => clienteInputRef.current?.focus(), 50);
           return;
@@ -767,33 +814,33 @@ export default function ConferenciaInterna() {
       // Validate carga
       if (qrCargaId !== selectedCarga.id) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra carga", details: "Esta etiqueta pertence a outra carga" };
-        setLastResult(result); addToHistory(result); playSound("warning"); return;
+        addToHistory(reportResult(result)); playSound("warning"); return;
       }
 
       // Validate NF
       if (numeroNf !== selectedNf) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra NF", details: `Esta etiqueta é da NF ${numeroNf}. Selecione a NF correta.` };
-        setLastResult(result); addToHistory(result); playSound("warning"); return;
+        addToHistory(reportResult(result)); playSound("warning"); return;
       }
 
       if (offlineMode || !isOnline) {
         if (etapa === 2) {
           const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         const etiqueta = await findEtiquetaByQr(qrData.trim());
 
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         if (etiqueta.status === "divergencia") {
           const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
           const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
+          addToHistory(reportResult(result)); playSound("warning"); return;
         }
         await saveScanOffline({
           etiqueta_id: etiqueta.id,
@@ -803,13 +850,13 @@ export default function ConferenciaInterna() {
           conferido_interno_em: new Date().toISOString(),
         });
         const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-        setLastResult(result); addToHistory(result); playSound("success");
+        addToHistory(reportResult(result)); playSound("success");
         bumpProgressOtimista();
         void reloadNfProgress();
       } else {
         if (pendingOnlineScansRef.current.has(qrPayload)) {
           const result: ScanResult = { type: "warning", message: "Etiqueta em gravação", details: `NF ${numeroNf} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
+          addToHistory(reportResult(result)); playSound("warning"); return;
         }
 
         const cargaId = selectedCarga.id;
@@ -822,20 +869,20 @@ export default function ConferenciaInterna() {
           const cached = nfCacheRef.current.get(qrPayload);
           if (!cached) {
             const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error"); return;
+            addToHistory(reportResult(result)); playSound("error"); return;
           }
           if (cached.status === "divergencia") {
             const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error"); return;
+            addToHistory(reportResult(result)); playSound("error"); return;
           }
           const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
           if (cached.status !== statusEsperado) {
             if (etapaAtual === 2 && cached.status === "pendente") {
               const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("error"); return;
+              addToHistory(reportResult(result)); playSound("error"); return;
             }
             const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("warning"); return;
+            addToHistory(reportResult(result)); playSound("warning"); return;
           }
 
           // Confirma na hora: som, contador e liberação do próximo bipe.
@@ -844,7 +891,7 @@ export default function ConferenciaInterna() {
             status: etapaAtual === 2 ? "conferido" : "conferido_interno",
           });
           const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("success");
+          addToHistory(reportResult(result)); playSound("success");
           bumpProgressOtimista();
           releaseForNextScan();
           enqueueWrite({ qrPayload, cargaId, etapa: etapaAtual, usuarioId });
@@ -898,7 +945,7 @@ export default function ConferenciaInterna() {
 
             if (updated) {
               const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("success");
+              addToHistory(reportResult(result)); playSound("success");
               bumpProgressOtimista();
               scheduleReloadNfProgress();
 
@@ -913,25 +960,25 @@ export default function ConferenciaInterna() {
 
               if (!etiqueta) {
                 const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               if (etiqueta.status === "divergencia") {
                 const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               if (etapaAtual === 2 && etiqueta.status === "pendente") {
                 const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("warning");
+              addToHistory(reportResult(result)); playSound("warning");
               scheduleReloadNfProgress();
 
             }
           } catch (error) {
             console.error("Erro ao gravar scan interno:", error);
             const result: ScanResult = { type: "error", message: "Erro ao gravar", details: `NF ${nfAtual} - Caixa ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error");
+            addToHistory(reportResult(result)); playSound("error");
           } finally {
             pendingOnlineScansRef.current.delete(qrPayload);
           }
@@ -943,7 +990,7 @@ export default function ConferenciaInterna() {
     } catch (error) {
       console.error("Erro ao processar scan:", error);
       const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
-      setLastResult(result); addToHistory(result); playSound("error");
+      addToHistory(reportResult(result)); playSound("error");
     } finally {
       if (!releasedForNextScan) {
         setQrInput("");
@@ -964,15 +1011,11 @@ export default function ConferenciaInterna() {
     let lastCharTs = 0;
 
 
-    const writeCollectorValue = () => {
-      // Agrupa a escrita em tela: 1 write por frame (leitores lentos digitam char a char)
-      if (rafId) return;
-      rafId = window.requestAnimationFrame(() => {
-        rafId = 0;
-        const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
-        if (target) target.value = collectorBufferRef.current;
-      });
-    };
+    // No modo coletor NÃO espelhamos caractere a caractere no input: cada write
+    // no DOM por caractere (60+ por etiqueta) é o que fazia a leitura "aparecer
+    // aos poucos" e engasgar em aparelhos fracos. O buffer fica só em RAM e o
+    // input é limpo apenas nos commits.
+    const writeCollectorValue = () => {};
 
     const flushWrite = () => {
       if (rafId) {
@@ -980,8 +1023,9 @@ export default function ConferenciaInterna() {
         rafId = 0;
       }
       const target = duplaChecagem && collectorStageRef.current === "cliente" ? clienteInputRef.current : inputRef.current;
-      if (target) target.value = collectorBufferRef.current;
+      if (target && target.value) target.value = "";
     };
+
 
     const clearIdleTimer = () => {
       if (idleTimer) {
@@ -1711,10 +1755,39 @@ export default function ConferenciaInterna() {
               {lastResult.type === "success" ? <CheckCircle2 className="w-6 h-6 shrink-0" /> : <AlertCircle className="w-6 h-6 shrink-0" />}
               <div>
                 <p className="font-bold text-lg">{lastResult.message}</p>
+                {(lastResult.codigo || lastResult.caixa) && (
+                  <p className="font-mono font-bold text-xl leading-tight">
+                    {lastResult.codigo ?? "—"}
+                    {lastResult.caixa && <span className="ml-2">· CX {lastResult.caixa}</span>}
+                  </p>
+                )}
                 {lastResult.details && <p className="text-sm opacity-80">{lastResult.details}</p>}
               </div>
             </div>
           )}
+
+          {/* Último erro — permanece fixo até o próximo erro */}
+          {lastError && (!lastResult || lastResult.type === "success") && (
+            <div className="p-4 rounded-lg border-2 border-destructive bg-destructive/10 text-destructive">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-6 h-6 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold uppercase opacity-70">Último erro (não resolvido)</p>
+                  <p className="font-bold">{lastError.message}</p>
+                  <p className="font-mono font-bold text-2xl leading-tight">
+                    {lastError.codigo ?? "—"}
+                    {lastError.caixa && <span className="ml-2">· CX {lastError.caixa}</span>}
+                  </p>
+                  {lastError.pendencia && <p className="text-sm font-medium">{lastError.pendencia}</p>}
+                  {lastError.details && <p className="text-xs opacity-80">{lastError.details}</p>}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setLastError(null)}>
+                  OK
+                </Button>
+              </div>
+            </div>
+          )}
+
 
           {/* Scan History */}
           {scanHistory.length > 0 && (
@@ -1738,6 +1811,9 @@ export default function ConferenciaInterna() {
                     >
                       {item.type === "success" ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                       <span className="font-medium">{item.message}</span>
+                      {(item.codigo || item.caixa) && (
+                        <span className="font-mono font-bold">{item.codigo}{item.caixa ? ` CX ` : ""}</span>
+                      )}
                       {item.details && <span className="opacity-70 truncate">- {item.details}</span>}
                     </div>
                   ))}
