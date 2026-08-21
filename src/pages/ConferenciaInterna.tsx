@@ -726,7 +726,7 @@ export default function ConferenciaInterna() {
 
       if (parts.length < 6) {
         const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
-        setLastResult(result); addToHistory(result); playSound("error"); return;
+        addToHistory(reportResult(result)); playSound("error"); return;
       }
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
@@ -740,7 +740,7 @@ export default function ConferenciaInterna() {
             message: "Bipe o código do cliente primeiro",
             details: "Modo Dupla Checagem ativo",
           };
-          setLastResult(result); addToHistory(result); playSound("warning");
+          addToHistory(reportResult(result)); playSound("warning");
           setTimeout(() => clienteInputRef.current?.focus(), 50);
           return;
         }
@@ -756,7 +756,7 @@ export default function ConferenciaInterna() {
             message: "DIVERGÊNCIA — códigos não batem",
             details: `Cliente: ${cliente}  ≠  Nosso cProd: ${nossoNorm}`,
           };
-          setLastResult(result); addToHistory(result); playSound("error");
+          addToHistory(reportResult(result)); playSound("error");
           setCodigoCliente("");
           setTimeout(() => clienteInputRef.current?.focus(), 50);
           return;
@@ -767,33 +767,33 @@ export default function ConferenciaInterna() {
       // Validate carga
       if (qrCargaId !== selectedCarga.id) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra carga", details: "Esta etiqueta pertence a outra carga" };
-        setLastResult(result); addToHistory(result); playSound("warning"); return;
+        addToHistory(reportResult(result)); playSound("warning"); return;
       }
 
       // Validate NF
       if (numeroNf !== selectedNf) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra NF", details: `Esta etiqueta é da NF ${numeroNf}. Selecione a NF correta.` };
-        setLastResult(result); addToHistory(result); playSound("warning"); return;
+        addToHistory(reportResult(result)); playSound("warning"); return;
       }
 
       if (offlineMode || !isOnline) {
         if (etapa === 2) {
           const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         const etiqueta = await findEtiquetaByQr(qrData.trim());
 
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         if (etiqueta.status === "divergencia") {
           const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("error"); return;
+          addToHistory(reportResult(result)); playSound("error"); return;
         }
         if (etiqueta.status === "conferido_interno" || etiqueta.status === "conferido") {
           const result: ScanResult = { type: "warning", message: "Já conferida (interno)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
+          addToHistory(reportResult(result)); playSound("warning"); return;
         }
         await saveScanOffline({
           etiqueta_id: etiqueta.id,
@@ -803,13 +803,13 @@ export default function ConferenciaInterna() {
           conferido_interno_em: new Date().toISOString(),
         });
         const result: ScanResult = { type: "success", message: "Conf. Interna ✓ (offline)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-        setLastResult(result); addToHistory(result); playSound("success");
+        addToHistory(reportResult(result)); playSound("success");
         bumpProgressOtimista();
         void reloadNfProgress();
       } else {
         if (pendingOnlineScansRef.current.has(qrPayload)) {
           const result: ScanResult = { type: "warning", message: "Etiqueta em gravação", details: `NF ${numeroNf} - Caixa ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("warning"); return;
+          addToHistory(reportResult(result)); playSound("warning"); return;
         }
 
         const cargaId = selectedCarga.id;
@@ -822,20 +822,20 @@ export default function ConferenciaInterna() {
           const cached = nfCacheRef.current.get(qrPayload);
           if (!cached) {
             const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error"); return;
+            addToHistory(reportResult(result)); playSound("error"); return;
           }
           if (cached.status === "divergencia") {
             const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error"); return;
+            addToHistory(reportResult(result)); playSound("error"); return;
           }
           const statusEsperado = etapaAtual === 2 ? "conferido_interno" : "pendente";
           if (cached.status !== statusEsperado) {
             if (etapaAtual === 2 && cached.status === "pendente") {
               const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("error"); return;
+              addToHistory(reportResult(result)); playSound("error"); return;
             }
             const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("warning"); return;
+            addToHistory(reportResult(result)); playSound("warning"); return;
           }
 
           // Confirma na hora: som, contador e liberação do próximo bipe.
@@ -844,7 +844,7 @@ export default function ConferenciaInterna() {
             status: etapaAtual === 2 ? "conferido" : "conferido_interno",
           });
           const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${cached.x_prod} - CX ${seqStr}/${totalStr}` };
-          setLastResult(result); addToHistory(result); playSound("success");
+          addToHistory(reportResult(result)); playSound("success");
           bumpProgressOtimista();
           releaseForNextScan();
           enqueueWrite({ qrPayload, cargaId, etapa: etapaAtual, usuarioId });
@@ -898,7 +898,7 @@ export default function ConferenciaInterna() {
 
             if (updated) {
               const result: ScanResult = { type: "success", message: etapaAtual === 2 ? "Expedição ✓" : "Separação ✓", details: `NF ${numeroNf} - ${updated.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("success");
+              addToHistory(reportResult(result)); playSound("success");
               bumpProgressOtimista();
               scheduleReloadNfProgress();
 
@@ -913,25 +913,25 @@ export default function ConferenciaInterna() {
 
               if (!etiqueta) {
                 const result: ScanResult = { type: "error", message: "Etiqueta não encontrada", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               if (etiqueta.status === "divergencia") {
                 const result: ScanResult = { type: "error", message: "Etiqueta bloqueada (Divergência)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               if (etapaAtual === 2 && etiqueta.status === "pendente") {
                 const result: ScanResult = { type: "error", message: "Falta a Etapa 1 (separação)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-                setLastResult(result); addToHistory(result); playSound("error"); return;
+                addToHistory(reportResult(result)); playSound("error"); return;
               }
               const result: ScanResult = { type: "warning", message: etapaAtual === 2 ? "Já expedida" : "Já separada (Etapa 1)", details: `NF ${numeroNf} - ${etiqueta.x_prod} - CX ${seqStr}/${totalStr}` };
-              setLastResult(result); addToHistory(result); playSound("warning");
+              addToHistory(reportResult(result)); playSound("warning");
               scheduleReloadNfProgress();
 
             }
           } catch (error) {
             console.error("Erro ao gravar scan interno:", error);
             const result: ScanResult = { type: "error", message: "Erro ao gravar", details: `NF ${nfAtual} - Caixa ${seqStr}/${totalStr}` };
-            setLastResult(result); addToHistory(result); playSound("error");
+            addToHistory(reportResult(result)); playSound("error");
           } finally {
             pendingOnlineScansRef.current.delete(qrPayload);
           }
@@ -943,7 +943,7 @@ export default function ConferenciaInterna() {
     } catch (error) {
       console.error("Erro ao processar scan:", error);
       const result: ScanResult = { type: "error", message: "Erro ao processar", details: "Tente novamente" };
-      setLastResult(result); addToHistory(result); playSound("error");
+      addToHistory(reportResult(result)); playSound("error");
     } finally {
       if (!releasedForNextScan) {
         setQrInput("");
