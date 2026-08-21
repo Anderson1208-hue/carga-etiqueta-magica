@@ -771,6 +771,10 @@ export default function ConferenciaInterna() {
       }
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
+      scanCtx.cProd = cProd;
+      scanCtx.seq = seqStr;
+      scanCtx.total = totalStr;
+
 
       // Dupla checagem: exige código do cliente bipado antes e confere com cProd
       if (duplaChecagem) {
