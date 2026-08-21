@@ -146,6 +146,8 @@ export default function ConferenciaInterna() {
   const codigoClienteRef = useRef("");
   const qrInputRef = useRef("");
   const collectorBufferRef = useRef("");
+  // Segmentos de um QR quebrado pelo leitor (";" enviado como Tab/Enter)
+  const qrSegmentsRef = useRef<string[]>([]);
   const collectorStageRef = useRef<"cliente" | "qr">("cliente");
   const [collectorStage, setCollectorStage] = useState<"cliente" | "qr">("cliente");
   const processingScanRef = useRef(false);
@@ -432,6 +434,7 @@ export default function ConferenciaInterna() {
   function focusClienteProximaLeitura() {
     if (!tecladoManual) {
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
       setCollectorStage(duplaChecagem ? "cliente" : "qr");
       clienteInputRef.current?.blur();
@@ -454,6 +457,7 @@ export default function ConferenciaInterna() {
   function focusNossaEtiqueta() {
     if (!tecladoManual) {
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = "qr";
       setCollectorStage("qr");
       clienteInputRef.current?.blur();
@@ -708,6 +712,7 @@ export default function ConferenciaInterna() {
       setQrInput("");
       if (duplaChecagem) setCodigoCliente("");
       collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
       collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
       setCollectorStage(duplaChecagem ? "cliente" : "qr");
       setScanning(false);
@@ -992,6 +997,28 @@ export default function ConferenciaInterna() {
       flushWrite();
       if (!value) return;
 
+      // ---- Reassembly de QR quebrado pelo leitor ----
+      // Alguns leitores/teclados Android enviam o ";" do payload como Tab/Enter,
+      // partindo o QR (cargaId;nf;cProd;seq;total;chave) em 6 leituras separadas.
+      // Detectamos o início pelo UUID da carga e remontamos o payload completo.
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+      if (isUuid) {
+        qrSegmentsRef.current = [value];
+        if (inputRef.current) inputRef.current.value = "";
+        return;
+      }
+      if (qrSegmentsRef.current.length > 0) {
+        qrSegmentsRef.current.push(value);
+        if (qrSegmentsRef.current.length >= 6) {
+          const full = qrSegmentsRef.current.slice(0, 6).join(";");
+          qrSegmentsRef.current = [];
+          qrInputRef.current = full;
+          if (inputRef.current) inputRef.current.value = full;
+          void processScan(full, duplaChecagem ? codigoClienteRef.current : "");
+        }
+        return;
+      }
+
       if (duplaChecagem && collectorStageRef.current === "cliente") {
         codigoClienteRef.current = value;
         setCodigoCliente(value);
@@ -1041,6 +1068,7 @@ export default function ConferenciaInterna() {
       if (key === "Escape") {
         clearIdleTimer();
         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
         flushWrite();
         return;
       }
@@ -1522,6 +1550,7 @@ export default function ConferenciaInterna() {
                       onCheckedChange={(v) => {
                         setTecladoManual(v);
                         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
                         collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
                         setCollectorStage(duplaChecagem ? "cliente" : "qr");
                         setTimeout(() => {
@@ -1551,6 +1580,7 @@ export default function ConferenciaInterna() {
                         setCodigoCliente("");
                         setQrInput("");
                         collectorBufferRef.current = "";
+      qrSegmentsRef.current = [];
                         collectorStageRef.current = v ? "cliente" : "qr";
                         setCollectorStage(v ? "cliente" : "qr");
                         setTimeout(() => {
