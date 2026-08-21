@@ -536,6 +536,20 @@ export default function ConferenciaInterna() {
       nfCprodsRef.current = cprods;
       setCacheReady(map.size > 0);
 
+      // Emitente da NF define se a dupla bipagem é obrigatória (IBAC).
+      if (offlineMode || !isOnline) {
+        setNfEhIbac(null);
+      } else {
+        const { data: nfRow } = await supabase
+          .from("notas_fiscais")
+          .select("cnpj_emitente")
+          .eq("carga_id", cargaId)
+          .eq("numero_nf", numeroNf)
+          .maybeSingle();
+        const digitos = ((nfRow as any)?.cnpj_emitente || "").replace(/\D/g, "");
+        setNfEhIbac(digitos ? digitos === CNPJ_IBAC : null);
+      }
+
       const divergencias = rows.filter((r) => r.status === "divergencia").length;
       const total = rows.length - divergencias;
       const conferidas = rows.filter((r) => contaComoConferida(r.status)).length;
