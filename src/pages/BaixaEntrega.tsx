@@ -403,6 +403,7 @@ export default function BaixaEntrega() {
 
           // 1) Tenta upload da foto, se houver foto offline persistida
           let fotoPath: string | null = null;
+          let fotoReciboPath: string | null = null;
           const fotoBlob = await getFotoOffline(baixa.id);
           if (fotoBlob) {
             const ext = (fotoBlob.type?.split("/")?.[1] || "jpg").replace("jpeg", "jpg");
@@ -412,6 +413,7 @@ export default function BaixaEntrega() {
               .upload(fileName, fotoBlob, { contentType: fotoBlob.type || "image/jpeg" });
             if (upErr) throw upErr;
             fotoPath = fileName;
+            fotoReciboPath = await gerarEEnviarRecibo(fileName, fotoBlob);
           }
 
           // 2) Insere a baixa
@@ -422,6 +424,7 @@ export default function BaixaEntrega() {
             ocorrencia: baixa.ocorrencia,
             recebedor_nome: baixa.recebedor_nome,
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             latitude: baixa.latitude,
             longitude: baixa.longitude,
             registrado_por: baixa.registrado_por,
