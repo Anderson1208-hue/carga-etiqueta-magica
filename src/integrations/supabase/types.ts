@@ -1718,32 +1718,41 @@ export type Database = {
       }
       ibac_config_envio: {
         Row: {
+          canhoto_apos_prestacao: boolean
           codigo_evento_entrega: string
           created_at: string
+          data_piloto: string | null
           envio_ativo: boolean
           id: boolean
           max_imagem_kb: number
           modo_imagem: string
+          placas_piloto: string[]
           updated_at: string
           whitelist_nfs: string[]
         }
         Insert: {
+          canhoto_apos_prestacao?: boolean
           codigo_evento_entrega?: string
           created_at?: string
+          data_piloto?: string | null
           envio_ativo?: boolean
           id?: boolean
           max_imagem_kb?: number
           modo_imagem?: string
+          placas_piloto?: string[]
           updated_at?: string
           whitelist_nfs?: string[]
         }
         Update: {
+          canhoto_apos_prestacao?: boolean
           codigo_evento_entrega?: string
           created_at?: string
+          data_piloto?: string | null
           envio_ativo?: boolean
           id?: boolean
           max_imagem_kb?: number
           modo_imagem?: string
+          placas_piloto?: string[]
           updated_at?: string
           whitelist_nfs?: string[]
         }
