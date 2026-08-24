@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("ibac_log_envios").insert({
       queue_id: item.id,
-      endpoint: IBAC_API_URL,
+      endpoint: endpointDestino,
       request_body: body,
       response_status: respStatus,
       response_body: respBody as any,
