@@ -557,6 +557,24 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("[ibac-sync] Falha ao verificar alertas:", err);
   }
+  // Próximo salto: só quando o envio está ligado, houve trabalho real nesta
+  // rodada e ainda restam pendentes. O caminho ocioso encerra a corrente.
+  let proximoSalto = false;
+  if (envioAtivo && resultados.length > 0 && profundidade < MAX_PROFUNDIDADE) {
+    const { count: restantes } = await supabase
+      .from("ibac_eventos_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+    if ((restantes ?? 0) > 0) {
+      proximoSalto = true;
+      setTimeout(() => {
+        supabase.functions
+          .invoke("ibac-sync", { body: { profundidade: profundidade + 1 } })
+          .catch((e) => console.error("[ibac-sync] Falha no auto-encadeamento:", e));
+      }, COOLDOWN_MS);
+    }
+  }
 
   return new Response(
     JSON.stringify({
