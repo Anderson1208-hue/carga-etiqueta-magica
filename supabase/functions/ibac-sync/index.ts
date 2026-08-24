@@ -52,6 +52,12 @@ Deno.serve(async (req) => {
   const whitelist: string[] = (envioCfg?.whitelist_nfs ?? []).map((v: string) => String(v).trim()).filter(Boolean);
   const codigoEventoEntrega = (envioCfg?.codigo_evento_entrega ?? "01").trim();
   const maxImagemKb = envioCfg?.max_imagem_kb ?? 1024;
+  // Piloto controlado: restringe o envio às placas/data informadas e
+  // libera a imagem do canhoto só depois do encerramento da prestação de contas.
+  const normPlaca = (v: unknown) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const placasPiloto: string[] = ((envioCfg as any)?.placas_piloto ?? []).map(normPlaca).filter(Boolean);
+  const dataPiloto: string | null = (envioCfg as any)?.data_piloto ?? null;
+  const canhotoAposPrestacao: boolean = (envioCfg as any)?.canhoto_apos_prestacao ?? true;
 
   // Carrega política de retry configurável
   const { data: retryCfg } = await supabase
