@@ -166,6 +166,60 @@ Deno.serve(async (req) => {
     pendentes = pendentes.slice(0, BATCH_SIZE);
   }
 
+  // -------- Piloto por placa/data + liberação do canhoto na prestação de contas --------
+  let foraDoPiloto = 0;
+  let aguardandoPrestacao = 0;
+  if (placasPiloto.length > 0 || canhotoAposPrestacao) {
+    const nfIds = [...new Set(pendentes.map((i) => i.nf_id).filter(Boolean))] as string[];
+    const veiculoPorNf = new Map<string, { placa: string; data: string | null; prestacao_contas_em: string | null }>();
+
+    if (nfIds.length > 0) {
+      const { data: vinculos } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id, veiculo_id")
+        .in("nf_id", nfIds);
+
+      const veicIds = [...new Set((vinculos ?? []).map((v: any) => v.veiculo_id).filter(Boolean))];
+      const { data: veics } = veicIds.length
+        ? await supabase
+            .from("veiculos")
+            .select("id, placa, data, prestacao_contas_em")
+            .in("id", veicIds)
+        : { data: [] as any[] };
+
+      const porId = new Map((veics ?? []).map((v: any) => [v.id, v]));
+      for (const v of vinculos ?? []) {
+        const veic = porId.get((v as any).veiculo_id);
+        if (veic) veiculoPorNf.set((v as any).nf_id, veic as any);
+      }
+    }
+
+    const antes = pendentes.length;
+    pendentes = pendentes.filter((item) => {
+      const veic = item.nf_id ? veiculoPorNf.get(item.nf_id) : undefined;
+
+      // Escopo do piloto: só placas listadas (e data, se informada)
+      if (placasPiloto.length > 0) {
+        if (!veic) return false;
+        if (!placasPiloto.includes(normPlaca(veic.placa))) return false;
+        if (dataPiloto && String(veic.data ?? "") !== String(dataPiloto)) return false;
+      }
+
+      // Imagem do canhoto: só depois de "Encerrar Prestação de Contas" do veículo
+      if (item.evento_interno === "envio_canhoto" && canhotoAposPrestacao) {
+        if (!veic?.prestacao_contas_em) {
+          aguardandoPrestacao++;
+          return false;
+        }
+      }
+      return true;
+    });
+    foraDoPiloto = antes - pendentes.length - aguardandoPrestacao;
+    pendentes = pendentes.slice(0, BATCH_SIZE);
+  }
+
+
+
 
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
