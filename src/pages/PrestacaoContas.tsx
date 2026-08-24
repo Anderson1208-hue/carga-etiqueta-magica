@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CanhotoViewer, type CanhotoItem } from "@/components/prestacao/CanhotoViewer";
 import {
   Tooltip,
   TooltipContent,
