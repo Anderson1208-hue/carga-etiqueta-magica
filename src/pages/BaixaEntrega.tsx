@@ -684,6 +684,14 @@ export default function BaixaEntrega() {
         baixaId = baixaInserida?.id || null;
       }
 
+      // Gatilho IBAC: baixa gravada online = sincronizada. Dispara a ocorrência de entrega.
+      if (baixaId) {
+        supabase.functions
+          .invoke("ibac-sync")
+          .catch((e) => console.warn("ibac-sync (baixa online) falhou:", e));
+      }
+
+
       // Valida foto do canhoto AGUARDANDO o resultado para permitir refazer
       // quando a IA classificar como "ruim". Só se aplica a entregas com foto.
       if (fotoPath && baixaId && ocorrencia === "entregue") {
