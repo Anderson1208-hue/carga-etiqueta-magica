@@ -537,6 +537,10 @@ Deno.serve(async (req) => {
       falhas: resultados.filter((r) => !r.sucesso).length,
       adiados_por_backoff: adiados,
       fora_da_whitelist: foraDaWhitelist,
+      fora_do_piloto: foraDoPiloto,
+      canhotos_aguardando_prestacao: aguardandoPrestacao,
+      placas_piloto: placasPiloto,
+      data_piloto: dataPiloto,
       modo_imagem: modoImagem,
       whitelist_ativa: whitelist.length > 0,
 
