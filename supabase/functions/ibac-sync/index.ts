@@ -299,12 +299,16 @@ Deno.serve(async (req) => {
         .maybeSingle();
       chaveCte = cteRow?.chave_cte ?? null;
 
+      // Nome do arquivo carrega o número da NF (o contrato não tem campo numeroNota):
+      // facilita a identificação da nota no portal da IBAC.
+      const extensao = String(payload.imagem_nome ?? payload.foto_path ?? "canhoto.jpg").split(".").pop() ?? "jpg";
       const imagem: Record<string, unknown> = {
-        nomeImagem: payload.imagem_nome ?? String(payload.foto_path ?? "comprovante.jpg").split("/").pop(),
+        nomeImagem: numeroNf ? `canhoto_NF${numeroNf}.${extensao}` : String(payload.foto_path ?? "canhoto.jpg").split("/").pop(),
         tipo: "CANHOTO",
       };
       if (payload.imagem_base64) imagem.base64 = payload.imagem_base64;
       else if (payload.foto_url) imagem.urlImagem = payload.foto_url;
+
 
       body = {
         chave: chaveNfe,
