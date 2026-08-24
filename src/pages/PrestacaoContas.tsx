@@ -497,6 +497,11 @@ export default function PrestacaoContas() {
         .eq("id", veiculoSel.id);
       if (error) throw error;
       toast({ title: "Prestação de contas encerrada" });
+      // Libera o envio das imagens (canhotos) à IBAC deste veículo — respeita o
+      // escopo do piloto (placas/data) e o kill switch de envio.
+      supabase.functions
+        .invoke("ibac-sync")
+        .catch((e) => console.warn("ibac-sync (encerramento) falhou:", e));
       await carregarVeiculos();
       setVeiculoSel(null);
       setBaixas([]);
