@@ -965,6 +965,33 @@ export default function PrestacaoContas() {
           </div>
         </div>
 
+        {/* Conferência de canhotos em massa (tiras leves + navegação por teclado) */}
+        <CanhotoViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          itens={itensCanhoto}
+          bloqueado={!!veiculoSel?.prestacao_contas_em}
+          onConferir={async (id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) await marcarConferido(b);
+          }}
+          onPendencia={(id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) {
+              setViewerOpen(false);
+              setPendDialog({ baixa: b, motivo: "" });
+            }
+          }}
+          onNovaFoto={(id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) {
+              setViewerOpen(false);
+              void solicitarNovaFoto(b);
+            }
+          }}
+        />
+
+
         {/* Foto modal */}
         <Dialog open={!!fotoUrl} onOpenChange={(o) => !o && setFotoUrl(null)}>
           <DialogContent className="max-w-2xl">
