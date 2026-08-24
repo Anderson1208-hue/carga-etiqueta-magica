@@ -1045,23 +1045,50 @@ export default function ConferenciaInterna() {
       // Alguns leitores/teclados Android enviam o ";" do payload como Tab/Enter,
       // partindo o QR (cargaId;nf;cProd;seq;total;chave) em 6 leituras separadas.
       // Detectamos o início pelo UUID da carga e remontamos o payload completo.
+      // IMPORTANTE: se a leitura já vier completa, processa direto e descarta
+      // qualquer segmento pendente — segmento órfão travava a bipagem no meio
+      // da conferência (QR completo era engolido como "parte" de outro).
+      if (isQrPayloadCompleto(value)) {
+        qrSegmentsRef.current = [];
+        qrSegmentsAtRef.current = 0;
+        qrInputRef.current = value;
+        if (inputRef.current) inputRef.current.value = value;
+        void processScan(value, duplaChecagem ? codigoClienteRef.current : "");
+        return;
+      }
+
+      // Segmentos velhos (>3s sem continuação) são lixo: descarta.
+      if (qrSegmentsRef.current.length > 0 && Date.now() - qrSegmentsAtRef.current > 3000) {
+        qrSegmentsRef.current = [];
+        qrSegmentsAtRef.current = 0;
+      }
+
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
       if (isUuid) {
         qrSegmentsRef.current = [value];
+        qrSegmentsAtRef.current = Date.now();
         if (inputRef.current) inputRef.current.value = "";
         return;
       }
       if (qrSegmentsRef.current.length > 0) {
         qrSegmentsRef.current.push(value);
+        qrSegmentsAtRef.current = Date.now();
         if (qrSegmentsRef.current.length >= 6) {
           const full = qrSegmentsRef.current.slice(0, 6).join(";");
           qrSegmentsRef.current = [];
+          qrSegmentsAtRef.current = 0;
+          if (!isQrPayloadCompleto(full)) {
+            // Remontagem inválida: não bloqueia o operador, apenas reinicia.
+            if (inputRef.current) inputRef.current.value = "";
+            return;
+          }
           qrInputRef.current = full;
           if (inputRef.current) inputRef.current.value = full;
           void processScan(full, duplaChecagem ? codigoClienteRef.current : "");
         }
         return;
       }
+
 
       if (duplaChecagem && collectorStageRef.current === "cliente") {
         codigoClienteRef.current = value;
