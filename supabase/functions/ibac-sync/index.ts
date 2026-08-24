@@ -244,10 +244,25 @@ Deno.serve(async (req) => {
 
     // Canhoto: IBAC exige a imagem junto ao evento de entrega (cód. 01 por padrão).
     if (item.evento_interno === "envio_canhoto") {
-      if (modoImagem === "base64" && payload.foto_path) {
+      // Prefere a TIRA do recibo (dezenas de KB) gerada na baixa; a foto original
+      // (MB) é fallback. É o que permite fechar veículos de 50+ notas sem estourar
+      // memória nem o limite de KB por imagem.
+      let caminhoImagem = (payload.foto_recibo_path as string | undefined) ?? null;
+      if (!caminhoImagem && item.baixa_id) {
+        const { data: bx } = await supabase
+          .from("baixas_entrega")
+          .select("foto_recibo_path")
+          .eq("id", item.baixa_id)
+          .maybeSingle();
+        caminhoImagem = (bx?.foto_recibo_path as string | null) ?? null;
+      }
+      if (!caminhoImagem && payload.foto_path) caminhoImagem = String(payload.foto_path);
+      if (caminhoImagem) payload.foto_path = caminhoImagem;
+
+      if (modoImagem === "base64" && caminhoImagem) {
         const { data: file, error: dlErr } = await supabase.storage
           .from("comprovantes")
-          .download(String(payload.foto_path));
+          .download(caminhoImagem);
         if (dlErr || !file) {
           erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
         } else {
