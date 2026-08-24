@@ -448,6 +448,11 @@ export default function BaixaEntrega() {
 
       if (syncedIds.length > 0) {
         await markAsSynced(syncedIds);
+        // Gatilho IBAC: dispara o envio da ocorrência de entrega no momento da sincronização.
+        // Só sai da fila o que estiver no escopo do piloto (placas/data) e com envio liberado.
+        supabase.functions
+          .invoke("ibac-sync")
+          .catch((e) => console.warn("ibac-sync (pós-sync) falhou:", e));
       }
 
       if (errors > 0) {
@@ -678,6 +683,14 @@ export default function BaixaEntrega() {
         if (insertError) throw insertError;
         baixaId = baixaInserida?.id || null;
       }
+
+      // Gatilho IBAC: baixa gravada online = sincronizada. Dispara a ocorrência de entrega.
+      if (baixaId) {
+        supabase.functions
+          .invoke("ibac-sync")
+          .catch((e) => console.warn("ibac-sync (baixa online) falhou:", e));
+      }
+
 
       // Valida foto do canhoto AGUARDANDO o resultado para permitir refazer
       // quando a IA classificar como "ruim". Só se aplica a entregas com foto.

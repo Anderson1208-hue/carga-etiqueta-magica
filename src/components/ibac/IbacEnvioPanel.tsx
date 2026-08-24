@@ -19,8 +19,11 @@ export function IbacEnvioPanel() {
     modo_imagem: "url" as "url" | "base64",
     codigo_evento_entrega: "01",
     max_imagem_kb: 1024,
+    data_piloto: "",
+    canhoto_apos_prestacao: true,
   });
   const [whitelistTexto, setWhitelistTexto] = useState("");
+  const [placasTexto, setPlacasTexto] = useState("");
 
   const { data: cfg } = useQuery({
     queryKey: ["ibac-config-envio"],
@@ -42,8 +45,11 @@ export function IbacEnvioPanel() {
         modo_imagem: (cfg.modo_imagem as "url" | "base64") ?? "url",
         codigo_evento_entrega: cfg.codigo_evento_entrega ?? "01",
         max_imagem_kb: cfg.max_imagem_kb ?? 1024,
+        data_piloto: (cfg as any).data_piloto ?? "",
+        canhoto_apos_prestacao: (cfg as any).canhoto_apos_prestacao ?? true,
       });
       setWhitelistTexto((cfg.whitelist_nfs ?? []).join("\n"));
+      setPlacasTexto(((cfg as any).placas_piloto ?? []).join(" "));
     }
   }, [cfg]);
 
@@ -52,11 +58,21 @@ export function IbacEnvioPanel() {
     .map((v) => v.trim())
     .filter(Boolean);
 
+  const placas = placasTexto
+    .split(/[\s,;]+/)
+    .map((v) => v.trim().toUpperCase())
+    .filter(Boolean);
+
   const salvar = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
         .from("ibac_config_envio")
-        .update({ ...form, whitelist_nfs: whitelist })
+        .update({
+          ...form,
+          data_piloto: form.data_piloto || null,
+          placas_piloto: placas,
+          whitelist_nfs: whitelist,
+        } as any)
         .eq("id", true);
       if (error) throw error;
     },
@@ -155,6 +171,48 @@ export function IbacEnvioPanel() {
             </div>
           </div>
 
+          <Separator />
+
+          <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+            <Label className="text-sm font-semibold">Piloto controlado por veículo</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1 md:col-span-2">
+                <Label className="text-xs">Placas do piloto (separadas por espaço/vírgula)</Label>
+                <Input
+                  value={placasTexto}
+                  onChange={(e) => setPlacasTexto(e.target.value)}
+                  placeholder="LNA5B11 DTB9J73"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data da roteirização</Label>
+                <Input
+                  type="date"
+                  value={form.data_piloto}
+                  onChange={(e) => setForm((f) => ({ ...f, data_piloto: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-xs">Enviar imagem do canhoto só após encerrar a Prestação de Contas</Label>
+                <p className="text-xs text-muted-foreground">
+                  A ocorrência de entrega segue em tempo real (na sincronização da baixa); a imagem aguarda o encerramento do veículo.
+                </p>
+              </div>
+              <Switch
+                checked={form.canhoto_apos_prestacao}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, canhoto_apos_prestacao: v }))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {placas.length > 0
+                ? `Somente as notas dos veículos ${placas.join(", ")}${form.data_piloto ? ` na data ${form.data_piloto}` : ""} são enviadas.`
+                : "Vazio = sem restrição por veículo."}
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-xs flex items-center gap-2">
               <ShieldAlert className="w-4 h-4" />
@@ -173,6 +231,7 @@ export function IbacEnvioPanel() {
                 : "Vazio = sem restrição por nota (envia tudo que estiver pendente quando liberado)."}
             </p>
           </div>
+
 
           <div className="flex gap-2">
             <Button onClick={() => salvar.mutate()} disabled={salvar.isPending}>
