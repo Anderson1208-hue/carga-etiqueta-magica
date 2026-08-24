@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
 
     const chaveNfe = String((payload as any).chave_acesso ?? item.chave_acesso ?? "");
     const numeroNf = String((payload as any).numero_nf ?? "");
-    // A IBAC valida data no padrão brasileiro dd/MM/yyyy HH:mm:ss (fuso de São Paulo)
+    // Layout oficial IBAC (24/08/2026): data dd-MM-yyyy e hora HH:mm:ss separadas (fuso de São Paulo)
     const dt = new Date(dataOcorrencia);
     const partes = new Intl.DateTimeFormat("pt-BR", {
       timeZone: "America/Sao_Paulo",
@@ -252,33 +252,32 @@ Deno.serve(async (req) => {
       hour12: false,
     }).formatToParts(dt);
     const p = (t: string) => partes.find((x) => x.type === t)?.value ?? "00";
-    const dataBr = `${p("day")}/${p("month")}/${p("year")} ${p("hour")}:${p("minute")}:${p("second")}`;
+    const dataEventoOcorrencia = `${p("day")}-${p("month")}-${p("year")}`;
+    const horaEventoOcorrencia = `${p("hour")}:${p("minute")}:${p("second")}`;
 
+    const descricao = item.evento_interno === "envio_canhoto"
+      ? "Comprovante de entrega (canhoto) digitalizado."
+      : String((payload as any).descricao ?? (payload as any).ocorrencia ?? "Entrega realizada.");
 
-    const body = {
-      codigo_evento: codigoFinal,
-      ...payload,
-      // Aliases para atender a validação da IBAC (variações de nomenclatura)
-      chaveAcessoNfe: chaveNfe,
-      chaveAcesso: chaveNfe,
-      chaveNfe: chaveNfe,
-      numeroNotaFiscal: numeroNf,
-      numeroNf: numeroNf,
+    const imagens = payload.imagem_base64
+      ? [{
+          base64: payload.imagem_base64,
+          nomeImagem: payload.imagem_nome ?? "comprovante.jpg",
+          tipo: "OCORRENCIA",
+        }]
+      : undefined;
+
+    const body: Record<string, unknown> = {
+      chaveNota: chaveNfe,
       numeroNota: numeroNf,
-      codigoEvento: codigoFinal,
-      codigoOcorrencia: codigoFinal,
-      evento: codigoFinal,
-      codigo: codigoFinal,
-      tipoEvento: codigoFinal,
-      codigoEventoOcorrencia: codigoFinal,
-      dataOcorrencia: dataBr,
-      dataEvento: dataBr,
-      data: dataBr,
-      dataHora: dataBr,
-      dataHoraOcorrencia: dataBr,
-      dataHoraEvento: dataBr,
-
+      cnpjTransportadora: cnpjTransportadora,
+      codigoEventoOcorrencia: Number(codigoFinal),
+      dataEventoOcorrencia,
+      horaEventoOcorrencia,
+      descricaoOcorrencia: descricao,
+      ...(imagens ? { imagens } : {}),
     };
+
 
 
 
