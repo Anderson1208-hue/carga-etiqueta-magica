@@ -156,6 +156,7 @@ export default function ConferenciaInterna() {
   const collectorBufferRef = useRef("");
   // Segmentos de um QR quebrado pelo leitor (";" enviado como Tab/Enter)
   const qrSegmentsRef = useRef<string[]>([]);
+  const qrSegmentsAtRef = useRef(0);
   const collectorStageRef = useRef<"cliente" | "qr">("cliente");
   const [collectorStage, setCollectorStage] = useState<"cliente" | "qr">("cliente");
   const processingScanRef = useRef(false);
