@@ -85,6 +85,28 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
   { value: "sem_canhoto", label: "Sem canhoto/assinatura", icon: <AlertTriangle className="w-5 h-5" />, color: "text-amber-600" },
 ];
 
+/**
+ * Gera a tira do recibo (1536x240 @150dpi) a partir da foto original e sobe no
+ * mesmo bucket com sufixo `-recibo.jpg`. É a imagem usada na conferência rápida
+ * da Prestação de Contas e no envio ao cliente (IBAC/OK Entrega): dezenas de KB
+ * em vez de MB, o que permite lotes grandes por veículo.
+ * Falha aqui nunca derruba a baixa — a foto original já está salva.
+ */
+async function gerarEEnviarRecibo(fotoPath: string, fotoBlob: Blob): Promise<string | null> {
+  try {
+    const recibo = await blobCanhotoRecibo(fotoBlob);
+    const reciboPath = `${fotoPath.replace(/\.[^./]+$/, "")}-recibo.jpg`;
+    const { error } = await supabase.storage
+      .from("comprovantes")
+      .upload(reciboPath, recibo, { contentType: "image/jpeg", upsert: true });
+    if (error) throw error;
+    return reciboPath;
+  } catch (e) {
+    console.warn("Falha ao gerar tira do recibo:", e);
+    return null;
+  }
+}
+
 export default function BaixaEntrega() {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
