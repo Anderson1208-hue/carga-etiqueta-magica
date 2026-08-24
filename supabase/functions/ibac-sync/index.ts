@@ -54,6 +54,14 @@ Deno.serve(async (req) => {
   const backoffMax = retryCfg?.backoff_max_segundos ?? 3600;
   const backoffAtivo = retryCfg?.ativo ?? true;
 
+  // CNPJ da transportadora (emitente do CT-e) — mesmo cadastro usado na integração OK Entrega
+  const { data: okCfg } = await supabase
+    .from("okentrega_config")
+    .select("cnpj_transportadora")
+    .limit(1)
+    .maybeSingle();
+  const cnpjTransportadora = String(okCfg?.cnpj_transportadora ?? "").replace(/\D/g, "");
+
 
   // Com whitelist ativa, filtra direto no banco pelas notas de teste
   // (evita que fiquem fora da janela por trás de eventos antigos).
