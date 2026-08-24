@@ -657,6 +657,7 @@ export default function BaixaEntrega() {
 
       // Online submission (original logic)
       let fotoPath: string | null = null;
+      let fotoReciboPath: string | null = null;
 
       if (fotoFile) {
         const ext = fotoFile.name.split(".").pop() || "jpg";
@@ -668,6 +669,7 @@ export default function BaixaEntrega() {
 
         if (uploadError) throw uploadError;
         fotoPath = fileName;
+        fotoReciboPath = await gerarEEnviarRecibo(fileName, fotoFile);
       }
 
       // Modo "refazer foto": já existe baixa criada — apenas atualiza foto_path
@@ -679,6 +681,7 @@ export default function BaixaEntrega() {
           .from("baixas_entrega")
           .update({
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             // limpa validação anterior para revalidar
             validacao_score: null,
             validacao_status: null,
@@ -698,6 +701,7 @@ export default function BaixaEntrega() {
             recebedor_nome: recebedorNome || null,
             observacao: observacao || null,
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             latitude: gpsCoords?.lat || null,
             longitude: gpsCoords?.lng || null,
             registrado_por: user?.id || null,
