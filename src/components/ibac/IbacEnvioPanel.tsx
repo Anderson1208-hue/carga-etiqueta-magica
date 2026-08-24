@@ -19,8 +19,11 @@ export function IbacEnvioPanel() {
     modo_imagem: "url" as "url" | "base64",
     codigo_evento_entrega: "01",
     max_imagem_kb: 1024,
+    data_piloto: "",
+    canhoto_apos_prestacao: true,
   });
   const [whitelistTexto, setWhitelistTexto] = useState("");
+  const [placasTexto, setPlacasTexto] = useState("");
 
   const { data: cfg } = useQuery({
     queryKey: ["ibac-config-envio"],
