@@ -463,6 +463,7 @@ export type Database = {
           conferido_por: string | null
           created_at: string
           foto_path: string | null
+          foto_recibo_path: string | null
           id: string
           imagem_ibac_enviada_em: string | null
           imagem_ibac_queue_id: string | null
@@ -499,6 +500,7 @@ export type Database = {
           conferido_por?: string | null
           created_at?: string
           foto_path?: string | null
+          foto_recibo_path?: string | null
           id?: string
           imagem_ibac_enviada_em?: string | null
           imagem_ibac_queue_id?: string | null
@@ -535,6 +537,7 @@ export type Database = {
           conferido_por?: string | null
           created_at?: string
           foto_path?: string | null
+          foto_recibo_path?: string | null
           id?: string
           imagem_ibac_enviada_em?: string | null
           imagem_ibac_queue_id?: string | null

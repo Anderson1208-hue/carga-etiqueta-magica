@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CanhotoViewer, type CanhotoItem } from "@/components/prestacao/CanhotoViewer";
 import {
   Tooltip,
   TooltipContent,
@@ -70,6 +71,7 @@ interface BaixaItem {
   ocorrencia: string | null;
   recebedor_nome: string | null;
   foto_path: string | null;
+  foto_recibo_path: string | null;
   latitude: number | null;
   longitude: number | null;
   registrado_em: string | null;
@@ -119,6 +121,23 @@ export default function PrestacaoContas() {
   const [pernoitando, setPernoitando] = useState(false);
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [conferindoLote, setConferindoLote] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  // Somente baixas com foto entram na conferência em massa de canhotos.
+  const itensCanhoto: CanhotoItem[] = useMemo(
+    () =>
+      baixas
+        .filter((b) => b.foto_path || b.foto_recibo_path)
+        .map((b) => ({
+          id: b.id,
+          numero_nf: b.nf?.numero_nf ?? null,
+          destinatario: b.nf?.dest_razao_social ?? null,
+          foto_path: b.foto_path,
+          foto_recibo_path: b.foto_recibo_path,
+          conferencia_status: b.conferencia_status,
+        })),
+    [baixas],
+  );
 
   async function marcarPernoite() {
     if (!veiculoSel) return;
@@ -249,7 +268,7 @@ export default function PrestacaoContas() {
       const { data, error } = await supabase
         .from("baixas_entrega")
         .select(`
-          id, nf_id, status, ocorrencia, recebedor_nome, foto_path, latitude, longitude,
+          id, nf_id, status, ocorrencia, recebedor_nome, foto_path, foto_recibo_path, latitude, longitude,
           registrado_em, validacao_score, validacao_status, validacao_problemas,
           conferido_em, conferencia_status, conferencia_motivo,
           nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf)
@@ -871,6 +890,14 @@ export default function PrestacaoContas() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             size="sm"
+                            variant="secondary"
+                            disabled={itensCanhoto.length === 0}
+                            onClick={() => setViewerOpen(true)}
+                          >
+                            Conferir canhotos ({itensCanhoto.length})
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="outline"
                             disabled={selecionadas.size === 0 || conferindoLote}
                             onClick={() => conferirEmLote(Array.from(selecionadas))}
@@ -937,6 +964,33 @@ export default function PrestacaoContas() {
             </div>
           </div>
         </div>
+
+        {/* Conferência de canhotos em massa (tiras leves + navegação por teclado) */}
+        <CanhotoViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          itens={itensCanhoto}
+          bloqueado={!!veiculoSel?.prestacao_contas_em}
+          onConferir={async (id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) await marcarConferido(b);
+          }}
+          onPendencia={(id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) {
+              setViewerOpen(false);
+              setPendDialog({ baixa: b, motivo: "" });
+            }
+          }}
+          onNovaFoto={(id) => {
+            const b = baixas.find((x) => x.id === id);
+            if (b) {
+              setViewerOpen(false);
+              void solicitarNovaFoto(b);
+            }
+          }}
+        />
+
 
         {/* Foto modal */}
         <Dialog open={!!fotoUrl} onOpenChange={(o) => !o && setFotoUrl(null)}>

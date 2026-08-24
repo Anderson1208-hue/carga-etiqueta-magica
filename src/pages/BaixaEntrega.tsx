@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { blobCanhotoRecibo } from "@/lib/okentrega-canhoto";
 import {
   Truck,
   Camera,
@@ -83,6 +84,28 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
   { value: "reentrega", label: "Reentrega", icon: <RotateCcw className="w-5 h-5" />, color: "text-blue-600" },
   { value: "sem_canhoto", label: "Sem canhoto/assinatura", icon: <AlertTriangle className="w-5 h-5" />, color: "text-amber-600" },
 ];
+
+/**
+ * Gera a tira do recibo (1536x240 @150dpi) a partir da foto original e sobe no
+ * mesmo bucket com sufixo `-recibo.jpg`. É a imagem usada na conferência rápida
+ * da Prestação de Contas e no envio ao cliente (IBAC/OK Entrega): dezenas de KB
+ * em vez de MB, o que permite lotes grandes por veículo.
+ * Falha aqui nunca derruba a baixa — a foto original já está salva.
+ */
+async function gerarEEnviarRecibo(fotoPath: string, fotoBlob: Blob): Promise<string | null> {
+  try {
+    const recibo = await blobCanhotoRecibo(fotoBlob);
+    const reciboPath = `${fotoPath.replace(/\.[^./]+$/, "")}-recibo.jpg`;
+    const { error } = await supabase.storage
+      .from("comprovantes")
+      .upload(reciboPath, recibo, { contentType: "image/jpeg", upsert: true });
+    if (error) throw error;
+    return reciboPath;
+  } catch (e) {
+    console.warn("Falha ao gerar tira do recibo:", e);
+    return null;
+  }
+}
 
 export default function BaixaEntrega() {
   const { user, signOut } = useAuth();
@@ -403,6 +426,7 @@ export default function BaixaEntrega() {
 
           // 1) Tenta upload da foto, se houver foto offline persistida
           let fotoPath: string | null = null;
+          let fotoReciboPath: string | null = null;
           const fotoBlob = await getFotoOffline(baixa.id);
           if (fotoBlob) {
             const ext = (fotoBlob.type?.split("/")?.[1] || "jpg").replace("jpeg", "jpg");
@@ -412,6 +436,7 @@ export default function BaixaEntrega() {
               .upload(fileName, fotoBlob, { contentType: fotoBlob.type || "image/jpeg" });
             if (upErr) throw upErr;
             fotoPath = fileName;
+            fotoReciboPath = await gerarEEnviarRecibo(fileName, fotoBlob);
           }
 
           // 2) Insere a baixa
@@ -422,6 +447,7 @@ export default function BaixaEntrega() {
             ocorrencia: baixa.ocorrencia,
             recebedor_nome: baixa.recebedor_nome,
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             latitude: baixa.latitude,
             longitude: baixa.longitude,
             registrado_por: baixa.registrado_por,
@@ -631,6 +657,7 @@ export default function BaixaEntrega() {
 
       // Online submission (original logic)
       let fotoPath: string | null = null;
+      let fotoReciboPath: string | null = null;
 
       if (fotoFile) {
         const ext = fotoFile.name.split(".").pop() || "jpg";
@@ -642,6 +669,7 @@ export default function BaixaEntrega() {
 
         if (uploadError) throw uploadError;
         fotoPath = fileName;
+        fotoReciboPath = await gerarEEnviarRecibo(fileName, fotoFile);
       }
 
       // Modo "refazer foto": já existe baixa criada — apenas atualiza foto_path
@@ -653,6 +681,7 @@ export default function BaixaEntrega() {
           .from("baixas_entrega")
           .update({
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             // limpa validação anterior para revalidar
             validacao_score: null,
             validacao_status: null,
@@ -672,6 +701,7 @@ export default function BaixaEntrega() {
             recebedor_nome: recebedorNome || null,
             observacao: observacao || null,
             foto_path: fotoPath,
+            foto_recibo_path: fotoReciboPath,
             latitude: gpsCoords?.lat || null,
             longitude: gpsCoords?.lng || null,
             registrado_por: user?.id || null,

@@ -30,10 +30,23 @@ const BATCH_SIZE = 25;
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
 
+// Auto-encadeamento: cada rodada processa um lote e chama a próxima até a fila
+// esvaziar. O orçamento de saltos evita corrida infinita (ver regras de job em lote).
+const MAX_PROFUNDIDADE = 20;
+const COOLDOWN_MS = 1500;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  let corpo: Record<string, unknown> = {};
+  try {
+    corpo = (await req.json()) ?? {};
+  } catch {
+    corpo = {};
+  }
+  const profundidade = Number(corpo.profundidade ?? 0);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
@@ -244,10 +257,25 @@ Deno.serve(async (req) => {
 
     // Canhoto: IBAC exige a imagem junto ao evento de entrega (cód. 01 por padrão).
     if (item.evento_interno === "envio_canhoto") {
-      if (modoImagem === "base64" && payload.foto_path) {
+      // Prefere a TIRA do recibo (dezenas de KB) gerada na baixa; a foto original
+      // (MB) é fallback. É o que permite fechar veículos de 50+ notas sem estourar
+      // memória nem o limite de KB por imagem.
+      let caminhoImagem = (payload.foto_recibo_path as string | undefined) ?? null;
+      if (!caminhoImagem && item.baixa_id) {
+        const { data: bx } = await supabase
+          .from("baixas_entrega")
+          .select("foto_recibo_path")
+          .eq("id", item.baixa_id)
+          .maybeSingle();
+        caminhoImagem = (bx?.foto_recibo_path as string | null) ?? null;
+      }
+      if (!caminhoImagem && payload.foto_path) caminhoImagem = String(payload.foto_path);
+      if (caminhoImagem) payload.foto_path = caminhoImagem;
+
+      if (modoImagem === "base64" && caminhoImagem) {
         const { data: file, error: dlErr } = await supabase.storage
           .from("comprovantes")
-          .download(String(payload.foto_path));
+          .download(caminhoImagem);
         if (dlErr || !file) {
           erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
         } else {
@@ -529,6 +557,24 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("[ibac-sync] Falha ao verificar alertas:", err);
   }
+  // Próximo salto: só quando o envio está ligado, houve trabalho real nesta
+  // rodada e ainda restam pendentes. O caminho ocioso encerra a corrente.
+  let proximoSalto = false;
+  if (envioAtivo && resultados.length > 0 && profundidade < MAX_PROFUNDIDADE) {
+    const { count: restantes } = await supabase
+      .from("ibac_eventos_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+    if ((restantes ?? 0) > 0) {
+      proximoSalto = true;
+      setTimeout(() => {
+        supabase.functions
+          .invoke("ibac-sync", { body: { profundidade: profundidade + 1 } })
+          .catch((e) => console.error("[ibac-sync] Falha no auto-encadeamento:", e));
+      }, COOLDOWN_MS);
+    }
+  }
 
   return new Response(
     JSON.stringify({
@@ -543,6 +589,9 @@ Deno.serve(async (req) => {
       data_piloto: dataPiloto,
       modo_imagem: modoImagem,
       whitelist_ativa: whitelist.length > 0,
+      profundidade,
+      proximo_salto: proximoSalto,
+
 
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
