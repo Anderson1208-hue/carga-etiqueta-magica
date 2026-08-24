@@ -188,3 +188,27 @@ export async function previewCanhotoOkEntrega(
   const { dataUrl, bytes } = await gerar(arquivo, modo, { ...AJUSTE_PADRAO, ...ajuste }, qualidade);
   return { dataUrl, bytes };
 }
+
+/**
+ * Mesma tira 1536x240 @150dpi, mas como Blob JPEG pronto para upload no bucket.
+ * Usada na baixa de entrega para persistir `baixas_entrega.foto_recibo_path`,
+ * mantendo a foto original intacta em `foto_path`.
+ */
+export async function blobCanhotoRecibo(
+  arquivo: Blob,
+  modo: ModoImagem = "recibo",
+  ajuste: Partial<AjusteCanhoto> = {},
+  qualidade = 0.92,
+): Promise<Blob> {
+  const bitmap = await createImageBitmap(arquivo);
+  const ajusteFinal = { ...AJUSTE_PADRAO, ...ajuste };
+  const fonte = ajusteFinal.rotacao ? orientar(bitmap, ajusteFinal.rotacao) : bitmap;
+  const canvas = desenhar(fonte as HTMLCanvasElement, modo, ajusteFinal);
+  bitmap.close?.();
+
+  const blob: Blob = await new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao gerar JPEG"))), "image/jpeg", qualidade),
+  );
+  const bytes = aplicarDensidadeJfif(new Uint8Array(await blob.arrayBuffer()));
+  return new Blob([bytes as unknown as BlobPart], { type: "image/jpeg" });
+}
