@@ -589,6 +589,9 @@ Deno.serve(async (req) => {
       data_piloto: dataPiloto,
       modo_imagem: modoImagem,
       whitelist_ativa: whitelist.length > 0,
+      profundidade,
+      proximo_salto: proximoSalto,
+
 
     }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } },
