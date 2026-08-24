@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { blobCanhotoRecibo } from "@/lib/okentrega-canhoto";
 import {
   Truck,
   Camera,
