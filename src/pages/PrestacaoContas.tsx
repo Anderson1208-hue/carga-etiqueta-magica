@@ -120,6 +120,23 @@ export default function PrestacaoContas() {
   const [pernoitando, setPernoitando] = useState(false);
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [conferindoLote, setConferindoLote] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  // Somente baixas com foto entram na conferência em massa de canhotos.
+  const itensCanhoto: CanhotoItem[] = useMemo(
+    () =>
+      baixas
+        .filter((b) => b.foto_path || b.foto_recibo_path)
+        .map((b) => ({
+          id: b.id,
+          numero_nf: b.nf?.numero_nf ?? null,
+          destinatario: b.nf?.dest_razao_social ?? null,
+          foto_path: b.foto_path,
+          foto_recibo_path: b.foto_recibo_path,
+          conferencia_status: b.conferencia_status,
+        })),
+    [baixas],
+  );
 
   async function marcarPernoite() {
     if (!veiculoSel) return;
