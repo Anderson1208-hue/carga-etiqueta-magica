@@ -278,28 +278,59 @@ Deno.serve(async (req) => {
       ? "Comprovante de entrega (canhoto) digitalizado."
       : String((payload as any).descricao ?? (payload as any).ocorrencia ?? "Entrega realizada.");
 
-    const imagens = payload.imagem_base64
-      ? [{
-          base64: payload.imagem_base64,
-          nomeImagem: payload.imagem_nome ?? "comprovante.jpg",
-          tipo: "OCORRENCIA",
-        }]
-      : undefined;
+    const somenteImagem = item.evento_interno === "envio_canhoto";
 
-    const body: Record<string, unknown> = {
-      chaveNota: chaveNfe,
-      numeroNota: numeroNf,
-      cnpjTransportadora: cnpjTransportadora,
-      codigoEventoOcorrencia: Number(codigoFinal),
-      dataEventoOcorrencia,
-      horaEventoOcorrencia,
-      descricaoOcorrencia: descricao,
-      ...(imagens ? { imagens } : {}),
-    };
+    let endpointDestino = IBAC_API_URL;
+    let body: Record<string, unknown>;
 
+    if (somenteImagem) {
+      // Endpoint dedicado de canhoto: envia SOMENTE a imagem vinculada à chave da NF.
+      // Não reenvia a ocorrência de entrega -> não gera 409 "Ocorrência já integrada".
+      endpointDestino = IBAC_CANHOTO_URL;
 
+      // Chave do CT-e vinculado à NF (opcional no layout da IBAC)
+      let chaveCte: string | null = null;
+      const { data: cteRow } = await supabase
+        .from("ctes")
+        .select("chave_cte")
+        .or(`nf_id.eq.${payload.nf_id},chave_nf_referenciada.eq.${chaveNfe}`)
+        .not("chave_cte", "is", null)
+        .limit(1)
+        .maybeSingle();
+      chaveCte = cteRow?.chave_cte ?? null;
 
+      const imagem: Record<string, unknown> = {
+        nomeImagem: payload.imagem_nome ?? String(payload.foto_path ?? "comprovante.jpg").split("/").pop(),
+        tipo: "CANHOTO",
+      };
+      if (payload.imagem_base64) imagem.base64 = payload.imagem_base64;
+      else if (payload.foto_url) imagem.urlImagem = payload.foto_url;
 
+      body = {
+        chave: chaveNfe,
+        ...(chaveCte ? { chaveCte } : {}),
+        imagens: [imagem],
+      };
+    } else {
+      const imagens = payload.imagem_base64
+        ? [{
+            base64: payload.imagem_base64,
+            nomeImagem: payload.imagem_nome ?? "comprovante.jpg",
+            tipo: "CANHOTO",
+          }]
+        : undefined;
+
+      body = {
+        chaveNota: chaveNfe,
+        numeroNota: numeroNf,
+        cnpjTransportadora: cnpjTransportadora,
+        codigoEventoOcorrencia: Number(codigoFinal),
+        dataEventoOcorrencia,
+        horaEventoOcorrencia,
+        descricaoOcorrencia: descricao,
+        ...(imagens ? { imagens } : {}),
+      };
+    }
 
     const t0 = Date.now();
     let respStatus = 0;
@@ -308,7 +339,8 @@ Deno.serve(async (req) => {
     let erroMsg: string | null = null;
 
     try {
-      const resp = await fetch(IBAC_API_URL, {
+      if (!endpointDestino) throw new Error("Endpoint de canhoto não configurado (IBAC_CANHOTO_URL).");
+      const resp = await fetch(endpointDestino, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
