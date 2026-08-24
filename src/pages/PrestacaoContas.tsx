@@ -872,6 +872,14 @@ export default function PrestacaoContas() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             size="sm"
+                            variant="secondary"
+                            disabled={itensCanhoto.length === 0}
+                            onClick={() => setViewerOpen(true)}
+                          >
+                            Conferir canhotos ({itensCanhoto.length})
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="outline"
                             disabled={selecionadas.size === 0 || conferindoLote}
                             onClick={() => conferirEmLote(Array.from(selecionadas))}
