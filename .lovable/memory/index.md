@@ -21,6 +21,7 @@ type: reference
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Match cProd zeros](mem://logica/match-cprod-zeros-a-esquerda) — c_prod da NF vem zero-padded; join com produtos.codigo sempre com ltrim(...,'0').
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
+- [IBAC Endpoints](mem://funcionalidades/ibac-endpoint-canhoto-separado) — Ocorrência vs. somente-imagem (canhoto) em endpoints distintos; evita HTTP 409.
 - [SLA e Tarifa por Região](mem://funcionalidades/comercial/sla-e-tarifa-por-regiao) — Regiões por fornecedor + cidades, SLA em dias úteis, tarifa única por região, acesso restrito.
 - [Cadastro de Produtos](mem://funcionalidades/cadastros/produtos-masterdata) — Tabela produtos por embarcador: dimensões, cubagem automática, paletização, shelf life; import Masterdata.
 - [Importação XML Duplicada](mem://logica/importacao-xml-duplicado) — Idempotent RPC import via import_batch_id.

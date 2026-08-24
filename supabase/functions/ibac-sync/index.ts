@@ -12,6 +12,17 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const IBAC_API_URL = (Deno.env.get("IBAC_API_URL") ?? "").trim();
 const IBAC_API_KEY = (Deno.env.get("IBAC_API_KEY") ?? "").trim();
+// Endpoint dedicado para enviar SOMENTE a imagem do canhoto (sem reenviar a ocorrência).
+// Evita HTTP 409 "Ocorrência já integrada". Pode ser sobrescrito por secret.
+const IBAC_CANHOTO_URL = (() => {
+  const custom = (Deno.env.get("IBAC_CANHOTO_URL") ?? "").trim();
+  if (custom) return custom;
+  try {
+    return new URL("/app/api/integracao-canhoto", IBAC_API_URL).toString();
+  } catch {
+    return "";
+  }
+})();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
@@ -267,28 +278,59 @@ Deno.serve(async (req) => {
       ? "Comprovante de entrega (canhoto) digitalizado."
       : String((payload as any).descricao ?? (payload as any).ocorrencia ?? "Entrega realizada.");
 
-    const imagens = payload.imagem_base64
-      ? [{
-          base64: payload.imagem_base64,
-          nomeImagem: payload.imagem_nome ?? "comprovante.jpg",
-          tipo: "OCORRENCIA",
-        }]
-      : undefined;
+    const somenteImagem = item.evento_interno === "envio_canhoto";
 
-    const body: Record<string, unknown> = {
-      chaveNota: chaveNfe,
-      numeroNota: numeroNf,
-      cnpjTransportadora: cnpjTransportadora,
-      codigoEventoOcorrencia: Number(codigoFinal),
-      dataEventoOcorrencia,
-      horaEventoOcorrencia,
-      descricaoOcorrencia: descricao,
-      ...(imagens ? { imagens } : {}),
-    };
+    let endpointDestino = IBAC_API_URL;
+    let body: Record<string, unknown>;
 
+    if (somenteImagem) {
+      // Endpoint dedicado de canhoto: envia SOMENTE a imagem vinculada à chave da NF.
+      // Não reenvia a ocorrência de entrega -> não gera 409 "Ocorrência já integrada".
+      endpointDestino = IBAC_CANHOTO_URL;
 
+      // Chave do CT-e vinculado à NF (opcional no layout da IBAC)
+      let chaveCte: string | null = null;
+      const { data: cteRow } = await supabase
+        .from("ctes")
+        .select("chave_cte")
+        .or(`nf_id.eq.${payload.nf_id},chave_nf_referenciada.eq.${chaveNfe}`)
+        .not("chave_cte", "is", null)
+        .limit(1)
+        .maybeSingle();
+      chaveCte = cteRow?.chave_cte ?? null;
 
+      const imagem: Record<string, unknown> = {
+        nomeImagem: payload.imagem_nome ?? String(payload.foto_path ?? "comprovante.jpg").split("/").pop(),
+        tipo: "CANHOTO",
+      };
+      if (payload.imagem_base64) imagem.base64 = payload.imagem_base64;
+      else if (payload.foto_url) imagem.urlImagem = payload.foto_url;
 
+      body = {
+        chave: chaveNfe,
+        ...(chaveCte ? { chaveCte } : {}),
+        imagens: [imagem],
+      };
+    } else {
+      const imagens = payload.imagem_base64
+        ? [{
+            base64: payload.imagem_base64,
+            nomeImagem: payload.imagem_nome ?? "comprovante.jpg",
+            tipo: "CANHOTO",
+          }]
+        : undefined;
+
+      body = {
+        chaveNota: chaveNfe,
+        numeroNota: numeroNf,
+        cnpjTransportadora: cnpjTransportadora,
+        codigoEventoOcorrencia: Number(codigoFinal),
+        dataEventoOcorrencia,
+        horaEventoOcorrencia,
+        descricaoOcorrencia: descricao,
+        ...(imagens ? { imagens } : {}),
+      };
+    }
 
     const t0 = Date.now();
     let respStatus = 0;
@@ -297,7 +339,8 @@ Deno.serve(async (req) => {
     let erroMsg: string | null = null;
 
     try {
-      const resp = await fetch(IBAC_API_URL, {
+      if (!endpointDestino) throw new Error("Endpoint de canhoto não configurado (IBAC_CANHOTO_URL).");
+      const resp = await fetch(endpointDestino, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,7 +360,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("ibac_log_envios").insert({
       queue_id: item.id,
-      endpoint: IBAC_API_URL,
+      endpoint: endpointDestino,
       request_body: body,
       response_status: respStatus,
       response_body: respBody as any,
