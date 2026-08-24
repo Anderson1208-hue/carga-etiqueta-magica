@@ -30,10 +30,23 @@ const BATCH_SIZE = 25;
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
 
+// Auto-encadeamento: cada rodada processa um lote e chama a próxima até a fila
+// esvaziar. O orçamento de saltos evita corrida infinita (ver regras de job em lote).
+const MAX_PROFUNDIDADE = 20;
+const COOLDOWN_MS = 1500;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  let corpo: Record<string, unknown> = {};
+  try {
+    corpo = (await req.json()) ?? {};
+  } catch {
+    corpo = {};
+  }
+  const profundidade = Number(corpo.profundidade ?? 0);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
