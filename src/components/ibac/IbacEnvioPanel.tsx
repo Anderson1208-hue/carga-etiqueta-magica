@@ -67,7 +67,12 @@ export function IbacEnvioPanel() {
     mutationFn: async () => {
       const { error } = await supabase
         .from("ibac_config_envio")
-        .update({ ...form, whitelist_nfs: whitelist })
+        .update({
+          ...form,
+          data_piloto: form.data_piloto || null,
+          placas_piloto: placas,
+          whitelist_nfs: whitelist,
+        } as any)
         .eq("id", true);
       if (error) throw error;
     },
