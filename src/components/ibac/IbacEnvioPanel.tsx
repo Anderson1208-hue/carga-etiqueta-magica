@@ -45,14 +45,22 @@ export function IbacEnvioPanel() {
         modo_imagem: (cfg.modo_imagem as "url" | "base64") ?? "url",
         codigo_evento_entrega: cfg.codigo_evento_entrega ?? "01",
         max_imagem_kb: cfg.max_imagem_kb ?? 1024,
+        data_piloto: (cfg as any).data_piloto ?? "",
+        canhoto_apos_prestacao: (cfg as any).canhoto_apos_prestacao ?? true,
       });
       setWhitelistTexto((cfg.whitelist_nfs ?? []).join("\n"));
+      setPlacasTexto(((cfg as any).placas_piloto ?? []).join(" "));
     }
   }, [cfg]);
 
   const whitelist = whitelistTexto
     .split(/[\s,;]+/)
     .map((v) => v.trim())
+    .filter(Boolean);
+
+  const placas = placasTexto
+    .split(/[\s,;]+/)
+    .map((v) => v.trim().toUpperCase())
     .filter(Boolean);
 
   const salvar = useMutation({
