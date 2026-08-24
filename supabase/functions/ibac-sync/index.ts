@@ -12,6 +12,17 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const IBAC_API_URL = (Deno.env.get("IBAC_API_URL") ?? "").trim();
 const IBAC_API_KEY = (Deno.env.get("IBAC_API_KEY") ?? "").trim();
+// Endpoint dedicado para enviar SOMENTE a imagem do canhoto (sem reenviar a ocorrência).
+// Evita HTTP 409 "Ocorrência já integrada". Pode ser sobrescrito por secret.
+const IBAC_CANHOTO_URL = (() => {
+  const custom = (Deno.env.get("IBAC_CANHOTO_URL") ?? "").trim();
+  if (custom) return custom;
+  try {
+    return new URL("/app/api/integracao-canhoto", IBAC_API_URL).toString();
+  } catch {
+    return "";
+  }
+})();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
 const BATCH_SIZE = 25;
