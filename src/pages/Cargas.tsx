@@ -742,9 +742,10 @@ export default function Cargas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
-                          {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                        <Button variant="ghost" size="sm" onClick={() => setEdiCacauCarga(carga)} title="Importar EDI Cacau (NOTFIS) — m³ pelo peso cubado ÷ 300">
+                          <FileDown className="w-4 h-4" />
                         </Button>
+
                         <Button variant="ghost" size="sm" onClick={() => setAddXmlCarga(carga)} title="Adicionar XML à carga">
                           <FilePlus2 className="w-4 h-4" />
                         </Button>
