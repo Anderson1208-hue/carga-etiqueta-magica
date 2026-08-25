@@ -17,6 +17,9 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BATCH_SIZE = 500;
 const MAX_TENTATIVAS = 5;
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 7; // 7 dias
+// Escopo do piloto: só canhotos a partir de 24/08/2026 (00:00 BRT = 03:00 UTC).
+// Histórico anterior não deve ser enviado à IBAC.
+const DATA_CORTE_ISO = "2026-08-24T03:00:00Z";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
