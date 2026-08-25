@@ -95,7 +95,9 @@ Deno.serve(async (req) => {
 
   // Com whitelist ativa, filtra direto no banco pelas notas de teste
   // (evita que fiquem fora da janela por trás de eventos antigos).
-  const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
+  // Piloto por placa também precisa de janela ampla: senão os eventos das placas
+// liberadas ficam atrás do backlog antigo e nunca entram no lote.
+  const janela = whitelist.length > 0 || placasPiloto.length > 0 ? 1000 : BATCH_SIZE;
 
   let query = supabase
     .from("ibac_eventos_queue")
