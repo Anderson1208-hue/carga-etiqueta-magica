@@ -47,10 +47,11 @@ import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { Badge } from "@/components/ui/badge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature, FileType } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature, FileType, FileDown } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { AtualizarM3TxtDocileDialog } from "@/components/cargas/AtualizarM3TxtDocileDialog";
+import { ImportarEdiCacauDialog } from "@/components/cargas/ImportarEdiCacauDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { ImportarMinutaDialog } from "@/components/cargas/ImportarMinutaDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
