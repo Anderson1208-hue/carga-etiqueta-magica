@@ -1,9 +1,11 @@
 // Parser do EDI NOTFIS (IBAC / Cacau Show) para extração de cubagem por NF.
 //
-// Memória de cálculo confirmada com o arquivo de 24/08/2026 (MQX5615, 532 NFs):
+// Memória de cálculo corrigida com planilha IBAC_m3_NOTFIS_CORRIGIDO.xlsx
+// e layout PROCEDA NOTFIS 3.1 (registro 313, 240 posições):
 //   - registro 313 = uma NF
-//   - peso bruto (pos. 100-107, 2 decimais) bateu 1:1 com o somatório da carga no banco
-//   - último campo numérico do registro (pos. 197-212, 2 decimais) = PESO CUBADO em kg
+//   - peso bruto: posições 101-107 do layout = slice(100, 107), 2 decimais
+//   - peso densidade/cubagem: posições 108-112 do layout = slice(107, 112), 2 decimais
+//   - NÃO usar posições 198-212: no layout oficial isso é valor total do frete, não cubagem
 //   - fator de cubagem IBAC = 300 kg/m³  =>  volume_m3 = peso_cubado / 300
 
 export const FATOR_CUBAGEM_IBAC = 300;
@@ -60,21 +62,7 @@ export function parseNotfisCubagem(content: string): NotfisCubagemRow[] {
     const valorNf = num(ln.slice(85, 100), 2);
     const pesoBruto = num(ln.slice(100, 107), 2);
 
-    // Peso cubado: campo final do registro. Posição nominal 197-212; alguns
-    // arquivos deslocam 2 posições, então buscamos o último grupo de dígitos
-    // não-zero da cauda quando a posição nominal vier vazia.
-    let pesoCubado = num(ln.slice(197, 212), 2);
-    if (pesoCubado <= 0) {
-      const cauda = ln.slice(150);
-      const grupos = cauda.split(/\s+/).filter(Boolean);
-      for (let i = grupos.length - 1; i >= 0; i--) {
-        const valor = num(grupos[i], 2);
-        if (valor > 0) {
-          pesoCubado = valor;
-          break;
-        }
-      }
-    }
+    const pesoCubado = num(ln.slice(107, 112), 2);
 
     const volumeM3 = pesoCubado > 0 ? +(pesoCubado / FATOR_CUBAGEM_IBAC).toFixed(4) : 0;
 
