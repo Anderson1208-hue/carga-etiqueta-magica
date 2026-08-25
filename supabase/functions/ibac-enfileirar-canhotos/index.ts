@@ -17,6 +17,9 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BATCH_SIZE = 500;
 const MAX_TENTATIVAS = 5;
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 7; // 7 dias
+// Escopo do piloto: só canhotos a partir de 24/08/2026 (00:00 BRT = 03:00 UTC).
+// Histórico anterior não deve ser enviado à IBAC.
+const DATA_CORTE_ISO = "2026-08-24T03:00:00Z";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -67,7 +70,8 @@ Deno.serve(async (req) => {
     .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
-    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS);
+    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
+    .gte("registrado_em", DATA_CORTE_ISO);
 
   if (veiculoIdAlvo) {
     query = query.eq("veiculo_id", veiculoIdAlvo);
