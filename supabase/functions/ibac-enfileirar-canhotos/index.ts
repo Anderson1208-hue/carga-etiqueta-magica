@@ -27,9 +27,13 @@ Deno.serve(async (req) => {
 
   // Filtro opcional por NFs específicas (teste controlado): { nfs: ["3897130", "chave..."] }
   let nfsAlvo: string[] = [];
+  let veiculoIdAlvo: string | null = null;
   try {
     const body = await req.json();
     nfsAlvo = (body?.nfs ?? []).map((v: unknown) => String(v).trim()).filter(Boolean);
+    veiculoIdAlvo = typeof body?.veiculo_id === "string" && /^[0-9a-f-]{36}$/i.test(body.veiculo_id)
+      ? body.veiculo_id
+      : null;
   } catch {
     nfsAlvo = [];
   }
@@ -64,6 +68,10 @@ Deno.serve(async (req) => {
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
     .lt("imagem_ibac_tentativas", MAX_TENTATIVAS);
+
+  if (veiculoIdAlvo) {
+    query = query.eq("veiculo_id", veiculoIdAlvo);
+  }
 
   if (nfsAlvo.length > 0) {
     query = query.or(
@@ -187,6 +195,7 @@ Deno.serve(async (req) => {
   return new Response(
     JSON.stringify({
       status: "ok",
+      veiculo_id: veiculoIdAlvo,
       cnpjs_configurados: prefixos.length,
       candidatos,
       enfileirados,

@@ -515,12 +515,22 @@ export default function PrestacaoContas() {
         })
         .eq("id", veiculoSel.id);
       if (error) throw error;
-      toast({ title: "Prestação de contas encerrada" });
-      // Libera o envio das imagens (canhotos) à IBAC deste veículo — respeita o
-      // escopo do piloto (placas/data) e o kill switch de envio.
-      supabase.functions
-        .invoke("ibac-sync")
-        .catch((e) => console.warn("ibac-sync (encerramento) falhou:", e));
+      // Cria a fila de canhotos exclusivamente para o veículo encerrado e só
+      // então dispara o envio. O ibac-sync mantém as travas de placa/data piloto.
+      const { data: fila, error: filaError } = await supabase.functions.invoke(
+        "ibac-enfileirar-canhotos",
+        { body: { veiculo_id: veiculoSel.id } },
+      );
+      if (filaError) throw filaError;
+
+      const enfileirados = Number(fila?.enfileirados ?? 0);
+      const { error: syncError } = await supabase.functions.invoke("ibac-sync");
+      if (syncError) throw syncError;
+
+      toast({
+        title: "Prestação de contas encerrada",
+        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC.`,
+      });
       await carregarVeiculos();
       setVeiculoSel(null);
       setBaixas([]);
