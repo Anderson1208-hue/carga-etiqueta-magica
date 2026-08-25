@@ -93,6 +93,7 @@ export default function Cargas() {
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
   const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [m3TxtDocileCarga, setM3TxtDocileCarga] = useState<Carga | null>(null);
+  const [ediCacauCarga, setEdiCacauCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [minutaCarga, setMinutaCarga] = useState<Carga | null>(null);
   const [addXmlCarga, setAddXmlCarga] = useState<Carga | null>(null);
