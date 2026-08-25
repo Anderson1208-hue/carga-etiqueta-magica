@@ -243,11 +243,15 @@ Deno.serve(async (req) => {
     pendentes = pendentes.filter((item) => {
       const veic = item.nf_id ? veiculoPorNf.get(item.nf_id) : undefined;
 
-      // Escopo do piloto: só placas listadas (e data, se informada)
+      // Escopo do piloto: placas listadas (vazio = todas)
       if (placasPiloto.length > 0) {
         if (!veic) return false;
         if (!placasPiloto.includes(normPlaca(veic.placa))) return false;
-        if (dataPiloto && String(veic.data ?? "") !== String(dataPiloto)) return false;
+      }
+      // Corte por data da rota: só transmite rotas a partir de data_piloto
+      if (dataPiloto) {
+        if (!veic?.data) return false;
+        if (String(veic.data) < String(dataPiloto)) return false;
       }
 
       // Imagem do canhoto: só depois de "Encerrar Prestação de Contas" do veículo
