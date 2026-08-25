@@ -863,6 +863,16 @@ export default function Cargas() {
             onUpdated={loadCargas}
           />
         )}
+        {/* Importar EDI Cacau (NOTFIS) Dialog */}
+        {ediCacauCarga && (
+          <ImportarEdiCacauDialog
+            open={!!ediCacauCarga}
+            onOpenChange={(open) => !open && setEdiCacauCarga(null)}
+            cargaId={ediCacauCarga.id}
+            cargaPlaca={ediCacauCarga.placa}
+            onUpdated={loadCargas}
+          />
+        )}
         {/* Adicionar XML à Carga Dialog */}
         {addXmlCarga && (
           <AdicionarXmlDialog
