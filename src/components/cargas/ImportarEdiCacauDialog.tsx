@@ -121,17 +121,31 @@ export function ImportarEdiCacauDialog({
       let atualizadas = 0;
       let erros = 0;
 
+      // Agrupa por valor de m³ para atualizar em lote (1 request por valor distinto),
+      // evitando centenas de requisições sequenciais em cargas grandes (500+ NFs).
+      const porVolume = new Map<number, string[]>();
       for (const row of rows) {
         const nfId = mapaNfs.get(row.numeroNf);
         if (!nfId || row.volumeM3 <= 0) continue;
+        const lista = porVolume.get(row.volumeM3) ?? [];
+        lista.push(nfId);
+        porVolume.set(row.volumeM3, lista);
+      }
 
-        const { error: errUpd } = await supabase
-          .from("notas_fiscais")
-          .update({ volume_m3: row.volumeM3 })
-          .eq("id", nfId);
+      const grupos = Array.from(porVolume.entries());
+      const CHUNK = 200;
 
-        if (errUpd) erros++;
-        else atualizadas++;
+      for (const [volume, ids] of grupos) {
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          const fatia = ids.slice(i, i + CHUNK);
+          const { error: errUpd } = await supabase
+            .from("notas_fiscais")
+            .update({ volume_m3: volume })
+            .in("id", fatia);
+
+          if (errUpd) erros += fatia.length;
+          else atualizadas += fatia.length;
+        }
       }
 
       setSaved(true);
