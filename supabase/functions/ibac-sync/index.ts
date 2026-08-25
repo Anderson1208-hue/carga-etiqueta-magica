@@ -25,7 +25,10 @@ const IBAC_CANHOTO_URL = (() => {
 })();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
-const BATCH_SIZE = 25;
+// 8 por rodada: base64 de canhoto consome memória e lotes maiores estouram o
+// limite de recursos do worker (WORKER_RESOURCE_LIMIT). O auto-encadeamento
+// mantém a fila esvaziando sem travar.
+const BATCH_SIZE = 8;
 // Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
