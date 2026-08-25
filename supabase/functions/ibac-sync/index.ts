@@ -68,8 +68,10 @@ Deno.serve(async (req) => {
   const whitelist: string[] = (envioCfg?.whitelist_nfs ?? []).map((v: string) => String(v).trim()).filter(Boolean);
   const codigoEventoEntrega = (envioCfg?.codigo_evento_entrega ?? "01").trim();
   const maxImagemKb = envioCfg?.max_imagem_kb ?? 1024;
-  // Piloto controlado: restringe o envio às placas/data informadas e
-  // libera a imagem do canhoto só depois do encerramento da prestação de contas.
+  // Piloto controlado: restringe o envio às placas informadas (vazio = todas) e
+  // a rotas com data >= data_piloto (corte, não data exata) — evita transmitir
+  // histórico antigo parado na fila. A imagem do canhoto só sai depois do
+  // encerramento da prestação de contas do veículo.
   const normPlaca = (v: unknown) => String(v ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   const placasPiloto: string[] = ((envioCfg as any)?.placas_piloto ?? []).map(normPlaca).filter(Boolean);
   const dataPiloto: string | null = (envioCfg as any)?.data_piloto ?? null;
@@ -241,11 +243,15 @@ Deno.serve(async (req) => {
     pendentes = pendentes.filter((item) => {
       const veic = item.nf_id ? veiculoPorNf.get(item.nf_id) : undefined;
 
-      // Escopo do piloto: só placas listadas (e data, se informada)
+      // Escopo do piloto: placas listadas (vazio = todas)
       if (placasPiloto.length > 0) {
         if (!veic) return false;
         if (!placasPiloto.includes(normPlaca(veic.placa))) return false;
-        if (dataPiloto && String(veic.data ?? "") !== String(dataPiloto)) return false;
+      }
+      // Corte por data da rota: só transmite rotas a partir de data_piloto
+      if (dataPiloto) {
+        if (!veic?.data) return false;
+        if (String(veic.data) < String(dataPiloto)) return false;
       }
 
       // Imagem do canhoto: só depois de "Encerrar Prestação de Contas" do veículo
