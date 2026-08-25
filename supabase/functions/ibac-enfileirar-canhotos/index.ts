@@ -70,7 +70,8 @@ Deno.serve(async (req) => {
     .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
-    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS);
+    .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
+    .gte("registrado_em", DATA_CORTE_ISO);
 
   if (veiculoIdAlvo) {
     query = query.eq("veiculo_id", veiculoIdAlvo);
