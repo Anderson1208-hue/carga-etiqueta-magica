@@ -47,10 +47,11 @@ import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { Badge } from "@/components/ui/badge";
 
-import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature, FileType } from "lucide-react";
+import { Plus, Truck, Loader2, FileText, Eye, Trash2, Printer, Package, AlertTriangle, FileUp, Box, FilePlus2, FileSignature, FileType, FileDown } from "lucide-react";
 import { UploadCubagemDialog } from "@/components/cargas/UploadCubagemDialog";
 import { AtualizarM3XmlDialog } from "@/components/cargas/AtualizarM3XmlDialog";
 import { AtualizarM3TxtDocileDialog } from "@/components/cargas/AtualizarM3TxtDocileDialog";
+import { ImportarEdiCacauDialog } from "@/components/cargas/ImportarEdiCacauDialog";
 import { ImportarCteDialog } from "@/components/cargas/ImportarCteDialog";
 import { ImportarMinutaDialog } from "@/components/cargas/ImportarMinutaDialog";
 import { AdicionarXmlDialog } from "@/components/cargas/AdicionarXmlDialog";
@@ -92,6 +93,7 @@ export default function Cargas() {
   const [cubagemCarga, setCubagemCarga] = useState<Carga | null>(null);
   const [m3XmlCarga, setM3XmlCarga] = useState<Carga | null>(null);
   const [m3TxtDocileCarga, setM3TxtDocileCarga] = useState<Carga | null>(null);
+  const [ediCacauCarga, setEdiCacauCarga] = useState<Carga | null>(null);
   const [cteCarga, setCteCarga] = useState<Carga | null>(null);
   const [minutaCarga, setMinutaCarga] = useState<Carga | null>(null);
   const [addXmlCarga, setAddXmlCarga] = useState<Carga | null>(null);
@@ -742,9 +744,10 @@ export default function Cargas() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handlePrintNotaCarga(carga)} disabled={printingCargaId === carga.id} title="Imprimir Nota de Carga">
-                          {printingCargaId === carga.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                        <Button variant="ghost" size="sm" onClick={() => setEdiCacauCarga(carga)} title="Importar EDI Cacau (NOTFIS) — m³ pelo peso cubado ÷ 300">
+                          <FileDown className="w-4 h-4" />
                         </Button>
+
                         <Button variant="ghost" size="sm" onClick={() => setAddXmlCarga(carga)} title="Adicionar XML à carga">
                           <FilePlus2 className="w-4 h-4" />
                         </Button>
@@ -857,6 +860,16 @@ export default function Cargas() {
             onOpenChange={(open) => !open && setM3TxtDocileCarga(null)}
             cargaId={m3TxtDocileCarga.id}
             cargaPlaca={m3TxtDocileCarga.placa}
+            onUpdated={loadCargas}
+          />
+        )}
+        {/* Importar EDI Cacau (NOTFIS) Dialog */}
+        {ediCacauCarga && (
+          <ImportarEdiCacauDialog
+            open={!!ediCacauCarga}
+            onOpenChange={(open) => !open && setEdiCacauCarga(null)}
+            cargaId={ediCacauCarga.id}
+            cargaPlaca={ediCacauCarga.placa}
             onUpdated={loadCargas}
           />
         )}
