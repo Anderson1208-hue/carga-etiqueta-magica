@@ -97,16 +97,43 @@ Deno.serve(async (req) => {
   // (evita que fiquem fora da janela por trás de eventos antigos).
   const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
 
+  // Piloto por placa: resolve no banco as NFs dos veículos liberados e filtra a fila
+  // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
+  let nfIdsPiloto: string[] | null = null;
+  if (placasPiloto.length > 0) {
+    let qVeic = supabase.from("veiculos").select("id, placa, data");
+    if (dataPiloto) qVeic = qVeic.eq("data", dataPiloto);
+    const { data: veicsPiloto } = await qVeic;
+    const idsVeic = (veicsPiloto ?? [])
+      .filter((v: any) => placasPiloto.includes(normPlaca(v.placa)))
+      .map((v: any) => v.id);
+
+    if (idsVeic.length === 0) {
+      nfIdsPiloto = [];
+    } else {
+      const { data: vinc } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id")
+        .in("veiculo_id", idsVeic);
+      nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
+    }
+  }
+
   let query = supabase
     .from("ibac_eventos_queue")
     .select("*")
     .eq("status", "pendente")
     .lt("tentativas", maxTentativas);
 
+  if (nfIdsPiloto) {
+    query = query.in("nf_id", nfIdsPiloto.length > 0 ? nfIdsPiloto : ["00000000-0000-0000-0000-000000000000"]);
+  }
+
   if (whitelist.length > 0) {
     const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
     query = query.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
   }
+
 
   const { data: pendentesRaw, error: errSelect } = await query
     .order("created_at", { ascending: true })
