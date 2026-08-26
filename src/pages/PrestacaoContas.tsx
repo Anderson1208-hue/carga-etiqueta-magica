@@ -105,6 +105,15 @@ const OCORRENCIA_LABEL: Record<string, string> = {
   outros: "Outros",
 };
 
+export const CANHOTO_MOTIVO_LABEL: Record<string, string> = {
+  esquecido_motorista: "Motorista esqueceu de trazer",
+  perdido: "Canhoto perdido",
+  retido_no_cliente: "Retido no cliente",
+  ilegivel_refazer: "Ilegível — refazer foto",
+  outro: "Outro",
+};
+
+
 function isoHoje() {
   return new Date().toISOString().slice(0, 10);
 }
