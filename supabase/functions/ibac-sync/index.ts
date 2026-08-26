@@ -25,10 +25,11 @@ const IBAC_CANHOTO_URL = (() => {
 })();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
-// 3 por rodada: baixas antigas não têm a TIRA (foto_recibo_path), então a foto
-// original (MB) é baixada e comprimida em memória — lotes maiores estouram o
-// WORKER_RESOURCE_LIMIT. O auto-encadeamento mantém a fila esvaziando.
-const BATCH_SIZE = 3;
+// Lotes separados: eventos operacionais são leves (HTTP POST JSON) e podem ir
+// em maior quantidade; canhotos baixam/comprimem fotos em memória, por isso
+// permanecem em lote pequeno para não estourar o WORKER_RESOURCE_LIMIT.
+const BATCH_SIZE_EVENTOS = 25;
+const BATCH_SIZE_CANHOTOS = 3;
 // Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
@@ -100,7 +101,8 @@ Deno.serve(async (req) => {
 
   // Com whitelist ativa, filtra direto no banco pelas notas de teste
   // (evita que fiquem fora da janela por trás de eventos antigos).
-  const janela = whitelist.length > 0 ? 1000 : BATCH_SIZE;
+  const janelaEventos = whitelist.length > 0 ? 1000 : BATCH_SIZE_EVENTOS;
+  const janelaCanhotos = whitelist.length > 0 ? 1000 : BATCH_SIZE_CANHOTOS;
 
   // Piloto por placa: resolve no banco as NFs dos veículos liberados e filtra a fila
   // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
@@ -150,11 +152,11 @@ Deno.serve(async (req) => {
   const { data: eventosRaw, error: errEv } = await baseQuery()
     .neq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
-    .limit(janela);
+    .limit(janelaEventos);
   const { data: canhotosRaw, error: errCan } = await baseQuery()
     .eq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
-    .limit(janela);
+    .limit(janelaCanhotos);
   const pendentesRaw = [...(eventosRaw ?? []), ...(canhotosRaw ?? [])];
   const errSelect = errEv ?? errCan;
 
@@ -223,7 +225,9 @@ Deno.serve(async (req) => {
       return whitelist.includes(numero) || whitelist.includes(chave);
     });
     foraDaWhitelist = antes - pendentes.length;
-    pendentes = pendentes.slice(0, BATCH_SIZE);
+    const ev = pendentes.filter((i) => i.evento_interno !== "envio_canhoto").slice(0, BATCH_SIZE_EVENTOS);
+    const can = pendentes.filter((i) => i.evento_interno === "envio_canhoto").slice(0, BATCH_SIZE_CANHOTOS);
+    pendentes = [...ev, ...can];
   }
 
   // -------- Piloto por placa/data + liberação do canhoto na prestação de contas --------
@@ -279,7 +283,9 @@ Deno.serve(async (req) => {
       return true;
     });
     foraDoPiloto = antes - pendentes.length - aguardandoPrestacao;
-    pendentes = pendentes.slice(0, BATCH_SIZE);
+    const ev = pendentes.filter((i) => i.evento_interno !== "envio_canhoto").slice(0, BATCH_SIZE_EVENTOS);
+    const can = pendentes.filter((i) => i.evento_interno === "envio_canhoto").slice(0, BATCH_SIZE_CANHOTOS);
+    pendentes = [...ev, ...can];
   }
 
 
