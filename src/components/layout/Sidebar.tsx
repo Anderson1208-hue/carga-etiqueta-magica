@@ -65,6 +65,7 @@ const transporteItems = [
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
+  { name: "Canhotos Pendentes", href: "/canhotos-pendentes", icon: FileWarning },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
