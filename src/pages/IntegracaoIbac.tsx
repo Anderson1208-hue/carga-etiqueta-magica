@@ -517,6 +517,8 @@ export default function IntegracaoIbac() {
                         onClick={() => setDetalheId(f.id)}
                       >
                         <TableCell className="font-mono text-xs font-semibold">{nfDoEvento(f) ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{cteDoEvento(f) ?? "—"}</TableCell>
+
                         <TableCell className="text-xs max-w-[200px] truncate">
                           {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
                         </TableCell>
