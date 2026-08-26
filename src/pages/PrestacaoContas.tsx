@@ -132,6 +132,8 @@ export default function PrestacaoContas() {
   const [loadingBaixas, setLoadingBaixas] = useState(false);
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [pendDialog, setPendDialog] = useState<{ baixa: BaixaItem; motivo: string } | null>(null);
+  const [canhotoDialog, setCanhotoDialog] = useState<{ baixa: BaixaItem; motivo: string; obs: string } | null>(null);
+  const [salvandoCanhoto, setSalvandoCanhoto] = useState(false);
   const [obsEncerramento, setObsEncerramento] = useState("");
   const [encerrando, setEncerrando] = useState(false);
   const [pernoitando, setPernoitando] = useState(false);
