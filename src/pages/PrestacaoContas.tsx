@@ -52,7 +52,9 @@ import {
   X,
   Undo2,
   Moon,
+  FileWarning,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -83,6 +85,9 @@ interface BaixaItem {
   conferido_em: string | null;
   conferencia_status: string | null;
   conferencia_motivo: string | null;
+  canhoto_pendente_motivo?: string | null;
+  canhoto_pendente_obs?: string | null;
+  canhoto_pendente_em?: string | null;
   nf: {
     numero_nf: string | null;
     dest_razao_social: string | null;
@@ -99,6 +104,15 @@ const OCORRENCIA_LABEL: Record<string, string> = {
   reentrega: "Reentrega",
   outros: "Outros",
 };
+
+export const CANHOTO_MOTIVO_LABEL: Record<string, string> = {
+  esquecido_motorista: "Motorista esqueceu de trazer",
+  perdido: "Canhoto perdido",
+  retido_no_cliente: "Retido no cliente",
+  ilegivel_refazer: "Ilegível — refazer foto",
+  outro: "Outro",
+};
+
 
 function isoHoje() {
   return new Date().toISOString().slice(0, 10);
@@ -118,6 +132,8 @@ export default function PrestacaoContas() {
   const [loadingBaixas, setLoadingBaixas] = useState(false);
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [pendDialog, setPendDialog] = useState<{ baixa: BaixaItem; motivo: string } | null>(null);
+  const [canhotoDialog, setCanhotoDialog] = useState<{ baixa: BaixaItem; motivo: string; obs: string } | null>(null);
+  const [salvandoCanhoto, setSalvandoCanhoto] = useState(false);
   const [obsEncerramento, setObsEncerramento] = useState("");
   const [encerrando, setEncerrando] = useState(false);
   const [pernoitando, setPernoitando] = useState(false);
@@ -276,6 +292,7 @@ export default function PrestacaoContas() {
           id, nf_id, status, ocorrencia, recebedor_nome, foto_path, foto_recibo_path, latitude, longitude,
           registrado_em, validacao_score, validacao_status, validacao_problemas,
           conferido_em, conferencia_status, conferencia_motivo,
+          canhoto_pendente_motivo, canhoto_pendente_obs, canhoto_pendente_em,
           nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf)
         `)
         .eq("veiculo_id", veiculo.id)
@@ -389,6 +406,38 @@ export default function PrestacaoContas() {
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
 
+  // Canhoto não voltou com o motorista: encerra a prestação sem travar o veículo,
+  // registra o motivo e mantém a NF na fila de recuperação (/canhotos-pendentes).
+  async function salvarCanhotoPendente() {
+    if (!canhotoDialog) return;
+    if (!canhotoDialog.motivo) {
+      toast({ title: "Escolha o motivo", variant: "destructive" });
+      return;
+    }
+    setSalvandoCanhoto(true);
+    try {
+      const { error } = await (supabase as any).rpc("registrar_canhoto_pendente", {
+        p_baixa_id: canhotoDialog.baixa.id,
+        p_motivo: canhotoDialog.motivo,
+        p_obs: canhotoDialog.obs || null,
+      });
+      if (error) throw error;
+      setCanhotoDialog(null);
+      toast({
+        title: "Canhoto pendente registrado",
+        description: "A NF fica na fila de recuperação. A imagem não será enviada até a foto ser anexada.",
+      });
+      if (veiculoSel) await carregarBaixas(veiculoSel);
+      setConciliacaoKey((k) => k + 1);
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message, variant: "destructive" });
+    } finally {
+      setSalvandoCanhoto(false);
+    }
+  }
+
+
+
   async function reabrirConferencia(baixa: BaixaItem) {
     const { error } = await supabase
       .from("baixas_entrega")
@@ -397,6 +446,10 @@ export default function PrestacaoContas() {
         conferido_por: null,
         conferencia_status: null,
         conferencia_motivo: null,
+        canhoto_pendente_motivo: null,
+        canhoto_pendente_obs: null,
+        canhoto_pendente_em: null,
+        canhoto_pendente_por: null,
       })
       .eq("id", baixa.id);
     if (error) {
@@ -574,7 +627,8 @@ export default function PrestacaoContas() {
     const aConferir = baixas.filter((b) => !b.conferencia_status).length;
     const semBaixa = Math.max(0, totalNfsCarga - total);
     const alertasIa = baixas.filter((b) => b.validacao_status === "ruim" || b.validacao_status === "alerta").length;
-    return { total, conferidas, pendentes, aConferir, semBaixa, alertasIa };
+    const canhotoPendente = baixas.filter((b) => b.conferencia_status === "canhoto_pendente").length;
+    return { total, conferidas, pendentes, aConferir, semBaixa, alertasIa, canhotoPendente };
   }, [baixas, totalNfsCarga]);
 
   const tudoConferido = stats.total > 0 && stats.aConferir === 0;
@@ -599,6 +653,11 @@ export default function PrestacaoContas() {
               />
               <Button variant="outline" size="sm" onClick={carregarVeiculos}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/canhotos-pendentes">
+                  <FileWarning className="w-4 h-4 mr-1" /> Canhotos pendentes
+                </Link>
               </Button>
               {podeDesfazer && (
                 <Button
@@ -685,12 +744,13 @@ export default function PrestacaoContas() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-center">
+                      <div className="grid grid-cols-2 md:grid-cols-7 gap-3 text-center">
                         <Stat label="NFs carga" value={totalNfsCarga} />
                         <Stat label="Baixadas" value={stats.total} />
                         <Stat label="Sem baixa" value={stats.semBaixa} tone={stats.semBaixa > 0 ? "warn" : undefined} />
                         <Stat label="Conferidas" value={stats.conferidas} tone="good" />
                         <Stat label="Pendência" value={stats.pendentes} tone={stats.pendentes > 0 ? "bad" : undefined} />
+                        <Stat label="Canhoto pend." value={stats.canhotoPendente} tone={stats.canhotoPendente > 0 ? "warn" : undefined} />
                         <Stat label="Alerta IA" value={stats.alertasIa} tone={stats.alertasIa > 0 ? "warn" : undefined} />
                       </div>
                     </CardContent>
@@ -751,7 +811,7 @@ export default function PrestacaoContas() {
                               const ocLabel = b.ocorrencia ? OCORRENCIA_LABEL[b.ocorrencia] || b.ocorrencia : "—";
                               const jaConferida = !!b.conferencia_status;
                               return (
-                                <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
+                                <TableRow key={b.id} className={`[&>*]:py-1.5 [&>*]:px-2 ${b.conferencia_status === "pendencia" ? "bg-red-50 dark:bg-red-950/20" : b.conferencia_status === "canhoto_pendente" ? "bg-amber-50 dark:bg-amber-950/20" : b.conferencia_status === "ok" ? "bg-green-50/40 dark:bg-green-950/10" : ""}`}>
                                   <TableCell>
                                     <Checkbox
                                       checked={selecionadas.has(b.id)}
@@ -858,6 +918,16 @@ export default function PrestacaoContas() {
                                         </TooltipTrigger>
                                         <TooltipContent>{b.conferencia_motivo}</TooltipContent>
                                       </Tooltip>
+                                    ) : b.conferencia_status === "canhoto_pendente" ? (
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Badge className="gap-1 text-[11px] px-1 py-0 h-5 bg-amber-500 hover:bg-amber-500"><FileWarning className="w-3 h-3" /> S/ canhoto</Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {CANHOTO_MOTIVO_LABEL[b.canhoto_pendente_motivo || ""] || b.canhoto_pendente_motivo}
+                                          {b.canhoto_pendente_obs ? ` — ${b.canhoto_pendente_obs}` : ""}
+                                        </TooltipContent>
+                                      </Tooltip>
                                     ) : (
                                       <Badge variant="outline" className="text-[11px] px-1 py-0 h-5">A conferir</Badge>
                                     )}
@@ -890,6 +960,20 @@ export default function PrestacaoContas() {
                                               </Button>
                                             </TooltipTrigger>
                                             <TooltipContent>Registrar pendência</TooltipContent>
+                                          </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="icon"
+                                                variant="outline"
+                                                className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                                disabled={!!veiculoSel.prestacao_contas_em}
+                                                onClick={() => setCanhotoDialog({ baixa: b, motivo: "esquecido_motorista", obs: "" })}
+                                              >
+                                                <FileWarning className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Canhoto não voltou — encerrar com pendência de recuperação</TooltipContent>
                                           </Tooltip>
                                         </>
                                       )}
@@ -969,6 +1053,13 @@ export default function PrestacaoContas() {
                           placeholder="Ex: Motorista entregou todos os canhotos. 1 reentrega pendente para amanhã."
                           rows={2}
                         />
+                        {stats.canhotoPendente > 0 && (
+                          <p className="text-sm text-amber-600 flex items-center gap-2">
+                            <FileWarning className="w-4 h-4" />
+                            {stats.canhotoPendente} canhoto(s) marcado(s) como pendente(s) de recuperação — a entrega é encerrada,
+                            mas a imagem só será enviada quando a foto for anexada em Canhotos pendentes (prazo: 2 dias úteis).
+                          </p>
+                        )}
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <p className="text-sm text-muted-foreground">
                             {tudoConferido
@@ -1060,6 +1151,52 @@ export default function PrestacaoContas() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setPendDialog(null)}>Cancelar</Button>
               <Button variant="destructive" onClick={salvarPendencia}>Salvar pendência</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Canhoto pendente de recuperação */}
+        <Dialog open={!!canhotoDialog} onOpenChange={(o) => !o && setCanhotoDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Canhoto não voltou com o motorista</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                NF <span className="font-mono">{canhotoDialog?.baixa.nf?.numero_nf}</span> —{" "}
+                {canhotoDialog?.baixa.nf?.dest_razao_social}. A entrega continua válida; a prestação de contas pode ser
+                encerrada e a imagem fica retida até a foto ser anexada em <strong>Canhotos pendentes</strong>.
+              </p>
+              <div className="space-y-1">
+                <Label>Motivo</Label>
+                <Select
+                  value={canhotoDialog?.motivo || ""}
+                  onValueChange={(v) => canhotoDialog && setCanhotoDialog({ ...canhotoDialog, motivo: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CANHOTO_MOTIVO_LABEL).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Observação (opcional)</Label>
+                <Textarea
+                  rows={2}
+                  value={canhotoDialog?.obs || ""}
+                  onChange={(e) => canhotoDialog && setCanhotoDialog({ ...canhotoDialog, obs: e.target.value })}
+                  placeholder="Ex: motorista trará o canhoto amanhã pela manhã."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCanhotoDialog(null)}>Cancelar</Button>
+              <Button onClick={salvarCanhotoPendente} disabled={salvandoCanhoto}>
+                {salvandoCanhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileWarning className="w-4 h-4 mr-2" />}
+                Registrar canhoto pendente
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

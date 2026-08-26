@@ -35,6 +35,7 @@ import RelatorioAgendamentosFornecedor from "./pages/RelatorioAgendamentosFornec
 import RelatorioPeriodo from "./pages/RelatorioPeriodo";
 import PrestacaoContas from "./pages/PrestacaoContas";
 import DesfazerBaixa from "./pages/DesfazerBaixa";
+import CanhotosPendentes from "./pages/CanhotosPendentes";
 import RomaneioPorNf from "./pages/RomaneioPorNf";
 
 import MotoristaAcesso from "./pages/MotoristaAcesso";
@@ -359,6 +360,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <DesfazerBaixa />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/canhotos-pendentes"
+        element={
+          <ProtectedRoute>
+            <CanhotosPendentes />
           </ProtectedRoute>
         }
       />

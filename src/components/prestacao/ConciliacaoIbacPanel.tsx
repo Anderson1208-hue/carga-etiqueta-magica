@@ -39,6 +39,7 @@ const LABEL: Record<string, string> = {
   canhoto_cancelado: "Canhoto cancelado (fora do escopo)",
   canhoto_nao_enfileirado: "Entregue, canhoto não enfileirado",
   entregue_sem_foto: "Entregue sem foto do canhoto",
+  canhoto_pendente_recuperacao: "Canhoto pendente de recuperação",
   ocorrencia_valida: "Ocorrência válida (reentrega/recusa/ausente)",
   fora_escopo_ibac: "Fora do escopo IBAC",
   sem_desfecho: "Sem desfecho (nem baixa, nem ocorrência)",

@@ -69,6 +69,7 @@ type: reference
 - [Mapa Leaflet UI](mem://funcionalidades/monitoramento/visualizacao-mapa-leaflet) — Map visuals, tokens, truck icon.
 - [Acesso Motorista](mem://arquitetura/banco-de-dados/veiculo-acesso-codigo-motorista) — 6-char public route access code.
 - [Conciliação Placa x Canhotos](mem://logica/conciliacao-placa-canhotos-ibac) — Fechamento obrigatório por placa: NFs roteirizadas = canhotos enviados + ocorrências válidas; erro bloqueia/alerta no encerramento.
+- [Canhoto Pendente](mem://logica/canhoto-pendente-recuperacao) — Motorista sem canhoto: encerra com pendência registrada, recupera a foto em /canhotos-pendentes e só então envia a imagem à IBAC (prazo 2 dias úteis).
 - [Status de Entrega](mem://logica/ciclo-de-vida-status-entrega) — Delivery lifecycle trigger points.
 - [Reconciliação Parada↔Baixa](mem://logica/reconciliacao-parada-baixa) — Baixa 'entregue' reabre paradas 'pulada'/'visita_inconsistente' e finaliza. Verdade da baixa > geofence.
 - [Agendamento Regras](mem://funcionalidades/transporte/agendamento) — Schedule rules (releases day before).
