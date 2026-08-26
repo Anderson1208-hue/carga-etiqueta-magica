@@ -52,7 +52,9 @@ import {
   X,
   Undo2,
   Moon,
+  FileWarning,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
