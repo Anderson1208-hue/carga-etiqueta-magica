@@ -130,7 +130,8 @@ Deno.serve(async (req) => {
       const { data: vinc } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
-        .in("veiculo_id", idsVeic);
+        .in("veiculo_id", idsVeic)
+        .limit(50000);
       nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
     }
   }
