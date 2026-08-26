@@ -961,6 +961,20 @@ export default function PrestacaoContas() {
                                             </TooltipTrigger>
                                             <TooltipContent>Registrar pendência</TooltipContent>
                                           </Tooltip>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                size="icon"
+                                                variant="outline"
+                                                className="h-6 w-6 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                                disabled={!!veiculoSel.prestacao_contas_em}
+                                                onClick={() => setCanhotoDialog({ baixa: b, motivo: "esquecido_motorista", obs: "" })}
+                                              >
+                                                <FileWarning className="w-3.5 h-3.5" />
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Canhoto não voltou — encerrar com pendência de recuperação</TooltipContent>
+                                          </Tooltip>
                                         </>
                                       )}
                                       {podeDesfazer && (
