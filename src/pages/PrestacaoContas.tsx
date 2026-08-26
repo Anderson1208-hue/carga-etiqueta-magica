@@ -1154,6 +1154,52 @@ export default function PrestacaoContas() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Canhoto pendente de recuperação */}
+        <Dialog open={!!canhotoDialog} onOpenChange={(o) => !o && setCanhotoDialog(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Canhoto não voltou com o motorista</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                NF <span className="font-mono">{canhotoDialog?.baixa.nf?.numero_nf}</span> —{" "}
+                {canhotoDialog?.baixa.nf?.dest_razao_social}. A entrega continua válida; a prestação de contas pode ser
+                encerrada e a imagem fica retida até a foto ser anexada em <strong>Canhotos pendentes</strong>.
+              </p>
+              <div className="space-y-1">
+                <Label>Motivo</Label>
+                <Select
+                  value={canhotoDialog?.motivo || ""}
+                  onValueChange={(v) => canhotoDialog && setCanhotoDialog({ ...canhotoDialog, motivo: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CANHOTO_MOTIVO_LABEL).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Observação (opcional)</Label>
+                <Textarea
+                  rows={2}
+                  value={canhotoDialog?.obs || ""}
+                  onChange={(e) => canhotoDialog && setCanhotoDialog({ ...canhotoDialog, obs: e.target.value })}
+                  placeholder="Ex: motorista trará o canhoto amanhã pela manhã."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCanhotoDialog(null)}>Cancelar</Button>
+              <Button onClick={salvarCanhotoPendente} disabled={salvandoCanhoto}>
+                {salvandoCanhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileWarning className="w-4 h-4 mr-2" />}
+                Registrar canhoto pendente
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </TooltipProvider>
     </MainLayout>
   );
