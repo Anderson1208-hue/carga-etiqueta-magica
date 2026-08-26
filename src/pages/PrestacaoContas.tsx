@@ -529,11 +529,15 @@ export default function PrestacaoContas() {
 
       toast({
         title: "Prestação de contas encerrada",
-        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC.`,
+        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC. Conferindo conciliação da placa...`,
       });
       await carregarVeiculos();
-      setVeiculoSel(null);
-      setBaixas([]);
+      // Mantém o veículo selecionado e força a conciliação: toda NF roteirizada
+      // precisa terminar como canhoto enviado ou ocorrência válida.
+      const atualizado = { ...veiculoSel, prestacao_contas_em: new Date().toISOString() };
+      await carregarBaixas(atualizado);
+      setConciliacaoKey((k) => k + 1);
+
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message, variant: "destructive" });
     } finally {
