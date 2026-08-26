@@ -126,29 +126,28 @@ Deno.serve(async (req) => {
     }
   }
 
-  let query = supabase
-    .from("ibac_eventos_queue")
-    .select("*")
-    .eq("status", "pendente")
-    .lt("tentativas", maxTentativas);
-
-  if (nfIdsPiloto) {
-    query = query.in("nf_id", nfIdsPiloto.length > 0 ? nfIdsPiloto : ["00000000-0000-0000-0000-000000000000"]);
-  }
-
-  if (whitelist.length > 0) {
-    const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
-    query = query.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
-  }
-
-
-  // Duas janelas separadas: eventos operacionais (tempo real) e canhotos
-  // (aguardam prestação de contas). Sem isso, canhotos antigos pendentes
-  // ocupam o topo da fila (ordem por created_at) e bloqueiam os eventos do dia.
+  // IMPORTANTE: o builder do supabase-js é mutável e não pode ser reaproveitado
+  // entre duas consultas — por isso cada janela monta um builder NOVO. Reutilizar
+  // o mesmo objeto fazia a segunda janela (canhotos) voltar vazia.
   const baseQuery = () => {
-    let q = query;
+    let q = supabase
+      .from("ibac_eventos_queue")
+      .select("*")
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+
+    if (nfIdsPiloto) {
+      q = q.in("nf_id", nfIdsPiloto.length > 0 ? nfIdsPiloto : ["00000000-0000-0000-0000-000000000000"]);
+    }
+
+    if (whitelist.length > 0) {
+      const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
+      q = q.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
+    }
+
     return q;
   };
+
   const { data: eventosRaw, error: errEv } = await baseQuery()
     .neq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
