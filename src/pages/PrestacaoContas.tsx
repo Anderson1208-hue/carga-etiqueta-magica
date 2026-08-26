@@ -654,6 +654,11 @@ export default function PrestacaoContas() {
               <Button variant="outline" size="sm" onClick={carregarVeiculos}>
                 <RefreshCw className="w-4 h-4 mr-1" /> Atualizar
               </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/canhotos-pendentes">
+                  <FileWarning className="w-4 h-4 mr-1" /> Canhotos pendentes
+                </Link>
+              </Button>
               {podeDesfazer && (
                 <Button
                   variant="outline"
