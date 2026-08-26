@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X } from "lucide-react";
+import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X, FileDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
