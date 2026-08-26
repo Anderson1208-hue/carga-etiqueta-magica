@@ -29,7 +29,9 @@ const DEFAULT_MAX_TENTATIVAS = 5;
 // em maior quantidade; canhotos baixam/comprimem fotos em memória, por isso
 // permanecem em lote pequeno para não estourar o WORKER_RESOURCE_LIMIT.
 const BATCH_SIZE_EVENTOS = 25;
-const BATCH_SIZE_CANHOTOS = 3;
+// 1 por execução: as baixas antigas não têm a TIRA gerada (foto_recibo_path) e a
+// foto original tem alguns MB — 2 ou 3 no mesmo worker estouram a memória.
+const BATCH_SIZE_CANHOTOS = 1;
 // Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
@@ -101,18 +103,24 @@ Deno.serve(async (req) => {
 
   // Com whitelist ativa, filtra direto no banco pelas notas de teste
   // (evita que fiquem fora da janela por trás de eventos antigos).
-  const janelaEventos = whitelist.length > 0 ? 1000 : BATCH_SIZE_EVENTOS;
-  const janelaCanhotos = whitelist.length > 0 ? 1000 : BATCH_SIZE_CANHOTOS;
+  let janelaEventos = whitelist.length > 0 ? 1000 : BATCH_SIZE_EVENTOS;
+  let janelaCanhotos = whitelist.length > 0 ? 1000 : BATCH_SIZE_CANHOTOS;
 
   // Piloto por placa: resolve no banco as NFs dos veículos liberados e filtra a fila
   // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
   let nfIdsPiloto: string[] | null = null;
   if (placasPiloto.length > 0) {
+    // Escopo: rotas a partir de data_piloto. As placas listadas valem SOMENTE na
+    // data_piloto (dia do teste controlado); datas posteriores entram sem restrição.
     let qVeic = supabase.from("veiculos").select("id, placa, data");
-    if (dataPiloto) qVeic = qVeic.eq("data", dataPiloto);
+    if (dataPiloto) qVeic = qVeic.gte("data", dataPiloto);
     const { data: veicsPiloto } = await qVeic;
     const idsVeic = (veicsPiloto ?? [])
-      .filter((v: any) => placasPiloto.includes(normPlaca(v.placa)))
+      .filter((v: any) =>
+        dataPiloto && String(v.data) === String(dataPiloto)
+          ? placasPiloto.includes(normPlaca(v.placa))
+          : true,
+      )
       .map((v: any) => v.id);
 
     if (idsVeic.length === 0) {
@@ -121,34 +129,44 @@ Deno.serve(async (req) => {
       const { data: vinc } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
-        .in("veiculo_id", idsVeic);
+        .in("veiculo_id", idsVeic)
+        .limit(50000);
       nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
+    }
+
+    // Lista grande de nf_id estoura o tamanho da URL do PostgREST (HTTP 400).
+    // Nesse caso abandonamos o pré-filtro no banco e ampliamos a janela — o
+    // filtro por placa/data continua sendo aplicado em memória logo abaixo.
+    if (nfIdsPiloto && nfIdsPiloto.length > 200) {
+      nfIdsPiloto = null;
+      janelaEventos = Math.max(janelaEventos, 500);
+      janelaCanhotos = Math.max(janelaCanhotos, 500);
     }
   }
 
-  let query = supabase
-    .from("ibac_eventos_queue")
-    .select("*")
-    .eq("status", "pendente")
-    .lt("tentativas", maxTentativas);
 
-  if (nfIdsPiloto) {
-    query = query.in("nf_id", nfIdsPiloto.length > 0 ? nfIdsPiloto : ["00000000-0000-0000-0000-000000000000"]);
-  }
-
-  if (whitelist.length > 0) {
-    const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
-    query = query.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
-  }
-
-
-  // Duas janelas separadas: eventos operacionais (tempo real) e canhotos
-  // (aguardam prestação de contas). Sem isso, canhotos antigos pendentes
-  // ocupam o topo da fila (ordem por created_at) e bloqueiam os eventos do dia.
+  // IMPORTANTE: o builder do supabase-js é mutável e não pode ser reaproveitado
+  // entre duas consultas — por isso cada janela monta um builder NOVO. Reutilizar
+  // o mesmo objeto fazia a segunda janela (canhotos) voltar vazia.
   const baseQuery = () => {
-    let q = query;
+    let q = supabase
+      .from("ibac_eventos_queue")
+      .select("*")
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+
+    if (nfIdsPiloto) {
+      q = q.in("nf_id", nfIdsPiloto.length > 0 ? nfIdsPiloto : ["00000000-0000-0000-0000-000000000000"]);
+    }
+
+    if (whitelist.length > 0) {
+      const lista = whitelist.map((v) => `"${v.replace(/"/g, "")}"`).join(",");
+      q = q.or(`payload->>numero_nf.in.(${lista}),chave_acesso.in.(${lista})`);
+    }
+
     return q;
   };
+
   const { data: eventosRaw, error: errEv } = await baseQuery()
     .neq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })

@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
   // match por prefixo é feito em JS sobre os dígitos, não via LIKE no Postgres.
   let query = supabase
     .from("baixas_entrega")
-    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
+    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, cnpj_emitente, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
     .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
@@ -106,8 +106,12 @@ Deno.serve(async (req) => {
   const elegiveis = (baixas ?? []).filter((b) => {
     if (baixasNaFila.has(b.id)) return false;
     if (nfsAlvo.length > 0) return true;
-    const cnpj = ((b as any).notas_fiscais?.cnpj_destinatario ?? "").replace(/\D/g, "");
-    return prefixos.some((p) => cnpj.startsWith(p));
+    // O escopo pode ser definido pelo destinatário (lojas próprias) OU pelo
+    // emitente/embarcador (ex.: IBAC 61472205) — as lojas franqueadas têm CNPJ
+    // próprio e ficavam de fora quando só o destinatário era considerado.
+    const cnpjDest = ((b as any).notas_fiscais?.cnpj_destinatario ?? "").replace(/\D/g, "");
+    const cnpjEmit = ((b as any).notas_fiscais?.cnpj_emitente ?? "").replace(/\D/g, "");
+    return prefixos.some((p) => cnpjDest.startsWith(p) || cnpjEmit.startsWith(p));
   }).slice(0, BATCH_SIZE);
 
 
