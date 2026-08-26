@@ -152,11 +152,11 @@ Deno.serve(async (req) => {
   const { data: eventosRaw, error: errEv } = await baseQuery()
     .neq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
-    .limit(janela);
+    .limit(janelaEventos);
   const { data: canhotosRaw, error: errCan } = await baseQuery()
     .eq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
-    .limit(janela);
+    .limit(janelaCanhotos);
   const pendentesRaw = [...(eventosRaw ?? []), ...(canhotosRaw ?? [])];
   const errSelect = errEv ?? errCan;
 
