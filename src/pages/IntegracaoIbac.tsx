@@ -436,6 +436,8 @@ export default function IntegracaoIbac() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>NF</TableHead>
+                      <TableHead>Destinatário</TableHead>
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Tentativas</TableHead>
@@ -451,6 +453,10 @@ export default function IntegracaoIbac() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setDetalheId(f.id)}
                       >
+                        <TableCell className="font-mono text-xs font-semibold">{nfDoEvento(f) ?? "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
                         <TableCell>{statusBadge(f.status)}</TableCell>
                         <TableCell>{f.tentativas}</TableCell>
@@ -461,7 +467,7 @@ export default function IntegracaoIbac() {
                             <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
                               Detalhes
                             </Button>
-                            {f.status === "erro" && (
+                            {isAdmin && f.status === "erro" && (
                               <Button size="sm" variant="outline" onClick={() => reenviar.mutate(f.id)}>
                                 Reenviar
                               </Button>
@@ -471,8 +477,9 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
+
                   </TableBody>
                 </Table>
               </CardContent>
