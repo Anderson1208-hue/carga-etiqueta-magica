@@ -292,6 +292,7 @@ export default function PrestacaoContas() {
           id, nf_id, status, ocorrencia, recebedor_nome, foto_path, foto_recibo_path, latitude, longitude,
           registrado_em, validacao_score, validacao_status, validacao_problemas,
           conferido_em, conferencia_status, conferencia_motivo,
+          canhoto_pendente_motivo, canhoto_pendente_obs, canhoto_pendente_em,
           nf:notas_fiscais!baixas_entrega_nf_id_fkey(numero_nf, dest_razao_social, dest_cidade, dest_uf)
         `)
         .eq("veiculo_id", veiculo.id)
