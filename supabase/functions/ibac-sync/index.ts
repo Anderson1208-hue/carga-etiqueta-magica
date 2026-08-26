@@ -110,12 +110,19 @@ Deno.serve(async (req) => {
   // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
   let nfIdsPiloto: string[] | null = null;
   if (placasPiloto.length > 0) {
+    // Escopo: rotas a partir de data_piloto. As placas listadas valem SOMENTE na
+    // data_piloto (dia do teste controlado); datas posteriores entram sem restrição.
     let qVeic = supabase.from("veiculos").select("id, placa, data");
-    if (dataPiloto) qVeic = qVeic.eq("data", dataPiloto);
+    if (dataPiloto) qVeic = qVeic.gte("data", dataPiloto);
     const { data: veicsPiloto } = await qVeic;
     const idsVeic = (veicsPiloto ?? [])
-      .filter((v: any) => placasPiloto.includes(normPlaca(v.placa)))
+      .filter((v: any) =>
+        dataPiloto && String(v.data) === String(dataPiloto)
+          ? placasPiloto.includes(normPlaca(v.placa))
+          : true,
+      )
       .map((v: any) => v.id);
+
 
     if (idsVeic.length === 0) {
       nfIdsPiloto = [];
