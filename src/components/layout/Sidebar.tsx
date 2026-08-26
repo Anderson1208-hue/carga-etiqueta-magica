@@ -7,6 +7,7 @@ import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import {
   Truck,
   FileText,
+  FileWarning,
   Tags,
   LogOut,
   User,
