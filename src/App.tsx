@@ -362,6 +362,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/canhotos-pendentes"
+        element={
+          <ProtectedRoute>
+            <CanhotosPendentes />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
