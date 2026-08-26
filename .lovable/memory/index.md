@@ -42,6 +42,7 @@ type: reference
 - [Roteirização Manual](mem://funcionalidades/roteirizacao/modo-manual) — Botão alternativo na Preparação: drag-and-drop + Haversine, sem OSRM.
 - [Geocodificação RJ](mem://logica/geocodificacao-fallback-estratetiga) — Fallback chain: BrasilAPI CEP -> Bairro -> Logradouro.
 - [Geocoding Google Fase 1](mem://funcionalidades/geocoding/google-fase1) — Edge function geocodificar-endereco + cache. Coordenada ROOFTOP via connector google_maps.
+- [Coordenadas Ambíguas Torre](mem://logica/coordenadas-ambiguas-torre) — Paradas com coordenada repetida (<50m) não geram chegada/saída por GPS.
 - [Coordenadas do CD](mem://arquitetura/banco-de-dados/coordenadas-cd-central) — Fixed coordinates (-22.8783, -43.3367).
 - [Conferência 2 Etapas](mem://arquitetura/fluxo-conferencia-duas-etapas) — Workflow for Galpão (Interna) vs Motorista (Externa).
 - [Conferência Externa](mem://funcionalidades/operacao/conferencia-externa-mobile) — Motorista app requirements and validation.

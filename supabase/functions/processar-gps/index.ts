@@ -347,6 +347,36 @@ Deno.serve(async (req) => {
     const paradasState = [...paradas];
     const routePositions = validPositions.filter((p) => p.heartbeat !== true);
 
+    // Coordenadas ambíguas: duas ou mais paradas da rota apontando praticamente
+    // para o mesmo ponto (geocode ruim / fallback de bairro). Um mesmo dwell não
+    // pode gerar chegada/saída para clientes diferentes — a Torre passaria a
+    // exibir horários misturados na mesma janela de tempo. Nesses casos o GPS
+    // não define horário; a parada só é fechada pela baixa (canhoto).
+    const AMBIGUIDADE_METROS = 50;
+    const paradasAmbiguas = new Set<string>();
+    for (let i = 0; i < paradasState.length; i++) {
+      const a: any = paradasState[i];
+      if (!a.latitude || !a.longitude) continue;
+      for (let j = i + 1; j < paradasState.length; j++) {
+        const b: any = paradasState[j];
+        if (!b.latitude || !b.longitude) continue;
+        if (
+          haversineDistance(
+            Number(a.latitude),
+            Number(a.longitude),
+            Number(b.latitude),
+            Number(b.longitude),
+          ) <= AMBIGUIDADE_METROS
+        ) {
+          paradasAmbiguas.add(a.id);
+          paradasAmbiguas.add(b.id);
+        }
+      }
+    }
+    if (paradasAmbiguas.size > 0) {
+      events.push(`coordenadas_ambiguas_${paradasAmbiguas.size}`);
+    }
+
     for (const pos of routePositions) {
       const posLat = Number(pos.latitude);
       const posLng = Number(pos.longitude);
@@ -358,6 +388,8 @@ Deno.serve(async (req) => {
 
       for (const parada of paradasState) {
         if (!parada.latitude || !parada.longitude) continue;
+        if (paradasAmbiguas.has(parada.id)) continue;
+
 
         const dist = haversineDistance(
           posLat,
