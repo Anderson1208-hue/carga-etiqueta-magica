@@ -103,8 +103,8 @@ Deno.serve(async (req) => {
 
   // Com whitelist ativa, filtra direto no banco pelas notas de teste
   // (evita que fiquem fora da janela por trás de eventos antigos).
-  const janelaEventos = whitelist.length > 0 ? 1000 : BATCH_SIZE_EVENTOS;
-  const janelaCanhotos = whitelist.length > 0 ? 1000 : BATCH_SIZE_CANHOTOS;
+  let janelaEventos = whitelist.length > 0 ? 1000 : BATCH_SIZE_EVENTOS;
+  let janelaCanhotos = whitelist.length > 0 ? 1000 : BATCH_SIZE_CANHOTOS;
 
   // Piloto por placa: resolve no banco as NFs dos veículos liberados e filtra a fila
   // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
@@ -123,7 +123,6 @@ Deno.serve(async (req) => {
       )
       .map((v: any) => v.id);
 
-
     if (idsVeic.length === 0) {
       nfIdsPiloto = [];
     } else {
@@ -134,7 +133,17 @@ Deno.serve(async (req) => {
         .limit(50000);
       nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
     }
+
+    // Lista grande de nf_id estoura o tamanho da URL do PostgREST (HTTP 400).
+    // Nesse caso abandonamos o pré-filtro no banco e ampliamos a janela — o
+    // filtro por placa/data continua sendo aplicado em memória logo abaixo.
+    if (nfIdsPiloto && nfIdsPiloto.length > 200) {
+      nfIdsPiloto = null;
+      janelaEventos = Math.max(janelaEventos, 500);
+      janelaCanhotos = Math.max(janelaCanhotos, 500);
+    }
   }
+
 
   // IMPORTANTE: o builder do supabase-js é mutável e não pode ser reaproveitado
   // entre duas consultas — por isso cada janela monta um builder NOVO. Reutilizar
