@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
   // A janela de busca dos canhotos é maior que o lote de envio: itens fora de
   // escopo (rota anterior ao corte, placa fora do piloto, prestação não encerrada)
   // são descartados em memória e não podem "travar" a fila ocupando o lote.
-  let janelaCanhotos = whitelist.length > 0 ? 1000 : 300;
+  let janelaCanhotos = whitelist.length > 0 ? 1000 : 60;
 
   // Piloto por placa: resolve no banco as NFs dos veículos liberados e filtra a fila
   // por esses nf_id. Sem isso, o backlog antigo ocupa toda a janela e o piloto nunca sai.
