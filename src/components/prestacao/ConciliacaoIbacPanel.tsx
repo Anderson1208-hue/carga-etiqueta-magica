@@ -47,10 +47,12 @@ const LABEL: Record<string, string> = {
 export function ConciliacaoIbacPanel({
   veiculoId,
   placa,
+  encerrado,
   onErrosChange,
 }: {
   veiculoId: string;
   placa: string;
+  encerrado?: boolean;
   onErrosChange?: (erros: number) => void;
 }) {
   const [linhas, setLinhas] = useState<ConciliacaoLinha[]>([]);
@@ -65,13 +67,20 @@ export function ConciliacaoIbacPanel({
         p_veiculo_id: veiculoId,
       });
       if (error) throw error;
-      setLinhas((data ?? []) as ConciliacaoLinha[]);
+      // Antes de encerrar a prestação, o canhoto ainda não foi enfileirado por
+      // definição — isso só é erro depois do encerramento.
+      const rows = ((data ?? []) as ConciliacaoLinha[]).map((l) =>
+        !encerrado && l.classificacao === "canhoto_nao_enfileirado"
+          ? { ...l, gravidade: "atencao" as const }
+          : l,
+      );
+      setLinhas(rows);
     } catch (e: any) {
       setErro(e?.message ?? "Falha na conciliação");
     } finally {
       setLoading(false);
     }
-  }, [veiculoId]);
+  }, [veiculoId, encerrado]);
 
   useEffect(() => {
     carregar();
