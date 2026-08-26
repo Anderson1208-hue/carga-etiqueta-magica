@@ -918,6 +918,16 @@ export default function PrestacaoContas() {
                                         </TooltipTrigger>
                                         <TooltipContent>{b.conferencia_motivo}</TooltipContent>
                                       </Tooltip>
+                                    ) : b.conferencia_status === "canhoto_pendente" ? (
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Badge className="gap-1 text-[11px] px-1 py-0 h-5 bg-amber-500 hover:bg-amber-500"><FileWarning className="w-3 h-3" /> S/ canhoto</Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {CANHOTO_MOTIVO_LABEL[b.canhoto_pendente_motivo || ""] || b.canhoto_pendente_motivo}
+                                          {b.canhoto_pendente_obs ? ` — ${b.canhoto_pendente_obs}` : ""}
+                                        </TooltipContent>
+                                      </Tooltip>
                                     ) : (
                                       <Badge variant="outline" className="text-[11px] px-1 py-0 h-5">A conferir</Badge>
                                     )}
