@@ -40,6 +40,7 @@ type: reference
 - [Sync Coord Parada](mem://arquitetura/monitoramento/sync-coordenadas-cadastro-mestre) — monitoramento_paradas reconcilia lat/lng com destinatario_enderecos ao iniciar.
 - [Raio Geofence por Cliente](mem://arquitetura/monitoramento/raio-geofence-por-destinatario) — destinatarios.raio_geofence_metros sobrescreve raio global (P2 Manus).
 - [Roteirização Manual](mem://funcionalidades/roteirizacao/modo-manual) — Botão alternativo na Preparação: drag-and-drop + Haversine, sem OSRM.
+- [Geocode Nome Fantasia IBAC](mem://logica/geocode-nome-fantasia-ibac) — IBAC/Cacau Show: buscar sempre pela fachada + rua/número, não pela razão social.
 - [Geocodificação RJ](mem://logica/geocodificacao-fallback-estratetiga) — Fallback chain: BrasilAPI CEP -> Bairro -> Logradouro.
 - [Geocoding Google Fase 1](mem://funcionalidades/geocoding/google-fase1) — Edge function geocodificar-endereco + cache. Coordenada ROOFTOP via connector google_maps.
 - [Coordenadas Ambíguas Torre](mem://logica/coordenadas-ambiguas-torre) — Paradas com coordenada repetida (<50m) não geram chegada/saída por GPS.
