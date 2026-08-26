@@ -76,6 +76,40 @@ export default function IntegracaoIbac() {
     refetchInterval: 15_000,
   });
 
+  // Resolve o número da NF (e destinatário) dos eventos da fila.
+  const nfIds = Array.from(new Set(fila.map((f: any) => f.nf_id).filter(Boolean))) as string[];
+  const { data: nfMap = {} } = useQuery({
+    queryKey: ["ibac-fila-nfs", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, { numero_nf: string | null; dest: string | null }> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, dest_razao_social")
+          .in("id", nfIds.slice(i, i + 200));
+        if (error) throw error;
+        (data ?? []).forEach((n: any) => {
+          map[n.id] = { numero_nf: n.numero_nf ?? null, dest: n.dest_razao_social ?? null };
+        });
+      }
+      return map;
+    },
+  });
+
+  const nfDoEvento = (f: any) => {
+    const doPayload = f?.payload?.numero_nf ?? f?.payload?.numeroNota ?? null;
+    const doBanco = f?.nf_id ? (nfMap as any)[f.nf_id]?.numero_nf : null;
+    const nf = doBanco ?? doPayload ?? null;
+    if (nf) return String(nf).replace(/^0+/, "") || String(nf);
+    // Fallback: extrai o número da NF da chave de acesso (posições 25-34).
+    const chave = (f?.chave_acesso ?? "").replace(/\D/g, "");
+    if (chave.length === 44) return chave.substring(25, 34).replace(/^0+/, "");
+    return null;
+  };
+
+
+
   const { data: dePara = [], refetch: refetchDePara } = useQuery({
     queryKey: ["ibac-de-para"],
     queryFn: async () => {
