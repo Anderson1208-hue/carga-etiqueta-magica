@@ -29,14 +29,19 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   // Filtro opcional por NFs específicas (teste controlado): { nfs: ["3897130", "chave..."] }
+  // ou por baixas específicas (recuperação de canhoto): { baixa_ids: ["uuid"] }
   let nfsAlvo: string[] = [];
   let veiculoIdAlvo: string | null = null;
+  let baixaIdsAlvo: string[] = [];
   try {
     const body = await req.json();
     nfsAlvo = (body?.nfs ?? []).map((v: unknown) => String(v).trim()).filter(Boolean);
     veiculoIdAlvo = typeof body?.veiculo_id === "string" && /^[0-9a-f-]{36}$/i.test(body.veiculo_id)
       ? body.veiculo_id
       : null;
+    baixaIdsAlvo = (body?.baixa_ids ?? [])
+      .map((v: unknown) => String(v).trim())
+      .filter((v: string) => /^[0-9a-f-]{36}$/i.test(v));
   } catch {
     nfsAlvo = [];
   }
