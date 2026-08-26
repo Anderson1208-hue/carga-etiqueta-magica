@@ -600,12 +600,19 @@ export default function PrestacaoContas() {
         const comBaixa = new Set((baixasVeiculo || []).map((r) => r.nf_id));
         const semBaixaIds = nfIds.filter((id) => !comBaixa.has(id));
         if (semBaixaIds.length > 0) {
-          await supabase
+          const { error: pendErr } = await supabase
             .from("notas_fiscais")
             .update({ status_entrega: "PENDENCIA DE BAIXA" })
             .in("id", semBaixaIds)
             .neq("status_entrega", "ENTREGUE")
             .neq("status_entrega", "RECUSADO");
+          if (pendErr) {
+            toast({
+              title: "Atenção: pendência não registrada",
+              description: `Não foi possível marcar ${semBaixaIds.length} NF(s) como PENDENCIA DE BAIXA: ${pendErr.message}`,
+              variant: "destructive",
+            });
+          }
         }
       }
 
