@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CanhotoViewer, type CanhotoItem } from "@/components/prestacao/CanhotoViewer";
+import { ConciliacaoIbacPanel } from "@/components/prestacao/ConciliacaoIbacPanel";
+
 import {
   Tooltip,
   TooltipContent,
@@ -122,6 +124,9 @@ export default function PrestacaoContas() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [conferindoLote, setConferindoLote] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [conciliacaoKey, setConciliacaoKey] = useState(0);
+  const [conciliacaoErros, setConciliacaoErros] = useState(0);
+
 
   // Somente baixas com foto entram na conferência em massa de canhotos.
   const itensCanhoto: CanhotoItem[] = useMemo(
