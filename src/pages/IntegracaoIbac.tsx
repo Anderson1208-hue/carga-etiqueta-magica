@@ -419,9 +419,16 @@ export default function IntegracaoIbac() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Fila de eventos</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={exportarPdf} disabled={fila.length === 0}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Gerar PDF
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
