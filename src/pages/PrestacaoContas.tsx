@@ -627,7 +627,8 @@ export default function PrestacaoContas() {
     const aConferir = baixas.filter((b) => !b.conferencia_status).length;
     const semBaixa = Math.max(0, totalNfsCarga - total);
     const alertasIa = baixas.filter((b) => b.validacao_status === "ruim" || b.validacao_status === "alerta").length;
-    return { total, conferidas, pendentes, aConferir, semBaixa, alertasIa };
+    const canhotoPendente = baixas.filter((b) => b.conferencia_status === "canhoto_pendente").length;
+    return { total, conferidas, pendentes, aConferir, semBaixa, alertasIa, canhotoPendente };
   }, [baixas, totalNfsCarga]);
 
   const tudoConferido = stats.total > 0 && stats.aConferir === 0;
