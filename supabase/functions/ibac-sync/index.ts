@@ -262,16 +262,19 @@ Deno.serve(async (req) => {
     pendentes = pendentes.filter((item) => {
       const veic = item.nf_id ? veiculoPorNf.get(item.nf_id) : undefined;
 
-      // Escopo do piloto: placas listadas (vazio = todas)
-      if (placasPiloto.length > 0) {
-        if (!veic) return false;
-        if (!placasPiloto.includes(normPlaca(veic.placa))) return false;
-      }
       // Corte por data da rota: só transmite rotas a partir de data_piloto
       if (dataPiloto) {
         if (!veic?.data) return false;
         if (String(veic.data) < String(dataPiloto)) return false;
       }
+      // Escopo do piloto: as placas listadas valem SOMENTE para a data do piloto
+      // (dia do teste controlado). Datas posteriores ao corte vão sem restrição.
+      if (placasPiloto.length > 0) {
+        if (!veic) return false;
+        const mesmaDataPiloto = dataPiloto ? String(veic.data) === String(dataPiloto) : true;
+        if (mesmaDataPiloto && !placasPiloto.includes(normPlaca(veic.placa))) return false;
+      }
+
 
       // Imagem do canhoto: só depois de "Encerrar Prestação de Contas" do veículo
       if (item.evento_interno === "envio_canhoto" && canhotoAposPrestacao) {
