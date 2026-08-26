@@ -686,6 +686,15 @@ export default function PrestacaoContas() {
                     </CardContent>
                   </Card>
 
+                  <ConciliacaoIbacPanel
+                    key={`${veiculoSel.id}-${conciliacaoKey}`}
+                    veiculoId={veiculoSel.id}
+                    placa={veiculoSel.placa}
+                    onErrosChange={setConciliacaoErros}
+                  />
+
+
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base">Baixas registradas</CardTitle>
