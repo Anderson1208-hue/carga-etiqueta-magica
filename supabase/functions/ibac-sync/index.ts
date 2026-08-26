@@ -29,7 +29,9 @@ const DEFAULT_MAX_TENTATIVAS = 5;
 // em maior quantidade; canhotos baixam/comprimem fotos em memória, por isso
 // permanecem em lote pequeno para não estourar o WORKER_RESOURCE_LIMIT.
 const BATCH_SIZE_EVENTOS = 25;
-const BATCH_SIZE_CANHOTOS = 3;
+// 1 por execução: as baixas antigas não têm a TIRA gerada (foto_recibo_path) e a
+// foto original tem alguns MB — 2 ou 3 no mesmo worker estouram a memória.
+const BATCH_SIZE_CANHOTOS = 1;
 // Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
