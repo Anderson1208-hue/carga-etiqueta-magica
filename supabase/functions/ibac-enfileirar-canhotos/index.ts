@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
   // match por prefixo é feito em JS sobre os dígitos, não via LIKE no Postgres.
   let query = supabase
     .from("baixas_entrega")
-    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, dest_razao_social, carga_id)")
+    .select("id, nf_id, foto_path, recebedor_nome, registrado_em, validacao_status, latitude, longitude, veiculo_id, imagem_ibac_tentativas, notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_destinatario, cnpj_emitente, dest_razao_social, carga_id)")
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
     .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
