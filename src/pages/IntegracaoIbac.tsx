@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X } from "lucide-react";
+import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X, FileDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +28,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 
 import { Navigate } from "react-router-dom";
+import { gerarPdfFilaIbac } from "@/lib/ibac-fila-pdf";
+
 import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
 import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
@@ -97,6 +99,27 @@ export default function IntegracaoIbac() {
     },
   });
 
+  // Números de CT-e vinculados às NFs da fila.
+  const { data: cteMap = {} } = useQuery({
+    queryKey: ["ibac-fila-ctes", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, string> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("ctes")
+          .select("nf_id, numero_cte, created_at")
+          .in("nf_id", nfIds.slice(i, i + 200))
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        (data ?? []).forEach((c: any) => {
+          if (c.nf_id && c.numero_cte) map[c.nf_id] = String(c.numero_cte);
+        });
+      }
+      return map;
+    },
+  });
+
   const nfDoEvento = (f: any) => {
     const doPayload = f?.payload?.numero_nf ?? f?.payload?.numeroNota ?? null;
     const doBanco = f?.nf_id ? (nfMap as any)[f.nf_id]?.numero_nf : null;
@@ -107,6 +130,36 @@ export default function IntegracaoIbac() {
     if (chave.length === 44) return chave.substring(25, 34).replace(/^0+/, "");
     return null;
   };
+
+  const cteDoEvento = (f: any) =>
+    (f?.nf_id ? (cteMap as any)[f.nf_id] : null) ?? f?.payload?.numero_cte ?? null;
+
+  const exportarPdf = async () => {
+    try {
+      await gerarPdfFilaIbac(
+        fila.map((f: any) => ({
+          nf: nfDoEvento(f),
+          cte: cteDoEvento(f),
+          destinatario: (f.nf_id && (nfMap as any)[f.nf_id]?.dest) || null,
+          evento: f.evento_interno,
+          status: f.status,
+          tentativas: f.tentativas,
+          criadoEm: new Date(f.created_at).toLocaleString("pt-BR"),
+          erro: f.erro_mensagem ?? null,
+        })),
+        {
+          status: filtroStatus,
+          evento: filtroEvento,
+          busca: filtroBusca,
+          dataIni: filtroDataIni,
+          dataFim: filtroDataFim,
+        },
+      );
+    } catch (e: any) {
+      toast.error(`Falha ao gerar PDF: ${e.message}`);
+    }
+  };
+
 
 
 
@@ -366,9 +419,16 @@ export default function IntegracaoIbac() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Fila de eventos</CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={exportarPdf} disabled={fila.length === 0}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Gerar PDF
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
@@ -438,7 +498,9 @@ export default function IntegracaoIbac() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>NF</TableHead>
+                      <TableHead>CT-e</TableHead>
                       <TableHead>Destinatário</TableHead>
+
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Tentativas</TableHead>
@@ -455,6 +517,8 @@ export default function IntegracaoIbac() {
                         onClick={() => setDetalheId(f.id)}
                       >
                         <TableCell className="font-mono text-xs font-semibold">{nfDoEvento(f) ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{cteDoEvento(f) ?? "—"}</TableCell>
+
                         <TableCell className="text-xs max-w-[200px] truncate">
                           {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
                         </TableCell>
@@ -478,7 +542,7 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
 
                   </TableBody>
