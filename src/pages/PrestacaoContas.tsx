@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CanhotoViewer, type CanhotoItem } from "@/components/prestacao/CanhotoViewer";
+import { ConciliacaoIbacPanel } from "@/components/prestacao/ConciliacaoIbacPanel";
+
 import {
   Tooltip,
   TooltipContent,
@@ -122,6 +124,9 @@ export default function PrestacaoContas() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set());
   const [conferindoLote, setConferindoLote] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [conciliacaoKey, setConciliacaoKey] = useState(0);
+  const [conciliacaoErros, setConciliacaoErros] = useState(0);
+
 
   // Somente baixas com foto entram na conferência em massa de canhotos.
   const itensCanhoto: CanhotoItem[] = useMemo(
@@ -504,7 +509,17 @@ export default function PrestacaoContas() {
 
   async function encerrarPrestacao() {
     if (!veiculoSel) return;
+    if (conciliacaoErros > 0) {
+      const ok = window.confirm(
+        `A conciliação da placa ${veiculoSel.placa} aponta ${conciliacaoErros} NF(s) em ERRO ` +
+          `(sem desfecho, entregue sem foto ou canhoto com falha de envio).\n\n` +
+          `Trate essas notas (reentrega, nova foto ou reenvio) antes de encerrar.\n\n` +
+          `Encerrar mesmo assim?`,
+      );
+      if (!ok) return;
+    }
     setEncerrando(true);
+
     try {
       const { error } = await supabase
         .from("veiculos")
@@ -529,11 +544,15 @@ export default function PrestacaoContas() {
 
       toast({
         title: "Prestação de contas encerrada",
-        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC.`,
+        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC. Conferindo conciliação da placa...`,
       });
       await carregarVeiculos();
-      setVeiculoSel(null);
-      setBaixas([]);
+      // Mantém o veículo selecionado e força a conciliação: toda NF roteirizada
+      // precisa terminar como canhoto enviado ou ocorrência válida.
+      const atualizado = { ...veiculoSel, prestacao_contas_em: new Date().toISOString() };
+      await carregarBaixas(atualizado);
+      setConciliacaoKey((k) => k + 1);
+
     } catch (err: any) {
       toast({ title: "Erro", description: err?.message, variant: "destructive" });
     } finally {
@@ -676,6 +695,17 @@ export default function PrestacaoContas() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  <ConciliacaoIbacPanel
+                    key={`${veiculoSel.id}-${conciliacaoKey}`}
+                    veiculoId={veiculoSel.id}
+                    placa={veiculoSel.placa}
+                    encerrado={!!veiculoSel.prestacao_contas_em}
+                    onErrosChange={setConciliacaoErros}
+                  />
+
+
+
 
                   <Card>
                     <CardHeader className="pb-3">

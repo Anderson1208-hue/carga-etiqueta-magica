@@ -3650,6 +3650,27 @@ export type Database = {
         Returns: Json
       }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      conciliar_veiculo_ibac: {
+        Args: { p_veiculo_id: string }
+        Returns: {
+          baixa_id: string
+          classificacao: string
+          cnpj_destinatario: string
+          conferencia_status: string
+          dest_cidade: string
+          dest_razao_social: string
+          em_escopo_ibac: boolean
+          enviado_em: string
+          gravidade: string
+          nf_id: string
+          numero_nf: string
+          ocorrencia: string
+          queue_erro: string
+          queue_status: string
+          status_baixa: string
+          tem_foto: boolean
+        }[]
+      }
       confianca_origem: {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
         Returns: number
