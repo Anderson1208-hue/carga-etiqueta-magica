@@ -224,7 +224,8 @@ export default function IntegracaoIbac() {
   });
 
   if (isLoading || !profile) return null;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!podeVerIbac) return <Navigate to="/" replace />;
+
 
   const counts = {
     pendente: fila.filter((f) => f.status === "pendente").length,
