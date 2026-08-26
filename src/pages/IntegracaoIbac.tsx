@@ -97,6 +97,27 @@ export default function IntegracaoIbac() {
     },
   });
 
+  // Números de CT-e vinculados às NFs da fila.
+  const { data: cteMap = {} } = useQuery({
+    queryKey: ["ibac-fila-ctes", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, string> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("ctes")
+          .select("nf_id, numero_cte, created_at")
+          .in("nf_id", nfIds.slice(i, i + 200))
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        (data ?? []).forEach((c: any) => {
+          if (c.nf_id && c.numero_cte) map[c.nf_id] = String(c.numero_cte);
+        });
+      }
+      return map;
+    },
+  });
+
   const nfDoEvento = (f: any) => {
     const doPayload = f?.payload?.numero_nf ?? f?.payload?.numeroNota ?? null;
     const doBanco = f?.nf_id ? (nfMap as any)[f.nf_id]?.numero_nf : null;
@@ -107,6 +128,36 @@ export default function IntegracaoIbac() {
     if (chave.length === 44) return chave.substring(25, 34).replace(/^0+/, "");
     return null;
   };
+
+  const cteDoEvento = (f: any) =>
+    (f?.nf_id ? (cteMap as any)[f.nf_id] : null) ?? f?.payload?.numero_cte ?? null;
+
+  const exportarPdf = async () => {
+    try {
+      await gerarPdfFilaIbac(
+        fila.map((f: any) => ({
+          nf: nfDoEvento(f),
+          cte: cteDoEvento(f),
+          destinatario: (f.nf_id && (nfMap as any)[f.nf_id]?.dest) || null,
+          evento: f.evento_interno,
+          status: f.status,
+          tentativas: f.tentativas,
+          criadoEm: new Date(f.created_at).toLocaleString("pt-BR"),
+          erro: f.erro_mensagem ?? null,
+        })),
+        {
+          status: filtroStatus,
+          evento: filtroEvento,
+          busca: filtroBusca,
+          dataIni: filtroDataIni,
+          dataFim: filtroDataFim,
+        },
+      );
+    } catch (e: any) {
+      toast.error(`Falha ao gerar PDF: ${e.message}`);
+    }
+  };
+
 
 
 
