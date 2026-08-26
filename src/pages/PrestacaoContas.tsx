@@ -509,7 +509,17 @@ export default function PrestacaoContas() {
 
   async function encerrarPrestacao() {
     if (!veiculoSel) return;
+    if (conciliacaoErros > 0) {
+      const ok = window.confirm(
+        `A conciliação da placa ${veiculoSel.placa} aponta ${conciliacaoErros} NF(s) em ERRO ` +
+          `(sem desfecho, entregue sem foto ou canhoto com falha de envio).\n\n` +
+          `Trate essas notas (reentrega, nova foto ou reenvio) antes de encerrar.\n\n` +
+          `Encerrar mesmo assim?`,
+      );
+      if (!ok) return;
+    }
     setEncerrando(true);
+
     try {
       const { error } = await supabase
         .from("veiculos")
@@ -690,8 +700,10 @@ export default function PrestacaoContas() {
                     key={`${veiculoSel.id}-${conciliacaoKey}`}
                     veiculoId={veiculoSel.id}
                     placa={veiculoSel.placa}
+                    encerrado={!!veiculoSel.prestacao_contas_em}
                     onErrosChange={setConciliacaoErros}
                   />
+
 
 
 
