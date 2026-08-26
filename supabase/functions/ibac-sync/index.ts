@@ -283,7 +283,9 @@ Deno.serve(async (req) => {
       return true;
     });
     foraDoPiloto = antes - pendentes.length - aguardandoPrestacao;
-    pendentes = pendentes.slice(0, BATCH_SIZE);
+    const ev = pendentes.filter((i) => i.evento_interno !== "envio_canhoto").slice(0, BATCH_SIZE_EVENTOS);
+    const can = pendentes.filter((i) => i.evento_interno === "envio_canhoto").slice(0, BATCH_SIZE_CANHOTOS);
+    pendentes = [...ev, ...can];
   }
 
 
