@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { useAcessoIbac } from "@/hooks/useAcessoIbac";
+
 import { Navigate } from "react-router-dom";
 import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
@@ -37,8 +39,10 @@ import { IbacEnvioPanel } from "@/components/ibac/IbacEnvioPanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
+  const { podeVerIbac } = useAcessoIbac();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
+
   const [detalheId, setDetalheId] = useState<string | null>(null);
 
   // Filtros da fila
@@ -71,6 +75,40 @@ export default function IntegracaoIbac() {
     },
     refetchInterval: 15_000,
   });
+
+  // Resolve o número da NF (e destinatário) dos eventos da fila.
+  const nfIds = Array.from(new Set(fila.map((f: any) => f.nf_id).filter(Boolean))) as string[];
+  const { data: nfMap = {} } = useQuery({
+    queryKey: ["ibac-fila-nfs", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, { numero_nf: string | null; dest: string | null }> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, dest_razao_social")
+          .in("id", nfIds.slice(i, i + 200));
+        if (error) throw error;
+        (data ?? []).forEach((n: any) => {
+          map[n.id] = { numero_nf: n.numero_nf ?? null, dest: n.dest_razao_social ?? null };
+        });
+      }
+      return map;
+    },
+  });
+
+  const nfDoEvento = (f: any) => {
+    const doPayload = f?.payload?.numero_nf ?? f?.payload?.numeroNota ?? null;
+    const doBanco = f?.nf_id ? (nfMap as any)[f.nf_id]?.numero_nf : null;
+    const nf = doBanco ?? doPayload ?? null;
+    if (nf) return String(nf).replace(/^0+/, "") || String(nf);
+    // Fallback: extrai o número da NF da chave de acesso (posições 25-34).
+    const chave = (f?.chave_acesso ?? "").replace(/\D/g, "");
+    if (chave.length === 44) return chave.substring(25, 34).replace(/^0+/, "");
+    return null;
+  };
+
+
 
   const { data: dePara = [], refetch: refetchDePara } = useQuery({
     queryKey: ["ibac-de-para"],
@@ -186,7 +224,8 @@ export default function IntegracaoIbac() {
   });
 
   if (isLoading || !profile) return null;
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!podeVerIbac) return <Navigate to="/" replace />;
+
 
   const counts = {
     pendente: fila.filter((f) => f.status === "pendente").length,
@@ -222,7 +261,9 @@ export default function IntegracaoIbac() {
               Fila de eventos, mapeamento e auditoria do EDI com IBAC.
             </p>
           </div>
+          {isAdmin && (
           <div className="flex items-center gap-2">
+
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" disabled={counts.erro === 0 || reenviarTodosErros.isPending}>
@@ -270,6 +311,8 @@ export default function IntegracaoIbac() {
               Processar fila agora
             </Button>
           </div>
+          )}
+
         </div>
 
         <div className="grid grid-cols-3 gap-4">
@@ -292,11 +335,12 @@ export default function IntegracaoIbac() {
             <TabsTrigger value="fila">Fila ({fila.length})</TabsTrigger>
             <TabsTrigger value="saude">Saúde</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
-            <TabsTrigger value="backfill">Backfill</TabsTrigger>
-            <TabsTrigger value="retry">Retry</TabsTrigger>
-            <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
+            {isAdmin && <TabsTrigger value="backfill">Backfill</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="retry">Retry</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>}
             <TabsTrigger value="canhotos">Canhotos</TabsTrigger>
-            <TabsTrigger value="envio">Envio</TabsTrigger>
+            {isAdmin && <TabsTrigger value="envio">Envio</TabsTrigger>}
+
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
 
@@ -393,6 +437,8 @@ export default function IntegracaoIbac() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>NF</TableHead>
+                      <TableHead>Destinatário</TableHead>
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Tentativas</TableHead>
@@ -408,6 +454,10 @@ export default function IntegracaoIbac() {
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setDetalheId(f.id)}
                       >
+                        <TableCell className="font-mono text-xs font-semibold">{nfDoEvento(f) ?? "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">
+                          {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
                         <TableCell>{statusBadge(f.status)}</TableCell>
                         <TableCell>{f.tentativas}</TableCell>
@@ -418,7 +468,7 @@ export default function IntegracaoIbac() {
                             <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
                               Detalhes
                             </Button>
-                            {f.status === "erro" && (
+                            {isAdmin && f.status === "erro" && (
                               <Button size="sm" variant="outline" onClick={() => reenviar.mutate(f.id)}>
                                 Reenviar
                               </Button>
@@ -428,8 +478,9 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
+
                   </TableBody>
                 </Table>
               </CardContent>

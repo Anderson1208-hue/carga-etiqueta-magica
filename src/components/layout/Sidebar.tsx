@@ -2,6 +2,8 @@ import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useGestaoComercial } from "@/hooks/useGestaoComercial";
+import { useAcessoIbac } from "@/hooks/useAcessoIbac";
+
 import {
   Truck,
   FileText,
@@ -163,6 +165,8 @@ export function Sidebar() {
   const location = useLocation();
   const { profile, signOut, isAdmin } = useAuth();
   const { podeGestaoComercial } = useGestaoComercial();
+  const { podeVerIbac } = useAcessoIbac();
+
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
@@ -235,6 +239,12 @@ export function Sidebar() {
                 />
               </>
             )}
+            {podeVerIbac && (
+              <NavItem
+                item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
+                isActive={location.pathname === "/integracoes/ibac"}
+              />
+            )}
             {isAdmin && (
               <>
                 <NavItem
@@ -245,10 +255,7 @@ export function Sidebar() {
                   item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
                   isActive={location.pathname === "/auditoria"}
                 />
-                <NavItem
-                  item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
-                  isActive={location.pathname === "/integracoes/ibac"}
-                />
+
                 <NavItem
                   item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
                   isActive={location.pathname === "/integracoes/okentrega"}

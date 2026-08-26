@@ -3805,6 +3805,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      pode_ver_ibac: { Args: never; Returns: boolean }
       produtos_pendentes_cadastro: {
         Args: { p_cnpj?: string; p_dias?: number }
         Returns: {
