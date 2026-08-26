@@ -25,10 +25,11 @@ const IBAC_CANHOTO_URL = (() => {
 })();
 
 const DEFAULT_MAX_TENTATIVAS = 5;
-// 3 por rodada: baixas antigas não têm a TIRA (foto_recibo_path), então a foto
-// original (MB) é baixada e comprimida em memória — lotes maiores estouram o
-// WORKER_RESOURCE_LIMIT. O auto-encadeamento mantém a fila esvaziando.
-const BATCH_SIZE = 3;
+// Lotes separados: eventos operacionais são leves (HTTP POST JSON) e podem ir
+// em maior quantidade; canhotos baixam/comprimem fotos em memória, por isso
+// permanecem em lote pequeno para não estourar o WORKER_RESOURCE_LIMIT.
+const BATCH_SIZE_EVENTOS = 25;
+const BATCH_SIZE_CANHOTOS = 3;
 // Compressão do canhoto antes do base64 (não altera o arquivo no bucket)
 const MAX_LARGURA_PX = 1600;
 const JPEG_QUALIDADE = 72;
