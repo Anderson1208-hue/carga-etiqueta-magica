@@ -225,7 +225,9 @@ Deno.serve(async (req) => {
       return whitelist.includes(numero) || whitelist.includes(chave);
     });
     foraDaWhitelist = antes - pendentes.length;
-    pendentes = pendentes.slice(0, BATCH_SIZE);
+    const ev = pendentes.filter((i) => i.evento_interno !== "envio_canhoto").slice(0, BATCH_SIZE_EVENTOS);
+    const can = pendentes.filter((i) => i.evento_interno === "envio_canhoto").slice(0, BATCH_SIZE_CANHOTOS);
+    pendentes = [...ev, ...can];
   }
 
   // -------- Piloto por placa/data + liberação do canhoto na prestação de contas --------
