@@ -28,6 +28,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 
 import { Navigate } from "react-router-dom";
+import { gerarPdfFilaIbac } from "@/lib/ibac-fila-pdf";
+
 import { IbacSaudePanel } from "@/components/ibac/IbacSaudePanel";
 import { IbacAlertasPanel } from "@/components/ibac/IbacAlertasPanel";
 import { IbacBackfillPanel } from "@/components/ibac/IbacBackfillPanel";
