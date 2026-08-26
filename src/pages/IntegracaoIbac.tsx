@@ -261,7 +261,9 @@ export default function IntegracaoIbac() {
               Fila de eventos, mapeamento e auditoria do EDI com IBAC.
             </p>
           </div>
+          {isAdmin && (
           <div className="flex items-center gap-2">
+
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" disabled={counts.erro === 0 || reenviarTodosErros.isPending}>
