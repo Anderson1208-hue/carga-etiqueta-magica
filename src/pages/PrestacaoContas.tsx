@@ -744,12 +744,13 @@ export default function PrestacaoContas() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-center">
+                      <div className="grid grid-cols-2 md:grid-cols-7 gap-3 text-center">
                         <Stat label="NFs carga" value={totalNfsCarga} />
                         <Stat label="Baixadas" value={stats.total} />
                         <Stat label="Sem baixa" value={stats.semBaixa} tone={stats.semBaixa > 0 ? "warn" : undefined} />
                         <Stat label="Conferidas" value={stats.conferidas} tone="good" />
                         <Stat label="Pendência" value={stats.pendentes} tone={stats.pendentes > 0 ? "bad" : undefined} />
+                        <Stat label="Canhoto pend." value={stats.canhotoPendente} tone={stats.canhotoPendente > 0 ? "warn" : undefined} />
                         <Stat label="Alerta IA" value={stats.alertasIa} tone={stats.alertasIa > 0 ? "warn" : undefined} />
                       </div>
                     </CardContent>
