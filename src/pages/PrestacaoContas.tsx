@@ -446,6 +446,10 @@ export default function PrestacaoContas() {
         conferido_por: null,
         conferencia_status: null,
         conferencia_motivo: null,
+        canhoto_pendente_motivo: null,
+        canhoto_pendente_obs: null,
+        canhoto_pendente_em: null,
+        canhoto_pendente_por: null,
       })
       .eq("id", baixa.id);
     if (error) {
