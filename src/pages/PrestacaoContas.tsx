@@ -583,6 +583,32 @@ export default function PrestacaoContas() {
         })
         .eq("id", veiculoSel.id);
       if (error) throw error;
+
+      // Marca como "PENDENCIA DE BAIXA" as NFs roteirizadas que ficaram sem
+      // baixa, para aparecerem com esse status na Consulta de NF.
+      const { data: vnfs } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id")
+        .eq("veiculo_id", veiculoSel.id);
+      const nfIds = (vnfs || []).map((r) => r.nf_id);
+      if (nfIds.length > 0) {
+        const { data: baixasVeiculo } = await supabase
+          .from("baixas_entrega")
+          .select("nf_id")
+          .eq("veiculo_id", veiculoSel.id)
+          .in("nf_id", nfIds);
+        const comBaixa = new Set((baixasVeiculo || []).map((r) => r.nf_id));
+        const semBaixaIds = nfIds.filter((id) => !comBaixa.has(id));
+        if (semBaixaIds.length > 0) {
+          await supabase
+            .from("notas_fiscais")
+            .update({ status_entrega: "PENDENCIA DE BAIXA" })
+            .in("id", semBaixaIds)
+            .neq("status_entrega", "ENTREGUE")
+            .neq("status_entrega", "RECUSADO");
+        }
+      }
+
       // Cria a fila de canhotos exclusivamente para o veículo encerrado e só
       // então dispara o envio. O ibac-sync mantém as travas de placa/data piloto.
       const { data: fila, error: filaError } = await supabase.functions.invoke(

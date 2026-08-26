@@ -96,6 +96,7 @@ const statusColors: Record<string, string> = {
   "NF EM ROTA": "bg-primary/10 text-primary",
   ENTREGUE: "bg-success/10 text-success",
   RECUSADO: "bg-destructive/10 text-destructive",
+  "PENDENCIA DE BAIXA": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
 };
 
 const agendamentoColors: Record<string, string> = {
