@@ -335,11 +335,12 @@ export default function IntegracaoIbac() {
             <TabsTrigger value="fila">Fila ({fila.length})</TabsTrigger>
             <TabsTrigger value="saude">Saúde</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
-            <TabsTrigger value="backfill">Backfill</TabsTrigger>
-            <TabsTrigger value="retry">Retry</TabsTrigger>
-            <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>
+            {isAdmin && <TabsTrigger value="backfill">Backfill</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="retry">Retry</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>}
             <TabsTrigger value="canhotos">Canhotos</TabsTrigger>
-            <TabsTrigger value="envio">Envio</TabsTrigger>
+            {isAdmin && <TabsTrigger value="envio">Envio</TabsTrigger>}
+
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
 
