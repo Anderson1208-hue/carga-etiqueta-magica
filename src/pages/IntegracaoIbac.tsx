@@ -37,8 +37,10 @@ import { IbacEnvioPanel } from "@/components/ibac/IbacEnvioPanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
+  const { podeVerIbac } = useAcessoIbac();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
+
   const [detalheId, setDetalheId] = useState<string | null>(null);
 
   // Filtros da fila
