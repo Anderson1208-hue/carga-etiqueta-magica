@@ -457,6 +457,12 @@ export type Database = {
       }
       baixas_entrega: {
         Row: {
+          canhoto_pendente_em: string | null
+          canhoto_pendente_motivo: string | null
+          canhoto_pendente_obs: string | null
+          canhoto_pendente_por: string | null
+          canhoto_recuperado_em: string | null
+          canhoto_recuperado_por: string | null
           conferencia_motivo: string | null
           conferencia_status: string | null
           conferido_em: string | null
@@ -494,6 +500,12 @@ export type Database = {
           veiculo_id: string
         }
         Insert: {
+          canhoto_pendente_em?: string | null
+          canhoto_pendente_motivo?: string | null
+          canhoto_pendente_obs?: string | null
+          canhoto_pendente_por?: string | null
+          canhoto_recuperado_em?: string | null
+          canhoto_recuperado_por?: string | null
           conferencia_motivo?: string | null
           conferencia_status?: string | null
           conferido_em?: string | null
@@ -531,6 +543,12 @@ export type Database = {
           veiculo_id: string
         }
         Update: {
+          canhoto_pendente_em?: string | null
+          canhoto_pendente_motivo?: string | null
+          canhoto_pendente_obs?: string | null
+          canhoto_pendente_por?: string | null
+          canhoto_recuperado_em?: string | null
+          canhoto_recuperado_por?: string | null
           conferencia_motivo?: string | null
           conferencia_status?: string | null
           conferido_em?: string | null
@@ -3650,6 +3668,10 @@ export type Database = {
         Returns: Json
       }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      canhoto_prazo_vencido: {
+        Args: { p_dias_uteis?: number; p_marcado_em: string }
+        Returns: boolean
+      }
       conciliar_veiculo_ibac: {
         Args: { p_veiculo_id: string }
         Returns: {
@@ -3787,6 +3809,28 @@ export type Database = {
         }
         Returns: Json
       }
+      listar_canhotos_pendentes: {
+        Args: never
+        Returns: {
+          baixa_id: string
+          data_rota: string
+          dest_cidade: string
+          dest_razao_social: string
+          dias_corridos: number
+          marcado_em: string
+          marcado_por_nome: string
+          motivo: string
+          motorista: string
+          nf_id: string
+          numero_nf: string
+          observacao: string
+          ocorrencia: string
+          placa: string
+          prazo_vencido: boolean
+          registrado_em: string
+          veiculo_id: string
+        }[]
+      }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: {
@@ -3827,6 +3871,18 @@ export type Database = {
       provisionar_torre_veiculo: {
         Args: { p_veiculo_id: string }
         Returns: Json
+      }
+      registrar_canhoto_pendente: {
+        Args: { p_baixa_id: string; p_motivo: string; p_obs?: string }
+        Returns: undefined
+      }
+      registrar_canhoto_recuperado: {
+        Args: {
+          p_baixa_id: string
+          p_foto_path: string
+          p_foto_recibo_path?: string
+        }
+        Returns: undefined
       }
       registrar_chegada_cd_manual: {
         Args: { p_nf_id: string; p_observacao?: string }
