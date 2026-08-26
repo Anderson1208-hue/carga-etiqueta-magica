@@ -140,9 +140,24 @@ Deno.serve(async (req) => {
   }
 
 
-  const { data: pendentesRaw, error: errSelect } = await query
+  // Duas janelas separadas: eventos operacionais (tempo real) e canhotos
+  // (aguardam prestação de contas). Sem isso, canhotos antigos pendentes
+  // ocupam o topo da fila (ordem por created_at) e bloqueiam os eventos do dia.
+  const baseQuery = () => {
+    let q = query;
+    return q;
+  };
+  const { data: eventosRaw, error: errEv } = await baseQuery()
+    .neq("evento_interno", "envio_canhoto")
     .order("created_at", { ascending: true })
     .limit(janela);
+  const { data: canhotosRaw, error: errCan } = await baseQuery()
+    .eq("evento_interno", "envio_canhoto")
+    .order("created_at", { ascending: true })
+    .limit(janela);
+  const pendentesRaw = [...(eventosRaw ?? []), ...(canhotosRaw ?? [])];
+  const errSelect = errEv ?? errCan;
+
 
 
 
