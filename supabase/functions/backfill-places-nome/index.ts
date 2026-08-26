@@ -182,7 +182,9 @@ Deno.serve(async (req) => {
           }
 
           const cnpj = cnpjById.get(d.id) ?? '';
-          const apelido = cnpj.length >= 8 ? apelidoPorRaiz.get(cnpj.slice(0, 8)) : undefined;
+          const apelido = cnpjsIbac.has(cnpj)
+            ? APELIDO_IBAC
+            : (cnpj.length >= 8 ? apelidoPorRaiz.get(cnpj.slice(0, 8)) : undefined);
           const nome = (apelido || d.nome_fantasia || d.razao_social || '').trim();
           if (!nome) {
             results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match', detalhe: 'sem nome' });
@@ -190,8 +192,13 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
+          // Logradouro + número entram na query: sem eles, franquias homônimas
+          // da mesma rede (ex.: 3 lojas Cacau Show na Tijuca) retornam o MESMO
+          // place_id e várias paradas ficam empilhadas na mesma coordenada.
+          const ruaNumero = [endereco.logradouro, endereco.numero].filter(Boolean).join(', ');
+          const textQuery = [nome, ruaNumero, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
             .filter(Boolean).join(', ');
+
 
           let resp: Response | null = null;
           let lastErr = '';
