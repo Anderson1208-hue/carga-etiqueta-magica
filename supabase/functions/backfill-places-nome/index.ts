@@ -121,6 +121,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Regra do embarcador IBAC (Cacau Show): as lojas são franquias com razões
+    // sociais e CNPJs totalmente distintos (ASSB, Sabor Cacau, Mada Ia...), mas
+    // a fachada — o que o Google indexa — é sempre "Cacau Show". Todo
+    // destinatário que recebe NF do emitente IBAC é buscado por nome fantasia
+    // Cacau Show + logradouro/número.
+    const IBAC_EMITENTE_RAIZ = '61472205';
+    const APELIDO_IBAC = 'Cacau Show';
+    const cnpjsIbac = new Set<string>();
+    {
+      let from = 0; const page = 1000;
+      while (true) {
+        const { data: nfs, error: nfErr } = await supabase
+          .from('notas_fiscais')
+          .select('cnpj_destinatario, cnpj_emitente')
+          .ilike('cnpj_emitente', `%${IBAC_EMITENTE_RAIZ.slice(0, 2)}.${IBAC_EMITENTE_RAIZ.slice(2, 5)}.${IBAC_EMITENTE_RAIZ.slice(5, 8)}%`)
+          .range(from, from + page - 1);
+        if (nfErr) { console.error('nfs ibac err', nfErr); break; }
+        if (!nfs || nfs.length === 0) break;
+        for (const nf of nfs) {
+          const emit = String(nf.cnpj_emitente ?? '').replace(/\D/g, '');
+          if (emit.slice(0, 8) !== IBAC_EMITENTE_RAIZ) continue;
+          const dest = String(nf.cnpj_destinatario ?? '').replace(/\D/g, '');
+          if (dest) cnpjsIbac.add(dest);
+        }
+        if (nfs.length < page) break;
+        from += page;
+      }
+      console.log('destinatarios IBAC (Cacau Show):', cnpjsIbac.size);
+    }
+
+
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
       .map((d) => ({ ...d, baixas: cnpjRanks.get(cnpjById.get(d.id) ?? '') ?? 0 }))
@@ -151,7 +182,9 @@ Deno.serve(async (req) => {
           }
 
           const cnpj = cnpjById.get(d.id) ?? '';
-          const apelido = cnpj.length >= 8 ? apelidoPorRaiz.get(cnpj.slice(0, 8)) : undefined;
+          const apelido = cnpjsIbac.has(cnpj)
+            ? APELIDO_IBAC
+            : (cnpj.length >= 8 ? apelidoPorRaiz.get(cnpj.slice(0, 8)) : undefined);
           const nome = (apelido || d.nome_fantasia || d.razao_social || '').trim();
           if (!nome) {
             results.push({ destinatario_id: d.id, razao_social: d.razao_social, status: 'sem_match', detalhe: 'sem nome' });
@@ -159,8 +192,13 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const textQuery = [nome, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
+          // Logradouro + número entram na query: sem eles, franquias homônimas
+          // da mesma rede (ex.: 3 lojas Cacau Show na Tijuca) retornam o MESMO
+          // place_id e várias paradas ficam empilhadas na mesma coordenada.
+          const ruaNumero = [endereco.logradouro, endereco.numero].filter(Boolean).join(', ');
+          const textQuery = [nome, ruaNumero, endereco.bairro, endereco.cidade, endereco.uf, 'Brasil']
             .filter(Boolean).join(', ');
+
 
           let resp: Response | null = null;
           let lastErr = '';
