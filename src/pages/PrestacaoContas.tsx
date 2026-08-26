@@ -1053,6 +1053,13 @@ export default function PrestacaoContas() {
                           placeholder="Ex: Motorista entregou todos os canhotos. 1 reentrega pendente para amanhã."
                           rows={2}
                         />
+                        {stats.canhotoPendente > 0 && (
+                          <p className="text-sm text-amber-600 flex items-center gap-2">
+                            <FileWarning className="w-4 h-4" />
+                            {stats.canhotoPendente} canhoto(s) marcado(s) como pendente(s) de recuperação — a entrega é encerrada,
+                            mas a imagem só será enviada quando a foto for anexada em Canhotos pendentes (prazo: 2 dias úteis).
+                          </p>
+                        )}
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <p className="text-sm text-muted-foreground">
                             {tudoConferido
