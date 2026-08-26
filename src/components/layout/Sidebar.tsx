@@ -163,6 +163,8 @@ export function Sidebar() {
   const location = useLocation();
   const { profile, signOut, isAdmin } = useAuth();
   const { podeGestaoComercial } = useGestaoComercial();
+  const { podeVerIbac } = useAcessoIbac();
+
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
