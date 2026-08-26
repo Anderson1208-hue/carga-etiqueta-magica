@@ -239,6 +239,12 @@ export function Sidebar() {
                 />
               </>
             )}
+            {podeVerIbac && (
+              <NavItem
+                item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
+                isActive={location.pathname === "/integracoes/ibac"}
+              />
+            )}
             {isAdmin && (
               <>
                 <NavItem
@@ -249,10 +255,7 @@ export function Sidebar() {
                   item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
                   isActive={location.pathname === "/auditoria"}
                 />
-                <NavItem
-                  item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
-                  isActive={location.pathname === "/integracoes/ibac"}
-                />
+
                 <NavItem
                   item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
                   isActive={location.pathname === "/integracoes/okentrega"}
