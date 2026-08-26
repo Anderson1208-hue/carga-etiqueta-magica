@@ -498,7 +498,9 @@ export default function IntegracaoIbac() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>NF</TableHead>
+                      <TableHead>CT-e</TableHead>
                       <TableHead>Destinatário</TableHead>
+
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Tentativas</TableHead>
