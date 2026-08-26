@@ -121,6 +121,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Regra do embarcador IBAC (Cacau Show): as lojas são franquias com razões
+    // sociais e CNPJs totalmente distintos (ASSB, Sabor Cacau, Mada Ia...), mas
+    // a fachada — o que o Google indexa — é sempre "Cacau Show". Todo
+    // destinatário que recebe NF do emitente IBAC é buscado por nome fantasia
+    // Cacau Show + logradouro/número.
+    const IBAC_EMITENTE_RAIZ = '61472205';
+    const APELIDO_IBAC = 'Cacau Show';
+    const cnpjsIbac = new Set<string>();
+    {
+      let from = 0; const page = 1000;
+      while (true) {
+        const { data: nfs, error: nfErr } = await supabase
+          .from('notas_fiscais')
+          .select('cnpj_destinatario, cnpj_emitente')
+          .ilike('cnpj_emitente', `%${IBAC_EMITENTE_RAIZ.slice(0, 2)}.${IBAC_EMITENTE_RAIZ.slice(2, 5)}.${IBAC_EMITENTE_RAIZ.slice(5, 8)}%`)
+          .range(from, from + page - 1);
+        if (nfErr) { console.error('nfs ibac err', nfErr); break; }
+        if (!nfs || nfs.length === 0) break;
+        for (const nf of nfs) {
+          const emit = String(nf.cnpj_emitente ?? '').replace(/\D/g, '');
+          if (emit.slice(0, 8) !== IBAC_EMITENTE_RAIZ) continue;
+          const dest = String(nf.cnpj_destinatario ?? '').replace(/\D/g, '');
+          if (dest) cnpjsIbac.add(dest);
+        }
+        if (nfs.length < page) break;
+        from += page;
+      }
+      console.log('destinatarios IBAC (Cacau Show):', cnpjsIbac.size);
+    }
+
+
     // Anexar rank e filtrar por min_baixas_90d
     const ranked = (dests ?? [])
       .map((d) => ({ ...d, baixas: cnpjRanks.get(cnpjById.get(d.id) ?? '') ?? 0 }))
