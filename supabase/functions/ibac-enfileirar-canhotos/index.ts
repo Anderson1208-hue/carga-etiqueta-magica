@@ -76,10 +76,17 @@ Deno.serve(async (req) => {
     .not("foto_path", "is", null)
     .is("imagem_ibac_enviada_em", null)
     .lt("imagem_ibac_tentativas", MAX_TENTATIVAS)
-    .gte("registrado_em", DATA_CORTE_ISO);
+    .gte("registrado_em", DATA_CORTE_ISO)
+    // Canhoto marcado como pendente de recuperação não sobe: a imagem só é
+    // enfileirada quando a foto for anexada em /canhotos-pendentes.
+    .or("conferencia_status.is.null,conferencia_status.neq.canhoto_pendente");
 
   if (veiculoIdAlvo) {
     query = query.eq("veiculo_id", veiculoIdAlvo);
+  }
+
+  if (baixaIdsAlvo.length > 0) {
+    query = query.in("id", baixaIdsAlvo);
   }
 
   if (nfsAlvo.length > 0) {
