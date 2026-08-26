@@ -406,6 +406,38 @@ export default function PrestacaoContas() {
     if (veiculoSel) carregarBaixas(veiculoSel);
   }
 
+  // Canhoto não voltou com o motorista: encerra a prestação sem travar o veículo,
+  // registra o motivo e mantém a NF na fila de recuperação (/canhotos-pendentes).
+  async function salvarCanhotoPendente() {
+    if (!canhotoDialog) return;
+    if (!canhotoDialog.motivo) {
+      toast({ title: "Escolha o motivo", variant: "destructive" });
+      return;
+    }
+    setSalvandoCanhoto(true);
+    try {
+      const { error } = await (supabase as any).rpc("registrar_canhoto_pendente", {
+        p_baixa_id: canhotoDialog.baixa.id,
+        p_motivo: canhotoDialog.motivo,
+        p_obs: canhotoDialog.obs || null,
+      });
+      if (error) throw error;
+      setCanhotoDialog(null);
+      toast({
+        title: "Canhoto pendente registrado",
+        description: "A NF fica na fila de recuperação. A imagem não será enviada até a foto ser anexada.",
+      });
+      if (veiculoSel) await carregarBaixas(veiculoSel);
+      setConciliacaoKey((k) => k + 1);
+    } catch (err: any) {
+      toast({ title: "Erro", description: err?.message, variant: "destructive" });
+    } finally {
+      setSalvandoCanhoto(false);
+    }
+  }
+
+
+
   async function reabrirConferencia(baixa: BaixaItem) {
     const { error } = await supabase
       .from("baixas_entrega")
