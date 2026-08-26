@@ -85,6 +85,9 @@ interface BaixaItem {
   conferido_em: string | null;
   conferencia_status: string | null;
   conferencia_motivo: string | null;
+  canhoto_pendente_motivo?: string | null;
+  canhoto_pendente_obs?: string | null;
+  canhoto_pendente_em?: string | null;
   nf: {
     numero_nf: string | null;
     dest_razao_social: string | null;
