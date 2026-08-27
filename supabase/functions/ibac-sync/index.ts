@@ -310,6 +310,9 @@ Deno.serve(async (req) => {
     const ev = pendentes.filter((i) => i.evento_interno !== "envio_canhoto").slice(0, BATCH_SIZE_EVENTOS);
     const can = pendentes.filter((i) => i.evento_interno === "envio_canhoto").slice(0, BATCH_SIZE_CANHOTOS);
     pendentes = [...ev, ...can];
+  }
+
+
 
   // -------- ESCOPO OBRIGATÓRIO POR EMITENTE --------
   // A API da IBAC só aceita documentos dos CNPJs do grupo (IBAC / Cacau Show).
