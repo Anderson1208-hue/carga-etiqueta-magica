@@ -628,9 +628,31 @@ export default function PrestacaoContas() {
       const { error: syncError } = await supabase.functions.invoke("ibac-sync");
       if (syncError) throw syncError;
 
+      // Canal Pandurata/OK Entrega: mesma regra da IBAC — ocorrência + imagem
+      // só são enfileiradas e enviadas após o encerramento da prestação de contas.
+      let enfileiradosOk = 0;
+      try {
+        const { data: filaOk, error: filaOkErr } = await supabase.functions.invoke(
+          "okentrega-enfileirar",
+          { body: { veiculo_id: veiculoSel.id } },
+        );
+        if (filaOkErr) throw filaOkErr;
+        enfileiradosOk = Number(filaOk?.enfileirados ?? 0);
+        if (enfileiradosOk > 0) {
+          const { error: okSyncErr } = await supabase.functions.invoke("okentrega-sync");
+          if (okSyncErr) throw okSyncErr;
+        }
+      } catch (okErr: any) {
+        toast({
+          title: "Atenção: OK Entrega",
+          description: `Falha ao enfileirar/enviar para a OK Entrega: ${okErr?.message ?? okErr}`,
+          variant: "destructive",
+        });
+      }
+
       toast({
         title: "Prestação de contas encerrada",
-        description: `${enfileirados} canhoto(s) enfileirado(s) para envio à IBAC. Conferindo conciliação da placa...`,
+        description: `${enfileirados} canhoto(s) para IBAC e ${enfileiradosOk} para OK Entrega (Pandurata). Conferindo conciliação da placa...`,
       });
       await carregarVeiculos();
       // Mantém o veículo selecionado e força a conciliação: toda NF roteirizada

@@ -30,9 +30,13 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
   let nfsAlvo: string[] = [];
+  let veiculoIdAlvo: string | null = null;
   try {
     const body = await req.json();
     nfsAlvo = (body?.nfs ?? []).map((v: unknown) => String(v).trim()).filter(Boolean);
+    veiculoIdAlvo = typeof body?.veiculo_id === "string" && /^[0-9a-f-]{36}$/i.test(body.veiculo_id)
+      ? body.veiculo_id
+      : null;
   } catch {
     nfsAlvo = [];
   }
@@ -49,19 +53,28 @@ Deno.serve(async (req) => {
     .map((c: string) => String(c).replace(/\D/g, ""))
     .filter(Boolean);
 
-  if (prefixos.length === 0 && nfsAlvo.length === 0) {
+  if (prefixos.length === 0) {
     return json({ status: "sem_cnpjs_configurados", enfileirados: 0, candidatos: 0 });
   }
 
+  // REGRA PANDURATA: ocorrência + imagem só saem depois que a prestação de contas
+  // do veículo for encerrada (veiculos.prestacao_contas_em preenchido).
   let query = supabase
     .from("baixas_entrega")
     .select(
-      "id, nf_id, foto_path, recebedor_nome, registrado_em, latitude, longitude, okentrega_tentativas, " +
+      "id, nf_id, foto_path, recebedor_nome, registrado_em, latitude, longitude, okentrega_tentativas, conferencia_status, " +
+        "veiculos:veiculo_id!inner(id, placa, prestacao_contas_em), " +
         "notas_fiscais:nf_id!inner(numero_nf, chave_acesso, cnpj_emitente, cnpj_destinatario, dest_razao_social, carga_id)",
     )
     .not("foto_path", "is", null)
     .is("okentrega_enviada_em", null)
-    .lt("okentrega_tentativas", maxTentativas);
+    .lt("okentrega_tentativas", maxTentativas)
+    .not("veiculos.prestacao_contas_em", "is", null)
+    .or("conferencia_status.is.null,conferencia_status.neq.canhoto_pendente");
+
+  if (veiculoIdAlvo) {
+    query = query.eq("veiculo_id", veiculoIdAlvo);
+  }
 
   if (nfsAlvo.length > 0) {
     query = query.or(
@@ -89,7 +102,8 @@ Deno.serve(async (req) => {
       if (!nf) return false;
       // chave da DANFE com 44 dígitos é obrigatória
       if (String(nf.chave_acesso ?? "").replace(/\D/g, "").length !== 44) return false;
-      if (nfsAlvo.length > 0) return true;
+      // Amarração por CNPJ do emitente é obrigatória mesmo em teste dirigido:
+      // um canal por embarcador (Pandurata só recebe NF da Pandurata).
       const cnpj = String(nf.cnpj_emitente ?? "").replace(/\D/g, "");
       return prefixos.some((p: string) => cnpj.startsWith(p));
     })
