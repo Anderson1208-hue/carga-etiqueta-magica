@@ -54,7 +54,7 @@ export default function IntegracaoIbac() {
   const [filtroDataIni, setFiltroDataIni] = useState<string>("");
   const [filtroDataFim, setFiltroDataFim] = useState<string>("");
 
-  const { data: fila = [], refetch: refetchFila } = useQuery({
+  const { data: filaRaw = [], refetch: refetchFila } = useQuery({
     queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
     queryFn: async () => {
       let q = supabase
@@ -78,26 +78,63 @@ export default function IntegracaoIbac() {
     refetchInterval: 15_000,
   });
 
+  // Raízes de CNPJ de emitente autorizadas no canal IBAC (1 canal = 1 grupo de CNPJ).
+  const { data: raizesEscopo = [] } = useQuery({
+    queryKey: ["ibac-escopo-emitentes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cnpj_envio_canhoto_auto")
+        .select("cnpj, ativo")
+        .eq("ativo", true);
+      if (error) throw error;
+      return (data ?? [])
+        .map((r: any) => String(r.cnpj ?? "").replace(/\D/g, "").slice(0, 8))
+        .filter((r: string) => r.length === 8);
+    },
+  });
+
   // Resolve o número da NF (e destinatário) dos eventos da fila.
-  const nfIds = Array.from(new Set(fila.map((f: any) => f.nf_id).filter(Boolean))) as string[];
+  const nfIds = Array.from(new Set(filaRaw.map((f: any) => f.nf_id).filter(Boolean))) as string[];
   const { data: nfMap = {} } = useQuery({
     queryKey: ["ibac-fila-nfs", nfIds.join(",")],
     enabled: nfIds.length > 0,
     queryFn: async () => {
-      const map: Record<string, { numero_nf: string | null; dest: string | null }> = {};
+      const map: Record<string, { numero_nf: string | null; dest: string | null; cnpj_emitente: string | null }> = {};
       for (let i = 0; i < nfIds.length; i += 200) {
         const { data, error } = await supabase
           .from("notas_fiscais")
-          .select("id, numero_nf, dest_razao_social")
+          .select("id, numero_nf, dest_razao_social, cnpj_emitente")
           .in("id", nfIds.slice(i, i + 200));
         if (error) throw error;
         (data ?? []).forEach((n: any) => {
-          map[n.id] = { numero_nf: n.numero_nf ?? null, dest: n.dest_razao_social ?? null };
+          map[n.id] = {
+            numero_nf: n.numero_nf ?? null,
+            dest: n.dest_razao_social ?? null,
+            cnpj_emitente: n.cnpj_emitente ?? null,
+          };
         });
       }
       return map;
     },
   });
+
+  // Só exibe eventos cujo emitente pertence ao escopo IBAC.
+  const raizEmitente = (f: any): string | null => {
+    const doBanco = f?.nf_id ? (nfMap as any)[f.nf_id]?.cnpj_emitente : null;
+    if (doBanco) return String(doBanco).replace(/\D/g, "").slice(0, 8) || null;
+    const chave = String(f?.chave_acesso ?? "").replace(/\D/g, "");
+    if (chave.length === 44) return chave.substring(6, 14);
+    return null;
+  };
+
+  const fila =
+    raizesEscopo.length === 0
+      ? filaRaw
+      : filaRaw.filter((f: any) => {
+          const raiz = raizEmitente(f);
+          return raiz ? raizesEscopo.includes(raiz) : true;
+        });
+
 
   // Números de CT-e vinculados às NFs da fila.
   const { data: cteMap = {} } = useQuery({
