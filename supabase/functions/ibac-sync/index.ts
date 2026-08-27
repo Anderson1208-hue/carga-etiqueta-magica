@@ -314,6 +314,57 @@ Deno.serve(async (req) => {
 
 
 
+  // -------- ESCOPO OBRIGATÓRIO POR EMITENTE --------
+  // A API da IBAC só aceita documentos dos CNPJs do grupo (IBAC / Cacau Show).
+  // Qualquer outro embarcador (Pandurata, Hershey, Docile, etc.) NUNCA pode ser
+  // transmitido: é cancelado na fila para não voltar em execuções futuras.
+  let foraDoEscopoEmitente = 0;
+  if (pendentes.length > 0) {
+    const { data: cnpjsEscopo } = await supabase
+      .from("cnpj_envio_canhoto_auto")
+      .select("cnpj")
+      .eq("ativo", true);
+    const raizes = new Set(
+      (cnpjsEscopo ?? [])
+        .map((c: any) => String(c.cnpj ?? "").replace(/\D/g, "").slice(0, 8))
+        .filter(Boolean),
+    );
+
+    const nfIdsEsc = [...new Set(pendentes.map((i) => i.nf_id).filter(Boolean))] as string[];
+    const emitentePorNf = new Map<string, string>();
+    if (nfIdsEsc.length > 0) {
+      const { data: nfsEsc } = await supabase
+        .from("notas_fiscais")
+        .select("id, cnpj_emitente")
+        .in("id", nfIdsEsc);
+      for (const nf of nfsEsc ?? []) {
+        emitentePorNf.set((nf as any).id, String((nf as any).cnpj_emitente ?? "").replace(/\D/g, "").slice(0, 8));
+      }
+    }
+
+    const foraIds: string[] = [];
+    pendentes = pendentes.filter((item) => {
+      const raiz = item.nf_id ? emitentePorNf.get(item.nf_id) : undefined;
+      if (raizes.size === 0 || !raiz || !raizes.has(raiz)) {
+        foraIds.push(item.id);
+        return false;
+      }
+      return true;
+    });
+    foraDoEscopoEmitente = foraIds.length;
+
+    if (foraIds.length > 0) {
+      await supabase
+        .from("ibac_eventos_queue")
+        .update({ status: "cancelado", erro_mensagem: "Fora do escopo IBAC (emitente não autorizado)" })
+        .in("id", foraIds);
+    }
+  }
+
+
+
+
+
 
   const resultados: Array<{ id: string; sucesso: boolean }> = [];
 
@@ -665,6 +716,7 @@ Deno.serve(async (req) => {
       adiados_por_backoff: adiados,
       fora_da_whitelist: foraDaWhitelist,
       fora_do_piloto: foraDoPiloto,
+      fora_do_escopo_emitente: foraDoEscopoEmitente,
       canhotos_aguardando_prestacao: aguardandoPrestacao,
       placas_piloto: placasPiloto,
       data_piloto: dataPiloto,
