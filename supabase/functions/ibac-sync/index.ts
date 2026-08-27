@@ -716,6 +716,7 @@ Deno.serve(async (req) => {
       adiados_por_backoff: adiados,
       fora_da_whitelist: foraDaWhitelist,
       fora_do_piloto: foraDoPiloto,
+      fora_do_escopo_emitente: foraDoEscopoEmitente,
       canhotos_aguardando_prestacao: aguardandoPrestacao,
       placas_piloto: placasPiloto,
       data_piloto: dataPiloto,
