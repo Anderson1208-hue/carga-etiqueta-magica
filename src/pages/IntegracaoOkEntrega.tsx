@@ -860,7 +860,10 @@ export default function IntegracaoOkEntrega() {
                               ? `Recusado${i.motivo_recusa ? ` — ${i.motivo_recusa}` : ""}`
                               : "Em análise"}
                         </TableCell>
-                        <TableCell>{i.tentativas}</TableCell>
+                        <TableCell>{i.tentativas ?? 0}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {i.created_at ? new Date(i.created_at).toLocaleString("pt-BR") : "—"}
+                        </TableCell>
                         <TableCell className="text-xs text-destructive max-w-[220px] truncate">
                           {i.erro_mensagem ?? ""}
                         </TableCell>
@@ -868,8 +871,10 @@ export default function IntegracaoOkEntrega() {
                     ))}
                     {fila.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                          Fila vazia. Use "Enfileirar baixas".
+                        <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
+                          {filaRaw.length === 0
+                            ? 'Fila vazia. Use "Enfileirar baixas".'
+                            : "Nenhum registro para os filtros aplicados."}
                         </TableCell>
                       </TableRow>
                     )}
