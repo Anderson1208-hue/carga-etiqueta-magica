@@ -88,6 +88,8 @@ export default function IntegracaoOkEntrega() {
   const qc = useQueryClient();
   const [tab, setTab] = useState("envio");
   const [dryRunJson, setDryRunJson] = useState<string>("");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [filtroBusca, setFiltroBusca] = useState<string>("");
 
   // form local da config
   const [ambiente, setAmbiente] = useState("homolog");
