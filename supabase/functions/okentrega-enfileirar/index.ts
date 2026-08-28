@@ -16,6 +16,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const BATCH_SIZE = 500;
+// Go-live da integração em produção: baixas anteriores a esta data não são
+// transmitidas (evita reenviar histórico de homologação/backlog).
+const CUTOFF_PRODUCAO = "2026-08-28T00:00:00-03:00";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -70,7 +73,18 @@ Deno.serve(async (req) => {
     .is("okentrega_enviada_em", null)
     .lt("okentrega_tentativas", maxTentativas)
     .not("veiculos.prestacao_contas_em", "is", null)
-    .or("conferencia_status.is.null,conferencia_status.neq.canhoto_pendente");
+    .or("conferencia_status.is.null,conferencia_status.neq.canhoto_pendente")
+    // Amarração do embarcador no BANCO (e não só em memória): sem isso o SELECT
+    // trazia as baixas mais antigas de TODOS os emitentes e as da Pandurata do
+    // dia ficavam fora da janela, nunca entrando na fila.
+    .or(
+      prefixos
+        .map((p: string) => `cnpj_emitente.like.${p.slice(0, 2)}.${p.slice(2, 5)}.${p.slice(5, 8)}%`)
+        .join(","),
+      { foreignTable: "notas_fiscais" },
+    )
+    // Corte de produção: não reprocessar histórico anterior ao go-live.
+    .gte("registrado_em", CUTOFF_PRODUCAO);
 
   if (veiculoIdAlvo) {
     query = query.eq("veiculo_id", veiculoIdAlvo);
@@ -84,7 +98,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: baixas, error: bErr } = await query
-    .order("registrado_em", { ascending: true })
+    .order("registrado_em", { ascending: false })
     .limit(BATCH_SIZE * 4);
 
   if (bErr) return json({ error: bErr.message }, 500);

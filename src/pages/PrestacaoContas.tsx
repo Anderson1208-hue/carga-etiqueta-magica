@@ -618,15 +618,25 @@ export default function PrestacaoContas() {
 
       // Cria a fila de canhotos exclusivamente para o veículo encerrado e só
       // então dispara o envio. O ibac-sync mantém as travas de placa/data piloto.
-      const { data: fila, error: filaError } = await supabase.functions.invoke(
-        "ibac-enfileirar-canhotos",
-        { body: { veiculo_id: veiculoSel.id } },
-      );
-      if (filaError) throw filaError;
-
-      const enfileirados = Number(fila?.enfileirados ?? 0);
-      const { error: syncError } = await supabase.functions.invoke("ibac-sync");
-      if (syncError) throw syncError;
+      // Canais são independentes: falha na IBAC não pode impedir o envio da
+      // Pandurata/OK Entrega (era a causa de nenhuma fila OK Entrega ser criada).
+      let enfileirados = 0;
+      try {
+        const { data: fila, error: filaError } = await supabase.functions.invoke(
+          "ibac-enfileirar-canhotos",
+          { body: { veiculo_id: veiculoSel.id } },
+        );
+        if (filaError) throw filaError;
+        enfileirados = Number(fila?.enfileirados ?? 0);
+        const { error: syncError } = await supabase.functions.invoke("ibac-sync");
+        if (syncError) throw syncError;
+      } catch (ibacErr: any) {
+        toast({
+          title: "Atenção: IBAC",
+          description: `Falha ao enfileirar/enviar para a IBAC: ${ibacErr?.message ?? ibacErr}`,
+          variant: "destructive",
+        });
+      }
 
       // Canal Pandurata/OK Entrega: mesma regra da IBAC — ocorrência + imagem
       // só são enfileiradas e enviadas após o encerramento da prestação de contas.
