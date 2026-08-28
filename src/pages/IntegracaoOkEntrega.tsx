@@ -129,7 +129,7 @@ export default function IntegracaoOkEntrega() {
     setMaxTentativas(String(cfg.max_tentativas ?? 5));
   }, [cfg]);
 
-  const { data: fila = [], refetch: refetchFila } = useQuery({
+  const { data: filaRaw = [], refetch: refetchFila } = useQuery({
     queryKey: ["okentrega-fila"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -143,6 +143,94 @@ export default function IntegracaoOkEntrega() {
     refetchInterval: 30_000,
 
   });
+
+  // Enriquecimento igual à tela da IBAC: NF, CT-e, destinatário e placa.
+  const nfIds = Array.from(new Set((filaRaw as any[]).map((f) => f.nf_id).filter(Boolean))) as string[];
+  const baixaIds = Array.from(new Set((filaRaw as any[]).map((f) => f.baixa_id).filter(Boolean))) as string[];
+
+  const { data: nfMap = {} } = useQuery({
+    queryKey: ["okentrega-fila-nfs", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, { numero_nf: string | null; dest: string | null }> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, dest_razao_social")
+          .in("id", nfIds.slice(i, i + 200));
+        if (error) throw error;
+        (data ?? []).forEach((n: any) => {
+          map[n.id] = { numero_nf: n.numero_nf ?? null, dest: n.dest_razao_social ?? null };
+        });
+      }
+      return map;
+    },
+  });
+
+  const { data: cteMap = {} } = useQuery({
+    queryKey: ["okentrega-fila-ctes", nfIds.join(",")],
+    enabled: nfIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, string> = {};
+      for (let i = 0; i < nfIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("ctes")
+          .select("nf_id, numero_cte, created_at")
+          .in("nf_id", nfIds.slice(i, i + 200))
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        (data ?? []).forEach((c: any) => {
+          if (c.nf_id && c.numero_cte) map[c.nf_id] = String(c.numero_cte);
+        });
+      }
+      return map;
+    },
+  });
+
+  const { data: placaMap = {} } = useQuery({
+    queryKey: ["okentrega-fila-placas", baixaIds.join(",")],
+    enabled: baixaIds.length > 0,
+    queryFn: async () => {
+      const map: Record<string, { placa: string | null; registrado_em: string | null }> = {};
+      for (let i = 0; i < baixaIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("baixas_entrega")
+          .select("id, registrado_em, veiculos:veiculo_id(placa)")
+          .in("id", baixaIds.slice(i, i + 200));
+        if (error) throw error;
+        (data ?? []).forEach((b: any) => {
+          map[b.id] = { placa: b.veiculos?.placa ?? null, registrado_em: b.registrado_em ?? null };
+        });
+      }
+      return map;
+    },
+  });
+
+  const nfDoItem = (i: any) => {
+    const doBanco = i?.nf_id ? (nfMap as any)[i.nf_id]?.numero_nf : null;
+    const nf = doBanco ?? i?.numero_nf ?? i?.payload?.numero_nf ?? null;
+    if (nf) return String(nf).replace(/^0+/, "") || String(nf);
+    const chave = String(i?.chave_acesso ?? "").replace(/\D/g, "");
+    if (chave.length === 44) return chave.substring(25, 34).replace(/^0+/, "");
+    return null;
+  };
+  const cteDoItem = (i: any) => (i?.nf_id ? (cteMap as any)[i.nf_id] : null) ?? null;
+  const destDoItem = (i: any) =>
+    (i?.nf_id ? (nfMap as any)[i.nf_id]?.dest : null) ?? i?.payload?.dest_razao_social ?? null;
+  const placaDoItem = (i: any) => (i?.baixa_id ? (placaMap as any)[i.baixa_id]?.placa : null) ?? null;
+
+  const fila = useMemo(() => {
+    const termo = filtroBusca.trim().toLowerCase();
+    return (filaRaw as any[]).filter((i) => {
+      if (filtroStatus !== "todos" && i.status !== filtroStatus) return false;
+      if (!termo) return true;
+      const alvo = [nfDoItem(i), cteDoItem(i), destDoItem(i), placaDoItem(i), i.chave_acesso]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return alvo.includes(termo);
+    });
+  }, [filaRaw, filtroStatus, filtroBusca, nfMap, cteMap, placaMap]);
 
   // Baixa a foto do primeiro item pendente com canhoto para servir de amostra do recorte.
   useEffect(() => {
