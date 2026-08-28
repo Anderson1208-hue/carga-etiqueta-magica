@@ -798,24 +798,51 @@ export default function IntegracaoOkEntrega() {
                   <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
                 </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os status</SelectItem>
+                      <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="enviado">Enviado</SelectItem>
+                      <SelectItem value="erro">Erro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Buscar NF, CT-e, destinatário ou placa"
+                    value={filtroBusca}
+                    onChange={(e) => setFiltroBusca(e.target.value)}
+                    className="w-[320px]"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {fila.length} de {filaRaw.length} registro(s)
+                  </span>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>NF</TableHead>
-                      <TableHead>Chave</TableHead>
+                      <TableHead>CT-e</TableHead>
+                      <TableHead>Destinatário</TableHead>
+                      <TableHead>Placa</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>statusbaixa</TableHead>
                       <TableHead>Comprovante</TableHead>
                       <TableHead>Tent.</TableHead>
+                      <TableHead>Criado em</TableHead>
                       <TableHead>Erro</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {fila.map((i) => (
                       <TableRow key={i.id}>
-                        <TableCell className="font-medium">{i.numero_nf || "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{i.chave_acesso?.slice(-12) ?? "—"}</TableCell>
+                        <TableCell className="font-medium">{nfDoItem(i) ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{cteDoItem(i) ?? "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[220px] truncate">{destDoItem(i) ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{placaDoItem(i) ?? "—"}</TableCell>
                         <TableCell>
                           <Badge
                             variant={
