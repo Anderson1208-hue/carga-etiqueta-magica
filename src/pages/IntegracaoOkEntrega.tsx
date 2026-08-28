@@ -146,6 +146,84 @@ export default function IntegracaoOkEntrega() {
 
   });
 
+  const hojeOperacional = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const prefixosConfigurados = (cfg?.cnpjs_emitente ?? [])
+    .map((cnpj: string) => String(cnpj).replace(/\D/g, ""))
+    .filter(Boolean);
+
+  // A fila contém somente baixas elegíveis. Para acompanhamento operacional é
+  // necessário mostrar também as NFs roteirizadas que ainda estão em rota,
+  // sem baixa/foto ou aguardando o encerramento da prestação de contas.
+  const { data: nfsRoteirizadasHoje = [], refetch: refetchRoteirizadas } = useQuery({
+    queryKey: ["okentrega-roteirizadas-hoje", hojeOperacional, prefixosConfigurados.join(",")],
+    enabled: prefixosConfigurados.length > 0,
+    queryFn: async () => {
+      const { data: veiculos, error: veiculosError } = await supabase
+        .from("veiculos")
+        .select("id, placa, motorista, prestacao_contas_em")
+        .eq("data", hojeOperacional);
+      if (veiculosError) throw veiculosError;
+
+      const veiculoIds = (veiculos ?? []).map((v: any) => v.id);
+      if (veiculoIds.length === 0) return [];
+
+      const vinculos: Array<{ veiculo_id: string; nf_id: string }> = [];
+      for (let i = 0; i < veiculoIds.length; i += 200) {
+        const { data, error } = await supabase
+          .from("veiculo_nfs")
+          .select("veiculo_id, nf_id")
+          .in("veiculo_id", veiculoIds.slice(i, i + 200));
+        if (error) throw error;
+        vinculos.push(...((data ?? []) as Array<{ veiculo_id: string; nf_id: string }>));
+      }
+
+      const nfIdsRoteirizados = Array.from(new Set(vinculos.map((v) => v.nf_id)));
+      if (nfIdsRoteirizados.length === 0) return [];
+
+      const notas: any[] = [];
+      for (let i = 0; i < nfIdsRoteirizados.length; i += 200) {
+        const { data, error } = await supabase
+          .from("notas_fiscais")
+          .select("id, numero_nf, chave_acesso, cnpj_emitente, dest_razao_social, status_entrega")
+          .in("id", nfIdsRoteirizados.slice(i, i + 200));
+        if (error) throw error;
+        notas.push(...(data ?? []));
+      }
+
+      const notasPandurata = notas.filter((nf: any) => {
+        const cnpj = String(nf.cnpj_emitente ?? "").replace(/\D/g, "");
+        return prefixosConfigurados.some((prefixo: string) => cnpj.startsWith(prefixo));
+      });
+      const idsPandurata = notasPandurata.map((nf: any) => nf.id);
+      if (idsPandurata.length === 0) return [];
+
+      const baixas: any[] = [];
+      for (let i = 0; i < idsPandurata.length; i += 200) {
+        const { data, error } = await supabase
+          .from("baixas_entrega")
+          .select("id, nf_id, veiculo_id, foto_path, registrado_em, conferencia_status")
+          .in("nf_id", idsPandurata.slice(i, i + 200))
+          .order("registrado_em", { ascending: false });
+        if (error) throw error;
+        baixas.push(...(data ?? []));
+      }
+
+      const veiculoMap = new Map((veiculos ?? []).map((v: any) => [v.id, v]));
+      const vinculoMap = new Map(vinculos.map((v) => [v.nf_id, v.veiculo_id]));
+      const baixaMap = new Map<string, any>();
+      baixas.forEach((b: any) => {
+        if (!baixaMap.has(b.nf_id)) baixaMap.set(b.nf_id, b);
+      });
+
+      return notasPandurata.map((nf: any) => {
+        const veiculoId = vinculoMap.get(nf.id);
+        const veiculo: any = veiculoId ? veiculoMap.get(veiculoId) : null;
+        return { ...nf, veiculo, baixa: baixaMap.get(nf.id) ?? null };
+      });
+    },
+    refetchInterval: 30_000,
+  });
+
   // Enriquecimento igual à tela da IBAC: NF, CT-e, destinatário e placa.
   const nfIds = Array.from(new Set((filaRaw as any[]).map((f) => f.nf_id).filter(Boolean))) as string[];
   const baixaIds = Array.from(new Set((filaRaw as any[]).map((f) => f.baixa_id).filter(Boolean))) as string[];
@@ -220,6 +298,45 @@ export default function IntegracaoOkEntrega() {
   const destDoItem = (i: any) =>
     (i?.nf_id ? (nfMap as any)[i.nf_id]?.dest : null) ?? i?.payload?.dest_razao_social ?? null;
   const placaDoItem = (i: any) => (i?.baixa_id ? (placaMap as any)[i.baixa_id]?.placa : null) ?? null;
+
+  const filaPorNfId = useMemo(() => {
+    const map = new Map<string, any>();
+    (filaRaw as any[]).forEach((item) => {
+      if (item.nf_id && !map.has(item.nf_id)) map.set(item.nf_id, item);
+    });
+    return map;
+  }, [filaRaw]);
+
+  const acompanhamentoHoje = useMemo(() => {
+    const termo = filtroBusca.trim().toLowerCase();
+    return (nfsRoteirizadasHoje as any[])
+      .map((nf) => ({ ...nf, fila: filaPorNfId.get(nf.id) ?? null }))
+      .filter((item) => {
+        const statusFila = item.fila?.status ?? "fora_fila";
+        if (filtroStatus !== "todos" && statusFila !== filtroStatus) return false;
+        if (!termo) return true;
+        return [item.numero_nf, item.dest_razao_social, item.veiculo?.placa, item.status_entrega]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(termo);
+      })
+      .sort((a, b) => String(a.veiculo?.placa ?? "").localeCompare(String(b.veiculo?.placa ?? "")));
+  }, [nfsRoteirizadasHoje, filaPorNfId, filtroBusca, filtroStatus]);
+
+  const statusAcompanhamento = (item: any) => {
+    if (item.fila?.status === "enviado") return { label: "Enviado", variant: "default" as const };
+    if (item.fila?.status === "erro") return { label: "Erro no envio", variant: "destructive" as const };
+    if (item.fila?.status === "pendente") return { label: "Na fila", variant: "secondary" as const };
+    if (!item.baixa) return { label: "Em rota / sem baixa", variant: "outline" as const };
+    if (item.baixa.conferencia_status === "canhoto_pendente" || !item.baixa.foto_path) {
+      return { label: "Canhoto pendente", variant: "destructive" as const };
+    }
+    if (!item.veiculo?.prestacao_contas_em) {
+      return { label: "Aguardando prestação", variant: "secondary" as const };
+    }
+    return { label: "Aguardando fila", variant: "secondary" as const };
+  };
 
   const fila = useMemo(() => {
     const termo = filtroBusca.trim().toLowerCase();
@@ -791,10 +908,15 @@ export default function IntegracaoOkEntrega() {
           </TabsContent>
 
           <TabsContent value="fila">
-            <Card>
+            <Card className="mb-4">
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Fila de envios</CardTitle>
-                <Button size="sm" variant="outline" onClick={() => refetchFila()}>
+                <div>
+                  <CardTitle>NFs Pandurata roteirizadas hoje</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Acompanhamento desde a roteirização até o retorno da OK Entrega.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => { refetchFila(); refetchRoteirizadas(); }}>
                   <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
                 </Button>
               </CardHeader>
@@ -809,6 +931,7 @@ export default function IntegracaoOkEntrega() {
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="enviado">Enviado</SelectItem>
                       <SelectItem value="erro">Erro</SelectItem>
+                      <SelectItem value="fora_fila">Ainda fora da fila</SelectItem>
                     </SelectContent>
                   </Select>
                   <Input
@@ -818,68 +941,63 @@ export default function IntegracaoOkEntrega() {
                     className="w-[320px]"
                   />
                   <span className="text-sm text-muted-foreground">
-                    {fila.length} de {filaRaw.length} registro(s)
+                    {acompanhamentoHoje.length} de {nfsRoteirizadasHoje.length} NF(s) · {new Set((nfsRoteirizadasHoje as any[]).map((n) => n.veiculo?.placa).filter(Boolean)).size} veículo(s)
                   </span>
                 </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>NF</TableHead>
-                      <TableHead>CT-e</TableHead>
                       <TableHead>Destinatário</TableHead>
                       <TableHead>Placa</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>statusbaixa</TableHead>
+                      <TableHead>Status da entrega</TableHead>
+                      <TableHead>Status da integração</TableHead>
+                      <TableHead>Retorno OK Entrega</TableHead>
                       <TableHead>Comprovante</TableHead>
-                      <TableHead>Tent.</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Erro</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fila.map((i) => (
+                    {acompanhamentoHoje.map((i: any) => {
+                      const status = statusAcompanhamento(i);
+                      return (
                       <TableRow key={i.id}>
-                        <TableCell className="font-medium">{nfDoItem(i) ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{cteDoItem(i) ?? "—"}</TableCell>
-                        <TableCell className="text-xs max-w-[220px] truncate">{destDoItem(i) ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{placaDoItem(i) ?? "—"}</TableCell>
+                        <TableCell className="font-medium">{String(i.numero_nf ?? "—").replace(/^0+/, "")}</TableCell>
+                        <TableCell className="text-xs max-w-[260px] truncate">{i.dest_razao_social ?? "—"}</TableCell>
+                        <TableCell className="font-mono text-xs">{i.veiculo?.placa ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{i.status_entrega ?? "Pendente"}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant={
-                              i.status === "enviado" ? "default" : i.status === "erro" ? "destructive" : "secondary"
-                            }
-                          >
-                            {i.status}
-                          </Badge>
+                          <Badge variant={status.variant}>{status.label}</Badge>
                         </TableCell>
-                        <TableCell className="text-xs">{rotuloStatusBaixa(i.status_baixa)}</TableCell>
+                        <TableCell className="text-xs">{rotuloStatusBaixa(i.fila?.status_baixa)}</TableCell>
                         <TableCell className="text-xs">
-                          {i.status_comprovante === "1"
+                          {!i.baixa?.foto_path
+                            ? "Sem imagem"
+                            : i.fila?.status_comprovante === "1"
                             ? "Aprovado"
-                            : i.status_comprovante === "2"
-                              ? `Recusado${i.motivo_recusa ? ` — ${i.motivo_recusa}` : ""}`
-                              : "Em análise"}
-                        </TableCell>
-                        <TableCell>{i.tentativas ?? 0}</TableCell>
-                        <TableCell className="text-xs whitespace-nowrap">
-                          {i.created_at ? new Date(i.created_at).toLocaleString("pt-BR") : "—"}
-                        </TableCell>
-                        <TableCell className="text-xs text-destructive max-w-[220px] truncate">
-                          {i.erro_mensagem ?? ""}
+                            : i.fila?.status_comprovante === "2"
+                              ? `Recusado${i.fila?.motivo_recusa ? ` — ${i.fila.motivo_recusa}` : ""}`
+                              : i.fila?.status === "enviado" ? "Em análise" : "Aguardando envio"}
                         </TableCell>
                       </TableRow>
-                    ))}
-                    {fila.length === 0 && (
+                    );})}
+                    {acompanhamentoHoje.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
-                          {filaRaw.length === 0
-                            ? 'Fila vazia. Use "Enfileirar baixas".'
-                            : "Nenhum registro para os filtros aplicados."}
+                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
+                          Nenhuma NF Pandurata roteirizada hoje para os filtros aplicados.
                         </TableCell>
                       </TableRow>
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Histórico técnico da fila</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {filaRaw.length} registro(s): {stats?.pendentes ?? 0} pendente(s), {stats?.enviados ?? 0} enviado(s) e {stats?.erros ?? 0} erro(s).
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
