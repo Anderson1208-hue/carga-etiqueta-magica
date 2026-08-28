@@ -86,7 +86,7 @@ Orkestria Logística`;
 export default function IntegracaoOkEntrega() {
   const { isAdmin, isLoading } = useAuth();
   const qc = useQueryClient();
-  const [tab, setTab] = useState("envio");
+  const [tab, setTab] = useState("fila");
   const [dryRunJson, setDryRunJson] = useState<string>("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroBusca, setFiltroBusca] = useState<string>("");
@@ -656,7 +656,7 @@ export default function IntegracaoOkEntrega() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="envio">Envio e configuração</TabsTrigger>
-            <TabsTrigger value="fila">Fila</TabsTrigger>
+            <TabsTrigger value="fila">Acompanhamento de NFs</TabsTrigger>
             <TabsTrigger value="teste">Teste / JSON</TabsTrigger>
           </TabsList>
 
