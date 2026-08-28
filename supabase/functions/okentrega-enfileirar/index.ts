@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: baixas, error: bErr } = await query
-    .order("registrado_em", { ascending: true })
+    .order("registrado_em", { ascending: false })
     .limit(BATCH_SIZE * 4);
 
   if (bErr) return json({ error: bErr.message }, 500);
