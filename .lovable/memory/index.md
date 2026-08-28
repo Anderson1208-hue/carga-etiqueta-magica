@@ -116,5 +116,6 @@ type: reference
 - [Pandurata Isenção ICMS](mem://fiscal/pandurata-isencao-icms-mg) — CT-es MG->RJ Pandurata: CST 41, CFOP 6932, Decreto MG 46.266/2013. Simulador não calcula ICMS.
 
 - [Integração OK Entrega](mem://funcionalidades/integracao-okentrega-canhotos) — Canhotos da PANDURATA/Bauducco (CNPJ raiz 70940994), não da IBAC; JPEG 1536x240 @150dpi; fila okentrega_queue; tela /integracoes/okentrega.
+- [OK Entrega fila/cutoff](mem://constraints/okentrega-fila-emitente-e-cutoff) — Filtro do emitente no SELECT, ordem desc, cutoff 28/08/2026, canais IBAC/OK Entrega independentes, psql sofre RLS na fila.
 
 - [IBAC Piloto por Placa](mem://funcionalidades/ibac-piloto-por-placa) — Escopo por placa/data (LNA5B11, DTB9J73 25/08/2026); ocorrência na sincronização da baixa, imagem só após encerrar prestação de contas.
