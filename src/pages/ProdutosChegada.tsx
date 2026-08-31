@@ -177,16 +177,17 @@ export default function ProdutosChegada() {
       if (!sel) throw new Error("Nenhum produto selecionado");
       if (!form.descricao.trim()) throw new Error("Descrição é obrigatória");
 
+      const cnpj = cnpjSel(sel);
       const { data: emb } = await supabase
         .from("embarcadores")
         .select("id")
-        .eq("cnpj", sel.cnpj_emitente)
+        .eq("cnpj", cnpj)
         .maybeSingle();
 
       const payload = {
         embarcador_id: emb?.id ?? null,
-        cnpj_embarcador: sel.cnpj_emitente,
-        codigo: sel.c_prod.trim(),
+        cnpj_embarcador: cnpj,
+        codigo: codigoSel(sel).trim(),
         descricao: form.descricao.trim(),
         unidade: form.unidade || null,
         qtd_rsu_por_tdu: num(form.qtd_rsu_por_tdu),
@@ -208,7 +209,7 @@ export default function ProdutosChegada() {
         fragil: form.fragil,
         sensivel_furto: form.sensivel_furto,
         observacao: form.observacao.trim() || null,
-        origem_cadastro: "chegada_manual",
+        origem_cadastro: isAlerta(sel) ? "chegada_correcao" : "chegada_manual",
         regra_giro: "FEFO",
         controla_lote: true,
         controla_validade: true,
@@ -216,14 +217,22 @@ export default function ProdutosChegada() {
         rascunho: false,
       };
 
-      const { error } = await supabase.from("produtos").insert(payload as never);
-      if (error) throw error;
+      if (isAlerta(sel)) {
+        const { error } = await supabase.from("produtos").update(payload as never).eq("id", sel.produto_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("produtos").insert(payload as never);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success(`Produto ${sel?.c_prod} cadastrado`);
+      const label = codigoSel(sel);
+      toast.success(isAlerta(sel!) ? `Produto ${label} atualizado` : `Produto ${label} cadastrado`);
       setSel(null);
+      setEditId(null);
       setForm(emptyForm);
       qc.invalidateQueries({ queryKey: ["produtos-pendentes"] });
+      qc.invalidateQueries({ queryKey: ["produtos-alerta-m3"] });
       qc.invalidateQueries({ queryKey: ["produtos"] });
     },
     onError: (e: Error) => toast.error(e.message),
