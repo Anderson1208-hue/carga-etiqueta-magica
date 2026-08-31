@@ -698,7 +698,15 @@ export default function ProdutosChegada() {
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" className="flex-1" onClick={() => setSel(null)}>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setSel(null);
+                        setEditId(null);
+                        setForm(emptyForm);
+                      }}
+                    >
                       Cancelar
                     </Button>
                     <Button
