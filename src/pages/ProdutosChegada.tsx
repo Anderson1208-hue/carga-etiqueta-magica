@@ -148,6 +148,55 @@ export default function ProdutosChegada() {
     });
   }, [pendentes, search, cnpjFilter]);
 
+  const { data: alertas = [] } = useQuery({
+    queryKey: ["produtos-alerta-m3", dias, cnpjFilter],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("produtos_alerta_m3_confiavel" as never, {
+        p_dias: Number(dias),
+        p_cnpj: cnpjFilter === "todos" ? null : cnpjFilter,
+      } as never);
+      if (error) throw error;
+      return (data ?? []) as unknown as Alerta[];
+    },
+  });
+
+  const { data: produtoEditando } = useQuery({
+    queryKey: ["produto", editId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("produtos").select("*").eq("id", editId!).single();
+      if (error) throw error;
+      return data as Record<string, unknown>;
+    },
+    enabled: !!editId,
+  });
+
+  useEffect(() => {
+    if (!editId || !produtoEditando) return;
+    setForm({
+      descricao: String(produtoEditando.descricao || ""),
+      unidade: String(produtoEditando.unidade || "CX"),
+      qtd_rsu_por_tdu: produtoEditando.qtd_rsu_por_tdu ? String(produtoEditando.qtd_rsu_por_tdu) : "",
+      peso_bruto_cx_kg: produtoEditando.peso_bruto_cx_kg ? String(produtoEditando.peso_bruto_cx_kg) : "",
+      peso_liquido_cx_kg: produtoEditando.peso_liquido_cx_kg ? String(produtoEditando.peso_liquido_cx_kg) : "",
+      comprimento_mm: produtoEditando.comprimento_mm ? String(produtoEditando.comprimento_mm) : "",
+      largura_mm: produtoEditando.largura_mm ? String(produtoEditando.largura_mm) : "",
+      altura_mm: produtoEditando.altura_mm ? String(produtoEditando.altura_mm) : "",
+      volume_m3: produtoEditando.volume_m3 ? String(produtoEditando.volume_m3) : "",
+      lastro: produtoEditando.lastro ? String(produtoEditando.lastro) : "",
+      camadas: produtoEditando.camadas ? String(produtoEditando.camadas) : "",
+      tipo_pallet: String(produtoEditando.tipo_pallet || "PBR"),
+      ean_tdu: String(produtoEditando.ean_tdu || ""),
+      ean_rsu: String(produtoEditando.ean_rsu || ""),
+      ncm: String(produtoEditando.ncm || ""),
+      shelf_life_dias: produtoEditando.shelf_life_dias ? String(produtoEditando.shelf_life_dias) : "",
+      faixa_temperatura: String(produtoEditando.faixa_temperatura || "ambiente"),
+      empilhavel: Boolean(produtoEditando.empilhavel ?? true),
+      fragil: Boolean(produtoEditando.fragil ?? false),
+      sensivel_furto: Boolean(produtoEditando.sensivel_furto ?? false),
+      observacao: String(produtoEditando.observacao || ""),
+    });
+  }, [editId, produtoEditando]);
+
   const volumeCalc = useMemo(() => {
     const c = num(form.comprimento_mm);
     const l = num(form.largura_mm);
@@ -163,13 +212,18 @@ export default function ProdutosChegada() {
     return la * ca;
   }, [form.lastro, form.camadas]);
 
-  function selecionar(p: Pendente) {
+  function selecionar(p: Pendente | Alerta) {
     setSel(p);
-    setForm({
-      ...emptyForm,
-      descricao: p.x_prod || "",
-      unidade: p.u_com || "CX",
-    });
+    if (isAlerta(p)) {
+      setEditId(p.produto_id);
+    } else {
+      setEditId(null);
+      setForm({
+        ...emptyForm,
+        descricao: p.x_prod || "",
+        unidade: p.u_com || "CX",
+      });
+    }
   }
 
   const salvar = useMutation({
