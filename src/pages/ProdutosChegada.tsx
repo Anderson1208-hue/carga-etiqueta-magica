@@ -466,7 +466,15 @@ export default function ProdutosChegada() {
           <Card className="h-fit">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <Ruler className="w-4 h-4" /> Captura rápida
+                {isAlerta(sel) ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-600" /> Correção de cubagem
+                  </>
+                ) : (
+                  <>
+                    <Ruler className="w-4 h-4" /> Captura rápida
+                  </>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
