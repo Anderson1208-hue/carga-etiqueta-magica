@@ -480,7 +480,8 @@ export default function ProdutosChegada() {
             <CardContent className="space-y-4">
               {!sel && (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  Selecione um produto da fila para capturar os dados.
+                  Selecione um produto da fila para capturar os dados, ou um item do alerta de cubagem
+                  para corrigir.
                 </p>
               )}
               {sel && (
