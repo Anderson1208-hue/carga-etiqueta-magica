@@ -45,6 +45,15 @@ type Alerta = {
   ultima_data: string | null;
 };
 
+const isAlerta = (s: Pendente | Alerta | null): s is Alerta => !!s && "produto_id" in s;
+const codigoSel = (s: Pendente | Alerta | null) => (isAlerta(s) ? s.codigo : s?.c_prod ?? "");
+const descricaoSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.descricao : s?.x_prod ?? "";
+const razaoSocialSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.razao_social_embarcador : s?.razao_social_emitente ?? "";
+const cnpjSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.cnpj_embarcador : s?.cnpj_emitente ?? "";
+
 const num = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
 const fmtCnpj = (c: string) =>
   c?.length === 14
