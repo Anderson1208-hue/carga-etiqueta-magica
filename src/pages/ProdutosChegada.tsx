@@ -29,6 +29,22 @@ type Pendente = {
   ultima_data: string | null;
 };
 
+type Alerta = {
+  produto_id: string;
+  cnpj_embarcador: string;
+  razao_social_embarcador: string | null;
+  codigo: string;
+  descricao: string;
+  unidade: string | null;
+  volume_m3: number | null;
+  volume_calculado: boolean;
+  origem_cadastro: string | null;
+  motivo: "sem_cubagem" | "cubagem_calculada";
+  ocorrencias: number;
+  qtd_total: number | null;
+  ultima_data: string | null;
+};
+
 const num = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
 const fmtCnpj = (c: string) =>
   c?.length === 14
