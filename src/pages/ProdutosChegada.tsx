@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -14,9 +14,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PackagePlus, Search, Ruler, Calculator, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { PackagePlus, Search, Ruler, Calculator, ArrowLeft, CheckCircle2, AlertTriangle, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Pendente = {
   cnpj_emitente: string;
@@ -28,6 +29,31 @@ type Pendente = {
   qtd_total: number | null;
   ultima_data: string | null;
 };
+
+type Alerta = {
+  produto_id: string;
+  cnpj_embarcador: string;
+  razao_social_embarcador: string | null;
+  codigo: string;
+  descricao: string;
+  unidade: string | null;
+  volume_m3: number | null;
+  volume_calculado: boolean;
+  origem_cadastro: string | null;
+  motivo: "sem_cubagem" | "cubagem_calculada";
+  ocorrencias: number;
+  qtd_total: number | null;
+  ultima_data: string | null;
+};
+
+const isAlerta = (s: Pendente | Alerta | null): s is Alerta => !!s && "produto_id" in s;
+const codigoSel = (s: Pendente | Alerta | null) => (isAlerta(s) ? s.codigo : s?.c_prod ?? "");
+const descricaoSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.descricao : s?.x_prod ?? "";
+const razaoSocialSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.razao_social_embarcador : s?.razao_social_emitente ?? "";
+const cnpjSel = (s: Pendente | Alerta | null) =>
+  isAlerta(s) ? s.cnpj_embarcador : s?.cnpj_emitente ?? "";
 
 const num = (v: string) => (v === "" ? null : Number(v.replace(",", ".")));
 const fmtCnpj = (c: string) =>
@@ -88,7 +114,8 @@ export default function ProdutosChegada() {
   const [dias, setDias] = useState("30");
   const [search, setSearch] = useState("");
   const [cnpjFilter, setCnpjFilter] = useState("todos");
-  const [sel, setSel] = useState<Pendente | null>(null);
+  const [sel, setSel] = useState<Pendente | Alerta | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
 
   const { data: pendentes = [], isLoading } = useQuery({
@@ -122,6 +149,55 @@ export default function ProdutosChegada() {
     });
   }, [pendentes, search, cnpjFilter]);
 
+  const { data: alertas = [] } = useQuery({
+    queryKey: ["produtos-alerta-m3", dias, cnpjFilter],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("produtos_alerta_m3_confiavel" as never, {
+        p_dias: Number(dias),
+        p_cnpj: cnpjFilter === "todos" ? null : cnpjFilter,
+      } as never);
+      if (error) throw error;
+      return (data ?? []) as unknown as Alerta[];
+    },
+  });
+
+  const { data: produtoEditando } = useQuery({
+    queryKey: ["produto", editId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("produtos").select("*").eq("id", editId!).single();
+      if (error) throw error;
+      return data as Record<string, unknown>;
+    },
+    enabled: !!editId,
+  });
+
+  useEffect(() => {
+    if (!editId || !produtoEditando) return;
+    setForm({
+      descricao: String(produtoEditando.descricao || ""),
+      unidade: String(produtoEditando.unidade || "CX"),
+      qtd_rsu_por_tdu: produtoEditando.qtd_rsu_por_tdu ? String(produtoEditando.qtd_rsu_por_tdu) : "",
+      peso_bruto_cx_kg: produtoEditando.peso_bruto_cx_kg ? String(produtoEditando.peso_bruto_cx_kg) : "",
+      peso_liquido_cx_kg: produtoEditando.peso_liquido_cx_kg ? String(produtoEditando.peso_liquido_cx_kg) : "",
+      comprimento_mm: produtoEditando.comprimento_mm ? String(produtoEditando.comprimento_mm) : "",
+      largura_mm: produtoEditando.largura_mm ? String(produtoEditando.largura_mm) : "",
+      altura_mm: produtoEditando.altura_mm ? String(produtoEditando.altura_mm) : "",
+      volume_m3: produtoEditando.volume_m3 ? String(produtoEditando.volume_m3) : "",
+      lastro: produtoEditando.lastro ? String(produtoEditando.lastro) : "",
+      camadas: produtoEditando.camadas ? String(produtoEditando.camadas) : "",
+      tipo_pallet: String(produtoEditando.tipo_pallet || "PBR"),
+      ean_tdu: String(produtoEditando.ean_tdu || ""),
+      ean_rsu: String(produtoEditando.ean_rsu || ""),
+      ncm: String(produtoEditando.ncm || ""),
+      shelf_life_dias: produtoEditando.shelf_life_dias ? String(produtoEditando.shelf_life_dias) : "",
+      faixa_temperatura: String(produtoEditando.faixa_temperatura || "ambiente"),
+      empilhavel: Boolean(produtoEditando.empilhavel ?? true),
+      fragil: Boolean(produtoEditando.fragil ?? false),
+      sensivel_furto: Boolean(produtoEditando.sensivel_furto ?? false),
+      observacao: String(produtoEditando.observacao || ""),
+    });
+  }, [editId, produtoEditando]);
+
   const volumeCalc = useMemo(() => {
     const c = num(form.comprimento_mm);
     const l = num(form.largura_mm);
@@ -137,13 +213,18 @@ export default function ProdutosChegada() {
     return la * ca;
   }, [form.lastro, form.camadas]);
 
-  function selecionar(p: Pendente) {
+  function selecionar(p: Pendente | Alerta) {
     setSel(p);
-    setForm({
-      ...emptyForm,
-      descricao: p.x_prod || "",
-      unidade: p.u_com || "CX",
-    });
+    if (isAlerta(p)) {
+      setEditId(p.produto_id);
+    } else {
+      setEditId(null);
+      setForm({
+        ...emptyForm,
+        descricao: p.x_prod || "",
+        unidade: p.u_com || "CX",
+      });
+    }
   }
 
   const salvar = useMutation({
@@ -151,16 +232,17 @@ export default function ProdutosChegada() {
       if (!sel) throw new Error("Nenhum produto selecionado");
       if (!form.descricao.trim()) throw new Error("Descrição é obrigatória");
 
+      const cnpj = cnpjSel(sel);
       const { data: emb } = await supabase
         .from("embarcadores")
         .select("id")
-        .eq("cnpj", sel.cnpj_emitente)
+        .eq("cnpj", cnpj)
         .maybeSingle();
 
       const payload = {
         embarcador_id: emb?.id ?? null,
-        cnpj_embarcador: sel.cnpj_emitente,
-        codigo: sel.c_prod.trim(),
+        cnpj_embarcador: cnpj,
+        codigo: codigoSel(sel).trim(),
         descricao: form.descricao.trim(),
         unidade: form.unidade || null,
         qtd_rsu_por_tdu: num(form.qtd_rsu_por_tdu),
@@ -182,7 +264,7 @@ export default function ProdutosChegada() {
         fragil: form.fragil,
         sensivel_furto: form.sensivel_furto,
         observacao: form.observacao.trim() || null,
-        origem_cadastro: "chegada_manual",
+        origem_cadastro: isAlerta(sel) ? "chegada_correcao" : "chegada_manual",
         regra_giro: "FEFO",
         controla_lote: true,
         controla_validade: true,
@@ -190,14 +272,22 @@ export default function ProdutosChegada() {
         rascunho: false,
       };
 
-      const { error } = await supabase.from("produtos").insert(payload as never);
-      if (error) throw error;
+      if (isAlerta(sel)) {
+        const { error } = await supabase.from("produtos").update(payload as never).eq("id", sel.produto_id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("produtos").insert(payload as never);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success(`Produto ${sel?.c_prod} cadastrado`);
+      const label = codigoSel(sel);
+      toast.success(isAlerta(sel!) ? `Produto ${label} atualizado` : `Produto ${label} cadastrado`);
       setSel(null);
+      setEditId(null);
       setForm(emptyForm);
       qc.invalidateQueries({ queryKey: ["produtos-pendentes"] });
+      qc.invalidateQueries({ queryKey: ["produtos-alerta-m3"] });
       qc.invalidateQueries({ queryKey: ["produtos"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -263,6 +353,42 @@ export default function ProdutosChegada() {
             </Button>
           </div>
         </div>
+
+        {alertas.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4" /> Alerta de cubagem não confiável
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                Esses produtos já estão cadastrados, mas estão com cubagem ausente ou calculada
+                automaticamente a partir de dimensões antigas. Clique para medir e corrigir.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {alertas.map((a) => (
+                  <button
+                    key={a.produto_id}
+                    onClick={() => selecionar(a)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-md border text-left text-sm transition-colors",
+                      isAlerta(sel) && sel.produto_id === a.produto_id
+                        ? "bg-amber-200 border-amber-500 dark:bg-amber-900"
+                        : "bg-white border-amber-200 hover:bg-amber-100 dark:bg-transparent dark:hover:bg-amber-900/30"
+                    )}
+                  >
+                    <span className="font-mono text-xs">{a.codigo.replace(/^0+/, "") || a.codigo}</span>
+                    <span className="max-w-[220px] truncate">{a.descricao}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {a.motivo === "sem_cubagem" ? "sem m³" : "calc. automático"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]">
@@ -332,7 +458,7 @@ export default function ProdutosChegada() {
                     {!isLoading && filtered.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          Nenhum produto pendente no período.
+                          Nenhum produto pendente de cadastro no período.
                         </TableCell>
                       </TableRow>
                     )}
@@ -340,7 +466,9 @@ export default function ProdutosChegada() {
                       <TableRow
                         key={`${p.cnpj_emitente}-${p.c_prod}`}
                         className={
-                          sel?.c_prod === p.c_prod && sel?.cnpj_emitente === p.cnpj_emitente
+                          !isAlerta(sel) &&
+                          sel?.c_prod === p.c_prod &&
+                          sel?.cnpj_emitente === p.cnpj_emitente
                             ? "bg-accent"
                             : "cursor-pointer"
                         }
@@ -375,23 +503,39 @@ export default function ProdutosChegada() {
           <Card className="h-fit">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <Ruler className="w-4 h-4" /> Captura rápida
+                {isAlerta(sel) ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-amber-600" /> Correção de cubagem
+                  </>
+                ) : (
+                  <>
+                    <Ruler className="w-4 h-4" /> Captura rápida
+                  </>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!sel && (
                 <p className="text-sm text-muted-foreground py-8 text-center">
-                  Selecione um produto da fila para capturar os dados.
+                  Selecione um produto da fila para capturar os dados, ou um item do alerta de cubagem
+                  para corrigir.
                 </p>
               )}
               {sel && (
                 <>
                   <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
-                    <p className="font-mono font-semibold">{sel.c_prod}</p>
-                    <p className="text-muted-foreground truncate">{sel.razao_social_emitente}</p>
+                    <p className="font-mono font-semibold">{codigoSel(sel)}</p>
+                    <p className="text-muted-foreground truncate">{razaoSocialSel(sel)}</p>
                     <p className="text-xs text-muted-foreground">
-                      CNPJ {fmtCnpj(sel.cnpj_emitente)}
+                      CNPJ {fmtCnpj(cnpjSel(sel))}
                     </p>
+                    {isAlerta(sel) && (
+                      <p className="text-xs font-medium text-amber-600">
+                        {sel.motivo === "sem_cubagem"
+                          ? "⚠ Cubagem ausente — medir e salvar"
+                          : "⚠ Cubagem calculada — conferir medição"}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -591,7 +735,15 @@ export default function ProdutosChegada() {
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button variant="outline" className="flex-1" onClick={() => setSel(null)}>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setSel(null);
+                        setEditId(null);
+                        setForm(emptyForm);
+                      }}
+                    >
                       Cancelar
                     </Button>
                     <Button
