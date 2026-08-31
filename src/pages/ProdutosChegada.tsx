@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PackagePlus, Search, Ruler, Calculator, ArrowLeft, CheckCircle2, AlertTriangle, Edit } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Pendente = {
   cnpj_emitente: string;
