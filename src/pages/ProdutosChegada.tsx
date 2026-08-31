@@ -104,7 +104,8 @@ export default function ProdutosChegada() {
   const [dias, setDias] = useState("30");
   const [search, setSearch] = useState("");
   const [cnpjFilter, setCnpjFilter] = useState("todos");
-  const [sel, setSel] = useState<Pendente | null>(null);
+  const [sel, setSel] = useState<Pendente | Alerta | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
 
   const { data: pendentes = [], isLoading } = useQuery({
