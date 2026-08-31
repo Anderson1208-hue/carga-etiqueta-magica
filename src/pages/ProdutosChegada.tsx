@@ -375,7 +375,9 @@ export default function ProdutosChegada() {
                       <TableRow
                         key={`${p.cnpj_emitente}-${p.c_prod}`}
                         className={
-                          sel?.c_prod === p.c_prod && sel?.cnpj_emitente === p.cnpj_emitente
+                          !isAlerta(sel) &&
+                          sel?.c_prod === p.c_prod &&
+                          sel?.cnpj_emitente === p.cnpj_emitente
                             ? "bg-accent"
                             : "cursor-pointer"
                         }
