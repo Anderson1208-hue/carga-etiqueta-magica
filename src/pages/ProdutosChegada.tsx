@@ -424,11 +424,18 @@ export default function ProdutosChegada() {
               {sel && (
                 <>
                   <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
-                    <p className="font-mono font-semibold">{sel.c_prod}</p>
-                    <p className="text-muted-foreground truncate">{sel.razao_social_emitente}</p>
+                    <p className="font-mono font-semibold">{codigoSel(sel)}</p>
+                    <p className="text-muted-foreground truncate">{razaoSocialSel(sel)}</p>
                     <p className="text-xs text-muted-foreground">
-                      CNPJ {fmtCnpj(sel.cnpj_emitente)}
+                      CNPJ {fmtCnpj(cnpjSel(sel))}
                     </p>
+                    {isAlerta(sel) && (
+                      <p className="text-xs font-medium text-amber-600">
+                        {sel.motivo === "sem_cubagem"
+                          ? "⚠ Cubagem ausente — medir e salvar"
+                          : "⚠ Cubagem calculada — conferir medição"}
+                      </p>
+                    )}
                   </div>
 
                   <div>
