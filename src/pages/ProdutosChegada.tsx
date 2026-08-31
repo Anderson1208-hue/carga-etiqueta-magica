@@ -353,6 +353,42 @@ export default function ProdutosChegada() {
           </div>
         </div>
 
+        {alertas.length > 0 && (
+          <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="w-4 h-4" /> Alerta de cubagem não confiável
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                Esses produtos já estão cadastrados, mas estão com cubagem ausente ou calculada
+                automaticamente a partir de dimensões antigas. Clique para medir e corrigir.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {alertas.map((a) => (
+                  <button
+                    key={a.produto_id}
+                    onClick={() => selecionar(a)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-md border text-left text-sm transition-colors",
+                      isAlerta(sel) && sel.produto_id === a.produto_id
+                        ? "bg-amber-200 border-amber-500 dark:bg-amber-900"
+                        : "bg-white border-amber-200 hover:bg-amber-100 dark:bg-transparent dark:hover:bg-amber-900/30"
+                    )}
+                  >
+                    <span className="font-mono text-xs">{a.codigo.replace(/^0+/, "") || a.codigo}</span>
+                    <span className="max-w-[220px] truncate">{a.descricao}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {a.motivo === "sem_cubagem" ? "sem m³" : "calc. automático"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
