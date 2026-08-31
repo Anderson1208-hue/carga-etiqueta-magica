@@ -3850,6 +3850,24 @@ export type Database = {
         Returns: boolean
       }
       pode_ver_ibac: { Args: never; Returns: boolean }
+      produtos_alerta_m3_confiavel: {
+        Args: { p_cnpj?: string; p_dias?: number }
+        Returns: {
+          cnpj_embarcador: string
+          codigo: string
+          descricao: string
+          motivo: string
+          ocorrencias: number
+          origem_cadastro: string
+          produto_id: string
+          qtd_total: number
+          razao_social_embarcador: string
+          ultima_data: string
+          unidade: string
+          volume_calculado: boolean
+          volume_m3: number
+        }[]
+      }
       produtos_pendentes_cadastro: {
         Args: { p_cnpj?: string; p_dias?: number }
         Returns: {
