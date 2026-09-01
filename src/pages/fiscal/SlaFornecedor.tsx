@@ -24,6 +24,7 @@ type CidadeAtendida = {
   total_nfs: number;
   total_clientes: number;
   ultima_emissao: string | null;
+  atendida: boolean;
 };
 type Sla = {
   id: string;
