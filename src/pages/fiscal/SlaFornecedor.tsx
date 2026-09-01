@@ -501,9 +501,149 @@ export default function SlaFornecedor() {
 
           {/* Detalhe */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Cidades — marcar a região de cada uma (independe de região selecionada) */}
+            <Card>
+              <CardHeader className="space-y-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ListChecks className="w-4 h-4" /> Cidades — marcar a região de cada uma
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Cada cidade pode ter uma região diferente. Use o seletor da linha para definir a região
+                  {regiaoSel ? <> ou marque várias e envie de uma vez para <b>{regiaoSel.nome}</b></> : null}.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={modoTodas ? "outline" : "default"} onClick={() => setModoTodas(false)}>
+                    Atendidas por este fornecedor
+                  </Button>
+                  <Button size="sm" variant={modoTodas ? "default" : "outline"} onClick={() => setModoTodas(true)}>
+                    Todas as cidades da base
+                  </Button>
+                </div>
+                {regioes.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    Nenhuma região cadastrada ainda — crie as regiões ao lado para poder marcá-las nas cidades.
+                  </p>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-7">
+                    <Label className="text-xs">Buscar cidade</Label>
+                    <Input
+                      value={filtroAtendidas}
+                      placeholder="ex.: rio, caxias"
+                      onChange={(e) => setFiltroAtendidas(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-5">
+                    <Label className="text-xs">UF</Label>
+                    <Select value={ufAtendidas} onValueChange={setUfAtendidas}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all">Todas</SelectItem>
+                        {ufsAtendidas.map((u) => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setMarcadas((prev) => {
+                        const next = new Set(prev);
+                        disponiveisFiltradas.forEach((c) => next.add(chaveCidade(c.uf, c.municipio)));
+                        return next;
+                      })
+                    }
+                    disabled={disponiveisFiltradas.length === 0}
+                  >
+                    Marcar todas ({disponiveisFiltradas.length})
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setMarcadas(new Set())} disabled={marcadas.size === 0}>
+                    Limpar marcação
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {atendidasFiltradas.length} cidade(s) • {marcadas.size} marcada(s)
+                  </span>
+                  <Button
+                    size="sm"
+                    className="ml-auto"
+                    onClick={adicionarMarcadas}
+                    disabled={salvandoCidades || marcadas.size === 0 || !regiaoSel}
+                  >
+                    {salvandoCidades ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+                    Marcadas → {regiaoSel ? regiaoSel.nome : "selecione a região"}
+                  </Button>
+                </div>
+
+                {loadingAtendidas ? (
+                  <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
+                ) : atendidasFiltradas.length === 0 ? (
+                  <p className="py-4 text-sm text-muted-foreground text-center">
+                    Nenhuma cidade encontrada com esse filtro.
+                  </p>
+                ) : (
+                  <div className="rounded-lg border divide-y max-h-96 overflow-auto">
+                    <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground bg-muted/50 sticky top-0 z-10">
+                      <span className="col-span-5">Cidade</span>
+                      <span className="col-span-1">UF</span>
+                      <span className="col-span-1 text-right">NFs</span>
+                      <span className="col-span-5">Região</span>
+                    </div>
+                    {atendidasFiltradas.map((c) => {
+                      const k = chaveCidade(c.uf, c.municipio);
+                      const vinculo = regiaoDaCidade.get(k);
+                      const jaNaRegiao = !!regiaoSel && vinculo?.regiao_id === regiaoSel.id;
+                      return (
+                        <div
+                          key={k}
+                          className="grid grid-cols-12 gap-2 items-center px-3 py-1.5 text-sm hover:bg-muted/40"
+                        >
+                          <span className="col-span-5 flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              checked={jaNaRegiao || marcadas.has(k)}
+                              disabled={jaNaRegiao}
+                              onCheckedChange={() => toggleMarcada(k)}
+                            />
+                            <span className="truncate" title={c.municipio}>{c.municipio}</span>
+                            {!c.atendida && (
+                              <Badge variant="outline" className="text-[10px] shrink-0">sem histórico</Badge>
+                            )}
+                          </span>
+                          <span className="col-span-1 text-muted-foreground">{c.uf}</span>
+                          <span className="col-span-1 text-right tabular-nums">{c.total_nfs || "—"}</span>
+                          <div className="col-span-5">
+                            <Select
+                              value={vinculo?.regiao_id ?? "__none"}
+                              onValueChange={(v) => definirRegiaoCidade(c, v)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Sem região" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none">Sem região</SelectItem>
+                                {regioes.map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {!regiaoSel ? (
               <Card><CardContent className="py-10 text-center text-muted-foreground">
-                Selecione uma região.
+                Selecione uma região para definir o prazo (SLA) e revisar as cidades vinculadas.
               </CardContent></Card>
             ) : (
               <>
@@ -549,143 +689,6 @@ export default function SlaFornecedor() {
                   </CardContent>
                 </Card>
 
-                {/* Cidades — marcar por região */}
-                <Card>
-                  <CardHeader className="space-y-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <ListChecks className="w-4 h-4" /> Cidades — marcar a região de cada uma
-                    </CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      Cada cidade pode ter uma região diferente. Use o seletor da linha para definir a região,
-                      ou marque várias e envie de uma vez para <b>{regiaoSel.nome}</b>.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant={modoTodas ? "outline" : "default"}
-                        onClick={() => setModoTodas(false)}
-                      >
-                        Atendidas por este fornecedor
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={modoTodas ? "default" : "outline"}
-                        onClick={() => setModoTodas(true)}
-                      >
-                        Todas as cidades da base
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-7">
-                        <Label className="text-xs">Buscar cidade</Label>
-                        <Input
-                          value={filtroAtendidas}
-                          placeholder="ex.: rio, caxias"
-                          onChange={(e) => setFiltroAtendidas(e.target.value)}
-                        />
-                      </div>
-                      <div className="col-span-5">
-                        <Label className="text-xs">UF</Label>
-                        <Select value={ufAtendidas} onValueChange={setUfAtendidas}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__all">Todas</SelectItem>
-                            {ufsAtendidas.map((u) => (
-                              <SelectItem key={u} value={u}>{u}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          setMarcadas((prev) => {
-                            const next = new Set(prev);
-                            disponiveisFiltradas.forEach((c) => next.add(chaveCidade(c.uf, c.municipio)));
-                            return next;
-                          })
-                        }
-                        disabled={disponiveisFiltradas.length === 0}
-                      >
-                        Marcar todas ({disponiveisFiltradas.length})
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setMarcadas(new Set())} disabled={marcadas.size === 0}>
-                        Limpar marcação
-                      </Button>
-                      <span className="text-xs text-muted-foreground">
-                        {atendidasFiltradas.length} cidade(s) • {marcadas.size} marcada(s)
-                      </span>
-                      <Button size="sm" className="ml-auto" onClick={adicionarMarcadas} disabled={salvandoCidades || marcadas.size === 0}>
-                        {salvandoCidades ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
-                        Marcadas → {regiaoSel.nome}
-                      </Button>
-                    </div>
-
-                    {loadingAtendidas ? (
-                      <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
-                    ) : atendidasFiltradas.length === 0 ? (
-                      <p className="py-4 text-sm text-muted-foreground text-center">
-                        Nenhuma cidade encontrada com esse filtro.
-                      </p>
-                    ) : (
-                      <div className="rounded-lg border divide-y max-h-96 overflow-auto">
-                        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground bg-muted/50 sticky top-0 z-10">
-                          <span className="col-span-5">Cidade</span>
-                          <span className="col-span-1">UF</span>
-                          <span className="col-span-1 text-right">NFs</span>
-                          <span className="col-span-5">Região</span>
-                        </div>
-                        {atendidasFiltradas.map((c) => {
-                          const k = chaveCidade(c.uf, c.municipio);
-                          const vinculo = regiaoDaCidade.get(k);
-                          const jaNaRegiao = vinculo?.regiao_id === regiaoSel.id;
-                          return (
-                            <div
-                              key={k}
-                              className="grid grid-cols-12 gap-2 items-center px-3 py-1.5 text-sm hover:bg-muted/40"
-                            >
-                              <span className="col-span-5 flex items-center gap-2 min-w-0">
-                                <Checkbox
-                                  checked={jaNaRegiao || marcadas.has(k)}
-                                  disabled={jaNaRegiao}
-                                  onCheckedChange={() => toggleMarcada(k)}
-                                />
-                                <span className="truncate" title={c.municipio}>{c.municipio}</span>
-                                {!c.atendida && (
-                                  <Badge variant="outline" className="text-[10px] shrink-0">sem histórico</Badge>
-                                )}
-                              </span>
-                              <span className="col-span-1 text-muted-foreground">{c.uf}</span>
-                              <span className="col-span-1 text-right tabular-nums">{c.total_nfs || "—"}</span>
-                              <div className="col-span-5">
-                                <Select
-                                  value={vinculo?.regiao_id ?? "__none"}
-                                  onValueChange={(v) => definirRegiaoCidade(c, v)}
-                                >
-                                  <SelectTrigger className="h-8 text-xs">
-                                    <SelectValue placeholder="Sem região" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="__none">Sem região</SelectItem>
-                                    {regioes.map((r) => (
-                                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
 
                 {/* Cidades */}
                 <Card>
@@ -804,22 +807,27 @@ export default function SlaFornecedor() {
               />
             </div>
             <div className="col-span-12">
-              <div className="flex items-end justify-between gap-2">
-                <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <Label className="flex-1 min-w-[200px]">
+                  Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")
+                </Label>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="shrink-0"
                   disabled={atendidas.length === 0}
                   onClick={() => {
                     const lista = (marcadas.size > 0
                       ? atendidas.filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
                       : atendidas
                     ).map((c) => `${c.municipio}/${c.uf}`);
+                    if (lista.length === 0) return toast.error("Nenhuma cidade disponível");
                     setFormCompleto({ ...formCompleto, cidades: lista.join("\n") });
+                    toast.success(`${lista.length} cidade(s) inserida(s)`);
                   }}
                 >
-                  {marcadas.size > 0 ? `Usar ${marcadas.size} marcada(s)` : `Usar as ${atendidas.length} atendidas`}
+                  {marcadas.size > 0 ? `Usar ${marcadas.size} marcada(s)` : `Usar as ${atendidas.length} listadas`}
                 </Button>
               </div>
               <Textarea
