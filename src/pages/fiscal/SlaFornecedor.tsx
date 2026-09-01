@@ -17,6 +17,13 @@ import { SemPermissao } from "@/components/comercial/SemPermissao";
 type Embarcador = { id: string; razao_social: string; nome_fantasia: string | null };
 type Regiao = { id: string; embarcador_id: string; nome: string; ativo: boolean };
 type Cidade = { id: string; regiao_id: string; uf: string; municipio: string };
+type CidadeAtendida = {
+  uf: string;
+  municipio: string;
+  total_nfs: number;
+  total_clientes: number;
+  ultima_emissao: string | null;
+};
 type Sla = {
   id: string;
   regiao_id: string;
