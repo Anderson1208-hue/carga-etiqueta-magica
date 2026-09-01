@@ -36,6 +36,10 @@ type Sla = {
 
 const hoje = () => new Date().toISOString().slice(0, 10);
 
+/** maiúsculas sem acento — mesma normalização usada em municipio_norm */
+const norm = (s: string) =>
+  (s || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+
 /** Aceita "Niterói", "Niterói/RJ", "RJ - Niterói", "Niterói;RJ" */
 function parseLinhaCidade(linha: string, ufPadrao: string) {
   const t = linha.trim();
