@@ -202,7 +202,7 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
     cy = Math.max(0, Math.min(src.height - novoH, cy - (novoH - ch) / 2));
     ch = novoH;
   }
-  void icy; void pcy;
+  void x0; void x1; void y0; void y1;
 
   return {
     x: Math.max(0, Math.round(cx)),
