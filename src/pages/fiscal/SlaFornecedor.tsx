@@ -83,6 +83,7 @@ export default function SlaFornecedor() {
   const [filtroAtendidas, setFiltroAtendidas] = useState("");
   const [ufAtendidas, setUfAtendidas] = useState("__all");
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [modoTodas, setModoTodas] = useState(false);
 
   const [openSla, setOpenSla] = useState(false);
   const [formSla, setFormSla] = useState<Partial<Sla>>({ prazo_dias_uteis: 1, vigente_de: hoje() });
