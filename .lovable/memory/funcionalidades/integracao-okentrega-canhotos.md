@@ -22,9 +22,16 @@ Elegibilidade por prefixo do CNPJ do emitente da NF-e: `70940994` (Pandurata Ali
 Credenciais em secrets (`OKENTREGA_EMAIL_*`, `OKENTREGA_PASSWORD_*`) — nunca no código.
 
 **Legibilidade (retorno OK Entrega 19/08/2026: "comunicação OK, imagem ilegível"):** as fotos do
-motorista são retrato (ex. 3072 × 4096). Encaixar a foto inteira (`contain`) na faixa 1536 × 240
-reduz tudo a 180 × 240 px → texto inaproveitável e recusa no cartório. Regra definitiva: modo
-`recibo` (padrão) em `src/lib/okentrega-canhoto.ts` — recorta **somente a tira do recibo da DANFE**
-(assinatura, carimbo, data, nº da NF; padrão centro em 24% da altura, tira de 22%), estica para
-1536 × 240 e aplica realce P&B (contraste 145%, brilho 106%), qualidade 0,92. Preparo roda no
-navegador (12 MP estoura a CPU da Edge Function). Sempre conferir a prévia da tela antes de transmitir.
+motorista são retrato. Encaixar a foto inteira (`contain`) na faixa 1536 × 240 reduz tudo a
+~180 × 240 px → texto inaproveitável. Modo `recibo` (padrão) recorta **somente a tira do recibo da
+DANFE** (nº da NF, data, nome, assinatura) e estica para 1536 × 240 com realce P&B.
+
+**Detecção automática (Edge Function `_shared/okentrega-image.ts`, set/2026):** o recorte por
+percentual fixo falhava quando o motorista fotografa a folha deitada/torta — chegava faixa quase
+em branco na OK Entrega. Algoritmo atual: (1) papel = região clara; (2) tinta = pixel abaixo de 82%
+da média LOCAL (janela 25) com papel claro na vizinhança e não muito escuro (exclui roupa/chão);
+(3) dilatação 7×7 + maior componente conectado = tira do recibo; (4) se a tira estiver em pé,
+rotaciona 90/270 — a metade com MAIS tinta é o cabeçalho impresso e deve terminar no topo
+(`rot = esq >= dir ? 270 : 90`, calibrado empiricamente). Testar sempre com
+`okentrega-sync` + `{"preview_queue_id": "<id>"}` (não envia nada, devolve base64 da faixa).
+No app, o preparo espelho fica em `src/lib/okentrega-canhoto.ts`.
