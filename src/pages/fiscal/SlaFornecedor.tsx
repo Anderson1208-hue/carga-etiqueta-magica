@@ -734,7 +734,24 @@ export default function SlaFornecedor() {
               />
             </div>
             <div className="col-span-12">
-              <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+              <div className="flex items-end justify-between gap-2">
+                <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={atendidas.length === 0}
+                  onClick={() => {
+                    const lista = (marcadas.size > 0
+                      ? atendidas.filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
+                      : atendidas
+                    ).map((c) => `${c.municipio}/${c.uf}`);
+                    setFormCompleto({ ...formCompleto, cidades: lista.join("\n") });
+                  }}
+                >
+                  {marcadas.size > 0 ? `Usar ${marcadas.size} marcada(s)` : `Usar as ${atendidas.length} atendidas`}
+                </Button>
+              </div>
               <Textarea
                 rows={8}
                 value={formCompleto.cidades}
@@ -742,7 +759,7 @@ export default function SlaFornecedor() {
                 placeholder={"Rio de Janeiro\nNiterói\nSão Gonçalo\nDuque de Caxias\nCabo Frio/RJ"}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Pode colar a lista direto do Excel — uma cidade por linha.
+                Pode colar a lista direto do Excel — uma cidade por linha — ou trazer as cidades já atendidas pelo fornecedor.
               </p>
             </div>
             <div className="col-span-4">
