@@ -3831,6 +3831,16 @@ export type Database = {
           veiculo_id: string
         }[]
       }
+      listar_cidades_atendidas: {
+        Args: { _embarcador_id: string }
+        Returns: {
+          municipio: string
+          total_clientes: number
+          total_nfs: number
+          uf: string
+          ultima_emissao: string
+        }[]
+      }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: {
