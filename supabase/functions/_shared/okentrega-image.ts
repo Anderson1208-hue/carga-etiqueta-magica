@@ -50,19 +50,36 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
   }
   if (x1 <= x0 || y1 <= y0) return null;
 
-  // 2) tinta dentro do papel = texto, assinatura, carimbo, linhas do recibo.
-  // Só vale como tinta o pixel escuro que tem papel claro por perto — assim a
-  // roupa/sombra escura do fundo não é confundida com escrita.
-  let soma = 0, n = 0;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const v = lum[y * w + x];
-      if (v > limPapel) { soma += v; n++; }
+  // 2) tinta = pixel bem mais escuro que a média LOCAL do papel (elimina sombra
+  // e degradê da folha) e que tenha papel claro na vizinhança (elimina roupa,
+  // chão e fundo escuro da foto).
+  const media = new Float32Array(w * h); // média local (janela 25) via duas passadas
+  const tmp = new Float32Array(w * h);
+  const RM = 12;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let s = 0, c = 0;
+      for (let k = -RM; k <= RM; k++) {
+        const xx = x + k;
+        if (xx < 0 || xx >= w) continue;
+        s += lum[y * w + xx]; c++;
+      }
+      tmp[y * w + x] = s / c;
     }
   }
-  const limTinta = (n ? soma / n : claro) * 0.78;
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let s = 0, c = 0;
+      for (let k = -RM; k <= RM; k++) {
+        const yy = y + k;
+        if (yy < 0 || yy >= h) continue;
+        s += tmp[yy * w + x]; c++;
+      }
+      media[y * w + x] = s / c;
+    }
+  }
 
-  // máximo local (janela ~7px) separável, para saber se há papel na vizinhança
+  // máximo local (janela 7) separável: existe papel claro por perto?
   const R = 3;
   const maxH = new Float32Array(w * h);
   for (let y = 0; y < h; y++) {
@@ -91,29 +108,64 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
     }
   }
 
-  const ehTinta = (x: number, y: number) => {
-    const i = y * w + x;
-    return lum[i] < limTinta && vizinho[i] > limPapel;
-  };
+  const tinta = new Uint8Array(w * h);
+  let totalTinta = 0;
+  for (let i = 0; i < tinta.length; i++) {
+    if (lum[i] < media[i] * 0.82 && vizinho[i] > limPapel && lum[i] > claro * 0.15) {
+      tinta[i] = 1; totalTinta++;
+    }
+  }
+  if (totalTinta < 40) return null;
 
-  let ix0 = x1, ix1 = x0, iy0 = y1, iy1 = y0;
-  for (let y = y0; y <= y1; y++) {
-    let cnt = 0;
-    for (let x = x0; x <= x1; x++) if (ehTinta(x, y)) cnt++;
-    if (cnt >= Math.max(3, (x1 - x0) * 0.02)) { if (y < iy0) iy0 = y; if (y > iy1) iy1 = y; }
+  // 3) dilata (janela 7) e fica com o MAIOR bloco conectado: é a tira do recibo,
+  // onde estão número da NF, data, nome e assinatura.
+  const D = 3;
+  const dil = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!tinta[y * w + x]) continue;
+      for (let dy = -D; dy <= D; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -D; dx <= D; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          dil[yy * w + xx] = 1;
+        }
+      }
+    }
   }
-  for (let x = x0; x <= x1; x++) {
-    let cnt = 0;
-    for (let y = y0; y <= y1; y++) if (ehTinta(x, y)) cnt++;
-    if (cnt >= Math.max(3, (y1 - y0) * 0.02)) { if (x < ix0) ix0 = x; if (x > ix1) ix1 = x; }
+
+  const visto = new Uint8Array(w * h);
+  const fila = new Int32Array(w * h);
+  let melhor = { peso: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
+  for (let s = 0; s < dil.length; s++) {
+    if (!dil[s] || visto[s]) continue;
+    let ini = 0, fim = 0;
+    fila[fim++] = s; visto[s] = 1;
+    let peso = 0, bx0 = w, bx1 = 0, by0 = h, by1 = 0;
+    while (ini < fim) {
+      const i = fila[ini++];
+      const x = i % w, y = (i - x) / w;
+      if (tinta[i]) peso++;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+      if (y < by0) by0 = y; if (y > by1) by1 = y;
+      if (x > 0 && dil[i - 1] && !visto[i - 1]) { visto[i - 1] = 1; fila[fim++] = i - 1; }
+      if (x < w - 1 && dil[i + 1] && !visto[i + 1]) { visto[i + 1] = 1; fila[fim++] = i + 1; }
+      if (y > 0 && dil[i - w] && !visto[i - w]) { visto[i - w] = 1; fila[fim++] = i - w; }
+      if (y < h - 1 && dil[i + w] && !visto[i + w]) { visto[i + w] = 1; fila[fim++] = i + w; }
+    }
+    if (peso > melhor.peso) melhor = { peso, x0: bx0, x1: bx1, y0: by0, y1: by1 };
   }
-  if (ix1 <= ix0 || iy1 <= iy0) return null;
+  if (melhor.peso < 30) return null;
+
+  let ix0 = melhor.x0, ix1 = melhor.x1, iy0 = melhor.y0, iy1 = melhor.y1;
 
   // margem de respiro
-  const padX = Math.round((ix1 - ix0) * 0.03) + 1;
-  const padY = Math.round((iy1 - iy0) * 0.08) + 1;
-  ix0 = Math.max(x0, ix0 - padX); ix1 = Math.min(x1, ix1 + padX);
-  iy0 = Math.max(y0, iy0 - padY); iy1 = Math.min(y1, iy1 + padY);
+  const padX = Math.round((ix1 - ix0) * 0.04) + 1;
+  const padY = Math.round((iy1 - iy0) * 0.04) + 1;
+  ix0 = Math.max(0, ix0 - padX); ix1 = Math.min(w - 1, ix1 + padX);
+  iy0 = Math.max(0, iy0 - padY); iy1 = Math.min(h - 1, iy1 + padY);
 
   // volta à resolução original
   let cx = (ix0 * src.width) / w;
