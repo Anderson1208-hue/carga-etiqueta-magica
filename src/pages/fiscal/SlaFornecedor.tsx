@@ -71,6 +71,13 @@ export default function SlaFornecedor() {
   const [bulkCidades, setBulkCidades] = useState("");
   const [salvandoCidades, setSalvandoCidades] = useState(false);
 
+  // Cidades já atendidas pelo fornecedor (histórico de NFs)
+  const [atendidas, setAtendidas] = useState<CidadeAtendida[]>([]);
+  const [loadingAtendidas, setLoadingAtendidas] = useState(false);
+  const [filtroAtendidas, setFiltroAtendidas] = useState("");
+  const [ufAtendidas, setUfAtendidas] = useState("__all");
+  const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+
   const [openSla, setOpenSla] = useState(false);
   const [formSla, setFormSla] = useState<Partial<Sla>>({ prazo_dias_uteis: 1, vigente_de: hoje() });
 
