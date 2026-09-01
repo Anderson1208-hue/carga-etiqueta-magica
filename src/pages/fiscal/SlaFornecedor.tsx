@@ -128,16 +128,14 @@ export default function SlaFornecedor() {
     loadRegioes(embarcadorId);
   }, [embarcadorId]);
 
-  // Carrega as cidades que o fornecedor já atendeu (histórico de notas fiscais)
+  // Cidades disponíveis para marcação: atendidas pelo fornecedor ou todas as da base
   useEffect(() => {
     setMarcadas(new Set());
-    setFiltroAtendidas("");
-    setUfAtendidas("__all");
     if (!embarcadorId) { setAtendidas([]); return; }
     let cancelado = false;
     setLoadingAtendidas(true);
     (supabase as any)
-      .rpc("listar_cidades_atendidas", { _embarcador_id: embarcadorId })
+      .rpc("listar_cidades_base", { _embarcador_id: embarcadorId, _todas: modoTodas })
       .then(({ data, error }: any) => {
         if (cancelado) return;
         setLoadingAtendidas(false);
@@ -145,7 +143,7 @@ export default function SlaFornecedor() {
         setAtendidas((data as CidadeAtendida[]) || []);
       });
     return () => { cancelado = true; };
-  }, [embarcadorId]);
+  }, [embarcadorId, modoTodas]);
 
   const loadDetalhe = async (regiao: Regiao) => {
     const [c, s, o] = await Promise.all([
