@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { MobileRedirect } from "@/components/layout/MobileRedirect";
+import { BackButton } from "@/components/layout/BackButton";
+
 
 const IS_NATIVE_APK = Capacitor.isNativePlatform();
 import Login from "./pages/Login";
