@@ -411,7 +411,9 @@ const App = () => {
             <BrowserRouter>
               <MobileRedirect>
                 <AppRoutes />
+                <BackButton />
               </MobileRedirect>
+
             </BrowserRouter>
           </TooltipProvider>
         </AuthProvider>
