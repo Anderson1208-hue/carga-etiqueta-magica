@@ -188,7 +188,7 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
         if (x < meio) esq++; else dir++;
       }
     }
-    rot = esq >= dir ? 90 : 270;
+    rot = esq >= dir ? 270 : 90;
   }
 
   // ajusta ao formato alvo (6.4:1 no eixo longo da tira) sem esmagar o conteúdo
