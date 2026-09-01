@@ -16,9 +16,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const BATCH_SIZE = 500;
-// Go-live da integração em produção: baixas anteriores a esta data não são
-// transmitidas (evita reenviar histórico de homologação/backlog).
-const CUTOFF_PRODUCAO = "2026-08-28T00:00:00-03:00";
+// Go-live definitivo em produção (01/09/2026): apenas as baixas registradas a
+// partir desta data entram na fila. O backlog da Pandurata anterior a 01/09
+// NÃO deve ser transmitido em momento algum (decisão operacional).
+const CUTOFF_PRODUCAO = "2026-09-01T00:00:00-03:00";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -7,7 +7,14 @@ export const OKE_LARGURA = 1536;
 export const OKE_ALTURA = 240;
 export const OKE_DPI = 150;
 
-export type ModoImagem = "contain" | "stretch" | "cover";
+export type ModoImagem = "recibo" | "contain" | "stretch" | "cover";
+
+// Faixa do recibo na DANFE (mesmos valores do preparo do app em
+// src/lib/okentrega-canhoto.ts): centro vertical em 24% da altura e faixa de
+// 22% da altura. Sem esse recorte a foto retrato inteira cabia em ~180x240 px
+// dentro da faixa 1536x240 e o comprovante chegava ilegível na OK Entrega.
+const RECIBO_OFFSET_Y = 0.24;
+const RECIBO_ALTURA = 0.22;
 
 /**
  * Redimensiona para exatamente 1536x240.
@@ -24,7 +31,20 @@ export async function prepararCanhoto(
 
   let final: Image;
 
-  if (modo === "stretch") {
+  if (modo === "recibo") {
+    const sh = Math.max(8, Math.min(src.height, Math.round(src.height * RECIBO_ALTURA)));
+    const cy = Math.round(src.height * RECIBO_OFFSET_Y);
+    const sy = Math.max(0, Math.min(src.height - sh, cy - Math.round(sh / 2)));
+    const faixa = src.crop(0, sy, src.width, sh).resize(OKE_LARGURA, OKE_ALTURA);
+    // Realce para leitura (P&B + contraste), igual ao preparo do app.
+    try {
+      faixa.saturation(0);
+      faixa.contrast(1.45);
+    } catch {
+      // se a versão da lib não expor os filtros, segue sem realce
+    }
+    final = faixa;
+  } else if (modo === "stretch") {
     final = src.resize(OKE_LARGURA, OKE_ALTURA);
   } else if (modo === "cover") {
     const escala = Math.max(OKE_LARGURA / src.width, OKE_ALTURA / src.height);
