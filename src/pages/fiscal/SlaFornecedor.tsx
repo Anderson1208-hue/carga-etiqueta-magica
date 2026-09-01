@@ -807,22 +807,27 @@ export default function SlaFornecedor() {
               />
             </div>
             <div className="col-span-12">
-              <div className="flex items-end justify-between gap-2">
-                <Label>Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")</Label>
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <Label className="flex-1 min-w-[200px]">
+                  Cidades (uma por linha; aceita "Niterói" ou "Niterói/RJ")
+                </Label>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
+                  className="shrink-0"
                   disabled={atendidas.length === 0}
                   onClick={() => {
                     const lista = (marcadas.size > 0
                       ? atendidas.filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
                       : atendidas
                     ).map((c) => `${c.municipio}/${c.uf}`);
+                    if (lista.length === 0) return toast.error("Nenhuma cidade disponível");
                     setFormCompleto({ ...formCompleto, cidades: lista.join("\n") });
+                    toast.success(`${lista.length} cidade(s) inserida(s)`);
                   }}
                 >
-                  {marcadas.size > 0 ? `Usar ${marcadas.size} marcada(s)` : `Usar as ${atendidas.length} atendidas`}
+                  {marcadas.size > 0 ? `Usar ${marcadas.size} marcada(s)` : `Usar as ${atendidas.length} listadas`}
                 </Button>
               </div>
               <Textarea
