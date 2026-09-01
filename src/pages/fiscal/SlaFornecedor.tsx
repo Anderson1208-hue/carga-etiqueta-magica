@@ -502,6 +502,120 @@ export default function SlaFornecedor() {
                   </CardContent>
                 </Card>
 
+                {/* Cidades já atendidas (histórico de NFs) */}
+                <Card>
+                  <CardHeader className="space-y-1">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" /> Cidades já atendidas por este fornecedor
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      Extraído do histórico de notas fiscais. Marque as cidades e adicione à região{" "}
+                      <b>{regiaoSel.nome}</b>.
+                    </p>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-7">
+                        <Label className="text-xs">Buscar cidade</Label>
+                        <Input
+                          value={filtroAtendidas}
+                          placeholder="ex.: rio, caxias"
+                          onChange={(e) => setFiltroAtendidas(e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-5">
+                        <Label className="text-xs">UF</Label>
+                        <Select value={ufAtendidas} onValueChange={setUfAtendidas}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all">Todas</SelectItem>
+                            {ufsAtendidas.map((u) => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setMarcadas((prev) => {
+                            const next = new Set(prev);
+                            disponiveisFiltradas.forEach((c) => next.add(chaveCidade(c.uf, c.municipio)));
+                            return next;
+                          })
+                        }
+                        disabled={disponiveisFiltradas.length === 0}
+                      >
+                        Marcar todas ({disponiveisFiltradas.length})
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setMarcadas(new Set())} disabled={marcadas.size === 0}>
+                        Limpar marcação
+                      </Button>
+                      <span className="text-xs text-muted-foreground">{marcadas.size} marcada(s)</span>
+                      <Button size="sm" className="ml-auto" onClick={adicionarMarcadas} disabled={salvandoCidades || marcadas.size === 0}>
+                        {salvandoCidades ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+                        Adicionar à região
+                      </Button>
+                    </div>
+
+                    {loadingAtendidas ? (
+                      <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
+                    ) : atendidasFiltradas.length === 0 ? (
+                      <p className="py-4 text-sm text-muted-foreground text-center">
+                        Nenhuma cidade encontrada no histórico deste fornecedor.
+                      </p>
+                    ) : (
+                      <div className="rounded-lg border divide-y max-h-80 overflow-auto">
+                        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground bg-muted/50 sticky top-0">
+                          <span className="col-span-5">Cidade</span>
+                          <span className="col-span-1">UF</span>
+                          <span className="col-span-2 text-right">NFs</span>
+                          <span className="col-span-2 text-right">Clientes</span>
+                          <span className="col-span-2 text-right">Última</span>
+                        </div>
+                        {atendidasFiltradas.map((c) => {
+                          const k = chaveCidade(c.uf, c.municipio);
+                          const jaNaRegiao = naRegiao.has(k);
+                          const outra = !jaNaRegiao && emOutraRegiao.has(k);
+                          return (
+                            <label
+                              key={k}
+                              className={`grid grid-cols-12 gap-2 items-center px-3 py-2 text-sm ${jaNaRegiao ? "opacity-60" : "cursor-pointer hover:bg-muted/40"}`}
+                            >
+                              <span className="col-span-5 flex items-center gap-2 min-w-0">
+                                <Checkbox
+                                  checked={jaNaRegiao || marcadas.has(k)}
+                                  disabled={jaNaRegiao}
+                                  onCheckedChange={() => toggleMarcada(k)}
+                                />
+                                <span className="truncate">{c.municipio}</span>
+                                {jaNaRegiao && <Badge variant="secondary" className="text-[10px]">já na região</Badge>}
+                                {outra && (
+                                  <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">
+                                    em outra região
+                                  </Badge>
+                                )}
+                              </span>
+                              <span className="col-span-1 text-muted-foreground">{c.uf}</span>
+                              <span className="col-span-2 text-right tabular-nums">{c.total_nfs}</span>
+                              <span className="col-span-2 text-right tabular-nums">{c.total_clientes}</span>
+                              <span className="col-span-2 text-right text-xs text-muted-foreground">
+                                {c.ultima_emissao
+                                  ? new Date(`${c.ultima_emissao}T00:00:00`).toLocaleDateString("pt-BR")
+                                  : "—"}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Cidades */}
                 <Card>
                   <CardHeader><CardTitle className="text-base">Cidades da região ({cidades.length})</CardTitle></CardHeader>
