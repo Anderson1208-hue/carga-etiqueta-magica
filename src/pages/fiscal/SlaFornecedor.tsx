@@ -24,6 +24,7 @@ type CidadeAtendida = {
   total_nfs: number;
   total_clientes: number;
   ultima_emissao: string | null;
+  atendida: boolean;
 };
 type Sla = {
   id: string;
@@ -82,6 +83,7 @@ export default function SlaFornecedor() {
   const [filtroAtendidas, setFiltroAtendidas] = useState("");
   const [ufAtendidas, setUfAtendidas] = useState("__all");
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set());
+  const [modoTodas, setModoTodas] = useState(false);
 
   const [openSla, setOpenSla] = useState(false);
   const [formSla, setFormSla] = useState<Partial<Sla>>({ prazo_dias_uteis: 1, vigente_de: hoje() });
@@ -126,16 +128,14 @@ export default function SlaFornecedor() {
     loadRegioes(embarcadorId);
   }, [embarcadorId]);
 
-  // Carrega as cidades que o fornecedor já atendeu (histórico de notas fiscais)
+  // Cidades disponíveis para marcação: atendidas pelo fornecedor ou todas as da base
   useEffect(() => {
     setMarcadas(new Set());
-    setFiltroAtendidas("");
-    setUfAtendidas("__all");
     if (!embarcadorId) { setAtendidas([]); return; }
     let cancelado = false;
     setLoadingAtendidas(true);
     (supabase as any)
-      .rpc("listar_cidades_atendidas", { _embarcador_id: embarcadorId })
+      .rpc("listar_cidades_base", { _embarcador_id: embarcadorId, _todas: modoTodas })
       .then(({ data, error }: any) => {
         if (cancelado) return;
         setLoadingAtendidas(false);
@@ -143,7 +143,7 @@ export default function SlaFornecedor() {
         setAtendidas((data as CidadeAtendida[]) || []);
       });
     return () => { cancelado = true; };
-  }, [embarcadorId]);
+  }, [embarcadorId, modoTodas]);
 
   const loadDetalhe = async (regiao: Regiao) => {
     const [c, s, o] = await Promise.all([
@@ -207,6 +207,15 @@ export default function SlaFornecedor() {
     [atendidasFiltradas, naRegiao],
   );
 
+  /** cidade normalizada -> vínculo atual (região deste fornecedor) */
+  const regiaoDaCidade = useMemo(() => {
+    const map = new Map<string, { id: string; regiao_id: string }>();
+    [...outrasCidades, ...cidades].forEach((c) =>
+      map.set(chaveCidade(c.uf, c.municipio), { id: c.id, regiao_id: c.regiao_id }),
+    );
+    return map;
+  }, [cidades, outrasCidades]);
+
   const toggleMarcada = (k: string) => {
     setMarcadas((prev) => {
       const next = new Set(prev);
@@ -215,14 +224,51 @@ export default function SlaFornecedor() {
     });
   };
 
+  /** Define (ou remove) a região de uma cidade — cada cidade fica em uma única região */
+  const definirRegiaoCidade = async (c: CidadeAtendida, regiaoId: string) => {
+    const k = chaveCidade(c.uf, c.municipio);
+    const atual = regiaoDaCidade.get(k);
+    if (atual?.regiao_id === regiaoId) return;
+    setSalvandoCidades(true);
+    if (atual) {
+      const { error } = await supabase.from("embarcador_regiao_cidades").delete().eq("id", atual.id);
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    if (regiaoId !== "__none") {
+      const { error } = await supabase
+        .from("embarcador_regiao_cidades")
+        .upsert([{ regiao_id: regiaoId, uf: c.uf.toUpperCase(), municipio: norm(c.municipio) }], {
+          onConflict: "regiao_id,uf,municipio_norm",
+          ignoreDuplicates: true,
+        });
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    setSalvandoCidades(false);
+    const nome = regioes.find((r) => r.id === regiaoId)?.nome;
+    toast.success(nome ? `${c.municipio} → ${nome}` : `${c.municipio} sem região`);
+    if (regiaoSel) loadDetalhe(regiaoSel);
+  };
+
   const adicionarMarcadas = async () => {
     if (!regiaoSel) return toast.error("Selecione a região de destino");
-    const rows = atendidas
+    const alvos = atendidas
       .filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
-      .filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio)))
-      .map((c) => ({ regiao_id: regiaoSel.id, uf: c.uf, municipio: norm(c.municipio) }));
-    if (rows.length === 0) return toast.error("Marque ao menos uma cidade nova");
+      .filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio)));
+    if (alvos.length === 0) return toast.error("Marque ao menos uma cidade nova");
     setSalvandoCidades(true);
+    // cada cidade fica em uma única região: remove vínculos anteriores em outras regiões
+    const remover = alvos
+      .map((c) => regiaoDaCidade.get(chaveCidade(c.uf, c.municipio))?.id)
+      .filter(Boolean) as string[];
+    if (remover.length > 0) {
+      const { error } = await supabase.from("embarcador_regiao_cidades").delete().in("id", remover);
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    const rows = alvos.map((c) => ({
+      regiao_id: regiaoSel.id,
+      uf: c.uf.toUpperCase(),
+      municipio: norm(c.municipio),
+    }));
     const { error } = await supabase
       .from("embarcador_regiao_cidades")
       .upsert(rows, { onConflict: "regiao_id,uf,municipio_norm", ignoreDuplicates: true });
@@ -503,16 +549,32 @@ export default function SlaFornecedor() {
                   </CardContent>
                 </Card>
 
-                {/* Cidades já atendidas (histórico de NFs) */}
+                {/* Cidades — marcar por região */}
                 <Card>
-                  <CardHeader className="space-y-1">
+                  <CardHeader className="space-y-2">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <ListChecks className="w-4 h-4" /> Cidades já atendidas por este fornecedor
+                      <ListChecks className="w-4 h-4" /> Cidades — marcar a região de cada uma
                     </CardTitle>
                     <p className="text-xs text-muted-foreground">
-                      Extraído do histórico de notas fiscais. Marque as cidades e adicione à região{" "}
-                      <b>{regiaoSel.nome}</b>.
+                      Cada cidade pode ter uma região diferente. Use o seletor da linha para definir a região,
+                      ou marque várias e envie de uma vez para <b>{regiaoSel.nome}</b>.
                     </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant={modoTodas ? "outline" : "default"}
+                        onClick={() => setModoTodas(false)}
+                      >
+                        Atendidas por este fornecedor
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={modoTodas ? "default" : "outline"}
+                        onClick={() => setModoTodas(true)}
+                      >
+                        Todas as cidades da base
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-12 gap-2 items-end">
@@ -556,10 +618,12 @@ export default function SlaFornecedor() {
                       <Button size="sm" variant="ghost" onClick={() => setMarcadas(new Set())} disabled={marcadas.size === 0}>
                         Limpar marcação
                       </Button>
-                      <span className="text-xs text-muted-foreground">{marcadas.size} marcada(s)</span>
+                      <span className="text-xs text-muted-foreground">
+                        {atendidasFiltradas.length} cidade(s) • {marcadas.size} marcada(s)
+                      </span>
                       <Button size="sm" className="ml-auto" onClick={adicionarMarcadas} disabled={salvandoCidades || marcadas.size === 0}>
                         {salvandoCidades ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
-                        Adicionar à região
+                        Marcadas → {regiaoSel.nome}
                       </Button>
                     </div>
 
@@ -567,25 +631,24 @@ export default function SlaFornecedor() {
                       <div className="py-6 text-center"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
                     ) : atendidasFiltradas.length === 0 ? (
                       <p className="py-4 text-sm text-muted-foreground text-center">
-                        Nenhuma cidade encontrada no histórico deste fornecedor.
+                        Nenhuma cidade encontrada com esse filtro.
                       </p>
                     ) : (
-                      <div className="rounded-lg border divide-y max-h-80 overflow-auto">
-                        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground bg-muted/50 sticky top-0">
+                      <div className="rounded-lg border divide-y max-h-96 overflow-auto">
+                        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-semibold uppercase text-muted-foreground bg-muted/50 sticky top-0 z-10">
                           <span className="col-span-5">Cidade</span>
                           <span className="col-span-1">UF</span>
-                          <span className="col-span-2 text-right">NFs</span>
-                          <span className="col-span-2 text-right">Clientes</span>
-                          <span className="col-span-2 text-right">Última</span>
+                          <span className="col-span-1 text-right">NFs</span>
+                          <span className="col-span-5">Região</span>
                         </div>
                         {atendidasFiltradas.map((c) => {
                           const k = chaveCidade(c.uf, c.municipio);
-                          const jaNaRegiao = naRegiao.has(k);
-                          const outra = !jaNaRegiao && emOutraRegiao.has(k);
+                          const vinculo = regiaoDaCidade.get(k);
+                          const jaNaRegiao = vinculo?.regiao_id === regiaoSel.id;
                           return (
-                            <label
+                            <div
                               key={k}
-                              className={`grid grid-cols-12 gap-2 items-center px-3 py-2 text-sm ${jaNaRegiao ? "opacity-60" : "cursor-pointer hover:bg-muted/40"}`}
+                              className="grid grid-cols-12 gap-2 items-center px-3 py-1.5 text-sm hover:bg-muted/40"
                             >
                               <span className="col-span-5 flex items-center gap-2 min-w-0">
                                 <Checkbox
@@ -593,23 +656,30 @@ export default function SlaFornecedor() {
                                   disabled={jaNaRegiao}
                                   onCheckedChange={() => toggleMarcada(k)}
                                 />
-                                <span className="truncate">{c.municipio}</span>
-                                {jaNaRegiao && <Badge variant="secondary" className="text-[10px]">já na região</Badge>}
-                                {outra && (
-                                  <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">
-                                    em outra região
-                                  </Badge>
+                                <span className="truncate" title={c.municipio}>{c.municipio}</span>
+                                {!c.atendida && (
+                                  <Badge variant="outline" className="text-[10px] shrink-0">sem histórico</Badge>
                                 )}
                               </span>
                               <span className="col-span-1 text-muted-foreground">{c.uf}</span>
-                              <span className="col-span-2 text-right tabular-nums">{c.total_nfs}</span>
-                              <span className="col-span-2 text-right tabular-nums">{c.total_clientes}</span>
-                              <span className="col-span-2 text-right text-xs text-muted-foreground">
-                                {c.ultima_emissao
-                                  ? new Date(`${c.ultima_emissao}T00:00:00`).toLocaleDateString("pt-BR")
-                                  : "—"}
-                              </span>
-                            </label>
+                              <span className="col-span-1 text-right tabular-nums">{c.total_nfs || "—"}</span>
+                              <div className="col-span-5">
+                                <Select
+                                  value={vinculo?.regiao_id ?? "__none"}
+                                  onValueChange={(v) => definirRegiaoCidade(c, v)}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Sem região" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none">Sem região</SelectItem>
+                                    {regioes.map((r) => (
+                                      <SelectItem key={r.id} value={r.id}>{r.nome}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
