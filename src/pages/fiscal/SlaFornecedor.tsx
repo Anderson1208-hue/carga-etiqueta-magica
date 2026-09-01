@@ -207,6 +207,15 @@ export default function SlaFornecedor() {
     [atendidasFiltradas, naRegiao],
   );
 
+  /** cidade normalizada -> vínculo atual (região deste fornecedor) */
+  const regiaoDaCidade = useMemo(() => {
+    const map = new Map<string, { id: string; regiao_id: string }>();
+    [...outrasCidades, ...cidades].forEach((c) =>
+      map.set(chaveCidade(c.uf, c.municipio), { id: c.id, regiao_id: c.regiao_id }),
+    );
+    return map;
+  }, [cidades, outrasCidades]);
+
   const toggleMarcada = (k: string) => {
     setMarcadas((prev) => {
       const next = new Set(prev);
@@ -215,14 +224,51 @@ export default function SlaFornecedor() {
     });
   };
 
+  /** Define (ou remove) a região de uma cidade — cada cidade fica em uma única região */
+  const definirRegiaoCidade = async (c: CidadeAtendida, regiaoId: string) => {
+    const k = chaveCidade(c.uf, c.municipio);
+    const atual = regiaoDaCidade.get(k);
+    if (atual?.regiao_id === regiaoId) return;
+    setSalvandoCidades(true);
+    if (atual) {
+      const { error } = await supabase.from("embarcador_regiao_cidades").delete().eq("id", atual.id);
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    if (regiaoId !== "__none") {
+      const { error } = await supabase
+        .from("embarcador_regiao_cidades")
+        .upsert([{ regiao_id: regiaoId, uf: c.uf.toUpperCase(), municipio: norm(c.municipio) }], {
+          onConflict: "regiao_id,uf,municipio_norm",
+          ignoreDuplicates: true,
+        });
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    setSalvandoCidades(false);
+    const nome = regioes.find((r) => r.id === regiaoId)?.nome;
+    toast.success(nome ? `${c.municipio} → ${nome}` : `${c.municipio} sem região`);
+    if (regiaoSel) loadDetalhe(regiaoSel);
+  };
+
   const adicionarMarcadas = async () => {
     if (!regiaoSel) return toast.error("Selecione a região de destino");
-    const rows = atendidas
+    const alvos = atendidas
       .filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
-      .filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio)))
-      .map((c) => ({ regiao_id: regiaoSel.id, uf: c.uf, municipio: norm(c.municipio) }));
-    if (rows.length === 0) return toast.error("Marque ao menos uma cidade nova");
+      .filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio)));
+    if (alvos.length === 0) return toast.error("Marque ao menos uma cidade nova");
     setSalvandoCidades(true);
+    // cada cidade fica em uma única região: remove vínculos anteriores em outras regiões
+    const remover = alvos
+      .map((c) => regiaoDaCidade.get(chaveCidade(c.uf, c.municipio))?.id)
+      .filter(Boolean) as string[];
+    if (remover.length > 0) {
+      const { error } = await supabase.from("embarcador_regiao_cidades").delete().in("id", remover);
+      if (error) { setSalvandoCidades(false); return toast.error(error.message); }
+    }
+    const rows = alvos.map((c) => ({
+      regiao_id: regiaoSel.id,
+      uf: c.uf.toUpperCase(),
+      municipio: norm(c.municipio),
+    }));
     const { error } = await supabase
       .from("embarcador_regiao_cidades")
       .upsert(rows, { onConflict: "regiao_id,uf,municipio_norm", ignoreDuplicates: true });
