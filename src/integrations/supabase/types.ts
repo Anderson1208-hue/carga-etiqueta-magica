@@ -3841,6 +3841,17 @@ export type Database = {
           ultima_emissao: string
         }[]
       }
+      listar_cidades_base: {
+        Args: { _embarcador_id: string; _todas?: boolean }
+        Returns: {
+          atendida: boolean
+          municipio: string
+          total_clientes: number
+          total_nfs: number
+          uf: string
+          ultima_emissao: string
+        }[]
+      }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: {
