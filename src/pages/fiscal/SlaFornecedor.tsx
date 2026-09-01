@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Plus, Trash2, Pencil, MapPin, AlertTriangle, Clock, ArrowLeft } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Plus, Trash2, Pencil, MapPin, AlertTriangle, Clock, ArrowLeft, ListChecks } from "lucide-react";
 import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { SemPermissao } from "@/components/comercial/SemPermissao";
 
