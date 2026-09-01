@@ -170,6 +170,64 @@ export default function SlaFornecedor() {
     return slas.find((s) => s.ativo && s.vigente_de <= d && (!s.vigente_ate || s.vigente_ate >= d)) || null;
   }, [slas]);
 
+  /** chave normalizada (sem acento, maiúsculas) para comparar cidades */
+  const chaveCidade = (uf: string, municipio: string) =>
+    `${(uf || "").trim().toUpperCase()}|${norm(municipio)}`;
+
+  const naRegiao = useMemo(
+    () => new Set(cidades.map((c) => chaveCidade(c.uf, c.municipio))),
+    [cidades],
+  );
+  const emOutraRegiao = useMemo(
+    () => new Set(outrasCidades.map((c) => chaveCidade(c.uf, c.municipio))),
+    [outrasCidades],
+  );
+
+  const ufsAtendidas = useMemo(
+    () => Array.from(new Set(atendidas.map((c) => c.uf))).sort(),
+    [atendidas],
+  );
+
+  const atendidasFiltradas = useMemo(() => {
+    const termo = norm(filtroAtendidas);
+    return atendidas.filter(
+      (c) =>
+        (ufAtendidas === "__all" || c.uf === ufAtendidas) &&
+        (!termo || norm(c.municipio).includes(termo)),
+    );
+  }, [atendidas, filtroAtendidas, ufAtendidas]);
+
+  const disponiveisFiltradas = useMemo(
+    () => atendidasFiltradas.filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio))),
+    [atendidasFiltradas, naRegiao],
+  );
+
+  const toggleMarcada = (k: string) => {
+    setMarcadas((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  };
+
+  const adicionarMarcadas = async () => {
+    if (!regiaoSel) return toast.error("Selecione a região de destino");
+    const rows = atendidas
+      .filter((c) => marcadas.has(chaveCidade(c.uf, c.municipio)))
+      .filter((c) => !naRegiao.has(chaveCidade(c.uf, c.municipio)))
+      .map((c) => ({ regiao_id: regiaoSel.id, uf: c.uf, municipio: norm(c.municipio) }));
+    if (rows.length === 0) return toast.error("Marque ao menos uma cidade nova");
+    setSalvandoCidades(true);
+    const { error } = await supabase
+      .from("embarcador_regiao_cidades")
+      .upsert(rows, { onConflict: "regiao_id,uf,municipio_norm", ignoreDuplicates: true });
+    setSalvandoCidades(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${rows.length} cidade(s) adicionada(s) à região "${regiaoSel.nome}"`);
+    setMarcadas(new Set());
+    loadDetalhe(regiaoSel);
+  };
+
   const salvarRegiao = async () => {
     if (!embarcadorId) return toast.error("Selecione o fornecedor");
     if (!formRegiao.nome.trim()) return toast.error("Informe o nome da região");
