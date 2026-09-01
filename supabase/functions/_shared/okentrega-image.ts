@@ -9,16 +9,214 @@ export const OKE_DPI = 150;
 
 export type ModoImagem = "recibo" | "contain" | "stretch" | "cover";
 
-// Faixa do recibo na DANFE (mesmos valores do preparo do app em
-// src/lib/okentrega-canhoto.ts): centro vertical em 24% da altura e faixa de
-// 22% da altura. Sem esse recorte a foto retrato inteira cabia em ~180x240 px
-// dentro da faixa 1536x240 e o comprovante chegava ilegível na OK Entrega.
+// Fallback da faixa do recibo quando a detecção automática não acha conteúdo:
+// centro vertical em 24% da altura e faixa de 22% da altura.
 const RECIBO_OFFSET_Y = 0.24;
 const RECIBO_ALTURA = 0.22;
 
 /**
+ * Detecta a área útil do canhoto (papel + tinta) na foto.
+ * A faixa fixa falhava quando o motorista fotografa o recibo de lado, torto ou
+ * ocupando apenas um canto: a OK Entrega recebia 1536x240 quase em branco.
+ */
+function detectarRecorte(src: Image): { x: number; y: number; w: number; h: number; rot: number } | null {
+  const ALVO = OKE_LARGURA / OKE_ALTURA; // 6.4
+  const escala = Math.max(1, Math.round(Math.max(src.width, src.height) / 320));
+  const w = Math.max(16, Math.floor(src.width / escala));
+  const h = Math.max(16, Math.floor(src.height / escala));
+  const small = src.clone().resize(w, h);
+  const px = small.bitmap; // RGBA
+
+  const lum = new Float32Array(w * h);
+  for (let i = 0, p = 0; i < lum.length; i++, p += 4) {
+    lum[i] = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+  }
+
+  // 1) papel = região clara (descarta fundo escuro, sombra, roupa do motorista)
+  const ord = Float32Array.from(lum).sort();
+  const claro = ord[Math.floor(ord.length * 0.95)] || 255;
+  const limPapel = claro * 0.7;
+
+  let x0 = w, x1 = -1, y0 = h, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    let cnt = 0;
+    for (let x = 0; x < w; x++) if (lum[y * w + x] > limPapel) cnt++;
+    if (cnt > w * 0.05) { if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  for (let x = 0; x < w; x++) {
+    let cnt = 0;
+    for (let y = 0; y < h; y++) if (lum[y * w + x] > limPapel) cnt++;
+    if (cnt > h * 0.05) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  }
+  if (x1 <= x0 || y1 <= y0) return null;
+
+  // 2) tinta = pixel bem mais escuro que a média LOCAL do papel (elimina sombra
+  // e degradê da folha) e que tenha papel claro na vizinhança (elimina roupa,
+  // chão e fundo escuro da foto).
+  const media = new Float32Array(w * h); // média local (janela 25) via duas passadas
+  const tmp = new Float32Array(w * h);
+  const RM = 12;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let s = 0, c = 0;
+      for (let k = -RM; k <= RM; k++) {
+        const xx = x + k;
+        if (xx < 0 || xx >= w) continue;
+        s += lum[y * w + xx]; c++;
+      }
+      tmp[y * w + x] = s / c;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let s = 0, c = 0;
+      for (let k = -RM; k <= RM; k++) {
+        const yy = y + k;
+        if (yy < 0 || yy >= h) continue;
+        s += tmp[yy * w + x]; c++;
+      }
+      media[y * w + x] = s / c;
+    }
+  }
+
+  // máximo local (janela 7) separável: existe papel claro por perto?
+  const R = 3;
+  const maxH = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let m = 0;
+      for (let k = -R; k <= R; k++) {
+        const xx = x + k;
+        if (xx < 0 || xx >= w) continue;
+        const v = lum[y * w + xx];
+        if (v > m) m = v;
+      }
+      maxH[y * w + x] = m;
+    }
+  }
+  const vizinho = new Float32Array(w * h);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      let m = 0;
+      for (let k = -R; k <= R; k++) {
+        const yy = y + k;
+        if (yy < 0 || yy >= h) continue;
+        const v = maxH[yy * w + x];
+        if (v > m) m = v;
+      }
+      vizinho[y * w + x] = m;
+    }
+  }
+
+  const tinta = new Uint8Array(w * h);
+  let totalTinta = 0;
+  for (let i = 0; i < tinta.length; i++) {
+    if (lum[i] < media[i] * 0.82 && vizinho[i] > limPapel && lum[i] > claro * 0.15) {
+      tinta[i] = 1; totalTinta++;
+    }
+  }
+  if (totalTinta < 40) return null;
+
+  // 3) dilata (janela 7) e fica com o MAIOR bloco conectado: é a tira do recibo,
+  // onde estão número da NF, data, nome e assinatura.
+  const D = 3;
+  const dil = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!tinta[y * w + x]) continue;
+      for (let dy = -D; dy <= D; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -D; dx <= D; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          dil[yy * w + xx] = 1;
+        }
+      }
+    }
+  }
+
+  const visto = new Uint8Array(w * h);
+  const fila = new Int32Array(w * h);
+  let melhor = { peso: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
+  for (let s = 0; s < dil.length; s++) {
+    if (!dil[s] || visto[s]) continue;
+    let ini = 0, fim = 0;
+    fila[fim++] = s; visto[s] = 1;
+    let peso = 0, bx0 = w, bx1 = 0, by0 = h, by1 = 0;
+    while (ini < fim) {
+      const i = fila[ini++];
+      const x = i % w, y = (i - x) / w;
+      if (tinta[i]) peso++;
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
+      if (y < by0) by0 = y; if (y > by1) by1 = y;
+      if (x > 0 && dil[i - 1] && !visto[i - 1]) { visto[i - 1] = 1; fila[fim++] = i - 1; }
+      if (x < w - 1 && dil[i + 1] && !visto[i + 1]) { visto[i + 1] = 1; fila[fim++] = i + 1; }
+      if (y > 0 && dil[i - w] && !visto[i - w]) { visto[i - w] = 1; fila[fim++] = i - w; }
+      if (y < h - 1 && dil[i + w] && !visto[i + w]) { visto[i + w] = 1; fila[fim++] = i + w; }
+    }
+    if (peso > melhor.peso) melhor = { peso, x0: bx0, x1: bx1, y0: by0, y1: by1 };
+  }
+  if (melhor.peso < 30) return null;
+
+  let ix0 = melhor.x0, ix1 = melhor.x1, iy0 = melhor.y0, iy1 = melhor.y1;
+
+  // margem de respiro
+  const padX = Math.round((ix1 - ix0) * 0.04) + 1;
+  const padY = Math.round((iy1 - iy0) * 0.04) + 1;
+  ix0 = Math.max(0, ix0 - padX); ix1 = Math.min(w - 1, ix1 + padX);
+  iy0 = Math.max(0, iy0 - padY); iy1 = Math.min(h - 1, iy1 + padY);
+
+  // volta à resolução original
+  let cx = (ix0 * src.width) / w;
+  let cy = (iy0 * src.height) / h;
+  let cw = ((ix1 - ix0 + 1) * src.width) / w;
+  let ch = ((iy1 - iy0 + 1) * src.height) / h;
+
+  // 3) orientação: o canhoto da DANFE é uma tira na BORDA da folha. Se a tira
+  // detectada está em pé (motorista fotografou a folha deitada), giramos para
+  // deixá-la na horizontal — sem isso a faixa 1536x240 saía quase em branco.
+  // Qual lado vira o topo: o cabeçalho impresso ("RECEBEMOS DE...") é a metade
+  // com mais tinta; ela precisa ficar em cima, senão o canhoto sai de ponta-cabeça.
+  let rot = 0;
+  if (ch > cw * 1.2) {
+    const meio = Math.round((ix0 + ix1) / 2);
+    let esq = 0, dir = 0;
+    for (let y = iy0; y <= iy1; y++) {
+      for (let x = ix0; x <= ix1; x++) {
+        if (!tinta[y * w + x]) continue;
+        if (x < meio) esq++; else dir++;
+      }
+    }
+    rot = esq >= dir ? 270 : 90;
+  }
+
+  // ajusta ao formato alvo (6.4:1 no eixo longo da tira) sem esmagar o conteúdo
+  const alvoLocal = rot === 0 ? ALVO : 1 / ALVO;
+  if (cw / ch < alvoLocal) {
+    const novoW = Math.min(src.width, ch * alvoLocal);
+    cx = Math.max(0, Math.min(src.width - novoW, cx - (novoW - cw) / 2));
+    cw = novoW;
+  } else {
+    const novoH = Math.min(src.height, cw / alvoLocal);
+    cy = Math.max(0, Math.min(src.height - novoH, cy - (novoH - ch) / 2));
+    ch = novoH;
+  }
+  void x0; void x1; void y0; void y1;
+
+  return {
+    x: Math.max(0, Math.round(cx)),
+    y: Math.max(0, Math.round(cy)),
+    w: Math.max(8, Math.min(src.width - Math.round(cx), Math.round(cw))),
+    h: Math.max(8, Math.min(src.height - Math.round(cy), Math.round(ch))),
+    rot,
+  };
+}
+
+/**
  * Redimensiona para exatamente 1536x240.
- * - contain: preserva proporção, centraliza sobre fundo branco (padrão, não distorce a assinatura)
+ * - recibo: detecta a área do canhoto na foto e encaixa na faixa (padrão em produção)
+ * - contain: preserva proporção, centraliza sobre fundo branco
  * - stretch: força 1536x240 (distorce)
  * - cover: preenche e recorta as sobras
  */
@@ -32,10 +230,21 @@ export async function prepararCanhoto(
   let final: Image;
 
   if (modo === "recibo") {
-    const sh = Math.max(8, Math.min(src.height, Math.round(src.height * RECIBO_ALTURA)));
-    const cy = Math.round(src.height * RECIBO_OFFSET_Y);
-    const sy = Math.max(0, Math.min(src.height - sh, cy - Math.round(sh / 2)));
-    const faixa = src.crop(0, sy, src.width, sh).resize(OKE_LARGURA, OKE_ALTURA);
+    let area: { x: number; y: number; w: number; h: number; rot: number } | null = null;
+    try {
+      area = detectarRecorte(src);
+    } catch {
+      area = null;
+    }
+    if (!area) {
+      const sh = Math.max(8, Math.min(src.height, Math.round(src.height * RECIBO_ALTURA)));
+      const cyF = Math.round(src.height * RECIBO_OFFSET_Y);
+      const syF = Math.max(0, Math.min(src.height - sh, cyF - Math.round(sh / 2)));
+      area = { x: 0, y: syF, w: src.width, h: sh, rot: 0 };
+    }
+    let recorte = src.crop(area.x, area.y, area.w, area.h);
+    if (area.rot) recorte = recorte.rotate(area.rot) as Image;
+    const faixa = recorte.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
     try {
       faixa.saturation(0);

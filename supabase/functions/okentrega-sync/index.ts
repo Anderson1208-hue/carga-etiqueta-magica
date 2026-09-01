@@ -10,6 +10,7 @@
 // Secrets: OKENTREGA_EMAIL_HOMOLOG/PASSWORD_HOMOLOG, OKENTREGA_EMAIL_PRODUCAO/PASSWORD_PRODUCAO
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { prepararCanhoto, paraBase64, type ModoImagem } from "../_shared/okentrega-image.ts";
+import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -168,6 +169,34 @@ Deno.serve(async (req) => {
         502,
       );
     }
+  }
+
+  // Pré-visualização do recorte (não envia nada): devolve a faixa 1536x240 em base64
+  if ((opts as any).preview_queue_id) {
+    const { data: it } = await supabase
+      .from("okentrega_queue")
+      .select("id, numero_nf, payload")
+      .eq("id", (opts as any).preview_queue_id)
+      .maybeSingle();
+    const fotoPath = (it?.payload as any)?.foto_path;
+    if (!fotoPath) return json({ status: "sem_foto" }, 400);
+    const { data: file, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
+    if (dlErr || !file) return json({ status: "erro_download", mensagem: dlErr?.message }, 500);
+    const buf = new Uint8Array(await file.arrayBuffer());
+    if ((opts as any).original) {
+      const src = await ImageLib.decode(buf);
+      const esc = Math.min(1, 900 / Math.max(src.width, src.height));
+      const mini = src.resize(Math.round(src.width * esc), Math.round(src.height * esc));
+      return json({
+        status: "preview_original",
+        numero_nf: it?.numero_nf,
+        largura: src.width,
+        altura: src.height,
+        base64: paraBase64(new Uint8Array(await mini.encodeJPEG(80))),
+      });
+    }
+    const { bytes } = await prepararCanhoto(buf, modoImagem);
+    return json({ status: "preview", numero_nf: it?.numero_nf, modo_imagem: modoImagem, base64: paraBase64(bytes) });
   }
 
 
