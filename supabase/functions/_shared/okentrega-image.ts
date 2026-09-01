@@ -176,14 +176,19 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
   // 3) orientação: o canhoto da DANFE é uma tira na BORDA da folha. Se a tira
   // detectada está em pé (motorista fotografou a folha deitada), giramos para
   // deixá-la na horizontal — sem isso a faixa 1536x240 saía quase em branco.
-  const pcx = ((x0 + x1) / 2) * (src.width / w);
-  const pcy = ((y0 + y1) / 2) * (src.height / h);
-  const icx = cx + cw / 2;
-  const icy = cy + ch / 2;
+  // Qual lado vira o topo: o cabeçalho impresso ("RECEBEMOS DE...") é a metade
+  // com mais tinta; ela precisa ficar em cima, senão o canhoto sai de ponta-cabeça.
   let rot = 0;
   if (ch > cw * 1.2) {
-    // tira vertical: gira para que ela fique no topo
-    rot = icx < pcx ? 90 : 270;
+    const meio = Math.round((ix0 + ix1) / 2);
+    let esq = 0, dir = 0;
+    for (let y = iy0; y <= iy1; y++) {
+      for (let x = ix0; x <= ix1; x++) {
+        if (!tinta[y * w + x]) continue;
+        if (x < meio) esq++; else dir++;
+      }
+    }
+    rot = esq >= dir ? 90 : 270;
   }
 
   // ajusta ao formato alvo (6.4:1 no eixo longo da tira) sem esmagar o conteúdo
