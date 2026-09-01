@@ -24,3 +24,14 @@ paletização, estadia, agendamento, escolta, despacho, frete mínimo).
 `tipo_calculo`: percentual_nf | percentual_frete | valor_por_ton |
 valor_por_100kg | valor_fixo | valor_por_entrega. `embutido` = componente
 "A EMBUTIR" no DACTE.
+
+## Cidades já atendidas (2026-09)
+`listar_cidades_atendidas(_embarcador_id)` (security definer, gated por
+`pode_gestao_comercial()`) agrupa `notas_fiscais` por `dest_uf` + município
+(sem acento, upper) casando o CNPJ do emitente por dígitos (em
+`notas_fiscais` o CNPJ vem formatado; em `embarcadores`, sem máscara),
+retornando total de NFs, clientes distintos e última emissão.
+A tela `/comercial/sla-fornecedor` mostra essa lista com checkbox para
+marcar cidades e adicioná-las à região (upsert com
+`onConflict: regiao_id,uf,municipio_norm`), sinalizando "já na região" e
+"em outra região". Pandurata (70.940.994/0082-77) tem 27 cidades atendidas.
