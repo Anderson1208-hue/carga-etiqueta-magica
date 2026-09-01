@@ -121,6 +121,25 @@ export default function SlaFornecedor() {
     loadRegioes(embarcadorId);
   }, [embarcadorId]);
 
+  // Carrega as cidades que o fornecedor já atendeu (histórico de notas fiscais)
+  useEffect(() => {
+    setMarcadas(new Set());
+    setFiltroAtendidas("");
+    setUfAtendidas("__all");
+    if (!embarcadorId) { setAtendidas([]); return; }
+    let cancelado = false;
+    setLoadingAtendidas(true);
+    (supabase as any)
+      .rpc("listar_cidades_atendidas", { _embarcador_id: embarcadorId })
+      .then(({ data, error }: any) => {
+        if (cancelado) return;
+        setLoadingAtendidas(false);
+        if (error) { toast.error(error.message); setAtendidas([]); return; }
+        setAtendidas((data as CidadeAtendida[]) || []);
+      });
+    return () => { cancelado = true; };
+  }, [embarcadorId]);
+
   const loadDetalhe = async (regiao: Regiao) => {
     const [c, s, o] = await Promise.all([
       supabase.from("embarcador_regiao_cidades").select("*").eq("regiao_id", regiao.id).order("uf").order("municipio"),
