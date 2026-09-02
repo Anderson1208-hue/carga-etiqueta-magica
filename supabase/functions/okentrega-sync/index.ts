@@ -221,6 +221,23 @@ Deno.serve(async (req) => {
   if (errSelect) return json({ error: errSelect.message }, 500);
 
   let pendentes = pendentesRaw ?? [];
+
+  // Bloqueio manual (NF digitada direto no portal do cliente): nunca transmitir,
+  // mesmo se por algum caminho tiver entrado na fila.
+  const blocklist = ((cfg?.blocklist_nfs ?? []) as string[])
+    .map((v) => String(v).replace(/\D/g, ""))
+    .filter(Boolean);
+  let bloqueadas = 0;
+  if (blocklist.length > 0) {
+    const antes = pendentes.length;
+    pendentes = pendentes.filter(
+      (i) =>
+        !blocklist.includes(String(i.numero_nf ?? "").replace(/\D/g, "")) &&
+        !blocklist.includes(String(i.chave_acesso ?? "").replace(/\D/g, "")),
+    );
+    bloqueadas = antes - pendentes.length;
+  }
+
   let foraDaWhitelist = 0;
   if (whitelist.length > 0 && !opts.queue_id) {
     const antes = pendentes.length;
@@ -230,6 +247,7 @@ Deno.serve(async (req) => {
     foraDaWhitelist = antes - pendentes.length;
     pendentes = pendentes.slice(0, BATCH_SIZE);
   }
+
 
   if (!envioAtivo && !dryRun) {
     return json({
