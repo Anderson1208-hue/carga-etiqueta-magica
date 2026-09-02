@@ -169,6 +169,7 @@ export function Sidebar() {
   const { profile, signOut, isAdmin } = useAuth();
   const { podeGestaoComercial } = useGestaoComercial();
   const { podeVerIbac } = useAcessoIbac();
+  const { podeVerOkEntrega } = useAcessoOkEntrega();
 
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
