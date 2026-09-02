@@ -35,15 +35,18 @@ Deno.serve(async (req) => {
 
   let nfsAlvo: string[] = [];
   let veiculoIdAlvo: string | null = null;
+  let dryRun = false;
   try {
     const body = await req.json();
     nfsAlvo = (body?.nfs ?? []).map((v: unknown) => String(v).trim()).filter(Boolean);
+    dryRun = body?.dry_run === true;
     veiculoIdAlvo = typeof body?.veiculo_id === "string" && /^[0-9a-f-]{36}$/i.test(body.veiculo_id)
       ? body.veiculo_id
       : null;
   } catch {
     nfsAlvo = [];
   }
+
 
   const { data: cfg } = await supabase
     .from("okentrega_config")
