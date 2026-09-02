@@ -477,7 +477,7 @@ Deno.serve(async (req) => {
     fora_da_whitelist: foraDaWhitelist,
     bloqueadas_manualmente: bloqueadas,
 
-    restantes: Math.max(0, (pendentesRaw?.length ?? 0) - resultados.length - foraDaWhitelist),
+    restantes: restantesFila,
     modo_imagem: modoImagem,
     resultados,
     ...(dryRun ? { amostras } : {}),
