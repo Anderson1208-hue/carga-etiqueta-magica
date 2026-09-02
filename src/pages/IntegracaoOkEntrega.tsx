@@ -85,6 +85,7 @@ Orkestria Logística`;
 
 export default function IntegracaoOkEntrega() {
   const { isAdmin, isLoading } = useAuth();
+  const { podeVerOkEntrega } = useAcessoOkEntrega();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
   const [dryRunJson, setDryRunJson] = useState<string>("");
