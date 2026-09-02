@@ -229,6 +229,9 @@ Deno.serve(async (req) => {
       const up = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
       if (up.error) throw new Error(up.error.message);
       const { data: assinado } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_TTL);
+      if (body?.base64 === true) {
+        return new Response(bytes, { headers: { ...corsHeaders, "Content-Type": "application/pdf" } });
+      }
       return json({ ok: true, amostra: true, dia, indice: idx, nf: l.numero_nf, bytes: bytes.length, url: assinado?.signedUrl ?? null });
     }
 
