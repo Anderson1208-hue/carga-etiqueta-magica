@@ -1,16 +1,21 @@
 // Edge function: relatorio-canhotos-diario
-// Gera, por dia, três arquivos consolidados das baixas de entrega:
+// Gera, por dia, os arquivos consolidados das baixas de entrega:
 //   1. PDF  — 1 página por NF entregue com foto de canhoto (imagem + cabeçalho)
-//   2. ZIP  — fotos originais nomeadas NF_<numero>_<placa>.jpg
+//   2. ZIP  — pacotes com as fotos, nomeadas NF_<numero>_<placa>.jpg
 //   3. XLSX — NFs entregues no dia SEM foto de canhoto (pendências)
-// Os arquivos vão para o bucket privado `relatorios-canhotos` em YYYY/MM/YYYY-MM-DD/
-// e o resumo é registrado em public.relatorios_canhotos_diarios.
+// Arquivos gravados no bucket privado `relatorios-canhotos` em YYYY/MM/YYYY-MM-DD/.
 // Nada é apagado: não existe rotina de limpeza nem expiração.
 //
+// Processamento em lotes com auto-encadeamento (o volume diário de canhotos
+// não cabe em uma única invocação): cada execução processa LOTE itens,
+// acrescenta as páginas ao PDF acumulado, gera um pacote ZIP do lote e
+// re-invoca a si mesma até concluir. Na última rodada gera a planilha de
+// pendências e dispara o e-mail.
+//
 // Body (todos opcionais):
-//   { data: "2026-09-01", dry_run: true, enviar_email: false, forcar: true }
+//   { data: "2026-09-01", dry_run: true, enviar_email: false, forcar: true, encadear: false }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
-import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1?target=deno";
 import { zipSync } from "https://esm.sh/fflate@0.8.2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
@@ -24,9 +29,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BUCKET = "relatorios-canhotos";
 const BUCKET_FOTOS = "comprovantes";
-const PAGINA = 500; // paginação determinística
+const PAGINA = 500; // paginação determinística na leitura das baixas
+const LOTE = 25; // canhotos processados por invocação
 const SIGNED_TTL = 60 * 60 * 24 * 90; // 90 dias
-const LARGURA_MAX_PDF = 1000; // px — imagem redimensionada antes de embutir
+const LARGURA_PDF = 900; // px — imagem redimensionada antes de embutir no PDF
+const LARGURA_ZIP = 1600; // px — imagem do pacote ZIP (uso em portais de clientes)
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -37,7 +44,7 @@ function json(body: unknown, status = 200) {
 
 /** Data (YYYY-MM-DD) de "ontem" no fuso America/Sao_Paulo. */
 function ontemBrasilia(): string {
-  const agora = new Date(Date.now() - 3 * 3600_000); // BRT = UTC-3
+  const agora = new Date(Date.now() - 3 * 3600_000);
   agora.setUTCDate(agora.getUTCDate() - 1);
   return agora.toISOString().slice(0, 10);
 }
@@ -45,8 +52,7 @@ function ontemBrasilia(): string {
 /** Janela UTC correspondente ao dia BRT informado. */
 function janelaUtc(dia: string) {
   const inicio = new Date(`${dia}T03:00:00.000Z`);
-  const fim = new Date(inicio.getTime() + 24 * 3600_000);
-  return { inicio: inicio.toISOString(), fim: fim.toISOString() };
+  return { inicio: inicio.toISOString(), fim: new Date(inicio.getTime() + 24 * 3600_000).toISOString() };
 }
 
 function dataHoraBr(iso?: string | null) {
@@ -60,10 +66,13 @@ function sanitizar(v: string) {
   return (v || "").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 60);
 }
 
+/** pdf-lib usa WinAnsi nas fontes padrão: remove o que estiver fora do Latin-1. */
+function winAnsi(t: string) {
+  return (t || "").replace(/[^\x20-\xFF]/g, "-");
+}
+
 type Linha = {
-  id: string;
-  foto_path: string | null;
-  foto_recibo_path: string | null;
+  path: string | null;
   registrado_em: string | null;
   recebedor_nome: string | null;
   ocorrencia: string | null;
@@ -100,9 +109,7 @@ async function buscarBaixas(supabase: any, dia: string): Promise<Linha[]> {
     if (!data?.length) break;
     for (const b of data as any[]) {
       linhas.push({
-        id: b.id,
-        foto_path: b.foto_path,
-        foto_recibo_path: b.foto_recibo_path,
+        path: b.foto_path || b.foto_recibo_path || null,
         registrado_em: b.registrado_em,
         recebedor_nome: b.recebedor_nome,
         ocorrencia: b.ocorrencia,
@@ -124,25 +131,27 @@ async function buscarBaixas(supabase: any, dia: string): Promise<Linha[]> {
   return linhas;
 }
 
-async function baixarFoto(supabase: any, path: string): Promise<Uint8Array | null> {
-  const { data, error } = await supabase.storage.from(BUCKET_FOTOS).download(path);
+async function jpegRedimensionado(bytes: Uint8Array, largura: number, qualidade: number) {
+  const img = await ImageLib.decode(bytes);
+  const final = img.width > largura ? img.resize(largura, ImageLib.RESIZE_AUTO) : img;
+  const jpeg = await final.encodeJPEG(qualidade);
+  return { jpeg, largura: final.width, altura: final.height };
+}
+
+async function baixarStorage(supabase: any, bucket: string, path: string): Promise<Uint8Array | null> {
+  const { data, error } = await supabase.storage.from(bucket).download(path);
   if (error || !data) return null;
   return new Uint8Array(await data.arrayBuffer());
 }
 
-/** Redimensiona para largura máxima e devolve JPEG (base64) + dimensões. */
-async function paraJpegPdf(bytes: Uint8Array) {
-  const img = await ImageLib.decode(bytes);
-  let final = img;
-  if (img.width > LARGURA_MAX_PDF) {
-    final = img.resize(LARGURA_MAX_PDF, ImageLib.RESIZE_AUTO);
-  }
-  const jpeg = await final.encodeJPEG(78);
-  let bin = "";
-  for (let i = 0; i < jpeg.length; i += 8192) {
-    bin += String.fromCharCode(...jpeg.subarray(i, i + 8192));
-  }
-  return { base64: btoa(bin), largura: final.width, altura: final.height };
+function caminhos(dia: string) {
+  const pasta = `${dia.slice(0, 4)}/${dia.slice(5, 7)}/${dia}`;
+  return {
+    pasta,
+    pdf: `${pasta}/canhotos-${dia}.pdf`,
+    xlsx: `${pasta}/sem-canhoto-${dia}.xlsx`,
+    zipParte: (n: number) => `${pasta}/canhotos-imagens-${dia}-parte-${String(n).padStart(2, "0")}.zip`,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -160,104 +169,175 @@ Deno.serve(async (req) => {
     const dryRun = body?.dry_run === true;
     const enviarEmail = body?.enviar_email !== false;
     const forcar = body?.forcar === true;
+    const encadear = body?.encadear !== false;
+    const p = caminhos(dia);
 
-    const { data: existente } = await supabase
+    const { data: atual } = await supabase
       .from("relatorios_canhotos_diarios")
       .select("*")
       .eq("data_referencia", dia)
       .maybeSingle();
 
-    if (existente?.status === "concluido" && !forcar && !dryRun) {
-      return json({ ok: true, dia, ja_gerado: true, relatorio: existente });
-    }
-
-    const linhas = await buscarBaixas(supabase, dia);
-    const comFoto = linhas.filter((l) => !!(l.foto_path || l.foto_recibo_path));
-    const semFoto = linhas.filter((l) => !(l.foto_path || l.foto_recibo_path));
-
     if (dryRun) {
+      const linhas = await buscarBaixas(supabase, dia);
+      const com = linhas.filter((l) => !!l.path);
       return json({
         ok: true,
         dry_run: true,
         dia,
         total_entregas: linhas.length,
-        total_com_canhoto: comFoto.length,
-        total_sem_canhoto: semFoto.length,
-        amostra_sem_canhoto: semFoto.slice(0, 10).map((l) => l.numero_nf),
+        total_com_canhoto: com.length,
+        total_sem_canhoto: linhas.length - com.length,
+        lotes_previstos: Math.ceil(com.length / LOTE),
+        amostra_sem_canhoto: linhas.filter((l) => !l.path).slice(0, 10).map((l) => l.numero_nf),
       });
     }
 
-    if (!existente) {
-      await supabase.from("relatorios_canhotos_diarios").insert({ data_referencia: dia, status: "processando" });
+    if (atual?.status === "concluido" && !forcar) {
+      return json({ ok: true, dia, ja_gerado: true, relatorio: atual });
+    }
+
+    // ---------- 1ª rodada: monta a fila do dia ----------
+    let itens: Linha[] = [];
+    let semFoto: Linha[] = [];
+    let offset = 0;
+    let zipPartes: string[] = [];
+
+    const emAndamento = atual?.status === "processando" && Array.isArray(atual?.itens) && !forcar;
+    if (emAndamento) {
+      const guardado = atual!.itens as any;
+      itens = guardado.com_foto ?? [];
+      semFoto = guardado.sem_foto ?? [];
+      offset = atual!.progresso_offset ?? 0;
+      zipPartes = (atual!.zip_partes as string[]) ?? [];
     } else {
+      const linhas = await buscarBaixas(supabase, dia);
+      itens = linhas.filter((l) => !!l.path);
+      semFoto = linhas.filter((l) => !l.path);
+      await supabase.from("relatorios_canhotos_diarios").upsert(
+        {
+          data_referencia: dia,
+          status: "processando",
+          erro: null,
+          progresso_offset: 0,
+          zip_partes: [],
+          itens: { com_foto: itens, sem_foto: semFoto },
+          total_entregas: itens.length + semFoto.length,
+          total_com_canhoto: itens.length,
+          total_sem_canhoto: semFoto.length,
+          pdf_path: null,
+          zip_path: null,
+          xlsx_path: null,
+        },
+        { onConflict: "data_referencia" },
+      );
+    }
+
+    const lote = itens.slice(offset, offset + LOTE);
+    const falhas: string[] = [];
+
+    if (lote.length) {
+      // PDF acumulado (carrega o que já existe)
+      let pdfDoc: PDFDocument;
+      const anterior = offset > 0 ? await baixarStorage(supabase, BUCKET, p.pdf) : null;
+      pdfDoc = anterior ? await PDFDocument.load(anterior) : await PDFDocument.create();
+      const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fonteBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+      const arquivosZip: Record<string, Uint8Array> = {};
+
+      for (const l of lote) {
+        const bytes = await baixarStorage(supabase, BUCKET_FOTOS, l.path!);
+        if (!bytes) {
+          falhas.push(l.numero_nf);
+          continue;
+        }
+        const nomeZip = `NF_${sanitizar(l.numero_nf)}_${sanitizar(l.placa || "SEMPLACA")}.jpg`;
+        try {
+          const zipImg = await jpegRedimensionado(bytes, LARGURA_ZIP, 82);
+          arquivosZip[nomeZip] = zipImg.jpeg;
+        } catch {
+          arquivosZip[nomeZip] = bytes;
+        }
+
+        try {
+          const { jpeg, largura, altura } = await jpegRedimensionado(bytes, LARGURA_PDF, 62);
+          const img = await pdfDoc.embedJpg(jpeg);
+          const page = pdfDoc.addPage([595, 842]); // A4 em pontos
+          page.drawText(winAnsi(`NF ${l.numero_nf}`), { x: 34, y: 800, size: 14, font: fonteBold });
+          const cab = [
+            `Destinatario: ${l.dest || "-"}`,
+            `Cidade: ${l.cidade || "-"}/${l.uf || "-"}   Emitente: ${l.emitente || "-"}`,
+            `Placa: ${l.placa || "-"}   Motorista: ${l.motorista || "-"}`,
+            `Baixa: ${dataHoraBr(l.registrado_em)}   Recebedor: ${l.recebedor_nome || "-"}`,
+          ];
+          cab.forEach((t, i) =>
+            page.drawText(winAnsi(t).slice(0, 105), { x: 34, y: 782 - i * 13, size: 9, font: fonte }),
+          );
+          page.drawLine({
+            start: { x: 34, y: 722 },
+            end: { x: 561, y: 722 },
+            thickness: 0.6,
+            color: rgb(0.75, 0.75, 0.75),
+          });
+          const maxW = 527;
+          const maxH = 660;
+          const escala = Math.min(maxW / largura, maxH / altura);
+          const w = largura * escala;
+          const h = altura * escala;
+          page.drawImage(img, { x: 34 + (maxW - w) / 2, y: 706 - h, width: w, height: h });
+        } catch {
+          falhas.push(l.numero_nf);
+        }
+      }
+
+      const pdfBytes = await pdfDoc.save({ useObjectStreams: false });
+      const upPdf = await supabase.storage
+        .from(BUCKET)
+        .upload(p.pdf, pdfBytes, { contentType: "application/pdf", upsert: true });
+      if (upPdf.error) throw new Error(`Falha no upload do PDF: ${upPdf.error.message}`);
+
+      const numeroParte = zipPartes.length + 1;
+      const zipPath = p.zipParte(numeroParte);
+      const zipBytes = zipSync(arquivosZip, { level: 0 });
+      const upZip = await supabase.storage
+        .from(BUCKET)
+        .upload(zipPath, zipBytes, { contentType: "application/zip", upsert: true });
+      if (upZip.error) throw new Error(`Falha no upload do ZIP: ${upZip.error.message}`);
+      zipPartes = [...zipPartes, zipPath];
+
+      offset += lote.length;
+      const acumuladoErro = [atual?.erro, falhas.length ? `Imagens nao lidas: ${falhas.join(", ")}` : null]
+        .filter(Boolean)
+        .join(" | ") || null;
       await supabase
         .from("relatorios_canhotos_diarios")
-        .update({ status: "processando", erro: null })
+        .update({
+          progresso_offset: offset,
+          zip_partes: zipPartes,
+          pdf_path: p.pdf,
+          pdf_bytes: pdfBytes.length,
+          zip_path: zipPartes[0] ?? null,
+          erro: acumuladoErro,
+        })
         .eq("data_referencia", dia);
     }
 
-    // ---------- PDF + ZIP ----------
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const arquivosZip: Record<string, Uint8Array> = {};
-    let paginas = 0;
-    const falhasImagem: string[] = [];
+    const restam = Math.max(0, itens.length - offset);
 
-    for (const l of comFoto) {
-      const path = (l.foto_path || l.foto_recibo_path)!;
-      const bytes = await baixarFoto(supabase, path);
-      if (!bytes) {
-        falhasImagem.push(l.numero_nf);
-        continue;
+    if (restam > 0) {
+      if (encadear) {
+        // cooldown curto antes da próxima rodada
+        setTimeout(() => {
+          supabase.functions
+            .invoke("relatorio-canhotos-diario", { body: { data: dia, enviar_email: enviarEmail } })
+            .catch((e: unknown) => console.error("auto-encadeamento falhou", e));
+        }, 1500);
       }
-      const nomeZip = `NF_${sanitizar(l.numero_nf)}_${sanitizar(l.placa || "SEMPLACA")}.jpg`;
-      arquivosZip[nomeZip] = bytes;
-
-      let img: { base64: string; largura: number; altura: number };
-      try {
-        img = await paraJpegPdf(bytes);
-      } catch {
-        falhasImagem.push(l.numero_nf);
-        continue;
-      }
-
-      if (paginas > 0) pdf.addPage();
-      paginas++;
-
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(12);
-      pdf.text(`NF ${l.numero_nf}`, 12, 14);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      const cab = [
-        `Destinatario: ${l.dest || "—"}`,
-        `Cidade: ${l.cidade || "—"}/${l.uf || "—"}    Emitente: ${l.emitente || "—"}`,
-        `Placa: ${l.placa || "—"}    Motorista: ${l.motorista || "—"}`,
-        `Baixa: ${dataHoraBr(l.registrado_em)}    Recebedor: ${l.recebedor_nome || "—"}`,
-      ];
-      cab.forEach((t, i) => pdf.text(t.slice(0, 120), 12, 20 + i * 5));
-      pdf.setDrawColor(200);
-      pdf.line(12, 42, 198, 42);
-
-      const maxW = 186;
-      const maxH = 235;
-      const escala = Math.min(maxW / img.largura, maxH / img.altura);
-      const w = img.largura * escala;
-      const h = img.altura * escala;
-      pdf.addImage(`data:image/jpeg;base64,${img.base64}`, "JPEG", 12 + (maxW - w) / 2, 46, w, h);
+      return json({ ok: true, dia, processados: offset, total: itens.length, restam, encadeado: encadear });
     }
 
-    if (paginas === 0) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(14);
-      pdf.text(`Sem canhotos registrados em ${dia.split("-").reverse().join("/")}`, 14, 20);
-    }
-
-    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"));
-    const zipBytes = Object.keys(arquivosZip).length
-      ? zipSync(arquivosZip, { level: 0 })
-      : zipSync({ "SEM-CANHOTOS.txt": new TextEncoder().encode(`Nenhum canhoto em ${dia}`) }, { level: 0 });
-
-    // ---------- XLSX de pendências ----------
+    // ---------- Finalização: planilha de pendências ----------
     const planilha = semFoto.map((l) => ({
       NF: l.numero_nf,
       Emitente: l.emitente,
@@ -269,7 +349,7 @@ Deno.serve(async (req) => {
       "Data da baixa": dataHoraBr(l.registrado_em),
       "Status da baixa": l.status ?? "",
       "Motivo pendencia": l.canhoto_pendente_motivo ?? "",
-      "Observacao pendencia": l.canhoto_pendente_obs ?? l.observacao ?? "",
+      "Observacao": l.canhoto_pendente_obs ?? l.observacao ?? "",
       Ocorrencia: l.ocorrencia ?? "",
     }));
     const wb = XLSX.utils.book_new();
@@ -279,78 +359,57 @@ Deno.serve(async (req) => {
       "Sem canhoto",
     );
     const xlsxBytes = new Uint8Array(XLSX.write(wb, { bookType: "xlsx", type: "array" }));
-
-    // ---------- Upload ----------
-    const pasta = `${dia.slice(0, 4)}/${dia.slice(5, 7)}/${dia}`;
-    const pdfPath = `${pasta}/canhotos-${dia}.pdf`;
-    const zipPath = `${pasta}/canhotos-imagens-${dia}.zip`;
-    const xlsxPath = `${pasta}/sem-canhoto-${dia}.xlsx`;
-
-    const uploads = [
-      supabase.storage.from(BUCKET).upload(pdfPath, pdfBytes, { contentType: "application/pdf", upsert: true }),
-      supabase.storage.from(BUCKET).upload(zipPath, zipBytes, { contentType: "application/zip", upsert: true }),
-      supabase.storage.from(BUCKET).upload(xlsxPath, xlsxBytes, {
-        contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        upsert: true,
-      }),
-    ];
-    for (const r of await Promise.all(uploads)) {
-      if ((r as any).error) throw new Error(`Falha no upload: ${(r as any).error.message}`);
-    }
+    const upXlsx = await supabase.storage.from(BUCKET).upload(p.xlsx, xlsxBytes, {
+      contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      upsert: true,
+    });
+    if (upXlsx.error) throw new Error(`Falha no upload da planilha: ${upXlsx.error.message}`);
 
     await supabase
       .from("relatorios_canhotos_diarios")
       .update({
-        total_entregas: linhas.length,
-        total_com_canhoto: comFoto.length,
-        total_sem_canhoto: semFoto.length,
-        pdf_path: pdfPath,
-        zip_path: zipPath,
-        xlsx_path: xlsxPath,
-        pdf_bytes: pdfBytes.length,
-        zip_bytes: zipBytes.length,
-        xlsx_bytes: xlsxBytes.length,
         status: "concluido",
-        erro: falhasImagem.length ? `Imagens não lidas: ${falhasImagem.join(", ")}` : null,
+        xlsx_path: p.xlsx,
+        xlsx_bytes: xlsxBytes.length,
+        zip_path: zipPartes[0] ?? null,
+        zip_partes: zipPartes,
+        total_entregas: itens.length + semFoto.length,
+        total_com_canhoto: itens.length,
+        total_sem_canhoto: semFoto.length,
         gerado_em: new Date().toISOString(),
+        itens: null,
       })
       .eq("data_referencia", dia);
 
-    // ---------- E-mail ----------
     let email: any = { enviado: false, motivo: "envio desativado na chamada" };
     if (enviarEmail) {
       email = await enviarResumo(supabase, dia, {
-        total: linhas.length,
-        comFoto: comFoto.length,
+        total: itens.length + semFoto.length,
+        comFoto: itens.length,
         semFoto: semFoto.length,
-        pdfPath,
-        zipPath,
-        xlsxPath,
+        pdfPath: p.pdf,
+        xlsxPath: p.xlsx,
+        zipPartes,
       });
     }
 
     return json({
       ok: true,
       dia,
-      total_entregas: linhas.length,
-      total_com_canhoto: comFoto.length,
+      concluido: true,
+      total_entregas: itens.length + semFoto.length,
+      total_com_canhoto: itens.length,
       total_sem_canhoto: semFoto.length,
-      paginas_pdf: paginas,
-      arquivos: { pdf: pdfPath, zip: zipPath, xlsx: xlsxPath },
-      tamanhos_kb: {
-        pdf: Math.round(pdfBytes.length / 1024),
-        zip: Math.round(zipBytes.length / 1024),
-        xlsx: Math.round(xlsxBytes.length / 1024),
-      },
-      falhas_imagem: falhasImagem,
+      arquivos: { pdf: p.pdf, xlsx: p.xlsx, zip_partes: zipPartes },
       email,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error("relatorio-canhotos-diario", msg);
     await supabase
       .from("relatorios_canhotos_diarios")
-      .upsert({ data_referencia: dia, status: "erro", erro: msg }, { onConflict: "data_referencia" });
-    console.error("relatorio-canhotos-diario", msg);
+      .update({ status: "erro", erro: msg })
+      .eq("data_referencia", dia);
     return json({ ok: false, dia, error: msg }, 500);
   }
 });
@@ -358,7 +417,7 @@ Deno.serve(async (req) => {
 async function enviarResumo(
   supabase: any,
   dia: string,
-  info: { total: number; comFoto: number; semFoto: number; pdfPath: string; zipPath: string; xlsxPath: string },
+  info: { total: number; comFoto: number; semFoto: number; pdfPath: string; xlsxPath: string; zipPartes: string[] },
 ) {
   const { data: destinatarios } = await supabase
     .from("relatorios_canhotos_destinatarios")
@@ -367,11 +426,14 @@ async function enviarResumo(
   const emails: string[] = (destinatarios ?? []).map((d: any) => d.email);
   if (!emails.length) return { enviado: false, motivo: "nenhum destinatário ativo" };
 
-  const links: Record<string, string> = {};
-  for (const [chave, path] of Object.entries({ pdf: info.pdfPath, zip: info.zipPath, xlsx: info.xlsxPath })) {
+  async function assinar(path: string) {
     const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_TTL);
-    if (data?.signedUrl) links[chave] = data.signedUrl;
+    return data?.signedUrl ?? "";
   }
+  const linkPdf = await assinar(info.pdfPath);
+  const linkXlsx = await assinar(info.xlsxPath);
+  const linksZip: string[] = [];
+  for (const z of info.zipPartes) linksZip.push(await assinar(z));
 
   const cobertura = info.total ? Math.round((info.comFoto / info.total) * 1000) / 10 : 0;
   const erros: string[] = [];
@@ -389,9 +451,9 @@ async function enviarResumo(
           comCanhoto: info.comFoto,
           semCanhoto: info.semFoto,
           cobertura,
-          linkPdf: links.pdf ?? "",
-          linkZip: links.zip ?? "",
-          linkXlsx: links.xlsx ?? "",
+          linkPdf,
+          linkXlsx,
+          linksZip,
         },
       },
     });
