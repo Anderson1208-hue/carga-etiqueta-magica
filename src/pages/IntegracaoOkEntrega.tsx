@@ -4,6 +4,7 @@ import { Navigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAuth } from "@/hooks/useAuth";
+import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +86,7 @@ Orkestria Logística`;
 
 export default function IntegracaoOkEntrega() {
   const { isAdmin, isLoading } = useAuth();
+  const { podeVerOkEntrega } = useAcessoOkEntrega();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
   const [dryRunJson, setDryRunJson] = useState<string>("");
@@ -602,7 +604,7 @@ export default function IntegracaoOkEntrega() {
       </MainLayout>
     );
   }
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!podeVerOkEntrega) return <Navigate to="/" replace />;
 
   return (
     <MainLayout>
@@ -655,9 +657,9 @@ export default function IntegracaoOkEntrega() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="envio">Envio e configuração</TabsTrigger>
+            {isAdmin && <TabsTrigger value="envio">Envio e configuração</TabsTrigger>}
             <TabsTrigger value="fila">Acompanhamento de NFs</TabsTrigger>
-            <TabsTrigger value="teste">Teste / JSON</TabsTrigger>
+            {isAdmin && <TabsTrigger value="teste">Teste / JSON</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="envio" className="space-y-4">

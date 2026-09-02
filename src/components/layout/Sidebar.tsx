@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
+import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 
 import {
   Truck,
@@ -168,6 +169,7 @@ export function Sidebar() {
   const { profile, signOut, isAdmin } = useAuth();
   const { podeGestaoComercial } = useGestaoComercial();
   const { podeVerIbac } = useAcessoIbac();
+  const { podeVerOkEntrega } = useAcessoOkEntrega();
 
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
@@ -247,6 +249,12 @@ export function Sidebar() {
                 isActive={location.pathname === "/integracoes/ibac"}
               />
             )}
+            {podeVerOkEntrega && (
+              <NavItem
+                item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
+                isActive={location.pathname === "/integracoes/okentrega"}
+              />
+            )}
             {isAdmin && (
               <>
                 <NavItem
@@ -258,10 +266,7 @@ export function Sidebar() {
                   isActive={location.pathname === "/auditoria"}
                 />
 
-                <NavItem
-                  item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
-                  isActive={location.pathname === "/integracoes/okentrega"}
-                />
+
 
                 <NavItem
                   item={{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }}
