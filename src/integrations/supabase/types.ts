@@ -3109,6 +3109,93 @@ export type Database = {
         }
         Relationships: []
       }
+      relatorios_canhotos_destinatarios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          email: string
+          id: string
+          nome: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          nome?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          nome?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      relatorios_canhotos_diarios: {
+        Row: {
+          created_at: string
+          data_referencia: string
+          enviado_em: string | null
+          erro: string | null
+          gerado_em: string | null
+          id: string
+          pdf_bytes: number | null
+          pdf_path: string | null
+          status: string
+          total_com_canhoto: number
+          total_entregas: number
+          total_sem_canhoto: number
+          updated_at: string
+          xlsx_bytes: number | null
+          xlsx_path: string | null
+          zip_bytes: number | null
+          zip_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_referencia: string
+          enviado_em?: string | null
+          erro?: string | null
+          gerado_em?: string | null
+          id?: string
+          pdf_bytes?: number | null
+          pdf_path?: string | null
+          status?: string
+          total_com_canhoto?: number
+          total_entregas?: number
+          total_sem_canhoto?: number
+          updated_at?: string
+          xlsx_bytes?: number | null
+          xlsx_path?: string | null
+          zip_bytes?: number | null
+          zip_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_referencia?: string
+          enviado_em?: string | null
+          erro?: string | null
+          gerado_em?: string | null
+          id?: string
+          pdf_bytes?: number | null
+          pdf_path?: string | null
+          status?: string
+          total_com_canhoto?: number
+          total_entregas?: number
+          total_sem_canhoto?: number
+          updated_at?: string
+          xlsx_bytes?: number | null
+          xlsx_path?: string | null
+          zip_bytes?: number | null
+          zip_path?: string | null
+        }
+        Relationships: []
+      }
       roteirizacao_paradas: {
         Row: {
           cnpj_destinatario: string
