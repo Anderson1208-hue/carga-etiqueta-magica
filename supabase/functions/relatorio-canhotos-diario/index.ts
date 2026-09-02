@@ -16,7 +16,7 @@
 //   { data: "2026-09-01", dry_run: true, enviar_email: false, forcar: true, encadear: false }
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1?target=deno";
-import { zipSync, unzipSync } from "https://esm.sh/fflate@0.8.2";
+import { zipSync } from "https://esm.sh/fflate@0.8.2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
@@ -30,10 +30,10 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BUCKET = "relatorios-canhotos";
 const BUCKET_FOTOS = "comprovantes";
 const PAGINA = 500; // paginação determinística na leitura das baixas
-const LOTE = 2; // canhotos por invocação (decode+resize é caro em CPU)
-const VOLUME = 50; // canhotos por arquivo (PDF e ZIP)
+const LOTE = 1; // canhotos por invocação (decode+resize é caro em CPU/memória)
+const VOLUME = 10; // canhotos por arquivo (PDF e ZIP) — mantém o append leve
 const SIGNED_TTL = 60 * 60 * 24 * 90; // 90 dias
-const LARGURA_IMG = 1200; // px — mesma imagem serve ao PDF e ao ZIP
+const LARGURA_IMG = 1000;
 const QUALIDADE_IMG = 70;
 
 function json(body: unknown, status = 200) {
@@ -153,8 +153,24 @@ function caminhos(dia: string) {
     xlsx: `${pasta}/sem-canhoto-${dia}.xlsx`,
     pdfVol: (n: number) => `${pasta}/canhotos-${dia}-parte-${suf(n)}.pdf`,
     zipVol: (n: number) => `${pasta}/canhotos-imagens-${dia}-parte-${suf(n)}.zip`,
+    tmp: (i: number) => `${pasta}/_tmp/${String(i).padStart(5, "0")}.jpg`,
   };
 }
+
+/**
+ * Continua a rotina em nova invocação (cada rodada tem CPU limitada).
+ * O agendamento sai pelo pg_net (RPC no banco) ANTES do trabalho pesado: um
+ * setTimeout morreria junto com o worker quando o limite de CPU é atingido em
+ * fotos de 8 MB. O progresso é gravado por valor absoluto, então uma eventual
+ * sobreposição de rodadas não pula item.
+ */
+async function reinvocar(supabase: any, dia: string, enviarEmail: boolean) {
+  const { error } = await supabase.rpc("fn_relatorio_canhotos_kick", { p_dia: dia, p_email: enviarEmail });
+  if (error) console.error("auto-encadeamento falhou", error.message);
+}
+
+
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -236,49 +252,91 @@ Deno.serve(async (req) => {
         },
         { onConflict: "data_referencia" },
       );
+      // a leitura das baixas já consome boa parte do orçamento de CPU:
+      // o processamento das imagens começa na próxima invocação
+      if (encadear) await reinvocar(supabase, dia, enviarEmail);
+      return json({
+        ok: true,
+        dia,
+        fase: "preparo",
+        total_entregas: itens.length + semFoto.length,
+        total_com_canhoto: itens.length,
+        total_sem_canhoto: semFoto.length,
+        encadeado: encadear,
+      });
     }
 
-    const lote = itens.slice(offset, offset + LOTE);
-    const falhas: string[] = [];
 
-    if (lote.length) {
-      const volume = Math.floor(offset / VOLUME) + 1;
-      const inicioVolume = (volume - 1) * VOLUME;
-      const pdfPath = p.pdfVol(volume);
-      const zipPath = p.zipVol(volume);
-      const continuandoVolume = offset > inicioVolume;
-
-      const pdfAnterior = continuandoVolume ? await baixarStorage(supabase, BUCKET, pdfPath) : null;
-      const pdfDoc = pdfAnterior ? await PDFDocument.load(pdfAnterior) : await PDFDocument.create();
-      const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const fonteBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-      const arquivosZip: Record<string, Uint8Array> = {};
-      if (continuandoVolume) {
-        const zipAnterior = await baixarStorage(supabase, BUCKET, zipPath);
-        if (zipAnterior) {
-          const conteudo = unzipSync(zipAnterior);
-          for (const [nome, dados] of Object.entries(conteudo)) arquivosZip[nome] = dados as Uint8Array;
+    // ---------- FASE A: preparar 1 imagem por invocação ----------
+    // Redimensionar (imagescript, JS puro) consome quase todo o orçamento de CPU
+    // da invocação: nada de montar PDF/ZIP na mesma rodada.
+    if (offset < itens.length) {
+      if (encadear) await reinvocar(supabase, dia, enviarEmail);
+      const l = itens[offset];
+      let falha: string | null = null;
+      const original = await baixarStorage(supabase, BUCKET_FOTOS, l.path!);
+      if (!original) {
+        falha = l.numero_nf;
+      } else {
+        try {
+          const img = await jpegReduzido(original);
+          const up = await supabase.storage
+            .from(BUCKET)
+            .upload(p.tmp(offset), img.jpeg, { contentType: "image/jpeg", upsert: true });
+          if (up.error) throw new Error(up.error.message);
+        } catch (e) {
+          console.error("falha ao preparar imagem", l.numero_nf, e);
+          falha = l.numero_nf;
         }
       }
 
-      for (const l of lote) {
-        const original = await baixarStorage(supabase, BUCKET_FOTOS, l.path!);
-        if (!original) {
-          falhas.push(l.numero_nf);
-          continue;
-        }
-        let img: { jpeg: Uint8Array; largura: number; altura: number };
-        try {
-          img = await jpegReduzido(original);
-        } catch {
-          falhas.push(l.numero_nf);
-          continue;
-        }
+      offset += 1;
+      const erroAcum = [atual?.erro, falha ? `Imagem nao lida: ${falha}` : null].filter(Boolean).join(" | ") || null;
+      await supabase
+        .from("relatorios_canhotos_diarios")
+        .update({ progresso_offset: offset, erro: erroAcum })
+        .eq("data_referencia", dia);
 
-        arquivosZip[`NF_${sanitizar(l.numero_nf)}_${sanitizar(l.placa || "SEMPLACA")}.jpg`] = img.jpeg;
+      return json({
+        ok: true,
+        dia,
+        fase: "imagens",
+        processados: offset,
 
-        const embed = await pdfDoc.embedJpg(img.jpeg);
+        total: itens.length,
+        restam: itens.length - offset,
+        encadeado: encadear,
+      });
+    }
+
+    // ---------- FASE B: montar 1 volume (PDF + ZIP) por invocação ----------
+    const totalVolumes = Math.ceil(itens.length / VOLUME);
+    if (partes.length < totalVolumes) {
+      if (encadear) await reinvocar(supabase, dia, enviarEmail);
+      const volume = partes.length + 1;
+
+      const inicio = (volume - 1) * VOLUME;
+      const doVolume = itens.slice(inicio, inicio + VOLUME);
+      const pdfPath = p.pdfVol(volume);
+      const zipPath = p.zipVol(volume);
+
+      const pdfDoc = await PDFDocument.create();
+      const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fonteBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const arquivosZip: Record<string, Uint8Array> = {};
+      const usados = new Set<string>();
+
+      for (let i = 0; i < doVolume.length; i++) {
+        const l = doVolume[i];
+        const jpeg = await baixarStorage(supabase, BUCKET, p.tmp(inicio + i));
+        if (!jpeg) continue;
+
+        let nome = `NF_${sanitizar(l.numero_nf)}_${sanitizar(l.placa || "SEMPLACA")}.jpg`;
+        if (usados.has(nome)) nome = nome.replace(/\.jpg$/, `_${inicio + i}.jpg`);
+        usados.add(nome);
+        arquivosZip[nome] = jpeg;
+
+        const embed = await pdfDoc.embedJpg(jpeg);
         const page = pdfDoc.addPage([595, 842]); // A4 em pontos
         page.drawText(winAnsi(`NF ${l.numero_nf}`), { x: 34, y: 800, size: 14, font: fonteBold });
         const cab = [
@@ -287,8 +345,8 @@ Deno.serve(async (req) => {
           `Placa: ${l.placa || "-"}   Motorista: ${l.motorista || "-"}`,
           `Baixa: ${dataHoraBr(l.registrado_em)}   Recebedor: ${l.recebedor_nome || "-"}`,
         ];
-        cab.forEach((t, i) =>
-          page.drawText(winAnsi(t).slice(0, 105), { x: 34, y: 782 - i * 13, size: 9, font: fonte }),
+        cab.forEach((t, i2) =>
+          page.drawText(winAnsi(t).slice(0, 105), { x: 34, y: 782 - i2 * 13, size: 9, font: fonte }),
         );
         page.drawLine({
           start: { x: 34, y: 722 },
@@ -298,9 +356,9 @@ Deno.serve(async (req) => {
         });
         const maxW = 527;
         const maxH = 660;
-        const escala = Math.min(maxW / img.largura, maxH / img.altura);
-        const w = img.largura * escala;
-        const h = img.altura * escala;
+        const escala = Math.min(maxW / embed.width, maxH / embed.height);
+        const w = embed.width * escala;
+        const h = embed.height * escala;
         page.drawImage(embed, { x: 34 + (maxW - w) / 2, y: 706 - h, width: w, height: h });
       }
 
@@ -316,37 +374,29 @@ Deno.serve(async (req) => {
         .upload(zipPath, zipBytes, { contentType: "application/zip", upsert: true });
       if (upZip.error) throw new Error(`Falha no upload do ZIP: ${upZip.error.message}`);
 
+      // as fotos originais permanecem intactas no bucket de comprovantes;
+      // aqui só saem os arquivos temporários de trabalho já embutidos no volume
+      await supabase.storage
+        .from(BUCKET)
+        .remove(doVolume.map((_, i) => p.tmp(inicio + i)));
+
       if (!partes.some((x) => x.volume === volume)) partes = [...partes, { volume, pdf: pdfPath, zip: zipPath }];
-      offset += lote.length;
-
-      const erroAcum = [atual?.erro, falhas.length ? `Imagens nao lidas: ${falhas.join(", ")}` : null]
-        .filter(Boolean)
-        .join(" | ") || null;
-
       await supabase
         .from("relatorios_canhotos_diarios")
-        .update({
-          progresso_offset: offset,
-          zip_partes: partes,
-          pdf_path: partes[0]?.pdf ?? null,
-          zip_path: partes[0]?.zip ?? null,
-          erro: erroAcum,
-        })
+        .update({ zip_partes: partes, pdf_path: partes[0]?.pdf ?? null, zip_path: partes[0]?.zip ?? null })
         .eq("data_referencia", dia);
+
+
+      return json({
+        ok: true,
+        dia,
+        fase: "volumes",
+        volume,
+        total_volumes: totalVolumes,
+        encadeado: encadear,
+      });
     }
 
-    const restam = Math.max(0, itens.length - offset);
-
-    if (restam > 0) {
-      if (encadear) {
-        setTimeout(() => {
-          supabase.functions
-            .invoke("relatorio-canhotos-diario", { body: { data: dia, enviar_email: enviarEmail } })
-            .catch((e: unknown) => console.error("auto-encadeamento falhou", e));
-        }, 1000);
-      }
-      return json({ ok: true, dia, processados: offset, total: itens.length, restam, encadeado: encadear });
-    }
 
     // ---------- finalização: planilha de pendências ----------
     const planilha = semFoto.map((l) => ({
