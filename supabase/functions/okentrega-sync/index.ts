@@ -221,6 +221,23 @@ Deno.serve(async (req) => {
   if (errSelect) return json({ error: errSelect.message }, 500);
 
   let pendentes = pendentesRaw ?? [];
+
+  // Bloqueio manual (NF digitada direto no portal do cliente): nunca transmitir,
+  // mesmo se por algum caminho tiver entrado na fila.
+  const blocklist = ((cfg?.blocklist_nfs ?? []) as string[])
+    .map((v) => String(v).replace(/\D/g, ""))
+    .filter(Boolean);
+  let bloqueadas = 0;
+  if (blocklist.length > 0) {
+    const antes = pendentes.length;
+    pendentes = pendentes.filter(
+      (i) =>
+        !blocklist.includes(String(i.numero_nf ?? "").replace(/\D/g, "")) &&
+        !blocklist.includes(String(i.chave_acesso ?? "").replace(/\D/g, "")),
+    );
+    bloqueadas = antes - pendentes.length;
+  }
+
   let foraDaWhitelist = 0;
   if (whitelist.length > 0 && !opts.queue_id) {
     const antes = pendentes.length;
@@ -230,6 +247,7 @@ Deno.serve(async (req) => {
     foraDaWhitelist = antes - pendentes.length;
     pendentes = pendentes.slice(0, BATCH_SIZE);
   }
+
 
   if (!envioAtivo && !dryRun) {
     return json({
@@ -422,7 +440,34 @@ Deno.serve(async (req) => {
     resultados.push({ id: item.id, sucesso, status_baixa: statusBaixa });
   }
 
+  // Encadeamento controlado: processa 1 canhoto por execução (limite de memória),
+  // então chama a si mesmo enquanto houver pendência, com teto de saltos e cooldown.
+  let restantesFila = 0;
+  const depth = Number((opts as any).depth ?? 0);
+  if (!dryRun && !opts.queue_id) {
+    const { count } = await supabase
+      .from("okentrega_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+    restantesFila = count ?? 0;
+    if (restantesFila > 0 && resultados.length > 0 && depth < 60) {
+      const proximo = async () => {
+        await new Promise((r) => setTimeout(r, 3000));
+        await fetch(`${SUPABASE_URL}/functions/v1/okentrega-sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+          body: JSON.stringify({ depth: depth + 1 }),
+        }).catch(() => {});
+      };
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(proximo());
+      else void proximo();
+    }
+  }
+
   return json({
+
     status: dryRun ? "dry_run" : "ok",
     ambiente,
     endpoint,
@@ -430,7 +475,9 @@ Deno.serve(async (req) => {
     sucessos: resultados.filter((r) => r.sucesso).length,
     falhas: resultados.filter((r) => !r.sucesso).length,
     fora_da_whitelist: foraDaWhitelist,
-    restantes: Math.max(0, (pendentesRaw?.length ?? 0) - resultados.length - foraDaWhitelist),
+    bloqueadas_manualmente: bloqueadas,
+
+    restantes: restantesFila,
     modo_imagem: modoImagem,
     resultados,
     ...(dryRun ? { amostras } : {}),

@@ -2422,6 +2422,7 @@ export type Database = {
       okentrega_config: {
         Row: {
           ambiente: string
+          blocklist_nfs: string[]
           cnpj_transportadora: string | null
           cnpjs_emitente: string[]
           created_at: string
@@ -2436,6 +2437,7 @@ export type Database = {
         }
         Insert: {
           ambiente?: string
+          blocklist_nfs?: string[]
           cnpj_transportadora?: string | null
           cnpjs_emitente?: string[]
           created_at?: string
@@ -2450,6 +2452,7 @@ export type Database = {
         }
         Update: {
           ambiente?: string
+          blocklist_nfs?: string[]
           cnpj_transportadora?: string | null
           cnpjs_emitente?: string[]
           created_at?: string
