@@ -107,8 +107,14 @@ Deno.serve(async (req) => {
   const { data: jaNaFila } = await supabase
     .from("okentrega_queue")
     .select("baixa_id")
-    .in("status", ["pendente", "enviado"]);
+    .in("status", ["pendente", "enviado", "bloqueado"]);
   const naFila = new Set((jaNaFila ?? []).map((r) => r.baixa_id).filter(Boolean));
+
+  // Bloqueio manual: NFs digitadas direto no portal do cliente nunca podem
+  // entrar na fila (evita duplicidade 1005 / HTTP 409 na OK Entrega).
+  const blocklist = new Set(
+    ((cfg?.blocklist_nfs ?? []) as string[]).map((v) => String(v).replace(/\D/g, "")).filter(Boolean),
+  );
 
   const elegiveis = (baixas ?? [])
     .filter((b) => {
@@ -117,12 +123,34 @@ Deno.serve(async (req) => {
       if (!nf) return false;
       // chave da DANFE com 44 dígitos é obrigatória
       if (String(nf.chave_acesso ?? "").replace(/\D/g, "").length !== 44) return false;
+      if (
+        blocklist.has(String(nf.numero_nf ?? "").replace(/\D/g, "")) ||
+        blocklist.has(String(nf.chave_acesso ?? "").replace(/\D/g, ""))
+      ) {
+        return false;
+      }
       // Amarração por CNPJ do emitente é obrigatória mesmo em teste dirigido:
       // um canal por embarcador (Pandurata só recebe NF da Pandurata).
       const cnpj = String(nf.cnpj_emitente ?? "").replace(/\D/g, "");
       return prefixos.some((p: string) => cnpj.startsWith(p));
     })
     .slice(0, BATCH_SIZE);
+
+  // Teste sem gravar nada: devolve quem entraria na fila.
+  if (dryRun) {
+    return json({
+      status: "dry_run",
+      ambiente,
+      candidatos: elegiveis.length,
+      bloqueadas: blocklist.size,
+      nfs: elegiveis.map((b) => ({
+        numero_nf: (b as any).notas_fiscais?.numero_nf,
+        placa: (b as any).veiculos?.placa,
+        registrado_em: b.registrado_em,
+      })),
+    });
+  }
+
 
   let enfileirados = 0;
   const erros: Array<{ baixa_id: string; erro: string }> = [];
