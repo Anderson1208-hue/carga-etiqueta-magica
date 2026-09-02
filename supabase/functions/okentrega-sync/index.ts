@@ -440,7 +440,34 @@ Deno.serve(async (req) => {
     resultados.push({ id: item.id, sucesso, status_baixa: statusBaixa });
   }
 
+  // Encadeamento controlado: processa 1 canhoto por execução (limite de memória),
+  // então chama a si mesmo enquanto houver pendência, com teto de saltos e cooldown.
+  let restantesFila = 0;
+  const depth = Number((opts as any).depth ?? 0);
+  if (!dryRun && !opts.queue_id) {
+    const { count } = await supabase
+      .from("okentrega_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pendente")
+      .lt("tentativas", maxTentativas);
+    restantesFila = count ?? 0;
+    if (restantesFila > 0 && resultados.length > 0 && depth < 60) {
+      const proximo = async () => {
+        await new Promise((r) => setTimeout(r, 3000));
+        await fetch(`${SUPABASE_URL}/functions/v1/okentrega-sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_ROLE}` },
+          body: JSON.stringify({ depth: depth + 1 }),
+        }).catch(() => {});
+      };
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(proximo());
+      else void proximo();
+    }
+  }
+
   return json({
+
     status: dryRun ? "dry_run" : "ok",
     ambiente,
     endpoint,
