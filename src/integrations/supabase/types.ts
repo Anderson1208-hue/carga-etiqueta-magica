@@ -3850,6 +3850,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      fn_relatorio_canhotos_kick: {
+        Args: { p_dia: string; p_email?: boolean }
+        Returns: undefined
+      }
       gerar_sugestoes_dwell_factual: {
         Args: never
         Returns: {
