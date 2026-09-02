@@ -448,6 +448,8 @@ Deno.serve(async (req) => {
     sucessos: resultados.filter((r) => r.sucesso).length,
     falhas: resultados.filter((r) => !r.sucesso).length,
     fora_da_whitelist: foraDaWhitelist,
+    bloqueadas_manualmente: bloqueadas,
+
     restantes: Math.max(0, (pendentesRaw?.length ?? 0) - resultados.length - foraDaWhitelist),
     modo_imagem: modoImagem,
     resultados,
