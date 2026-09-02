@@ -3144,8 +3144,10 @@ export type Database = {
           erro: string | null
           gerado_em: string | null
           id: string
+          itens: Json | null
           pdf_bytes: number | null
           pdf_path: string | null
+          progresso_offset: number
           status: string
           total_com_canhoto: number
           total_entregas: number
@@ -3154,6 +3156,7 @@ export type Database = {
           xlsx_bytes: number | null
           xlsx_path: string | null
           zip_bytes: number | null
+          zip_partes: Json
           zip_path: string | null
         }
         Insert: {
@@ -3163,8 +3166,10 @@ export type Database = {
           erro?: string | null
           gerado_em?: string | null
           id?: string
+          itens?: Json | null
           pdf_bytes?: number | null
           pdf_path?: string | null
+          progresso_offset?: number
           status?: string
           total_com_canhoto?: number
           total_entregas?: number
@@ -3173,6 +3178,7 @@ export type Database = {
           xlsx_bytes?: number | null
           xlsx_path?: string | null
           zip_bytes?: number | null
+          zip_partes?: Json
           zip_path?: string | null
         }
         Update: {
@@ -3182,8 +3188,10 @@ export type Database = {
           erro?: string | null
           gerado_em?: string | null
           id?: string
+          itens?: Json | null
           pdf_bytes?: number | null
           pdf_path?: string | null
+          progresso_offset?: number
           status?: string
           total_com_canhoto?: number
           total_entregas?: number
@@ -3192,6 +3200,7 @@ export type Database = {
           xlsx_bytes?: number | null
           xlsx_path?: string | null
           zip_bytes?: number | null
+          zip_partes?: Json
           zip_path?: string | null
         }
         Relationships: []
