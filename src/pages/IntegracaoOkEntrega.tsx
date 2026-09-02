@@ -604,7 +604,7 @@ export default function IntegracaoOkEntrega() {
       </MainLayout>
     );
   }
-  if (!isAdmin) return <Navigate to="/" replace />;
+  if (!podeVerOkEntrega) return <Navigate to="/" replace />;
 
   return (
     <MainLayout>
