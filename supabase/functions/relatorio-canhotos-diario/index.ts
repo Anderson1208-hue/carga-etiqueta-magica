@@ -196,6 +196,42 @@ Deno.serve(async (req) => {
       .eq("data_referencia", dia)
       .maybeSingle();
 
+    // ---------- amostra: 1 página só para conferência visual ----------
+    // Usa uma imagem já preparada em _tmp (não relê baixas, não altera estado).
+    if (body?.amostra === true) {
+      const guardadas: Linha[] = ((atual?.itens as any)?.com_foto ?? []) as Linha[];
+      const idx = Number.isInteger(body?.indice) ? body.indice : 0;
+      const l = guardadas[idx];
+      if (!l) return json({ ok: false, error: "sem itens preparados para amostra" }, 400);
+      const jpeg = await baixarStorage(supabase, BUCKET, p.tmp(idx));
+      if (!jpeg) return json({ ok: false, error: `imagem temporaria ${idx} indisponivel` }, 404);
+
+      const pdfDoc = await PDFDocument.create();
+      const fonte = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fonteBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const embed = await pdfDoc.embedJpg(jpeg);
+      const page = pdfDoc.addPage([595, 842]);
+      page.drawText(winAnsi(`NF ${l.numero_nf}`), { x: 34, y: 800, size: 14, font: fonteBold });
+      [
+        `Destinatario: ${l.dest || "-"}`,
+        `Cidade: ${l.cidade || "-"}/${l.uf || "-"}   Emitente: ${l.emitente || "-"}`,
+        `Placa: ${l.placa || "-"}   Motorista: ${l.motorista || "-"}`,
+        `Baixa: ${dataHoraBr(l.registrado_em)}   Recebedor: ${l.recebedor_nome || "-"}`,
+      ].forEach((t, i2) => page.drawText(winAnsi(t).slice(0, 105), { x: 34, y: 782 - i2 * 13, size: 9, font: fonte }));
+      page.drawLine({ start: { x: 34, y: 722 }, end: { x: 561, y: 722 }, thickness: 0.6, color: rgb(0.75, 0.75, 0.75) });
+      const escala = Math.min(527 / embed.width, 660 / embed.height);
+      const w = embed.width * escala;
+      const h = embed.height * escala;
+      page.drawImage(embed, { x: 34 + (527 - w) / 2, y: 706 - h, width: w, height: h });
+
+      const bytes = await pdfDoc.save({ useObjectStreams: false });
+      const path = `${p.pasta}/_amostra/amostra-${dia}-${idx}.pdf`;
+      const up = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
+      if (up.error) throw new Error(up.error.message);
+      const { data: assinado } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_TTL);
+      return json({ ok: true, amostra: true, dia, indice: idx, nf: l.numero_nf, bytes: bytes.length, url: assinado?.signedUrl ?? null });
+    }
+
     if (dryRun) {
       const linhas = await buscarBaixas(supabase, dia);
       const com = linhas.filter((l) => !!l.path);
