@@ -9,21 +9,41 @@ export const OKE_DPI = 150;
 
 export type ModoImagem = "recibo" | "contain" | "stretch" | "cover";
 
-// Fallback da faixa do recibo quando a detecção automática não acha conteúdo:
-// centro vertical em 24% da altura e faixa de 22% da altura.
-const RECIBO_OFFSET_Y = 0.24;
-const RECIBO_ALTURA = 0.22;
+// Altura da tira do recibo em relação à folha (canhoto da DANFE ~ 15%; usamos
+// 24% para garantir cabeçalho "RECEBEMOS DE", data, nome e assinatura).
+const TIRA_FRACAO = 0.24;
+
+export class CanhotoIlegivelError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "CanhotoIlegivelError";
+  }
+}
+
+type Recipe = { x: number; y: number; w: number; h: number; rot: number };
 
 /**
- * Detecta a área útil do canhoto (papel + tinta) na foto.
- * A faixa fixa falhava quando o motorista fotografa o recibo de lado, torto ou
- * ocupando apenas um canto: a OK Entrega recebia 1536x240 quase em branco.
+ * Localiza a FOLHA (papel) na foto e devolve o recorte da tira do recibo.
+ *
+ * Por que mudou: a heurística anterior pegava o "maior bloco conectado de tinta",
+ * que em fotos tiradas sobre mesa de escritório ancorava em teclado, mouse ou
+ * embalagem de resma (muito mais contraste que o canhoto). A OK Entrega recebia
+ * uma faixa que não era o canhoto e recusava por ilegibilidade.
+ *
+ * Estratégia atual:
+ *  1) maior região CLARA conectada = folha (descarta mesa, teclado, resma, chão);
+ *  2) eixo longo da folha define os dois extremos candidatos (a DANFE é retrato e
+ *     o canhoto é uma tira em uma das pontas);
+ *  3) escolhe a ponta com MENOS tinta que ainda tenha linhas de texto — o corpo
+ *     da DANFE (tabelas) é sempre muito mais denso que o recibo. Isso resolve
+ *     também o giro de 180°;
+ *  4) valida a tira (densidade de tinta + linhas de texto). Sem validação, faixa
+ *     branca ou objeto errado era enviado como se fosse comprovante.
  */
-function detectarRecorte(src: Image): { x: number; y: number; w: number; h: number; rot: number } | null {
-  const ALVO = OKE_LARGURA / OKE_ALTURA; // 6.4
-  const escala = Math.max(1, Math.round(Math.max(src.width, src.height) / 320));
-  const w = Math.max(16, Math.floor(src.width / escala));
-  const h = Math.max(16, Math.floor(src.height / escala));
+function detectarRecorte(src: Image): Recipe {
+  const escala = Math.max(1, Math.round(Math.max(src.width, src.height) / 360));
+  const w = Math.max(24, Math.floor(src.width / escala));
+  const h = Math.max(24, Math.floor(src.height / escala));
   const small = src.clone().resize(w, h);
   const px = small.bitmap; // RGBA
 
@@ -32,190 +52,292 @@ function detectarRecorte(src: Image): { x: number; y: number; w: number; h: numb
     lum[i] = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
   }
 
-  // 1) papel = região clara (descarta fundo escuro, sombra, roupa do motorista)
+  // ---- 1) folha = maior componente conectado de pixels claros
   const ord = Float32Array.from(lum).sort();
-  const claro = ord[Math.floor(ord.length * 0.95)] || 255;
-  const limPapel = claro * 0.7;
+  const claro = ord[Math.floor(ord.length * 0.97)] || 255;
+  const limPapel = Math.max(70, claro * 0.72);
 
-  let x0 = w, x1 = -1, y0 = h, y1 = -1;
-  for (let y = 0; y < h; y++) {
-    let cnt = 0;
-    for (let x = 0; x < w; x++) if (lum[y * w + x] > limPapel) cnt++;
-    if (cnt > w * 0.05) { if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  }
-  for (let x = 0; x < w; x++) {
-    let cnt = 0;
-    for (let y = 0; y < h; y++) if (lum[y * w + x] > limPapel) cnt++;
-    if (cnt > h * 0.05) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
-  }
-  if (x1 <= x0 || y1 <= y0) return null;
-
-  // 2) tinta = pixel bem mais escuro que a média LOCAL do papel (elimina sombra
-  // e degradê da folha) e que tenha papel claro na vizinhança (elimina roupa,
-  // chão e fundo escuro da foto).
-  const media = new Float32Array(w * h); // média local (janela 25) via duas passadas
-  const tmp = new Float32Array(w * h);
-  const RM = 12;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let s = 0, c = 0;
-      for (let k = -RM; k <= RM; k++) {
-        const xx = x + k;
-        if (xx < 0 || xx >= w) continue;
-        s += lum[y * w + xx]; c++;
-      }
-      tmp[y * w + x] = s / c;
-    }
-  }
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      let s = 0, c = 0;
-      for (let k = -RM; k <= RM; k++) {
-        const yy = y + k;
-        if (yy < 0 || yy >= h) continue;
-        s += tmp[yy * w + x]; c++;
-      }
-      media[y * w + x] = s / c;
-    }
-  }
-
-  // máximo local (janela 7) separável: existe papel claro por perto?
-  const R = 3;
-  const maxH = new Float32Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let m = 0;
-      for (let k = -R; k <= R; k++) {
-        const xx = x + k;
-        if (xx < 0 || xx >= w) continue;
-        const v = lum[y * w + xx];
-        if (v > m) m = v;
-      }
-      maxH[y * w + x] = m;
-    }
-  }
-  const vizinho = new Float32Array(w * h);
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      let m = 0;
-      for (let k = -R; k <= R; k++) {
-        const yy = y + k;
-        if (yy < 0 || yy >= h) continue;
-        const v = maxH[yy * w + x];
-        if (v > m) m = v;
-      }
-      vizinho[y * w + x] = m;
-    }
-  }
-
-  const tinta = new Uint8Array(w * h);
-  let totalTinta = 0;
-  for (let i = 0; i < tinta.length; i++) {
-    if (lum[i] < media[i] * 0.82 && vizinho[i] > limPapel && lum[i] > claro * 0.15) {
-      tinta[i] = 1; totalTinta++;
-    }
-  }
-  if (totalTinta < 40) return null;
-
-  // 3) dilata (janela 7) e fica com o MAIOR bloco conectado: é a tira do recibo,
-  // onde estão número da NF, data, nome e assinatura.
-  const D = 3;
-  const dil = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (!tinta[y * w + x]) continue;
-      for (let dy = -D; dy <= D; dy++) {
-        const yy = y + dy;
-        if (yy < 0 || yy >= h) continue;
-        for (let dx = -D; dx <= D; dx++) {
-          const xx = x + dx;
-          if (xx < 0 || xx >= w) continue;
-          dil[yy * w + xx] = 1;
-        }
-      }
-    }
-  }
+  const papel = new Uint8Array(w * h);
+  for (let i = 0; i < lum.length; i++) if (lum[i] > limPapel) papel[i] = 1;
 
   const visto = new Uint8Array(w * h);
   const fila = new Int32Array(w * h);
-  let melhor = { peso: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
-  for (let s = 0; s < dil.length; s++) {
-    if (!dil[s] || visto[s]) continue;
+  let folha = { area: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
+  const marca = new Uint8Array(w * h); // componente vencedor
+  for (let s = 0; s < papel.length; s++) {
+    if (!papel[s] || visto[s]) continue;
     let ini = 0, fim = 0;
     fila[fim++] = s; visto[s] = 1;
-    let peso = 0, bx0 = w, bx1 = 0, by0 = h, by1 = 0;
+    let area = 0, bx0 = w, bx1 = 0, by0 = h, by1 = 0;
+    const inicio = fim - 1;
     while (ini < fim) {
       const i = fila[ini++];
       const x = i % w, y = (i - x) / w;
-      if (tinta[i]) peso++;
+      area++;
       if (x < bx0) bx0 = x; if (x > bx1) bx1 = x;
       if (y < by0) by0 = y; if (y > by1) by1 = y;
-      if (x > 0 && dil[i - 1] && !visto[i - 1]) { visto[i - 1] = 1; fila[fim++] = i - 1; }
-      if (x < w - 1 && dil[i + 1] && !visto[i + 1]) { visto[i + 1] = 1; fila[fim++] = i + 1; }
-      if (y > 0 && dil[i - w] && !visto[i - w]) { visto[i - w] = 1; fila[fim++] = i - w; }
-      if (y < h - 1 && dil[i + w] && !visto[i + w]) { visto[i + w] = 1; fila[fim++] = i + w; }
+      if (x > 0 && papel[i - 1] && !visto[i - 1]) { visto[i - 1] = 1; fila[fim++] = i - 1; }
+      if (x < w - 1 && papel[i + 1] && !visto[i + 1]) { visto[i + 1] = 1; fila[fim++] = i + 1; }
+      if (y > 0 && papel[i - w] && !visto[i - w]) { visto[i - w] = 1; fila[fim++] = i - w; }
+      if (y < h - 1 && papel[i + w] && !visto[i + w]) { visto[i + w] = 1; fila[fim++] = i + w; }
     }
-    if (peso > melhor.peso) melhor = { peso, x0: bx0, x1: bx1, y0: by0, y1: by1 };
+    if (area > folha.area) {
+      folha = { area, x0: bx0, x1: bx1, y0: by0, y1: by1 };
+      marca.fill(0);
+      for (let k = inicio; k < fim; k++) marca[fila[k]] = 1;
+    }
   }
-  if (melhor.peso < 30) return null;
 
-  let ix0 = melhor.x0, ix1 = melhor.x1, iy0 = melhor.y0, iy1 = melhor.y1;
+  const fw = folha.x1 - folha.x0 + 1;
+  const fh = folha.y1 - folha.y0 + 1;
+  if (folha.area < w * h * 0.06 || fw < 12 || fh < 12) {
+    throw new CanhotoIlegivelError("Folha do canhoto não identificada na foto.");
+  }
 
-  // margem de respiro
-  const padX = Math.round((ix1 - ix0) * 0.04) + 1;
-  const padY = Math.round((iy1 - iy0) * 0.04) + 1;
-  ix0 = Math.max(0, ix0 - padX); ix1 = Math.min(w - 1, ix1 + padX);
-  iy0 = Math.max(0, iy0 - padY); iy1 = Math.min(h - 1, iy1 + padY);
+  // ---- 2) tinta dentro da folha (contraste local, ignora sombra e degradê)
+  const tinta = new Uint8Array(w * h);
+  const RM = 10;
+  for (let y = folha.y0; y <= folha.y1; y++) {
+    for (let x = folha.x0; x <= folha.x1; x++) {
+      const i = y * w + x;
+      let s = 0, c = 0;
+      for (let k = -RM; k <= RM; k++) {
+        const xx = x + k;
+        if (xx < folha.x0 || xx > folha.x1) continue;
+        s += lum[y * w + xx]; c++;
+      }
+      const mediaLocal = s / Math.max(1, c);
+      if (lum[i] < mediaLocal * 0.86) tinta[i] = 1;
+    }
+  }
 
-  // volta à resolução original
-  let cx = (ix0 * src.width) / w;
-  let cy = (iy0 * src.height) / h;
-  let cw = ((ix1 - ix0 + 1) * src.width) / w;
-  let ch = ((iy1 - iy0 + 1) * src.height) / h;
-
-  // 3) orientação: o canhoto da DANFE é uma tira na BORDA da folha. Se a tira
-  // detectada está em pé (motorista fotografou a folha deitada), giramos para
-  // deixá-la na horizontal — sem isso a faixa 1536x240 saía quase em branco.
-  // Qual lado vira o topo: o cabeçalho impresso ("RECEBEMOS DE...") é a metade
-  // com mais tinta; ela precisa ficar em cima, senão o canhoto sai de ponta-cabeça.
-  let rot = 0;
-  if (ch > cw * 1.2) {
-    const meio = Math.round((ix0 + ix1) / 2);
-    let esq = 0, dir = 0;
-    for (let y = iy0; y <= iy1; y++) {
-      for (let x = ix0; x <= ix1; x++) {
-        if (!tinta[y * w + x]) continue;
-        if (x < meio) esq++; else dir++;
+  const densidade = (ax0: number, ax1: number, ay0: number, ay1: number) => {
+    let ink = 0, tot = 0;
+    for (let y = ay0; y <= ay1; y++) {
+      for (let x = ax0; x <= ax1; x++) {
+        if (!marca[y * w + x] && !tinta[y * w + x]) continue;
+        tot++;
+        if (tinta[y * w + x]) ink++;
       }
     }
-    rot = esq >= dir ? 270 : 90;
-  }
+    return tot > 0 ? ink / tot : 0;
+  };
 
-  // ajusta ao formato alvo (6.4:1 no eixo longo da tira) sem esmagar o conteúdo
-  const alvoLocal = rot === 0 ? ALVO : 1 / ALVO;
-  if (cw / ch < alvoLocal) {
-    const novoW = Math.min(src.width, ch * alvoLocal);
-    cx = Math.max(0, Math.min(src.width - novoW, cx - (novoW - cw) / 2));
-    cw = novoW;
+  const linhasTexto = (ax0: number, ax1: number, ay0: number, ay1: number) => {
+    let linhas = 0;
+    const larg = ax1 - ax0 + 1;
+    for (let y = ay0; y <= ay1; y++) {
+      let cnt = 0;
+      for (let x = ax0; x <= ax1; x++) if (tinta[y * w + x]) cnt++;
+      if (cnt > larg * 0.04) linhas++;
+    }
+    return linhas;
+  };
+
+  // ---- 3) eixo longo + escolha da ponta que contém o recibo
+  const vertical = fh >= fw;
+  const tiraPx = Math.max(6, Math.round((vertical ? fh : fw) * TIRA_FRACAO));
+
+  type Cand = { rot: number; dens: number; linhas: number };
+  const cands: Cand[] = [];
+  if (vertical) {
+    cands.push({
+      rot: 0,
+      dens: densidade(folha.x0, folha.x1, folha.y0, folha.y0 + tiraPx),
+      linhas: linhasTexto(folha.x0, folha.x1, folha.y0, folha.y0 + tiraPx),
+    });
+    cands.push({
+      rot: 180,
+      dens: densidade(folha.x0, folha.x1, folha.y1 - tiraPx, folha.y1),
+      linhas: linhasTexto(folha.x0, folha.x1, folha.y1 - tiraPx, folha.y1),
+    });
   } else {
-    const novoH = Math.min(src.height, cw / alvoLocal);
-    cy = Math.max(0, Math.min(src.height - novoH, cy - (novoH - ch) / 2));
-    ch = novoH;
+    // ponta esquerda vira topo girando 90° no sentido horário
+    cands.push({
+      rot: 90,
+      dens: densidade(folha.x0, folha.x0 + tiraPx, folha.y0, folha.y1),
+      linhas: linhasTexto(folha.x0, folha.x0 + tiraPx, folha.y0, folha.y1),
+    });
+    cands.push({
+      rot: 270,
+      dens: densidade(folha.x1 - tiraPx, folha.x1, folha.y0, folha.y1),
+      linhas: linhasTexto(folha.x1 - tiraPx, folha.x1, folha.y0, folha.y1),
+    });
   }
-  void x0; void x1; void y0; void y1;
 
+  // o recibo tem texto, mas muito menos tinta que o corpo da DANFE
+  const validos = cands.filter((c) => c.dens >= 0.006 && c.dens <= 0.30 && c.linhas >= 3);
+  if (validos.length === 0) {
+    throw new CanhotoIlegivelError(
+      "Tira do canhoto não localizada na folha (foto sem o recibo ou fora de foco).",
+    );
+  }
+  validos.sort((a, b) => a.dens - b.dens);
+  const escolhido = validos[0];
+
+  // ---- 4) tira do recibo em coordenadas ORIGINAIS.
+  // Recortamos só a tira (não a folha inteira): girar uma folha A4 de 12 MP
+  // estoura o limite de CPU do worker.
+  const padX = Math.round(fw * 0.015) + 1;
+  const padY = Math.round(fh * 0.015) + 1;
+  let bx0 = folha.x0, bx1 = folha.x1, by0 = folha.y0, by1 = folha.y1;
+  if (escolhido.rot === 0) by1 = Math.min(folha.y1, folha.y0 + tiraPx);
+  else if (escolhido.rot === 180) by0 = Math.max(folha.y0, folha.y1 - tiraPx);
+  else if (escolhido.rot === 90) bx1 = Math.min(folha.x1, folha.x0 + tiraPx);
+  else bx0 = Math.max(folha.x0, folha.x1 - tiraPx);
+
+  bx0 = Math.max(0, bx0 - padX); bx1 = Math.min(w - 1, bx1 + padX);
+  by0 = Math.max(0, by0 - padY); by1 = Math.min(h - 1, by1 + padY);
+
+  const x = Math.max(0, Math.round((bx0 * src.width) / w));
+  const y = Math.max(0, Math.round((by0 * src.height) / h));
+  const cw = Math.max(8, Math.min(src.width - x, Math.round(((bx1 - bx0 + 1) * src.width) / w)));
+  const ch = Math.max(8, Math.min(src.height - y, Math.round(((by1 - by0 + 1) * src.height) / h)));
+
+  return { x, y, w: cw, h: ch, rot: escolhido.rot };
+}
+
+
+/**
+ * Localiza o canhoto por VISÃO (Lovable AI) e devolve o recorte + rotação.
+ *
+ * Motivo: heurísticas de contraste erram quando a foto é tirada sobre mesa de
+ * escritório (teclado, mouse, embalagem de resma, pilha de folhas em branco) —
+ * foi exatamente o que derrubou 100% dos envios de 03/09. O modelo de visão
+ * identifica o bloco "RECEBEMOS DE ... / NF-e Nº ..." e o sentido do texto,
+ * inclusive quando a folha está deitada ou de cabeça para baixo.
+ */
+async function chamarVisao(
+  chave: string,
+  modelo: string,
+  instrucao: string,
+  b64: string,
+): Promise<Record<string, unknown>> {
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
+    body: JSON.stringify({
+      model: modelo,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: instrucao },
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!resp.ok) throw new Error(`Visão indisponível (${resp.status}).`);
+  const data = await resp.json();
+  const bruto = String(data?.choices?.[0]?.message?.content ?? "");
+  const m = bruto.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("Visão não devolveu JSON.");
+  return JSON.parse(m[0]);
+}
+
+async function miniB64(src: Image, lado = 1024, q = 85): Promise<string> {
+  const esc = Math.min(1, lado / Math.max(src.width, src.height));
+  const mini = esc < 1 ? src.clone().resize(Math.round(src.width * esc), Math.round(src.height * esc)) : src.clone();
+  return paraBase64(new Uint8Array(await mini.encodeJPEG(q)));
+}
+
+/** Confere a faixa já recortada: legível? invertida 180°? número correto? */
+export async function conferirFaixa(
+  faixa: Image,
+  numeroNf?: string,
+): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean }> {
+  const chave = Deno.env.get("LOVABLE_API_KEY");
+  if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente.");
+  const instrucao =
+    `Esta imagem é uma faixa de canhoto/recibo de nota fiscal (DANFE).` +
+    (numeroNf ? ` O número esperado da nota é ${numeroNf}.` : "") +
+    ` Responda SOMENTE JSON: {"legivel":true|false,"invertido":true|false,` +
+    `"numero_nf":"<digitos>"|null,"tem_assinatura":true|false}. ` +
+    `invertido=true se o texto estiver de cabeça para baixo (180 graus). ` +
+    `numero_nf apenas se conseguir LER de fato; caso contrário null.`;
+  const r = await chamarVisao(chave, "google/gemini-2.5-flash", instrucao, await miniB64(faixa, 1024, 88));
+  const nfLida = r.numero_nf ? String(r.numero_nf).replace(/\D/g, "") : null;
   return {
-    x: Math.max(0, Math.round(cx)),
-    y: Math.max(0, Math.round(cy)),
-    w: Math.max(8, Math.min(src.width - Math.round(cx), Math.round(cw))),
-    h: Math.max(8, Math.min(src.height - Math.round(cy), Math.round(ch))),
-    rot,
+    legivel: r.legivel !== false,
+    invertido: r.invertido === true,
+    nfLida,
+    temAssinatura: r.tem_assinatura === true,
   };
 }
 
 /**
+ * Localiza o canhoto na foto com modelo de visão de grounding (box_2d 0-1000).
+ */
+export async function localizarCanhotoIA(
+  src: Image,
+  numeroNf?: string,
+): Promise<{ recipe: Recipe; nfLida: string | null; bruto?: unknown }> {
+  const chave = Deno.env.get("LOVABLE_API_KEY");
+  if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente para localizar o canhoto.");
+
+  const instrucao =
+    `Na imagem aparece uma DANFE (nota fiscal). Localize o CANHOTO/RECIBO: a faixa retangular com ` +
+    `"RECEBEMOS DE Pandurata ...", "DATA DE RECEBIMENTO", "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR" ` +
+    `e a caixa "NF-e Nº${numeroNf ? " " + numeroNf : ""} SÉRIE 20". Ela termina numa linha pontilhada de corte. ` +
+    `Não inclua o corpo da nota abaixo dessa linha, mesa, teclado, embalagem de papel nem outras folhas. ` +
+    `O canhoto pode estar deitado (texto vertical) ou invertido.\n` +
+    `Responda SOMENTE JSON com a caixa envolvente em coordenadas normalizadas 0-1000 na imagem como ela está: ` +
+    `{"encontrado":true|false,"box_2d":[y0,x0,y1,x1],"rotacao_horaria":0|90|180|270,"numero_nf":"<digitos>"|null}. ` +
+    `rotacao_horaria = giro HORÁRIO necessário para o texto do canhoto ficar horizontal e legível. ` +
+    `numero_nf somente se conseguir LER de fato; se a folha estiver quase de perfil, fora de foco ou ilegível, null.`;
+
+  let r: Record<string, unknown>;
+  try {
+    r = await chamarVisao(chave, "google/gemini-3-pro-preview", instrucao, await miniB64(src, 1024, 88));
+  } catch (e) {
+    // fallback de modelo antes de cair na geometria
+    r = await chamarVisao(chave, "google/gemini-2.5-pro", instrucao, await miniB64(src, 1024, 88));
+    void e;
+  }
+  if (r?.encontrado === false) throw new CanhotoIlegivelError("Canhoto não identificado na foto.");
+
+  const box = Array.isArray(r.box_2d) ? (Array.isArray(r.box_2d[0]) ? r.box_2d[0] : r.box_2d) : null;
+  if (!box || (box as unknown[]).length < 4) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
+  const [by0, bx0, by1, bx1] = (box as unknown[]).map((v) => Number(v));
+  const cl = (v: number) => Math.min(1, Math.max(0, v / 1000));
+  let x0 = cl(Math.min(bx0, bx1)), x1 = cl(Math.max(bx0, bx1));
+  let y0 = cl(Math.min(by0, by1)), y1 = cl(Math.max(by0, by1));
+  if (!(x1 > x0 && y1 > y0)) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
+
+  // respiro para não cortar assinatura/número nas bordas
+  const padX = (x1 - x0) * 0.03, padY = (y1 - y0) * 0.06;
+  x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX);
+  y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY);
+
+  const rotBruta = Number(r.rotacao_horaria ?? r.rotacao) || 0;
+  const rot = [0, 90, 180, 270].includes(rotBruta) ? rotBruta : 0;
+
+  const x = Math.round(x0 * src.width);
+  const y = Math.round(y0 * src.height);
+  const w = Math.max(8, Math.min(src.width - x, Math.round((x1 - x0) * src.width)));
+  const h = Math.max(8, Math.min(src.height - y, Math.round((y1 - y0) * src.height)));
+
+  const nfLida = r.numero_nf ? String(r.numero_nf).replace(/\D/g, "") : null;
+  if (nfLida && numeroNf && nfLida.replace(/^0+/, "") !== String(numeroNf).replace(/^0+/, "")) {
+    throw new CanhotoIlegivelError(
+      `[CANHOTO_ILEGIVEL] Canhoto da foto é de outra nota (lido ${nfLida}, esperado ${numeroNf}).`,
+    );
+  }
+  if (!nfLida) {
+    throw new CanhotoIlegivelError(
+      "[CANHOTO_ILEGIVEL] Número da NF não legível no canhoto (foto de perfil, borrada ou sem o recibo).",
+    );
+  }
+
+  return { recipe: { x, y, w, h, rot }, nfLida, bruto: r };
+}
+
+/**
  * Redimensiona para exatamente 1536x240.
- * - recibo: detecta a área do canhoto na foto e encaixa na faixa (padrão em produção)
+ * - recibo: localiza o canhoto na foto (visão + fallback geométrico) e encaixa na faixa
  * - contain: preserva proporção, centraliza sobre fundo branco
  * - stretch: força 1536x240 (distorce)
  * - cover: preenche e recorta as sobras
@@ -224,27 +346,50 @@ export async function prepararCanhoto(
   originais: Uint8Array,
   modo: ModoImagem = "contain",
   qualidade = 85,
-): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number }> {
+  opts: { numeroNf?: string } = {},
+): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string }> {
   const src = await Image.decode(originais);
 
   let final: Image;
+  let origem = modo as string;
 
   if (modo === "recibo") {
-    let area: { x: number; y: number; w: number; h: number; rot: number } | null = null;
+    // Falha aqui é proposital: melhor a NF ficar em exceção para conferência
+    // manual do que transmitir uma faixa que não é o canhoto (recusa por
+    // ilegibilidade no cartório digital).
+    let area: Recipe;
     try {
-      area = detectarRecorte(src);
-    } catch {
-      area = null;
+      area = (await localizarCanhotoIA(src, opts.numeroNf)).recipe;
+      origem = "recibo:visao";
+    } catch (e) {
+      if (e instanceof CanhotoIlegivelError && e.message.includes("[CANHOTO_ILEGIVEL]")) throw e;
+      area = detectarRecorte(src); // fallback geométrico
+      origem = "recibo:geometrico";
     }
-    if (!area) {
-      const sh = Math.max(8, Math.min(src.height, Math.round(src.height * RECIBO_ALTURA)));
-      const cyF = Math.round(src.height * RECIBO_OFFSET_Y);
-      const syF = Math.max(0, Math.min(src.height - sh, cyF - Math.round(sh / 2)));
-      area = { x: 0, y: syF, w: src.width, h: sh, rot: 0 };
+
+    let tira = src.crop(area.x, area.y, area.w, area.h);
+    if (area.rot) tira = tira.rotate(area.rot) as Image;
+
+    // 2ª passada: o giro devolvido pela visão às vezes vem 180° trocado.
+    if (origem === "recibo:visao") {
+      try {
+        const chk = await conferirFaixa(tira, opts.numeroNf);
+        if (chk.invertido) {
+          tira = tira.rotate(180) as Image;
+          origem = "recibo:visao+180";
+        }
+        if (!chk.legivel && !chk.nfLida) {
+          throw new CanhotoIlegivelError(
+            "[CANHOTO_ILEGIVEL] Faixa do canhoto ilegível após o recorte (foto de perfil ou borrada).",
+          );
+        }
+      } catch (e) {
+        if (e instanceof CanhotoIlegivelError) throw e;
+        // indisponibilidade da conferência não bloqueia o envio
+      }
     }
-    let recorte = src.crop(area.x, area.y, area.w, area.h);
-    if (area.rot) recorte = recorte.rotate(area.rot) as Image;
-    const faixa = recorte.resize(OKE_LARGURA, OKE_ALTURA);
+
+    const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
     try {
       faixa.saturation(0);
@@ -253,6 +398,7 @@ export async function prepararCanhoto(
       // se a versão da lib não expor os filtros, segue sem realce
     }
     final = faixa;
+
   } else if (modo === "stretch") {
     final = src.resize(OKE_LARGURA, OKE_ALTURA);
   } else if (modo === "cover") {
@@ -275,7 +421,7 @@ export async function prepararCanhoto(
   const jpeg = await final.encodeJPEG(qualidade);
   const comDpi = aplicarDensidadeJfif(new Uint8Array(jpeg), OKE_DPI);
 
-  return { bytes: comDpi, largura: OKE_LARGURA, altura: OKE_ALTURA, dpi: OKE_DPI };
+  return { bytes: comDpi, largura: OKE_LARGURA, altura: OKE_ALTURA, dpi: OKE_DPI, origem };
 }
 
 /**
