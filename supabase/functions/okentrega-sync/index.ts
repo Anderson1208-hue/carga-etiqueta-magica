@@ -195,8 +195,16 @@ Deno.serve(async (req) => {
         base64: paraBase64(new Uint8Array(await mini.encodeJPEG(80))),
       });
     }
-    const { bytes } = await prepararCanhoto(buf, modoImagem);
-    return json({ status: "preview", numero_nf: it?.numero_nf, modo_imagem: modoImagem, base64: paraBase64(bytes) });
+    const { bytes, origem } = await prepararCanhoto(buf, modoImagem, 85, {
+      numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,
+    });
+    return json({
+      status: "preview",
+      numero_nf: it?.numero_nf,
+      modo_imagem: modoImagem,
+      origem_recorte: origem,
+      base64: paraBase64(bytes),
+    });
   }
 
 
@@ -295,7 +303,9 @@ Deno.serve(async (req) => {
         erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
       } else {
         try {
-          const { bytes } = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem);
+          const { bytes } = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem, 85, {
+            numeroNf: item.numero_nf ? String(item.numero_nf) : undefined,
+          });
           fotos.push({
             tipofoto: "C",
             foto: `data:image/jpeg;base64,${paraBase64(bytes)}`,
@@ -312,7 +322,10 @@ Deno.serve(async (req) => {
 
     if (erroPreparo) {
       if (!dryRun) {
-        const statusPreparo = item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
+        // Canhoto ilegível/errado não melhora com retentativa: vai direto para
+        // exceção (conferência manual) em vez de gastar 5 tentativas.
+        const ilegivel = erroPreparo.includes("[CANHOTO_ILEGIVEL]");
+        const statusPreparo = ilegivel || item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
         await supabase
           .from("okentrega_queue")
           .update({
