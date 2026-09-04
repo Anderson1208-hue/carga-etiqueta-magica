@@ -207,37 +207,17 @@ function detectarRecorte(src: Image): Recipe {
  * identifica o bloco "RECEBEMOS DE ... / NF-e Nº ..." e o sentido do texto,
  * inclusive quando a folha está deitada ou de cabeça para baixo.
  */
-export async function localizarCanhotoIA(
-  src: Image,
-  numeroNf?: string,
-): Promise<{ recipe: Recipe; nfLida: string | null; bruto?: unknown }> {
-  const chave = Deno.env.get("LOVABLE_API_KEY");
-  if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente para localizar o canhoto.");
-
-  const esc = Math.min(1, 1024 / Math.max(src.width, src.height));
-  const mini = src.clone().resize(Math.round(src.width * esc), Math.round(src.height * esc));
-  const b64 = paraBase64(new Uint8Array(await mini.encodeJPEG(80)));
-
-  const instrucao =
-    `Na foto há uma DANFE (nota fiscal). Localize APENAS o CANHOTO/RECIBO de entrega: ` +
-    `o retângulo que contém "RECEBEMOS DE ...", data de recebimento, identificação e assinatura ` +
-    `do recebedor, e a caixa "NF-e Nº". Ele termina na linha pontilhada de corte — não inclua o ` +
-    `corpo da nota abaixo dela, nem mesa, teclado, embalagem de papel ou outras folhas.\n` +
-    (numeroNf ? `O número esperado da nota é ${numeroNf}.\n` : "") +
-    `Responda SOMENTE JSON: {"encontrado": true|false, ` +
-    `"x0":0-1,"y0":0-1,"x1":0-1,"y1":0-1, ` +
-    `"rotacao": 0|90|180|270, "numero_nf": "<digitos>"|null}\n` +
-    `Coordenadas normalizadas (0 a 1) do retângulo do canhoto na imagem enviada. ` +
-    `"rotacao" = graus no sentido HORÁRIO necessários para o texto do canhoto ficar na horizontal ` +
-    `e legível (0 se já está legível). Em "numero_nf" devolva o número impresso no canhoto ` +
-    `SOMENTE se você conseguir LER de fato (foto de frente, nítida). Se a folha estiver quase de ` +
-    `perfil, fora de foco ou o texto ilegível, devolva "numero_nf": null.`;
-
+async function chamarVisao(
+  chave: string,
+  modelo: string,
+  instrucao: string,
+  b64: string,
+): Promise<Record<string, unknown>> {
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: modelo,
       messages: [
         {
           role: "user",
@@ -250,26 +230,89 @@ export async function localizarCanhotoIA(
       response_format: { type: "json_object" },
     }),
   });
-  if (!resp.ok) {
-    throw new CanhotoIlegivelError(`Visão indisponível (${resp.status}) ao localizar canhoto.`);
-  }
+  if (!resp.ok) throw new Error(`Visão indisponível (${resp.status}).`);
   const data = await resp.json();
-  const bruto = data?.choices?.[0]?.message?.content ?? "";
-  const m = String(bruto).match(/\{[\s\S]*\}/);
-  if (!m) throw new CanhotoIlegivelError("Visão não devolveu coordenadas do canhoto.");
-  const r = JSON.parse(m[0]);
-  if (!r?.encontrado) throw new CanhotoIlegivelError("Canhoto não identificado na foto.");
+  const bruto = String(data?.choices?.[0]?.message?.content ?? "");
+  const m = bruto.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("Visão não devolveu JSON.");
+  return JSON.parse(m[0]);
+}
 
-  const cl = (v: unknown) => Math.min(1, Math.max(0, Number(v)));
-  let x0 = cl(r.x0), y0 = cl(r.y0), x1 = cl(r.x1), y1 = cl(r.y1);
+async function miniB64(src: Image, lado = 1024, q = 85): Promise<string> {
+  const esc = Math.min(1, lado / Math.max(src.width, src.height));
+  const mini = esc < 1 ? src.clone().resize(Math.round(src.width * esc), Math.round(src.height * esc)) : src.clone();
+  return paraBase64(new Uint8Array(await mini.encodeJPEG(q)));
+}
+
+/** Confere a faixa já recortada: legível? invertida 180°? número correto? */
+export async function conferirFaixa(
+  faixa: Image,
+  numeroNf?: string,
+): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean }> {
+  const chave = Deno.env.get("LOVABLE_API_KEY");
+  if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente.");
+  const instrucao =
+    `Esta imagem é uma faixa de canhoto/recibo de nota fiscal (DANFE).` +
+    (numeroNf ? ` O número esperado da nota é ${numeroNf}.` : "") +
+    ` Responda SOMENTE JSON: {"legivel":true|false,"invertido":true|false,` +
+    `"numero_nf":"<digitos>"|null,"tem_assinatura":true|false}. ` +
+    `invertido=true se o texto estiver de cabeça para baixo (180 graus). ` +
+    `numero_nf apenas se conseguir LER de fato; caso contrário null.`;
+  const r = await chamarVisao(chave, "google/gemini-2.5-flash", instrucao, await miniB64(faixa, 1024, 88));
+  const nfLida = r.numero_nf ? String(r.numero_nf).replace(/\D/g, "") : null;
+  return {
+    legivel: r.legivel !== false,
+    invertido: r.invertido === true,
+    nfLida,
+    temAssinatura: r.tem_assinatura === true,
+  };
+}
+
+/**
+ * Localiza o canhoto na foto com modelo de visão de grounding (box_2d 0-1000).
+ */
+export async function localizarCanhotoIA(
+  src: Image,
+  numeroNf?: string,
+): Promise<{ recipe: Recipe; nfLida: string | null; bruto?: unknown }> {
+  const chave = Deno.env.get("LOVABLE_API_KEY");
+  if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente para localizar o canhoto.");
+
+  const instrucao =
+    `Na imagem aparece uma DANFE (nota fiscal). Localize o CANHOTO/RECIBO: a faixa retangular com ` +
+    `"RECEBEMOS DE Pandurata ...", "DATA DE RECEBIMENTO", "IDENTIFICAÇÃO E ASSINATURA DO RECEBEDOR" ` +
+    `e a caixa "NF-e Nº${numeroNf ? " " + numeroNf : ""} SÉRIE 20". Ela termina numa linha pontilhada de corte. ` +
+    `Não inclua o corpo da nota abaixo dessa linha, mesa, teclado, embalagem de papel nem outras folhas. ` +
+    `O canhoto pode estar deitado (texto vertical) ou invertido.\n` +
+    `Responda SOMENTE JSON com a caixa envolvente em coordenadas normalizadas 0-1000 na imagem como ela está: ` +
+    `{"encontrado":true|false,"box_2d":[y0,x0,y1,x1],"rotacao_horaria":0|90|180|270,"numero_nf":"<digitos>"|null}. ` +
+    `rotacao_horaria = giro HORÁRIO necessário para o texto do canhoto ficar horizontal e legível. ` +
+    `numero_nf somente se conseguir LER de fato; se a folha estiver quase de perfil, fora de foco ou ilegível, null.`;
+
+  let r: Record<string, unknown>;
+  try {
+    r = await chamarVisao(chave, "google/gemini-3-pro-preview", instrucao, await miniB64(src, 1024, 88));
+  } catch (e) {
+    // fallback de modelo antes de cair na geometria
+    r = await chamarVisao(chave, "google/gemini-2.5-pro", instrucao, await miniB64(src, 1024, 88));
+    void e;
+  }
+  if (r?.encontrado === false) throw new CanhotoIlegivelError("Canhoto não identificado na foto.");
+
+  const box = Array.isArray(r.box_2d) ? (Array.isArray(r.box_2d[0]) ? r.box_2d[0] : r.box_2d) : null;
+  if (!box || (box as unknown[]).length < 4) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
+  const [by0, bx0, by1, bx1] = (box as unknown[]).map((v) => Number(v));
+  const cl = (v: number) => Math.min(1, Math.max(0, v / 1000));
+  let x0 = cl(Math.min(bx0, bx1)), x1 = cl(Math.max(bx0, bx1));
+  let y0 = cl(Math.min(by0, by1)), y1 = cl(Math.max(by0, by1));
   if (!(x1 > x0 && y1 > y0)) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
 
   // respiro para não cortar assinatura/número nas bordas
-  const padX = (x1 - x0) * 0.03, padY = (y1 - y0) * 0.05;
+  const padX = (x1 - x0) * 0.03, padY = (y1 - y0) * 0.06;
   x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX);
   y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY);
 
-  const rotBruta = Number(r.rotacao) || 0;
+  const rotBruta = Number(r.rotacao_horaria ?? r.rotacao) || 0;
   const rot = [0, 90, 180, 270].includes(rotBruta) ? rotBruta : 0;
 
   const x = Math.round(x0 * src.width);
@@ -283,8 +326,6 @@ export async function localizarCanhotoIA(
       `[CANHOTO_ILEGIVEL] Canhoto da foto é de outra nota (lido ${nfLida}, esperado ${numeroNf}).`,
     );
   }
-  // Sem o número legível o cartório digital recusa: manda para conferência manual
-  // em vez de transmitir uma faixa duvidosa.
   if (!nfLida) {
     throw new CanhotoIlegivelError(
       "[CANHOTO_ILEGIVEL] Número da NF não legível no canhoto (foto de perfil, borrada ou sem o recibo).",
@@ -328,6 +369,25 @@ export async function prepararCanhoto(
 
     let tira = src.crop(area.x, area.y, area.w, area.h);
     if (area.rot) tira = tira.rotate(area.rot) as Image;
+
+    // 2ª passada: o giro devolvido pela visão às vezes vem 180° trocado.
+    if (origem === "recibo:visao") {
+      try {
+        const chk = await conferirFaixa(tira, opts.numeroNf);
+        if (chk.invertido) {
+          tira = tira.rotate(180) as Image;
+          origem = "recibo:visao+180";
+        }
+        if (!chk.legivel && !chk.nfLida) {
+          throw new CanhotoIlegivelError(
+            "[CANHOTO_ILEGIVEL] Faixa do canhoto ilegível após o recorte (foto de perfil ou borrada).",
+          );
+        }
+      } catch (e) {
+        if (e instanceof CanhotoIlegivelError) throw e;
+        // indisponibilidade da conferência não bloqueia o envio
+      }
+    }
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
