@@ -9,7 +9,7 @@
 //
 // Secrets: OKENTREGA_EMAIL_HOMOLOG/PASSWORD_HOMOLOG, OKENTREGA_EMAIL_PRODUCAO/PASSWORD_PRODUCAO
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
-import { prepararCanhoto, paraBase64, type ModoImagem } from "../_shared/okentrega-image.ts";
+import { prepararCanhoto, paraBase64, localizarCanhotoIA, type ModoImagem } from "../_shared/okentrega-image.ts";
 import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 const corsHeaders = {
@@ -194,6 +194,15 @@ Deno.serve(async (req) => {
         altura: src.height,
         base64: paraBase64(new Uint8Array(await mini.encodeJPEG(80))),
       });
+    }
+    if ((opts as any).debug_ia) {
+      const src2 = await ImageLib.decode(buf);
+      try {
+        const r = await localizarCanhotoIA(src2, it?.numero_nf ? String(it.numero_nf) : undefined);
+        return json({ status: "debug_ia", numero_nf: it?.numero_nf, largura: src2.width, altura: src2.height, ...r });
+      } catch (e) {
+        return json({ status: "debug_ia_falhou", mensagem: e instanceof Error ? e.message : String(e) });
+      }
     }
     const { bytes, origem } = await prepararCanhoto(buf, modoImagem, 85, {
       numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,

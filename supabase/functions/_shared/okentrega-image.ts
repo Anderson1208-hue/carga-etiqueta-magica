@@ -207,10 +207,10 @@ function detectarRecorte(src: Image): Recipe {
  * identifica o bloco "RECEBEMOS DE ... / NF-e Nº ..." e o sentido do texto,
  * inclusive quando a folha está deitada ou de cabeça para baixo.
  */
-async function localizarCanhotoIA(
+export async function localizarCanhotoIA(
   src: Image,
   numeroNf?: string,
-): Promise<{ recipe: Recipe; nfLida: string | null }> {
+): Promise<{ recipe: Recipe; nfLida: string | null; bruto?: unknown }> {
   const chave = Deno.env.get("LOVABLE_API_KEY");
   if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente para localizar o canhoto.");
 
@@ -291,7 +291,7 @@ async function localizarCanhotoIA(
     );
   }
 
-  return { recipe: { x, y, w, h, rot }, nfLida };
+  return { recipe: { x, y, w, h, rot }, nfLida, bruto: r };
 }
 
 /**
