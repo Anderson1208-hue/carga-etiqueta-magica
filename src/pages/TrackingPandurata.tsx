@@ -341,9 +341,19 @@ export default function TrackingPandurata() {
               {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               Atualizar
             </Button>
-            <Button onClick={exportar} disabled={isFetching || !linhas.length}>
+            <Button onClick={exportar} disabled={isFetching || !linhasFiltradas.length}>
               <Download className="w-4 h-4 mr-2" /> Exportar planilha
             </Button>
+            <div className="flex items-center gap-2 pb-1">
+              <Switch
+                id="apenas-em-aberto"
+                checked={apenasEmAberto}
+                onCheckedChange={setApenasEmAberto}
+              />
+              <Label htmlFor="apenas-em-aberto" className="cursor-pointer">
+                Apenas entregas em aberto
+              </Label>
+            </div>
           </CardContent>
         </Card>
 
