@@ -426,7 +426,14 @@ export default function TrackingPandurata() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {linhas.map((l) => (
+                  {!isFetching && linhas.length && !linhasFiltradas.length && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Todas as notas do período já foram entregues.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {linhasFiltradas.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{l.numero_nf}</TableCell>
                       <TableCell className="max-w-[260px] truncate">{l.dest}</TableCell>
