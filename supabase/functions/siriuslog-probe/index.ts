@@ -47,6 +47,8 @@ Deno.serve(async (req) => {
     if (body?.nf) nf = String(body.nf)
   } catch { /* sem body */ }
   out.nf = nf
+  let somente: string | null = null
+  try { const b = await req.clone().json(); if (b?.somente) somente = String(b.somente) } catch { /* noop */ }
 
   const jar: Jar = {}
   const passos: unknown[] = []
@@ -195,7 +197,8 @@ Deno.serve(async (req) => {
     },
   ]
   const leituras: unknown[] = []
-  for (const t of tentativas) {
+  const filtro = (() => { try { return null } catch { return null } })()
+  for (const t of tentativas.filter((x) => !somente || x.nome === somente)) {
     try {
       const r = await fetch(t.url, t.init as RequestInit)
       const txt = await r.text()
