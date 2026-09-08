@@ -10,6 +10,7 @@
 // Secrets: OKENTREGA_EMAIL_HOMOLOG/PASSWORD_HOMOLOG, OKENTREGA_EMAIL_PRODUCAO/PASSWORD_PRODUCAO
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { prepararCanhoto, paraBase64, localizarCanhotoIA, type ModoImagem } from "../_shared/okentrega-image.ts";
+import { classificarRetornoOkEntrega } from "../_shared/okentrega-state.ts";
 import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 const corsHeaders = {
@@ -478,21 +479,14 @@ Deno.serve(async (req) => {
 
     const statusBaixa = respBody?.statusbaixa ?? null;
     const statusComprovante = respBody?.statuscomprovante != null ? String(respBody.statuscomprovante) : null;
-    const aprovado = sucesso && statusComprovante === "1";
-    const recusado = sucesso && statusComprovante === "2";
     const duplicado = respStatus === 409;
-    const retryable = respStatus === 0 || respStatus === 429 || respStatus >= 500;
-    const novoStatus = aprovado
-      ? "aprovado"
-      : recusado
-        ? "recusado"
-        : sucesso
-          ? "aguardando_aprovacao"
-          : duplicado
-            ? "revisao"
-            : retryable && item.tentativas + 1 < maxTentativas
-              ? "pendente"
-              : "erro";
+    const novoStatus = classificarRetornoOkEntrega({
+      sucessoHttp: sucesso,
+      httpStatus: respStatus,
+      statusComprovante,
+      tentativasAtuais: item.tentativas,
+      maxTentativas,
+    });
     if (duplicado) erroMsg = "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
 
     await supabase
