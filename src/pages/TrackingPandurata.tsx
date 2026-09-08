@@ -132,7 +132,8 @@ export default function TrackingPandurata() {
           .select(
             "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status), agendamentos(status, data_agendamento, created_at)"
           )
-          .like("cnpj_emitente", "70940994%")
+          // CNPJ do emitente pode estar gravado com ou sem pontuação.
+          .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%")
           .gte("created_at", `${de}T00:00:00`)
           .lte("created_at", `${ate}T23:59:59`)
           .order("created_at", { ascending: true })
