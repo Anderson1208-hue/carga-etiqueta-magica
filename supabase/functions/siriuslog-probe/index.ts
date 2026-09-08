@@ -191,9 +191,32 @@ Deno.serve(async (req) => {
     if (Array.isArray(arr) && arr.length) reg = arr[0]
   } catch { /* truncado */ }
 
-  const detailId = reg?.invoiceDetailId ?? reg?.deliveryInvoiceDetailId ?? reg?.id ?? null
+  const tripId = (reg?.id as number | undefined) ?? null
+  out.tripId = tripId
+
+  // detalhe da viagem -> lista de notas com seu invoiceDetailId
+  let detailId: number | null = null
+  if (tripId) {
+    const det = await call('status/detail', `${TRACK}/trip/delivery/status/detail/${tripId}`)
+    out.detalhe_viagem = det
+    try {
+      const b = JSON.parse((det as { corpo?: string }).corpo ?? '{}')
+      const invs = b.invoices ?? b.deliveryInvoiceDetails ?? b.content ?? []
+      if (Array.isArray(invs)) {
+        out.notas_da_viagem = invs.map((x: Record<string, unknown>) => ({
+          numero: x.invoiceNumber ?? x.number,
+          invoiceDetailId: x.invoiceDetailId ?? x.id,
+          statusDetalhado: (x.tripInvoiceDetailedStatus as { name?: string } | undefined)?.name ?? null,
+          deliveryDate: x.deliveryDate ?? null,
+          branchArrivalDate: x.branchArrivalDate ?? null,
+        }))
+        const hit = invs.find((x: Record<string, unknown>) =>
+          String(x.invoiceNumber ?? x.number ?? '') === nf)
+        detailId = (hit?.invoiceDetailId ?? hit?.id ?? null) as number | null
+      }
+    } catch { /* truncado */ }
+  }
   out.invoice_detail_id = detailId
-  out.tripId = reg?.tripId ?? null
 
   if (acao !== 'gravar-uma') return json()
   if (confirmar !== 'SIM') {
