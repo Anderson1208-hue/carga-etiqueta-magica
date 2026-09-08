@@ -94,7 +94,12 @@ type Linha = {
   previsao: string | null;
   /** "Agendamento" ou "Lead time (N d.ú.)" ou "Sem SLA cadastrado". */
   previsaoOrigem: string;
+  /** Data (ISO) da roteirização da nota (data do veículo em que ela foi expedida). */
+  chegadaCliente: string | null;
+  /** Data (ISO) da entrega efetiva (baixa com status entregue). */
+  entregaEfetiva: string | null;
 };
+
 
 export default function TrackingPandurata() {
   const { podeVerOkEntrega, isLoading: carregandoAcesso } = useAcessoOkEntrega();
@@ -180,13 +185,52 @@ export default function TrackingPandurata() {
             proximo,
             previsao,
             previsaoOrigem,
+            chegadaCliente: null,
+            entregaEfetiva: null,
           });
         }
         if (lote.length < PAGE) break;
       }
+
+      // Chegada ao Cliente = data da roteirização da nota (data do veículo que a expediu).
+      // Entrega Efetiva = data da baixa com status entregue.
+      const ids = linhas.map((l) => l.id);
+      const roteirizadaPorNf = new Map<string, string>();
+      const entregaPorNf = new Map<string, string>();
+      const CH = 300;
+      for (let i = 0; i < ids.length; i += CH) {
+        const chunk = ids.slice(i, i + CH);
+        const [{ data: vnfs, error: eV }, { data: baixas, error: eB }] = await Promise.all([
+          supabase.from("veiculo_nfs").select("nf_id, veiculos(data)").in("nf_id", chunk),
+          supabase
+            .from("baixas_entrega")
+            .select("nf_id, status, registrado_em")
+            .in("nf_id", chunk)
+            .ilike("status", "ENTREG%"),
+        ]);
+        if (eV) throw eV;
+        if (eB) throw eB;
+        for (const v of (vnfs ?? []) as any[]) {
+          const d = v.veiculos?.data ? String(v.veiculos.data).slice(0, 10) : null;
+          if (!d) continue;
+          const atualD = roteirizadaPorNf.get(v.nf_id);
+          if (!atualD || d < atualD) roteirizadaPorNf.set(v.nf_id, d);
+        }
+        for (const b of (baixas ?? []) as any[]) {
+          if (!b.registrado_em) continue;
+          const d = String(b.registrado_em).slice(0, 10);
+          const atualD = entregaPorNf.get(b.nf_id);
+          if (!atualD || d > atualD) entregaPorNf.set(b.nf_id, d);
+        }
+      }
+      for (const l of linhas) {
+        l.chegadaCliente = roteirizadaPorNf.get(l.id) ?? null;
+        l.entregaEfetiva = entregaPorNf.get(l.id) ?? null;
+      }
       return linhas;
     },
   });
+
 
   const linhas = data ?? [];
 
@@ -208,12 +252,13 @@ export default function TrackingPandurata() {
       NF: Number(l.numero_nf) || l.numero_nf,
       "Status Atual": l.atual,
       "Próximo Status": l.proximo,
-      "Entrega Efetiva": "",
+      "Entrega Efetiva": fmtBR(l.entregaEfetiva),
       // Solicitação e Confirmação da Agenda são preenchidas pela Pandurata.
       "Solicitação de Agendamento": "",
       "Confirmação da Agenda": "",
       "Previsão de entrega": fmtBR(l.previsao),
-      "Chegada ao Cliente": "",
+      "Chegada ao Cliente": fmtBR(l.chegadaCliente),
+
       "Previsão de chegada na filial": "",
       "Chegada na filial": "",
       "Saída na filial": "",
@@ -322,19 +367,22 @@ export default function TrackingPandurata() {
                     <TableHead>Status Atual</TableHead>
                     <TableHead>Próximo Status</TableHead>
                     <TableHead>Previsão de entrega</TableHead>
+                    <TableHead>Chegada ao Cliente</TableHead>
+                    <TableHead>Entrega Efetiva</TableHead>
+
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isFetching && !linhas.length && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
                   )}
                   {!isFetching && !linhas.length && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         Nenhuma nota da Pandurata no período.
                       </TableCell>
                     </TableRow>
@@ -358,6 +406,9 @@ export default function TrackingPandurata() {
                           <span className="text-xs text-destructive">{l.previsaoOrigem || "—"}</span>
                         )}
                       </TableCell>
+                      <TableCell className="whitespace-nowrap">{fmtBR(l.chegadaCliente) || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{fmtBR(l.entregaEfetiva) || "—"}</TableCell>
+
                     </TableRow>
                   ))}
                 </TableBody>
