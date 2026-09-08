@@ -207,16 +207,27 @@ Deno.serve(async (req) => {
         return json({ status: "debug_ia_falhou", mensagem: e instanceof Error ? e.message : String(e) });
       }
     }
-    const { bytes, origem } = await prepararCanhoto(buf, modoImagem, 85, {
-      numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,
-    });
-    return json({
-      status: "preview",
-      numero_nf: it?.numero_nf,
-      modo_imagem: modoImagem,
-      origem_recorte: origem,
-      base64: paraBase64(bytes),
-    });
+    try {
+      const { bytes, origem, validacao } = await prepararCanhoto(buf, modoImagem, 85, {
+        numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,
+      });
+      return json({
+        status: "preview",
+        numero_nf: it?.numero_nf,
+        modo_imagem: modoImagem,
+        origem_recorte: origem,
+        validacao,
+        base64: paraBase64(bytes),
+      });
+    } catch (e) {
+      return json({
+        status: "preview_reprovado",
+        numero_nf: it?.numero_nf,
+        modo_imagem: modoImagem,
+        mensagem: e instanceof Error ? e.message : String(e),
+      });
+    }
+
   }
 
 
