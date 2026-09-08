@@ -249,18 +249,20 @@ Deno.serve(async (req) => {
     .order("created_at", { ascending: true })
     .limit(whitelist.length > 0 ? 500 : BATCH_SIZE);
 
+  const aprovacaoManual = !!opts.aprovacao_manual && !!opts.queue_id;
+
   if (opts.queue_id) {
     q = supabase
       .from("okentrega_queue")
       .select("*")
       .eq("id", opts.queue_id)
-      .eq("status", "pendente")
       .limit(1);
+    if (!aprovacaoManual) q = q.eq("status", "pendente");
   }
 
   let pendentesRaw: any[] | null = null;
   let errSelect: any = null;
-  if (dryRun) {
+  if (dryRun || aprovacaoManual) {
     const selecionados = await q;
     pendentesRaw = selecionados.data;
     errSelect = selecionados.error;
