@@ -367,6 +367,9 @@ export default function TrackingPandurata() {
                     <TableHead>Status Atual</TableHead>
                     <TableHead>Próximo Status</TableHead>
                     <TableHead>Previsão de entrega</TableHead>
+                    <TableHead>Chegada ao Cliente</TableHead>
+                    <TableHead>Entrega Efetiva</TableHead>
+
                   </TableRow>
                 </TableHeader>
                 <TableBody>
