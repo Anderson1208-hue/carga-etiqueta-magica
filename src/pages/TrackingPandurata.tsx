@@ -108,6 +108,7 @@ export default function TrackingPandurata() {
   const { podeVerTrackingPandurata, isLoading: carregandoAcesso } = useAcessoTrackingPandurata();
   const [de, setDe] = useState(diasAtrasISO(7));
   const [ate, setAte] = useState(hojeISO());
+  const [apenasEmAberto, setApenasEmAberto] = useState(false);
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["tracking-pandurata", de, ate],
