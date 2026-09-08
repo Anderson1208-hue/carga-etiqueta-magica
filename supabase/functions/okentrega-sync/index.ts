@@ -367,6 +367,7 @@ Deno.serve(async (req) => {
         try {
           const preparado = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem, 85, {
             numeroNf: item.numero_nf ? String(item.numero_nf) : undefined,
+            aprovadoManualmente: aprovacaoManual,
           });
           const { bytes, origem, validacao } = preparado;
           imagemBytes = bytes;
