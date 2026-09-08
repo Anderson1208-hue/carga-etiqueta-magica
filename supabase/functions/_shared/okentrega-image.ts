@@ -380,22 +380,42 @@ export async function prepararCanhoto(
     const area = localizado.recipe;
     origem = "recibo:visao";
 
-    let tira = src.crop(area.x, area.y, area.w, area.h);
-    if (area.rot) tira = tira.rotate(area.rot) as Image;
+    const recortar = (fator: number) => {
+      const cx = area.x + area.w / 2, cy = area.y + area.h / 2;
+      const w = Math.min(src.width, Math.round(area.w * fator));
+      const h = Math.min(src.height, Math.round(area.h * fator));
+      const x = Math.max(0, Math.min(src.width - w, Math.round(cx - w / 2)));
+      const y = Math.max(0, Math.min(src.height - h, Math.round(cy - h / 2)));
+      let t = src.crop(x, y, w, h);
+      if (area.rot) t = t.rotate(area.rot) as Image;
+      return t;
+    };
 
-    const chk = await conferirFaixa(tira, opts.numeroNf);
+    let tira = recortar(1);
+    let chk = await conferirFaixa(tira, opts.numeroNf);
+    // Canhoto cortado é o motivo real das recusas: alarga o recorte e reconfere.
+    if (!chk.completo) {
+      const alargada = recortar(1.25);
+      const chk2 = await conferirFaixa(alargada, opts.numeroNf);
+      if (chk2.completo) {
+        tira = alargada;
+        chk = chk2;
+        origem = "recibo:visao+alargado";
+      }
+    }
     if (chk.invertido) {
       tira = tira.rotate(180) as Image;
-      origem = "recibo:visao+180";
+      origem += "+180";
     }
     const esperado = String(opts.numeroNf ?? "").replace(/\D/g, "").replace(/^0+/, "");
     const lido = String(chk.nfLida ?? "").replace(/^0+/, "");
-    if (!chk.legivel || !lido || (esperado && lido !== esperado) || !chk.temAssinatura) {
+    if (!chk.completo || !chk.legivel || !lido || (esperado && lido !== esperado)) {
       throw new CanhotoIlegivelError(
-        `[CANHOTO_ILEGIVEL] Validação final reprovada: legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}, assinatura=${chk.temAssinatura}.`,
+        `[CANHOTO_ILEGIVEL] Validação final reprovada: canhoto inteiro=${chk.completo}, legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}.`,
       );
     }
     validacao = { ...chk, numero_nf_esperado: esperado, numero_nf_localizado: localizado.nfLida };
+
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
