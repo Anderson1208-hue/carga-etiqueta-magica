@@ -376,6 +376,7 @@ export default function TrackingPandurata() {
                     <TableHead>Cidade</TableHead>
                     <TableHead>Status Atual</TableHead>
                     <TableHead>Próximo Status</TableHead>
+                    <TableHead>Chegada na filial</TableHead>
                     <TableHead>Previsão de entrega</TableHead>
                     <TableHead>Chegada ao Cliente</TableHead>
                     <TableHead>Entrega Efetiva</TableHead>
@@ -406,6 +407,7 @@ export default function TrackingPandurata() {
                         <Badge variant={l.atual === EM_TRANSITO ? "secondary" : "default"}>{l.atual}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{l.proximo || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{fmtBR(l.chegadaFilial) || "—"}</TableCell>
                       <TableCell>
                         {l.previsao ? (
                           <span className="whitespace-nowrap">
