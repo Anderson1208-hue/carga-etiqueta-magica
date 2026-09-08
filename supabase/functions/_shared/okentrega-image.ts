@@ -249,18 +249,27 @@ async function miniB64(src: Image, lado = 1024, q = 85): Promise<string> {
   return paraBase64(new Uint8Array(await mini.encodeJPEG(q)));
 }
 
-/** Confere a faixa já recortada: legível? invertida 180°? número correto? */
+/**
+ * Confere a faixa já recortada. A recusa da OK Entrega é por canhoto
+ * INCOMPLETO ou ILEGÍVEL — não por ausência de assinatura. Portanto o critério
+ * bloqueante é: canhoto inteiro (as 4 bordas do recibo dentro da faixa, sem
+ * corte) e texto legível, com o número da nota conferido.
+ */
 export async function conferirFaixa(
   faixa: Image,
   numeroNf?: string,
-): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean }> {
+): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean; completo: boolean }> {
   const chave = Deno.env.get("LOVABLE_API_KEY");
   if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente.");
   const instrucao =
     `Esta imagem é uma faixa de canhoto/recibo de nota fiscal (DANFE).` +
     (numeroNf ? ` O número esperado da nota é ${numeroNf}.` : "") +
-    ` Responda SOMENTE JSON: {"legivel":true|false,"invertido":true|false,` +
+    ` Responda SOMENTE JSON: {"legivel":true|false,"completo":true|false,"invertido":true|false,` +
     `"numero_nf":"<digitos>"|null,"tem_assinatura":true|false}. ` +
+    `completo=true somente se o canhoto aparecer INTEIRO: cabeçalho "RECEBEMOS DE", ` +
+    `campos de data e identificação do recebedor e a caixa "NF-e Nº ... SÉRIE" todos visíveis, ` +
+    `sem nenhum desses trechos cortado pelas bordas da faixa. ` +
+    `legivel=true somente se o texto puder ser lido sem esforço. ` +
     `invertido=true se o texto estiver de cabeça para baixo (180 graus). ` +
     `numero_nf apenas se conseguir LER de fato; caso contrário null.`;
   const r = await chamarVisao(chave, "google/gemini-3.8-flash", instrucao, await miniB64(faixa, 1024, 88));
@@ -270,8 +279,10 @@ export async function conferirFaixa(
     invertido: r.invertido === true,
     nfLida,
     temAssinatura: r.tem_assinatura === true,
+    completo: r.completo !== false,
   };
 }
+
 
 /**
  * Localiza o canhoto na foto com modelo de visão de grounding (box_2d 0-1000).
@@ -312,10 +323,12 @@ export async function localizarCanhotoIA(
   let y0 = cl(Math.min(by0, by1)), y1 = cl(Math.max(by0, by1));
   if (!(x1 > x0 && y1 > y0)) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
 
-  // respiro para não cortar assinatura/número nas bordas
-  const padX = (x1 - x0) * 0.03, padY = (y1 - y0) * 0.06;
+  // Respiro generoso: a recusa da OK Entrega é por canhoto cortado, então é
+  // melhor sobrar um pouco de folha do que perder cabeçalho, data ou nº da NF.
+  const padX = (x1 - x0) * 0.06, padY = (y1 - y0) * 0.14;
   x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX);
   y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY);
+
 
   const rotBruta = Number(r.rotacao_horaria ?? r.rotacao) || 0;
   const rot = [0, 90, 180, 270].includes(rotBruta) ? rotBruta : 0;
@@ -367,22 +380,42 @@ export async function prepararCanhoto(
     const area = localizado.recipe;
     origem = "recibo:visao";
 
-    let tira = src.crop(area.x, area.y, area.w, area.h);
-    if (area.rot) tira = tira.rotate(area.rot) as Image;
+    const recortar = (fator: number) => {
+      const cx = area.x + area.w / 2, cy = area.y + area.h / 2;
+      const w = Math.min(src.width, Math.round(area.w * fator));
+      const h = Math.min(src.height, Math.round(area.h * fator));
+      const x = Math.max(0, Math.min(src.width - w, Math.round(cx - w / 2)));
+      const y = Math.max(0, Math.min(src.height - h, Math.round(cy - h / 2)));
+      let t = src.crop(x, y, w, h);
+      if (area.rot) t = t.rotate(area.rot) as Image;
+      return t;
+    };
 
-    const chk = await conferirFaixa(tira, opts.numeroNf);
+    let tira = recortar(1);
+    let chk = await conferirFaixa(tira, opts.numeroNf);
+    // Canhoto cortado é o motivo real das recusas: alarga o recorte e reconfere.
+    if (!chk.completo) {
+      const alargada = recortar(1.25);
+      const chk2 = await conferirFaixa(alargada, opts.numeroNf);
+      if (chk2.completo) {
+        tira = alargada;
+        chk = chk2;
+        origem = "recibo:visao+alargado";
+      }
+    }
     if (chk.invertido) {
       tira = tira.rotate(180) as Image;
-      origem = "recibo:visao+180";
+      origem += "+180";
     }
     const esperado = String(opts.numeroNf ?? "").replace(/\D/g, "").replace(/^0+/, "");
     const lido = String(chk.nfLida ?? "").replace(/^0+/, "");
-    if (!chk.legivel || !lido || (esperado && lido !== esperado) || !chk.temAssinatura) {
+    if (!chk.completo || !chk.legivel || !lido || (esperado && lido !== esperado)) {
       throw new CanhotoIlegivelError(
-        `[CANHOTO_ILEGIVEL] Validação final reprovada: legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}, assinatura=${chk.temAssinatura}.`,
+        `[CANHOTO_ILEGIVEL] Validação final reprovada: canhoto inteiro=${chk.completo}, legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}.`,
       );
     }
     validacao = { ...chk, numero_nf_esperado: esperado, numero_nf_localizado: localizado.nfLida };
+
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.

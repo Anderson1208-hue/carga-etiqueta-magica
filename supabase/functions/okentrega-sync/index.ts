@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
     | "producao";
   const envioAtivo = cfg?.envio_ativo ?? false;
   // Pandurata exige a faixa do recibo. Outros modos não possuem a barreira
-  // completa (NF + legibilidade + assinatura) e não são autorizados no envio.
+  // completa (NF + canhoto inteiro + legibilidade) e não são autorizados no envio.
   const modoImagem: ModoImagem = "recibo";
   const maxTentativas = cfg?.max_tentativas ?? 5;
   const entregadorId = ambiente === "producao" ? cfg?.entregador_id_producao : cfg?.entregador_id_homolog;
@@ -207,16 +207,27 @@ Deno.serve(async (req) => {
         return json({ status: "debug_ia_falhou", mensagem: e instanceof Error ? e.message : String(e) });
       }
     }
-    const { bytes, origem } = await prepararCanhoto(buf, modoImagem, 85, {
-      numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,
-    });
-    return json({
-      status: "preview",
-      numero_nf: it?.numero_nf,
-      modo_imagem: modoImagem,
-      origem_recorte: origem,
-      base64: paraBase64(bytes),
-    });
+    try {
+      const { bytes, origem, validacao } = await prepararCanhoto(buf, modoImagem, 85, {
+        numeroNf: it?.numero_nf ? String(it.numero_nf) : undefined,
+      });
+      return json({
+        status: "preview",
+        numero_nf: it?.numero_nf,
+        modo_imagem: modoImagem,
+        origem_recorte: origem,
+        validacao,
+        base64: paraBase64(bytes),
+      });
+    } catch (e) {
+      return json({
+        status: "preview_reprovado",
+        numero_nf: it?.numero_nf,
+        modo_imagem: modoImagem,
+        mensagem: e instanceof Error ? e.message : String(e),
+      });
+    }
+
   }
 
 
