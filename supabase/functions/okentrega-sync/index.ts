@@ -234,7 +234,17 @@ Deno.serve(async (req) => {
 
   if (opts.queue_id) q = supabase.from("okentrega_queue").select("*").eq("id", opts.queue_id).limit(1);
 
-  const { data: pendentesRaw, error: errSelect } = await q;
+  let pendentesRaw: any[] | null = null;
+  let errSelect: any = null;
+  if (dryRun) {
+    const selecionados = await q;
+    pendentesRaw = selecionados.data;
+    errSelect = selecionados.error;
+  } else {
+    const reservado = await supabase.rpc("okentrega_reservar_item", { p_queue_id: opts.queue_id ?? null });
+    pendentesRaw = reservado.data;
+    errSelect = reservado.error;
+  }
   if (errSelect) return json({ error: errSelect.message }, 500);
 
   let pendentes = pendentesRaw ?? [];
@@ -293,17 +303,13 @@ Deno.serve(async (req) => {
   for (const item of pendentes) {
     const p = (item.payload ?? {}) as any;
     let erroPreparo: string | null = null;
+    let imagemOrigem: string | null = null;
+    let validacaoImagem: Record<string, unknown> | null = null;
+    let imagemBytes: Uint8Array | null = null;
     const fotos: Array<Record<string, string>> = [];
 
     if (opts.imagem_base64) {
-      fotos.push({
-        tipofoto: "C",
-        foto: opts.imagem_base64.startsWith("data:")
-          ? opts.imagem_base64
-          : `data:image/jpeg;base64,${opts.imagem_base64}`,
-        mime: "data:image/jpeg;base64",
-        extensao: "jpeg",
-      });
+      erroPreparo = "[CANHOTO_ILEGIVEL] Imagem externa sem validação do servidor. Gere a prévia validada antes do envio.";
     } else if (p.foto_path) {
       const { data: file, error: dlErr } = await supabase.storage
         .from("comprovantes")
@@ -312,9 +318,13 @@ Deno.serve(async (req) => {
         erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
       } else {
         try {
-          const { bytes } = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem, 85, {
+          const preparado = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem, 85, {
             numeroNf: item.numero_nf ? String(item.numero_nf) : undefined,
           });
+          const { bytes, origem, validacao } = preparado;
+          imagemBytes = bytes;
+          imagemOrigem = origem ?? null;
+          validacaoImagem = validacao ?? null;
           fotos.push({
             tipofoto: "C",
             foto: `data:image/jpeg;base64,${paraBase64(bytes)}`,
@@ -333,8 +343,7 @@ Deno.serve(async (req) => {
       if (!dryRun) {
         // Canhoto ilegível/errado não melhora com retentativa: vai direto para
         // exceção (conferência manual) em vez de gastar 5 tentativas.
-        const ilegivel = erroPreparo.includes("[CANHOTO_ILEGIVEL]");
-        const statusPreparo = ilegivel || item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
+        const statusPreparo = "revisao";
         await supabase
           .from("okentrega_queue")
           .update({
@@ -342,6 +351,7 @@ Deno.serve(async (req) => {
             erro_mensagem: erroPreparo,
             tentativas: item.tentativas + 1,
             ultima_tentativa_em: new Date().toISOString(),
+            processamento_iniciado_em: null,
           })
           .eq("id", item.id);
         if (item.baixa_id) {
@@ -356,6 +366,26 @@ Deno.serve(async (req) => {
       }
       resultados.push({ id: item.id, sucesso: false });
       continue;
+    }
+
+    let imagemEnviadaPath: string | null = null;
+    if (!dryRun && imagemBytes) {
+      imagemEnviadaPath = `okentrega-enviadas/${item.id}/${Date.now()}.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from("comprovantes")
+        .upload(imagemEnviadaPath, imagemBytes, { contentType: "image/jpeg", upsert: false });
+      if (uploadErr) {
+        const msg = `Falha ao arquivar a imagem exata do envio: ${uploadErr.message}`;
+        await supabase.from("okentrega_queue").update({ status: "revisao", erro_mensagem: msg, processamento_iniciado_em: null }).eq("id", item.id);
+        resultados.push({ id: item.id, sucesso: false });
+        continue;
+      }
+      await supabase.from("okentrega_queue").update({
+        imagem_enviada_path: imagemEnviadaPath,
+        imagem_origem: imagemOrigem,
+        validacao_imagem: validacaoImagem,
+        validado_em: new Date().toISOString(),
+      }).eq("id", item.id);
     }
 
     const dtEntregaLocal = toSaoPauloISO(p.dtentrega ?? p.registrado_em ?? item.created_at);
@@ -423,9 +453,24 @@ Deno.serve(async (req) => {
       sucesso,
     });
 
-    const novoStatus = sucesso ? "enviado" : item.tentativas + 1 >= maxTentativas ? "erro" : "pendente";
     const statusBaixa = respBody?.statusbaixa ?? null;
     const statusComprovante = respBody?.statuscomprovante != null ? String(respBody.statuscomprovante) : null;
+    const aprovado = sucesso && (statusComprovante === "1" || String(statusBaixa ?? "").startsWith("02"));
+    const recusado = sucesso && (statusComprovante === "2" || ["51", "52", "53"].some((s) => String(statusBaixa ?? "").startsWith(s)));
+    const duplicado = respStatus === 409;
+    const retryable = respStatus === 0 || respStatus === 429 || respStatus >= 500;
+    const novoStatus = aprovado
+      ? "aprovado"
+      : recusado
+        ? "recusado"
+        : sucesso
+          ? "aguardando_aprovacao"
+          : duplicado
+            ? "revisao"
+            : retryable && item.tentativas + 1 < maxTentativas
+              ? "pendente"
+              : "erro";
+    if (duplicado) erroMsg = "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
 
     await supabase
       .from("okentrega_queue")
@@ -433,12 +478,13 @@ Deno.serve(async (req) => {
         status: novoStatus,
         tentativas: item.tentativas + 1,
         ultima_tentativa_em: new Date().toISOString(),
-        enviado_em: sucesso ? new Date().toISOString() : null,
+        enviado_em: sucesso ? new Date().toISOString() : item.enviado_em,
         erro_mensagem: erroMsg,
         ocorrencia_entrega_id: respBody?.ocorrenciaentregaId ?? null,
         status_baixa: statusBaixa,
         status_comprovante: statusComprovante,
         motivo_recusa: respBody?.motivorecusa ?? null,
+        processamento_iniciado_em: null,
       })
       .eq("id", item.id);
 

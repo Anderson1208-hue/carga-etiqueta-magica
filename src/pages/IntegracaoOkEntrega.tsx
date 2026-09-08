@@ -327,7 +327,11 @@ export default function IntegracaoOkEntrega() {
   }, [nfsRoteirizadasHoje, filaPorNfId, filtroBusca, filtroStatus]);
 
   const statusAcompanhamento = (item: any) => {
-    if (item.fila?.status === "enviado") return { label: "Enviado", variant: "default" as const };
+    if (item.fila?.status === "aprovado") return { label: "Aprovado", variant: "default" as const };
+    if (item.fila?.status === "aguardando_aprovacao" || item.fila?.status === "enviado") return { label: "Em análise", variant: "secondary" as const };
+    if (item.fila?.status === "recusado") return { label: "Recusado", variant: "destructive" as const };
+    if (item.fila?.status === "revisao") return { label: "Revisão necessária", variant: "destructive" as const };
+    if (item.fila?.status === "processando") return { label: "Validando", variant: "secondary" as const };
     if (item.fila?.status === "erro") return { label: "Erro no envio", variant: "destructive" as const };
     if (item.fila?.status === "pendente") return { label: "Na fila", variant: "secondary" as const };
     if (!item.baixa) return { label: "Em rota / sem baixa", variant: "outline" as const };
@@ -397,7 +401,7 @@ export default function IntegracaoOkEntrega() {
     queryFn: async () => {
       const [pend, env, err] = await Promise.all([
         supabase.from("okentrega_queue").select("id", { count: "exact", head: true }).eq("status", "pendente"),
-        supabase.from("okentrega_queue").select("id", { count: "exact", head: true }).eq("status", "enviado"),
+        supabase.from("okentrega_queue").select("id", { count: "exact", head: true }).in("status", ["aguardando_aprovacao", "aprovado", "enviado"]),
         supabase.from("okentrega_queue").select("id", { count: "exact", head: true }).eq("status", "erro"),
       ]);
       return { pendentes: pend.count ?? 0, enviados: env.count ?? 0, erros: err.count ?? 0 };
@@ -559,8 +563,9 @@ export default function IntegracaoOkEntrega() {
           try {
             const { data: blob, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
             if (dlErr || !blob) throw dlErr ?? new Error("arquivo vazio");
-            const { base64 } = await prepararCanhotoOkEntrega(blob, modoImagem as any, ajuste);
-            imagem_base64 = base64;
+            // A imagem local serve apenas como prévia. O servidor sempre refaz e
+            // valida o recorte antes de transmitir; nunca aceita imagem não validada.
+            await prepararCanhotoOkEntrega(blob, modoImagem as any, ajuste);
           } catch (e: any) {
             toast.error(`NF ${item.numero_nf}: falha ao preparar canhoto — ${e.message ?? e}`);
             falhas += 1;
@@ -569,7 +574,7 @@ export default function IntegracaoOkEntrega() {
         }
 
         const { data, error } = await supabase.functions.invoke("okentrega-sync", {
-          body: { dry_run: dryRun, queue_id: item.id, imagem_base64 },
+          body: { dry_run: dryRun, queue_id: item.id },
         });
         if (error) throw error;
         ultimo = data;
@@ -932,6 +937,10 @@ export default function IntegracaoOkEntrega() {
                       <SelectItem value="todos">Todos os status</SelectItem>
                       <SelectItem value="pendente">Pendente</SelectItem>
                       <SelectItem value="enviado">Enviado</SelectItem>
+                      <SelectItem value="aguardando_aprovacao">Em análise</SelectItem>
+                      <SelectItem value="aprovado">Aprovado</SelectItem>
+                      <SelectItem value="recusado">Recusado</SelectItem>
+                      <SelectItem value="revisao">Revisão necessária</SelectItem>
                       <SelectItem value="erro">Erro</SelectItem>
                       <SelectItem value="fora_fila">Ainda fora da fila</SelectItem>
                     </SelectContent>

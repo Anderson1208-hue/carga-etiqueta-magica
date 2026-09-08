@@ -215,7 +215,7 @@ async function chamarVisao(
 ): Promise<Record<string, unknown>> {
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${chave}` },
+    headers: { "Content-Type": "application/json", "Lovable-API-Key": chave, "X-Lovable-AIG-SDK": "fetch" },
     body: JSON.stringify({
       model: modelo,
       messages: [
@@ -230,7 +230,12 @@ async function chamarVisao(
       response_format: { type: "json_object" },
     }),
   });
-  if (!resp.ok) throw new Error(`Visão indisponível (${resp.status}).`);
+  if (!resp.ok) {
+    const detalhe = await resp.text().catch(() => "");
+    throw new CanhotoIlegivelError(
+      `[VALIDACAO_INDISPONIVEL] Visão indisponível (${resp.status})${detalhe ? `: ${detalhe.slice(0, 240)}` : ""}`,
+    );
+  }
   const data = await resp.json();
   const bruto = String(data?.choices?.[0]?.message?.content ?? "");
   const m = bruto.match(/\{[\s\S]*\}/);
@@ -258,7 +263,7 @@ export async function conferirFaixa(
     `"numero_nf":"<digitos>"|null,"tem_assinatura":true|false}. ` +
     `invertido=true se o texto estiver de cabeça para baixo (180 graus). ` +
     `numero_nf apenas se conseguir LER de fato; caso contrário null.`;
-  const r = await chamarVisao(chave, "google/gemini-2.5-flash", instrucao, await miniB64(faixa, 1024, 88));
+  const r = await chamarVisao(chave, "google/gemini-3.8-flash", instrucao, await miniB64(faixa, 1024, 88));
   const nfLida = r.numero_nf ? String(r.numero_nf).replace(/\D/g, "") : null;
   return {
     legivel: r.legivel !== false,
@@ -291,10 +296,10 @@ export async function localizarCanhotoIA(
 
   let r: Record<string, unknown>;
   try {
-    r = await chamarVisao(chave, "google/gemini-3-pro-preview", instrucao, await miniB64(src, 1024, 88));
+    r = await chamarVisao(chave, "google/gemini-3.1-pro-preview", instrucao, await miniB64(src, 1024, 88));
   } catch (e) {
-    // fallback de modelo antes de cair na geometria
-    r = await chamarVisao(chave, "google/gemini-2.5-pro", instrucao, await miniB64(src, 1024, 88));
+    // Segundo modelo permitido; se ambos falharem, o envio é bloqueado.
+    r = await chamarVisao(chave, "google/gemini-3.8-flash", instrucao, await miniB64(src, 1024, 88));
     void e;
   }
   if (r?.encontrado === false) throw new CanhotoIlegivelError("Canhoto não identificado na foto.");
@@ -347,47 +352,37 @@ export async function prepararCanhoto(
   modo: ModoImagem = "contain",
   qualidade = 85,
   opts: { numeroNf?: string } = {},
-): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string }> {
+): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string; validacao?: Record<string, unknown> }> {
   const src = await Image.decode(originais);
 
   let final: Image;
   let origem = modo as string;
+  let validacao: Record<string, unknown> | undefined;
 
   if (modo === "recibo") {
-    // Falha aqui é proposital: melhor a NF ficar em exceção para conferência
-    // manual do que transmitir uma faixa que não é o canhoto (recusa por
-    // ilegibilidade no cartório digital).
-    let area: Recipe;
-    try {
-      area = (await localizarCanhotoIA(src, opts.numeroNf)).recipe;
-      origem = "recibo:visao";
-    } catch (e) {
-      if (e instanceof CanhotoIlegivelError && e.message.includes("[CANHOTO_ILEGIVEL]")) throw e;
-      area = detectarRecorte(src); // fallback geométrico
-      origem = "recibo:geometrico";
-    }
+    // Fail-closed: sem validação inteligente não há transmissão automática.
+    // O recorte geométrico permanece apenas como utilitário interno e nunca é
+    // usado como autorização para enviar ao cliente.
+    const localizado = await localizarCanhotoIA(src, opts.numeroNf);
+    const area = localizado.recipe;
+    origem = "recibo:visao";
 
     let tira = src.crop(area.x, area.y, area.w, area.h);
     if (area.rot) tira = tira.rotate(area.rot) as Image;
 
-    // 2ª passada: o giro devolvido pela visão às vezes vem 180° trocado.
-    if (origem === "recibo:visao") {
-      try {
-        const chk = await conferirFaixa(tira, opts.numeroNf);
-        if (chk.invertido) {
-          tira = tira.rotate(180) as Image;
-          origem = "recibo:visao+180";
-        }
-        if (!chk.legivel && !chk.nfLida) {
-          throw new CanhotoIlegivelError(
-            "[CANHOTO_ILEGIVEL] Faixa do canhoto ilegível após o recorte (foto de perfil ou borrada).",
-          );
-        }
-      } catch (e) {
-        if (e instanceof CanhotoIlegivelError) throw e;
-        // indisponibilidade da conferência não bloqueia o envio
-      }
+    const chk = await conferirFaixa(tira, opts.numeroNf);
+    if (chk.invertido) {
+      tira = tira.rotate(180) as Image;
+      origem = "recibo:visao+180";
     }
+    const esperado = String(opts.numeroNf ?? "").replace(/\D/g, "").replace(/^0+/, "");
+    const lido = String(chk.nfLida ?? "").replace(/^0+/, "");
+    if (!chk.legivel || !lido || (esperado && lido !== esperado) || !chk.temAssinatura) {
+      throw new CanhotoIlegivelError(
+        `[CANHOTO_ILEGIVEL] Validação final reprovada: legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}, assinatura=${chk.temAssinatura}.`,
+      );
+    }
+    validacao = { ...chk, numero_nf_esperado: esperado, numero_nf_localizado: localizado.nfLida };
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
@@ -421,7 +416,7 @@ export async function prepararCanhoto(
   const jpeg = await final.encodeJPEG(qualidade);
   const comDpi = aplicarDensidadeJfif(new Uint8Array(jpeg), OKE_DPI);
 
-  return { bytes: comDpi, largura: OKE_LARGURA, altura: OKE_ALTURA, dpi: OKE_DPI, origem };
+  return { bytes: comDpi, largura: OKE_LARGURA, altura: OKE_ALTURA, dpi: OKE_DPI, origem, validacao };
 }
 
 /**

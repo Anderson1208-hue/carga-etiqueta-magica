@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
   const { data: jaNaFila } = await supabase
     .from("okentrega_queue")
     .select("baixa_id")
-    .in("status", ["pendente", "enviado", "bloqueado"]);
+    .in("status", ["pendente", "processando", "aguardando_aprovacao", "aprovado", "revisao", "enviado", "bloqueado"]);
   const naFila = new Set((jaNaFila ?? []).map((r) => r.baixa_id).filter(Boolean));
 
   // Bloqueio manual: NFs digitadas direto no portal do cliente nunca podem
@@ -194,6 +194,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (iErr || !inserted) {
+      if (iErr?.code === "23505") continue;
       erros.push({ baixa_id: b.id, erro: iErr?.message ?? "insert vazio" });
       await supabase
         .from("baixas_entrega")
