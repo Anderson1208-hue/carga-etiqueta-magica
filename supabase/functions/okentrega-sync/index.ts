@@ -120,8 +120,8 @@ Deno.serve(async (req) => {
     limite?: number;
     queue_id?: string;
     testar_login?: boolean;
-    // Imagem já ajustada (1536x240 @150dpi) pelo cliente. Evita decodificar
-    // fotos de 12 MP aqui dentro, o que estoura o limite de CPU do worker.
+    // Mantido apenas para rejeitar clientes antigos: imagens externas não
+    // passam pela validação obrigatória do servidor.
     imagem_base64?: string;
   } = {};
   try {
@@ -275,8 +275,23 @@ Deno.serve(async (req) => {
     pendentes = pendentes.slice(0, BATCH_SIZE);
   }
 
+  // Se uma reserva não puder seguir por regra operacional, libere-a sem
+  // consumir tentativa. Isso evita itens presos em "processando".
+  if (!dryRun && pendentesRaw && pendentes.length === 0 && pendentesRaw.length > 0) {
+    await supabase
+      .from("okentrega_queue")
+      .update({ status: "pendente", processamento_iniciado_em: null })
+      .in("id", pendentesRaw.map((item) => item.id));
+  }
+
 
   if (!envioAtivo && !dryRun) {
+    if (pendentes.length > 0) {
+      await supabase
+        .from("okentrega_queue")
+        .update({ status: "pendente", processamento_iniciado_em: null })
+        .in("id", pendentes.map((item) => item.id));
+    }
     return json({
       status: "envio_bloqueado",
       mensagem: "Envio à OK Entrega desativado. A fila continua acumulando sem perda.",
@@ -292,6 +307,12 @@ Deno.serve(async (req) => {
       const t = await obterToken(supabase, ambiente);
       token = t.token;
     } catch (e) {
+      if (pendentes.length > 0) {
+        await supabase
+          .from("okentrega_queue")
+          .update({ status: "pendente", processamento_iniciado_em: null })
+          .in("id", pendentes.map((item) => item.id));
+      }
       return json({ status: "erro_login", mensagem: e instanceof Error ? e.message : String(e) }, 502);
     }
   }
@@ -455,8 +476,8 @@ Deno.serve(async (req) => {
 
     const statusBaixa = respBody?.statusbaixa ?? null;
     const statusComprovante = respBody?.statuscomprovante != null ? String(respBody.statuscomprovante) : null;
-    const aprovado = sucesso && (statusComprovante === "1" || String(statusBaixa ?? "").startsWith("02"));
-    const recusado = sucesso && (statusComprovante === "2" || ["51", "52", "53"].some((s) => String(statusBaixa ?? "").startsWith(s)));
+    const aprovado = sucesso && statusComprovante === "1";
+    const recusado = sucesso && statusComprovante === "2";
     const duplicado = respStatus === 409;
     const retryable = respStatus === 0 || respStatus === 429 || respStatus >= 500;
     const novoStatus = aprovado

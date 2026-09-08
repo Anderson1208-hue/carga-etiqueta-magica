@@ -19,7 +19,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import {
-  prepararCanhotoOkEntrega,
   previewCanhotoOkEntrega,
   AJUSTE_PADRAO,
   type AjusteCanhoto,
@@ -533,8 +532,7 @@ export default function IntegracaoOkEntrega() {
   });
 
   const sincronizar = useMutation({
-    // A imagem 1536x240 @150dpi é preparada aqui no navegador e enviada pronta,
-    // item por item — decodificar fotos de 12 MP na função estoura a CPU do worker.
+    // O servidor prepara, valida e arquiva a imagem exata antes de transmitir.
     mutationFn: async (dryRun: boolean) => {
       const { data: pendentes, error: errFila } = await supabase
         .from("okentrega_queue")
@@ -557,22 +555,6 @@ export default function IntegracaoOkEntrega() {
       }
 
       for (const item of pendentes) {
-        let imagem_base64: string | undefined;
-        const fotoPath = (item.payload as any)?.foto_path;
-        if (fotoPath) {
-          try {
-            const { data: blob, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
-            if (dlErr || !blob) throw dlErr ?? new Error("arquivo vazio");
-            // A imagem local serve apenas como prévia. O servidor sempre refaz e
-            // valida o recorte antes de transmitir; nunca aceita imagem não validada.
-            await prepararCanhotoOkEntrega(blob, modoImagem as any, ajuste);
-          } catch (e: any) {
-            toast.error(`NF ${item.numero_nf}: falha ao preparar canhoto — ${e.message ?? e}`);
-            falhas += 1;
-            continue;
-          }
-        }
-
         const { data, error } = await supabase.functions.invoke("okentrega-sync", {
           body: { dry_run: dryRun, queue_id: item.id },
         });
@@ -987,7 +969,7 @@ export default function IntegracaoOkEntrega() {
                             ? "Aprovado"
                             : i.fila?.status_comprovante === "2"
                               ? `Recusado${i.fila?.motivo_recusa ? ` — ${i.fila.motivo_recusa}` : ""}`
-                              : i.fila?.status === "enviado" ? "Em análise" : "Aguardando envio"}
+                              : ["enviado", "aguardando_aprovacao"].includes(i.fila?.status) ? "Em análise" : "Aguardando envio"}
                         </TableCell>
                       </TableRow>
                     );})}

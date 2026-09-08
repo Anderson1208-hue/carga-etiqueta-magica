@@ -342,7 +342,7 @@ export async function localizarCanhotoIA(
 
 /**
  * Redimensiona para exatamente 1536x240.
- * - recibo: localiza o canhoto na foto (visão + fallback geométrico) e encaixa na faixa
+ * - recibo: localiza e valida o canhoto por visão; sem validação, bloqueia o envio
  * - contain: preserva proporção, centraliza sobre fundo branco
  * - stretch: força 1536x240 (distorce)
  * - cover: preenche e recorta as sobras
