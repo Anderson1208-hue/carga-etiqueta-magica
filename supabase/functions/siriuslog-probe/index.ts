@@ -4,7 +4,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
 const SSO = 'https://sso.siriuslog.com'
-const GATEWAY = 'https://siriuslog.com/gateway'
+const GATEWAY = 'https://portal.siriuslog.com'
 // Valores públicos, expostos no bundle do próprio portal:
 const CLIENT_ID = 'TKwlKiwd1YHgKhqHxRbnECCRIZga'
 const CLIENT_SECRET = 'vQMfgzLe2TIgnkPz39j9gr9h7gsa'
