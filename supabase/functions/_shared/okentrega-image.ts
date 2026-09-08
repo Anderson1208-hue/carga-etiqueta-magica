@@ -249,18 +249,27 @@ async function miniB64(src: Image, lado = 1024, q = 85): Promise<string> {
   return paraBase64(new Uint8Array(await mini.encodeJPEG(q)));
 }
 
-/** Confere a faixa já recortada: legível? invertida 180°? número correto? */
+/**
+ * Confere a faixa já recortada. A recusa da OK Entrega é por canhoto
+ * INCOMPLETO ou ILEGÍVEL — não por ausência de assinatura. Portanto o critério
+ * bloqueante é: canhoto inteiro (as 4 bordas do recibo dentro da faixa, sem
+ * corte) e texto legível, com o número da nota conferido.
+ */
 export async function conferirFaixa(
   faixa: Image,
   numeroNf?: string,
-): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean }> {
+): Promise<{ legivel: boolean; invertido: boolean; nfLida: string | null; temAssinatura: boolean; completo: boolean }> {
   const chave = Deno.env.get("LOVABLE_API_KEY");
   if (!chave) throw new CanhotoIlegivelError("LOVABLE_API_KEY ausente.");
   const instrucao =
     `Esta imagem é uma faixa de canhoto/recibo de nota fiscal (DANFE).` +
     (numeroNf ? ` O número esperado da nota é ${numeroNf}.` : "") +
-    ` Responda SOMENTE JSON: {"legivel":true|false,"invertido":true|false,` +
+    ` Responda SOMENTE JSON: {"legivel":true|false,"completo":true|false,"invertido":true|false,` +
     `"numero_nf":"<digitos>"|null,"tem_assinatura":true|false}. ` +
+    `completo=true somente se o canhoto aparecer INTEIRO: cabeçalho "RECEBEMOS DE", ` +
+    `campos de data e identificação do recebedor e a caixa "NF-e Nº ... SÉRIE" todos visíveis, ` +
+    `sem nenhum desses trechos cortado pelas bordas da faixa. ` +
+    `legivel=true somente se o texto puder ser lido sem esforço. ` +
     `invertido=true se o texto estiver de cabeça para baixo (180 graus). ` +
     `numero_nf apenas se conseguir LER de fato; caso contrário null.`;
   const r = await chamarVisao(chave, "google/gemini-3.8-flash", instrucao, await miniB64(faixa, 1024, 88));
@@ -270,8 +279,10 @@ export async function conferirFaixa(
     invertido: r.invertido === true,
     nfLida,
     temAssinatura: r.tem_assinatura === true,
+    completo: r.completo !== false,
   };
 }
+
 
 /**
  * Localiza o canhoto na foto com modelo de visão de grounding (box_2d 0-1000).
