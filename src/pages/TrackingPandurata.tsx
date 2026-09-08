@@ -406,6 +406,9 @@ export default function TrackingPandurata() {
                           <span className="text-xs text-destructive">{l.previsaoOrigem || "—"}</span>
                         )}
                       </TableCell>
+                      <TableCell className="whitespace-nowrap">{fmtBR(l.chegadaCliente) || "—"}</TableCell>
+                      <TableCell className="whitespace-nowrap">{fmtBR(l.entregaEfetiva) || "—"}</TableCell>
+
                     </TableRow>
                   ))}
                 </TableBody>
