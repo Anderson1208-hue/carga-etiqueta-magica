@@ -121,6 +121,9 @@ Deno.serve(async (req) => {
     limite?: number;
     queue_id?: string;
     testar_login?: boolean;
+    // Liberação por conferência humana: exige queue_id e mantém as demais
+    // barreiras (NF correta + texto legível).
+    aprovacao_manual?: boolean;
     // Mantido apenas para rejeitar clientes antigos: imagens externas não
     // passam pela validação obrigatória do servidor.
     imagem_base64?: string;
@@ -246,18 +249,20 @@ Deno.serve(async (req) => {
     .order("created_at", { ascending: true })
     .limit(whitelist.length > 0 ? 500 : BATCH_SIZE);
 
+  const aprovacaoManual = !!opts.aprovacao_manual && !!opts.queue_id;
+
   if (opts.queue_id) {
     q = supabase
       .from("okentrega_queue")
       .select("*")
       .eq("id", opts.queue_id)
-      .eq("status", "pendente")
       .limit(1);
+    if (!aprovacaoManual) q = q.eq("status", "pendente");
   }
 
   let pendentesRaw: any[] | null = null;
   let errSelect: any = null;
-  if (dryRun) {
+  if (dryRun || aprovacaoManual) {
     const selecionados = await q;
     pendentesRaw = selecionados.data;
     errSelect = selecionados.error;
@@ -362,6 +367,7 @@ Deno.serve(async (req) => {
         try {
           const preparado = await prepararCanhoto(new Uint8Array(await file.arrayBuffer()), modoImagem, 85, {
             numeroNf: item.numero_nf ? String(item.numero_nf) : undefined,
+            aprovadoManualmente: aprovacaoManual,
           });
           const { bytes, origem, validacao } = preparado;
           imagemBytes = bytes;

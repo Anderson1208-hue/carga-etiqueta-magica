@@ -364,7 +364,7 @@ export async function prepararCanhoto(
   originais: Uint8Array,
   modo: ModoImagem = "contain",
   qualidade = 85,
-  opts: { numeroNf?: string } = {},
+  opts: { numeroNf?: string; aprovadoManualmente?: boolean } = {},
 ): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string; validacao?: Record<string, unknown> }> {
   const src = await Image.decode(originais);
 
@@ -409,12 +409,21 @@ export async function prepararCanhoto(
     }
     const esperado = String(opts.numeroNf ?? "").replace(/\D/g, "").replace(/^0+/, "");
     const lido = String(chk.nfLida ?? "").replace(/^0+/, "");
-    if (!chk.completo || !chk.legivel || !lido || (esperado && lido !== esperado)) {
+    // Conferência humana (administrador) pode liberar o caso em que a visão
+    // apontou "cortado" mas o canhoto está de fato inteiro e legível.
+    const exigeCompleto = !opts.aprovadoManualmente;
+    if ((exigeCompleto && !chk.completo) || !chk.legivel || !lido || (esperado && lido !== esperado)) {
       throw new CanhotoIlegivelError(
         `[CANHOTO_ILEGIVEL] Validação final reprovada: canhoto inteiro=${chk.completo}, legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}.`,
       );
     }
-    validacao = { ...chk, numero_nf_esperado: esperado, numero_nf_localizado: localizado.nfLida };
+    if (opts.aprovadoManualmente) origem += "+aprovado_manual";
+    validacao = {
+      ...chk,
+      numero_nf_esperado: esperado,
+      numero_nf_localizado: localizado.nfLida,
+      ...(opts.aprovadoManualmente ? { aprovado_manualmente: true } : {}),
+    };
 
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
