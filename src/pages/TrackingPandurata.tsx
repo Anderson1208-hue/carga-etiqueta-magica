@@ -137,7 +137,7 @@ export default function TrackingPandurata() {
         const { data: nfs, error } = await supabase
           .from("notas_fiscais")
           .select(
-            "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status), agendamentos(status, data_agendamento, created_at)"
+            "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status, updated_at), agendamentos(status, data_agendamento, created_at)"
           )
           // CNPJ do emitente pode estar gravado com ou sem pontuação.
           .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%")
@@ -149,9 +149,14 @@ export default function TrackingPandurata() {
         if (error) throw error;
         const lote = nfs ?? [];
         for (const nf of lote) {
-          const statusCarga =
-            (nf as unknown as { cargas?: { status?: string } | null }).cargas?.status ?? null;
+          const carga = (nf as unknown as { cargas?: { status?: string; updated_at?: string } | null }).cargas;
+          const statusCarga = carga?.status ?? null;
           const { atual, proximo } = statusPandurata(statusCarga);
+          // Chegada na filial = data em que a carga deixou de estar "fechada" (foi aberta).
+          const chegadaFilial =
+            statusCarga && statusCarga !== "fechada" && carga?.updated_at
+              ? String(carga.updated_at).slice(0, 10)
+              : null;
 
           // Previsão de entrega: data do agendamento quando houver; senão, fim do lead time.
           const ags = ((nf as any).agendamentos ?? []) as { data_agendamento: string | null; created_at: string }[];
@@ -189,6 +194,7 @@ export default function TrackingPandurata() {
             previsaoOrigem,
             chegadaCliente: null,
             entregaEfetiva: null,
+            chegadaFilial,
           });
         }
         if (lote.length < PAGE) break;
