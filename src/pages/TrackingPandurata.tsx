@@ -249,7 +249,9 @@ export default function TrackingPandurata() {
             <h1 className="text-2xl font-bold">Tracking Pandurata (FIORD)</h1>
             <p className="text-sm text-muted-foreground">
               Planilha de status por nota fiscal. Viagem, Tipo de Viagem e DT ficam em branco — o
-              portal preenche sozinho ao informar o número da nota.
+              portal preenche sozinho ao informar o número da nota. Solicitação e Confirmação da
+              Agenda são preenchidas pela Pandurata. A previsão de entrega usa a data do agendamento
+              e, quando não há agendamento, o último dia do prazo cadastrado da região.
             </p>
           </div>
         </div>
@@ -277,7 +279,7 @@ export default function TrackingPandurata() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Notas no período</p>
@@ -296,6 +298,12 @@ export default function TrackingPandurata() {
               <p className="text-2xl font-bold">{resumo.naFilial}</p>
             </CardContent>
           </Card>
+          <Card className={resumo.semSla ? "border-destructive" : undefined}>
+            <CardContent className="pt-6">
+              <p className="text-xs text-muted-foreground">Sem prazo cadastrado</p>
+              <p className="text-2xl font-bold">{resumo.semSla}</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -312,19 +320,20 @@ export default function TrackingPandurata() {
                     <TableHead>Cidade</TableHead>
                     <TableHead>Status Atual</TableHead>
                     <TableHead>Próximo Status</TableHead>
+                    <TableHead>Previsão de entrega</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isFetching && !linhas.length && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Carregando…
                       </TableCell>
                     </TableRow>
                   )}
                   {!isFetching && !linhas.length && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Nenhuma nota da Pandurata no período.
                       </TableCell>
                     </TableRow>
@@ -338,6 +347,16 @@ export default function TrackingPandurata() {
                         <Badge variant={l.atual === EM_TRANSITO ? "secondary" : "default"}>{l.atual}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{l.proximo || "—"}</TableCell>
+                      <TableCell>
+                        {l.previsao ? (
+                          <span className="whitespace-nowrap">
+                            {fmtBR(l.previsao)}{" "}
+                            <span className="text-xs text-muted-foreground">({l.previsaoOrigem})</span>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-destructive">{l.previsaoOrigem || "—"}</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
