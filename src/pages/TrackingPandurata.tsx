@@ -453,17 +453,22 @@ export default function TrackingPandurata() {
                   {!isFetching && !linhas.length && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        Nenhuma nota da Pandurata no período.
+                        {apenasEmAberto
+                          ? "Nenhuma entrega em aberto da Pandurata."
+                          : "Nenhuma nota da Pandurata no período."}
                       </TableCell>
                     </TableRow>
                   )}
                   {!isFetching && linhas.length && !linhasFiltradas.length && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        Todas as notas do período já foram entregues.
+                        {apenasEmAberto
+                          ? "Não há entregas em aberto no filtro atual."
+                          : "Todas as notas do período já foram entregues."}
                       </TableCell>
                     </TableRow>
                   )}
+
                   {linhasFiltradas.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{l.numero_nf}</TableCell>
