@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
+import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
 
 import {
   Truck,
@@ -170,6 +171,7 @@ export function Sidebar() {
   const { podeGestaoComercial } = useGestaoComercial();
   const { podeVerIbac } = useAcessoIbac();
   const { podeVerOkEntrega } = useAcessoOkEntrega();
+  const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
 
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
@@ -255,7 +257,7 @@ export function Sidebar() {
                 isActive={location.pathname === "/integracoes/okentrega"}
               />
             )}
-            {podeVerOkEntrega && (
+            {podeVerTrackingPandurata && (
               <NavItem
                 item={{ name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug }}
                 isActive={location.pathname === "/integracoes/tracking-pandurata"}
