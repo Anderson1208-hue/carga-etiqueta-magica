@@ -235,7 +235,14 @@ Deno.serve(async (req) => {
     .order("created_at", { ascending: true })
     .limit(whitelist.length > 0 ? 500 : BATCH_SIZE);
 
-  if (opts.queue_id) q = supabase.from("okentrega_queue").select("*").eq("id", opts.queue_id).limit(1);
+  if (opts.queue_id) {
+    q = supabase
+      .from("okentrega_queue")
+      .select("*")
+      .eq("id", opts.queue_id)
+      .eq("status", "pendente")
+      .limit(1);
+  }
 
   let pendentesRaw: any[] | null = null;
   let errSelect: any = null;
