@@ -194,10 +194,33 @@ Deno.serve(async (req) => {
       leituras.push(await get(p, `${BASE}/${p}`))
     }
   } else {
-    // testa nomes de parâmetro de filtro por nota, um a um
-    const params = ['invoiceNumber', 'invoice', 'nfNumber', 'numberInvoice', 'documentNumber', 'search']
-    for (const p of params) {
-      leituras.push(await get(`filtro:${p}`, `${BASE}/trip/delivery/status/view?page=0&size=1&${p}=${nf}`))
+    // busca via POST (consulta, não gravação): tenta corpos de filtro
+    const post = async (nome: string, url: string, body: unknown, ms = 25000) => {
+      const ctl = new AbortController()
+      const t = setTimeout(() => ctl.abort(), ms)
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          signal: ctl.signal,
+        })
+        const txt = await r.text()
+        return { nome, status: r.status, tamanho: txt.length, amostra: txt.slice(0, 1200) }
+      } catch (e) {
+        return { nome, erro: String(e) }
+      } finally {
+        clearTimeout(t)
+      }
+    }
+    const alvos = [
+      ['view+invoiceNumber', `${BASE}/trip/delivery/status/view?page=0&size=5`, { invoiceNumber: nf }],
+      ['view+invoiceNumbers', `${BASE}/trip/delivery/status/view?page=0&size=5`, { invoiceNumbers: [nf] }],
+      ['view/filter', `${BASE}/trip/delivery/status/view/filter?page=0&size=5`, { invoiceNumber: nf }],
+      ['detail-history/filter', `${BASE}/delivery-invoice-detail-history/filter?page=0&size=5`, { invoiceNumber: nf }],
+    ] as const
+    for (const [nome, url, body] of alvos) {
+      leituras.push(await post(nome, url, body))
     }
   }
   out.leituras = leituras
