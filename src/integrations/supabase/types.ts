@@ -2508,15 +2508,19 @@ export type Database = {
           ambiente: string
           baixa_id: string | null
           chave_acesso: string | null
+          conciliado_em: string | null
           created_at: string
           enviado_em: string | null
           erro_mensagem: string | null
           id: string
+          imagem_enviada_path: string | null
+          imagem_origem: string | null
           motivo_recusa: string | null
           nf_id: string | null
           numero_nf: string | null
           ocorrencia_entrega_id: string | null
           payload: Json
+          processamento_iniciado_em: string | null
           status: string
           status_baixa: string | null
           status_comprovante: string | null
@@ -2524,20 +2528,26 @@ export type Database = {
           tipo_entrega: string
           tipo_ocorrencia_id: number
           ultima_tentativa_em: string | null
+          validacao_imagem: Json | null
+          validado_em: string | null
         }
         Insert: {
           ambiente?: string
           baixa_id?: string | null
           chave_acesso?: string | null
+          conciliado_em?: string | null
           created_at?: string
           enviado_em?: string | null
           erro_mensagem?: string | null
           id?: string
+          imagem_enviada_path?: string | null
+          imagem_origem?: string | null
           motivo_recusa?: string | null
           nf_id?: string | null
           numero_nf?: string | null
           ocorrencia_entrega_id?: string | null
           payload?: Json
+          processamento_iniciado_em?: string | null
           status?: string
           status_baixa?: string | null
           status_comprovante?: string | null
@@ -2545,20 +2555,26 @@ export type Database = {
           tipo_entrega?: string
           tipo_ocorrencia_id?: number
           ultima_tentativa_em?: string | null
+          validacao_imagem?: Json | null
+          validado_em?: string | null
         }
         Update: {
           ambiente?: string
           baixa_id?: string | null
           chave_acesso?: string | null
+          conciliado_em?: string | null
           created_at?: string
           enviado_em?: string | null
           erro_mensagem?: string | null
           id?: string
+          imagem_enviada_path?: string | null
+          imagem_origem?: string | null
           motivo_recusa?: string | null
           nf_id?: string | null
           numero_nf?: string | null
           ocorrencia_entrega_id?: string | null
           payload?: Json
+          processamento_iniciado_em?: string | null
           status?: string
           status_baixa?: string | null
           status_comprovante?: string | null
@@ -2566,6 +2582,8 @@ export type Database = {
           tipo_entrega?: string
           tipo_ocorrencia_id?: number
           ultima_tentativa_em?: string | null
+          validacao_imagem?: Json | null
+          validado_em?: string | null
         }
         Relationships: []
       }
@@ -3954,6 +3972,42 @@ export type Database = {
           uf: string
           ultima_emissao: string
         }[]
+      }
+      okentrega_reservar_item: {
+        Args: { p_queue_id?: string }
+        Returns: {
+          ambiente: string
+          baixa_id: string | null
+          chave_acesso: string | null
+          conciliado_em: string | null
+          created_at: string
+          enviado_em: string | null
+          erro_mensagem: string | null
+          id: string
+          imagem_enviada_path: string | null
+          imagem_origem: string | null
+          motivo_recusa: string | null
+          nf_id: string | null
+          numero_nf: string | null
+          ocorrencia_entrega_id: string | null
+          payload: Json
+          processamento_iniciado_em: string | null
+          status: string
+          status_baixa: string | null
+          status_comprovante: string | null
+          tentativas: number
+          tipo_entrega: string
+          tipo_ocorrencia_id: number
+          ultima_tentativa_em: string | null
+          validacao_imagem: Json | null
+          validado_em: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "okentrega_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
