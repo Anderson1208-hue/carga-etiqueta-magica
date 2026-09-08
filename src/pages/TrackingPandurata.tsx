@@ -4,7 +4,7 @@ import { Navigate, Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
-import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
+import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
 import { addDiasUteis } from "@/lib/feriados-rj";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -104,13 +104,13 @@ type Linha = {
 
 
 export default function TrackingPandurata() {
-  const { podeVerOkEntrega, isLoading: carregandoAcesso } = useAcessoOkEntrega();
+  const { podeVerTrackingPandurata, isLoading: carregandoAcesso } = useAcessoTrackingPandurata();
   const [de, setDe] = useState(diasAtrasISO(7));
   const [ate, setAte] = useState(hojeISO());
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["tracking-pandurata", de, ate],
-    enabled: podeVerOkEntrega,
+    enabled: podeVerTrackingPandurata,
     queryFn: async (): Promise<Linha[]> => {
       // Lead time cadastrado (SLA por região da Pandurata): cidade -> prazo em dias úteis
       const { data: regioes, error: eReg } = await supabase
@@ -290,7 +290,7 @@ export default function TrackingPandurata() {
       </MainLayout>
     );
   }
-  if (!podeVerOkEntrega) return <Navigate to="/" replace />;
+  if (!podeVerTrackingPandurata) return <Navigate to="/" replace />;
 
   return (
     <MainLayout>
