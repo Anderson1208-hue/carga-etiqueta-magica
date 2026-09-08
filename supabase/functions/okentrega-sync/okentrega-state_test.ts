@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { classificarRetornoOkEntrega } from "./okentrega-state.ts";
+import { classificarRetornoOkEntrega } from "../_shared/okentrega-state.ts";
 
 Deno.test("HTTP 200 em análise não é aprovação", () => {
   assertEquals(classificarRetornoOkEntrega({ sucessoHttp: true, httpStatus: 200, statusComprovante: null, tentativasAtuais: 0, maxTentativas: 5 }), "aguardando_aprovacao");
