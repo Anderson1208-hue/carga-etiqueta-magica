@@ -275,7 +275,7 @@ export default function TrackingPandurata() {
 
   function exportar() {
     if (!linhasFiltradas.length) {
-      toast.error("Nada para exportar no período selecionado");
+      toast.error(apenasEmAberto ? "Nenhuma entrega em aberto da Pandurata" : "Nada para exportar no período selecionado");
       return;
     }
     const dados = linhasFiltradas.map((l) => ({
@@ -300,9 +300,13 @@ export default function TrackingPandurata() {
     ws["!cols"] = COLUNAS.map((c) => ({ wch: Math.max(12, c.length + 2) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "sheet");
-    XLSX.writeFile(wb, `status-entregas-pandurata-${de}_a_${ate}.xlsx`);
+    const nomeArquivo = apenasEmAberto
+      ? `status-entregas-pandurata-em-aberto-${hojeISO()}.xlsx`
+      : `status-entregas-pandurata-${de}_a_${ate}.xlsx`;
+    XLSX.writeFile(wb, nomeArquivo);
     toast.success(`${dados.length} nota(s) exportada(s)`);
   }
+
 
   if (carregandoAcesso) {
     return (
