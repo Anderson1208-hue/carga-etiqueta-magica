@@ -218,9 +218,11 @@ export default function TrackingPandurata() {
         ]);
         if (eV) throw eV;
         if (eB) throw eB;
+        const hoje = hojeISO();
         for (const v of (vnfs ?? []) as any[]) {
           const d = v.veiculos?.data ? String(v.veiculos.data).slice(0, 10) : null;
-          if (!d) continue;
+          // Só considera o veículo efetivamente expedido: data de roteirização já chegou.
+          if (!d || d > hoje) continue;
           const atualD = roteirizadaPorNf.get(v.nf_id);
           if (!atualD || d < atualD) roteirizadaPorNf.set(v.nf_id, d);
         }
