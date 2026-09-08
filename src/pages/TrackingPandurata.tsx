@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
@@ -107,6 +108,7 @@ export default function TrackingPandurata() {
   const { podeVerTrackingPandurata, isLoading: carregandoAcesso } = useAcessoTrackingPandurata();
   const [de, setDe] = useState(diasAtrasISO(7));
   const [ate, setAte] = useState(hojeISO());
+  const [apenasEmAberto, setApenasEmAberto] = useState(false);
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["tracking-pandurata", de, ate],
@@ -243,19 +245,29 @@ export default function TrackingPandurata() {
 
 
   const linhas = data ?? [];
+  const linhasFiltradas = useMemo(
+    () => (apenasEmAberto ? linhas.filter((l) => !l.entregaEfetiva) : linhas),
+    [linhas, apenasEmAberto]
+  );
 
   const resumo = useMemo(() => {
-    const emTransito = linhas.filter((l) => l.atual === EM_TRANSITO).length;
-    const semSla = linhas.filter((l) => l.previsaoOrigem === "Sem SLA cadastrado").length;
-    return { total: linhas.length, emTransito, naFilial: linhas.length - emTransito, semSla };
-  }, [linhas]);
+    const emTransito = linhasFiltradas.filter((l) => l.atual === EM_TRANSITO).length;
+    const semSla = linhasFiltradas.filter((l) => l.previsaoOrigem === "Sem SLA cadastrado").length;
+    return {
+      total: linhasFiltradas.length,
+      emTransito,
+      naFilial: linhasFiltradas.length - emTransito,
+      semSla,
+      emAberto: linhasFiltradas.filter((l) => !l.entregaEfetiva).length,
+    };
+  }, [linhasFiltradas]);
 
   function exportar() {
-    if (!linhas.length) {
+    if (!linhasFiltradas.length) {
       toast.error("Nada para exportar no período selecionado");
       return;
     }
-    const dados = linhas.map((l) => ({
+    const dados = linhasFiltradas.map((l) => ({
       Viagem: "",
       "Tipo de Viagem": "",
       DT: "",
@@ -329,13 +341,23 @@ export default function TrackingPandurata() {
               {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               Atualizar
             </Button>
-            <Button onClick={exportar} disabled={isFetching || !linhas.length}>
+            <Button onClick={exportar} disabled={isFetching || !linhasFiltradas.length}>
               <Download className="w-4 h-4 mr-2" /> Exportar planilha
             </Button>
+            <div className="flex items-center gap-2 pb-1">
+              <Switch
+                id="apenas-em-aberto"
+                checked={apenasEmAberto}
+                onCheckedChange={setApenasEmAberto}
+              />
+              <Label htmlFor="apenas-em-aberto" className="cursor-pointer">
+                Apenas entregas em aberto
+              </Label>
+            </div>
           </CardContent>
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-5">
           <Card>
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Notas no período</p>
@@ -352,6 +374,12 @@ export default function TrackingPandurata() {
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Na filial da transportadora</p>
               <p className="text-2xl font-bold">{resumo.naFilial}</p>
+            </CardContent>
+          </Card>
+          <Card className={resumo.emAberto ? "border-amber-500" : undefined}>
+            <CardContent className="pt-6">
+              <p className="text-xs text-muted-foreground">Entregas em aberto</p>
+              <p className="text-2xl font-bold">{resumo.emAberto}</p>
             </CardContent>
           </Card>
           <Card className={resumo.semSla ? "border-destructive" : undefined}>
@@ -398,7 +426,14 @@ export default function TrackingPandurata() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {linhas.map((l) => (
+                  {!isFetching && linhas.length && !linhasFiltradas.length && (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Todas as notas do período já foram entregues.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {linhasFiltradas.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{l.numero_nf}</TableCell>
                       <TableCell className="max-w-[260px] truncate">{l.dest}</TableCell>
