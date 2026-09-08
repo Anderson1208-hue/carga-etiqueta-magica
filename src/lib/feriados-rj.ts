@@ -80,3 +80,20 @@ export function proximoDiaUtilApos(date: Date): Date {
   }
   return d;
 }
+
+// Soma N dias úteis a partir de `date` (D+0 = a própria data se for dia útil).
+// Ex.: prazo 1 dia útil = próximo dia útil após a data.
+export function addDiasUteis(date: Date, dias: number): Date {
+  let d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  let restantes = Math.max(0, Math.trunc(dias));
+  if (restantes === 0) {
+    while (!isDiaUtil(d)) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  while (restantes > 0) {
+    d = proximoDiaUtilApos(d);
+    restantes -= 1;
+  }
+  return d;
+}
