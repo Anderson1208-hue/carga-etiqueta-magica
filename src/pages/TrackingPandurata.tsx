@@ -270,7 +270,7 @@ export default function TrackingPandurata() {
       "Chegada ao Cliente": fmtBR(l.chegadaCliente),
 
       "Previsão de chegada na filial": "",
-      "Chegada na filial": "",
+      "Chegada na filial": fmtBR(l.chegadaFilial),
       "Saída na filial": "",
     }));
     const ws = XLSX.utils.json_to_sheet(dados, { header: [...COLUNAS] });
