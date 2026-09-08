@@ -168,43 +168,49 @@ Deno.serve(async (req) => {
     tenant: 'bauducco.siriuslog.com',
   }
 
-  // 5) leituras (sem gravar nada)
-  const tentativas = [
-    {
-      nome: 'delivery-status-view',
-      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view`,
-      init: { method: 'GET', headers },
-    },
-    {
-      nome: 'busca-por-nf',
-      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view?page=0&size=5&invoiceNumber=${nf}`,
-      init: { method: 'GET', headers },
-    },
-    {
-      nome: 'historico-nf',
-      url: `${GATEWAY}/sirius-national-tracking-api/v1/delivery-invoice-detail-history/filter?page=0&size=5&invoiceNumber=${nf}`,
-      init: { method: 'GET', headers },
-    },
-    {
-      nome: 'status-all',
-      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/status/all`,
-      init: { method: 'GET', headers },
-    },
-    {
-      nome: 'detailed-status-all',
-      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/invoice/detailed-status/all`,
-      init: { method: 'GET', headers },
-    },
-  ]
-  const leituras: unknown[] = []
-  const filtro = (() => { try { return null } catch { return null } })()
-  for (const t of tentativas.filter((x) => !somente || x.nome === somente)) {
+  // 5) leituras (sem gravar nada) — timeout curto por chamada
+  const get = async (nome: string, url: string, ms = 20000) => {
+    const ctl = new AbortController()
+    const t = setTimeout(() => ctl.abort(), ms)
     try {
-      const r = await fetch(t.url, t.init as RequestInit)
+      const r = await fetch(url, { method: 'GET', headers, signal: ctl.signal })
       const txt = await r.text()
-      leituras.push({ nome: t.nome, status: r.status, amostra: txt.slice(0, 700) })
+      return { nome, status: r.status, tamanho: txt.length, amostra: txt.slice(0, 2500) }
     } catch (e) {
-      leituras.push({ nome: t.nome, erro: String(e) })
+      return { nome, erro: String(e) }
+    } finally {
+      clearTimeout(t)
+    }
+  }
+
+  const BASE = `${GATEWAY}/sirius-national-tracking-api/v1`
+  const leituras: unknown[] = []
+
+  if (somente === 'amostra-registro') {
+    // 1 registro só, para descobrir os nomes dos campos (inclui o da NF)
+    leituras.push(await get('amostra-registro', `${BASE}/trip/delivery/status/view?page=0&size=1`))
+  } else if (somente === 'detalhe-viagem') {
+    for (const p of ['trip/67667', 'trip/detail/67667', 'trip/delivery/67667']) {
+      leituras.push(await get(p, `${BASE}/${p}`))
+    }
+  } else {
+    // Busca correta: nfe?number=... -> invoiceIds -> trip/delivery/status/view
+    const nfe = await get('nfe', `${GATEWAY}/sirius-load-composition-api/nfe?number=${nf}&size=5`)
+    leituras.push(nfe)
+    let ids: number[] = []
+    try {
+      const body = JSON.parse((nfe as { amostra?: string }).amostra ?? '{}')
+      const arr = body.content ?? body
+      if (Array.isArray(arr)) ids = arr.map((x: { id: number }) => x.id).filter(Boolean)
+    } catch { /* amostra truncada */ }
+    out.invoice_ids = ids
+    if (ids.length) {
+      leituras.push(
+        await get(
+          'view+invoiceIds',
+          `${BASE}/trip/delivery/status/view?page=0&size=5&invoiceIds=${ids.join(',')}`,
+        ),
+      )
     }
   }
   out.leituras = leituras
