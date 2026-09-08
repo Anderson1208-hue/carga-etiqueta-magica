@@ -237,19 +237,38 @@ Deno.serve(async (req) => {
     'branchArrivalDate',
     'branchDepartureDate',
   ]
-  if (!CAMPOS.includes(campo) || !valor) {
-    out.erro = 'campo_ou_valor_invalido'
-    out.campos_aceitos = CAMPOS
-    return json()
+  const statusId = Number(body.statusId ?? 0)
+
+  // Modo A: mudar status detalhado (opcionalmente com uma data) - PATCH no recurso
+  if (statusId) {
+    const dataExtra = campo && valor && CAMPOS.includes(campo) ? { [campo]: valor } : {}
+    const tentativas: unknown[] = []
+    const payloads: Record<string, unknown>[] = [
+      { tripInvoiceDetailedStatusId: statusId, ...dataExtra },
+      { tripInvoiceDetailedStatus: { id: statusId }, ...dataExtra },
+      { detailedStatusId: statusId, ...dataExtra },
+    ]
+    for (const p of payloads) {
+      const r = await call('patch detalhe', `${TRACK}/delivery-invoice-detail/${detailId}`, 'PATCH', p)
+      tentativas.push({ enviado: p, ...r })
+      if ((r as { status?: number }).status && (r as { status: number }).status < 300) break
+    }
+    out.gravacao_status = tentativas
+  } else {
+    if (!CAMPOS.includes(campo) || !valor) {
+      out.erro = 'campo_ou_valor_invalido'
+      out.campos_aceitos = CAMPOS
+      return json()
+    }
+    // Gravacao de UMA data, sem alterar status (modo "current-status" do portal)
+    out.gravacao = await call(
+      'patch current-status',
+      `${TRACK}/delivery-invoice-detail/${detailId}/current-status`,
+      'PATCH',
+      { [campo]: valor },
+    )
   }
 
-  // Gravacao de UMA data, sem alterar status (modo "current-status" do portal)
-  out.gravacao = await call(
-    'patch current-status',
-    `${TRACK}/delivery-invoice-detail/${detailId}/current-status`,
-    'PATCH',
-    { [campo]: valor },
-  )
 
   // reler para confirmar
   out.conferencia = await call(
