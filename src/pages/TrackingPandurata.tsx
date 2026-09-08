@@ -263,11 +263,11 @@ export default function TrackingPandurata() {
   }, [linhasFiltradas]);
 
   function exportar() {
-    if (!linhas.length) {
+    if (!linhasFiltradas.length) {
       toast.error("Nada para exportar no período selecionado");
       return;
     }
-    const dados = linhas.map((l) => ({
+    const dados = linhasFiltradas.map((l) => ({
       Viagem: "",
       "Tipo de Viagem": "",
       DT: "",
