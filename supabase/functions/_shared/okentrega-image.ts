@@ -294,14 +294,14 @@ export async function localizarCanhotoIA(
     `rotacao_horaria = giro HORÁRIO necessário para o texto do canhoto ficar horizontal e legível. ` +
     `numero_nf somente se conseguir LER de fato; se a folha estiver quase de perfil, fora de foco ou ilegível, null.`;
 
-  let r: Record<string, unknown>;
-  try {
-    r = await chamarVisao(chave, "google/gemini-3.1-pro-preview", instrucao, await miniB64(src, 1024, 88));
-  } catch (e) {
-    // Segundo modelo permitido; se ambos falharem, o envio é bloqueado.
-    r = await chamarVisao(chave, "google/gemini-3.8-flash", instrucao, await miniB64(src, 1024, 88));
-    void e;
-  }
+  // Uma única chamada: negativas permanentes (crédito/política) jamais são
+  // repetidas dentro da mesma execução.
+  const r: Record<string, unknown> = await chamarVisao(
+    chave,
+    "google/gemini-3.8-flash",
+    instrucao,
+    await miniB64(src, 1024, 88),
+  );
   if (r?.encontrado === false) throw new CanhotoIlegivelError("Canhoto não identificado na foto.");
 
   const box = Array.isArray(r.box_2d) ? (Array.isArray(r.box_2d[0]) ? r.box_2d[0] : r.box_2d) : null;
