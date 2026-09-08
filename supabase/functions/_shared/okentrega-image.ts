@@ -323,10 +323,12 @@ export async function localizarCanhotoIA(
   let y0 = cl(Math.min(by0, by1)), y1 = cl(Math.max(by0, by1));
   if (!(x1 > x0 && y1 > y0)) throw new CanhotoIlegivelError("Recorte do canhoto inválido.");
 
-  // respiro para não cortar assinatura/número nas bordas
-  const padX = (x1 - x0) * 0.03, padY = (y1 - y0) * 0.06;
+  // Respiro generoso: a recusa da OK Entrega é por canhoto cortado, então é
+  // melhor sobrar um pouco de folha do que perder cabeçalho, data ou nº da NF.
+  const padX = (x1 - x0) * 0.06, padY = (y1 - y0) * 0.14;
   x0 = Math.max(0, x0 - padX); x1 = Math.min(1, x1 + padX);
   y0 = Math.max(0, y0 - padY); y1 = Math.min(1, y1 + padY);
+
 
   const rotBruta = Number(r.rotacao_horaria ?? r.rotacao) || 0;
   const rot = [0, 90, 180, 270].includes(rotBruta) ? rotBruta : 0;
