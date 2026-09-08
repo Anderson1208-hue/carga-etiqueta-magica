@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
+import { addDiasUteis } from "@/lib/feriados-rj";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,8 @@ const COLUNAS = [
 
 const EM_TRANSITO = "Em trânsito para filial da transportadora";
 const NA_FILIAL = "Na filial da transportadora";
+/** CNPJ raiz do emitente Pandurata (Bauducco). */
+const PANDURATA_EMBARCADOR_ID = "b503c75d-4058-4ce4-945a-7a307a5fb629";
 
 /** Status atual conforme a fase da carga no nosso sistema. */
 function statusPandurata(statusCarga: string | null | undefined) {
@@ -55,15 +58,42 @@ function diasAtrasISO(dias: number) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Normaliza município para casar com o cadastro de regiões (sem acento, maiúsculo). */
+function normCidade(v: string | null | undefined) {
+  return (v ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+}
+
+function fmtISO(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+function fmtBR(iso: string | null) {
+  if (!iso) return "";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
 type Linha = {
   id: string;
   numero_nf: string;
   dest: string;
   cidade: string;
+  uf: string;
   entrada: string;
   statusCarga: string | null;
   atual: string;
   proximo: string;
+  /** Data (ISO) da previsão de entrega: agendamento quando houver, senão fim do lead time. */
+  previsao: string | null;
+  /** "Agendamento" ou "Lead time (N d.ú.)" ou "Sem SLA cadastrado". */
+  previsaoOrigem: string;
 };
 
 export default function TrackingPandurata() {
