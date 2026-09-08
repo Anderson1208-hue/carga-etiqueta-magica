@@ -245,12 +245,22 @@ export default function TrackingPandurata() {
 
 
   const linhas = data ?? [];
+  const linhasFiltradas = useMemo(
+    () => (apenasEmAberto ? linhas.filter((l) => !l.entregaEfetiva) : linhas),
+    [linhas, apenasEmAberto]
+  );
 
   const resumo = useMemo(() => {
-    const emTransito = linhas.filter((l) => l.atual === EM_TRANSITO).length;
-    const semSla = linhas.filter((l) => l.previsaoOrigem === "Sem SLA cadastrado").length;
-    return { total: linhas.length, emTransito, naFilial: linhas.length - emTransito, semSla };
-  }, [linhas]);
+    const emTransito = linhasFiltradas.filter((l) => l.atual === EM_TRANSITO).length;
+    const semSla = linhasFiltradas.filter((l) => l.previsaoOrigem === "Sem SLA cadastrado").length;
+    return {
+      total: linhasFiltradas.length,
+      emTransito,
+      naFilial: linhasFiltradas.length - emTransito,
+      semSla,
+      emAberto: linhasFiltradas.filter((l) => !l.entregaEfetiva).length,
+    };
+  }, [linhasFiltradas]);
 
   function exportar() {
     if (!linhas.length) {
