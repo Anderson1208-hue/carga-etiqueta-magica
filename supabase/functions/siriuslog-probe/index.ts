@@ -163,6 +163,7 @@ Deno.serve(async (req) => {
   const headers = {
     Authorization: `Bearer ${access}`,
     'Content-Type': 'application/json',
+    tenant: 'bauducco.siriuslog.com',
   }
 
   // 5) leituras (sem gravar nada)
@@ -170,7 +171,7 @@ Deno.serve(async (req) => {
     {
       nome: 'delivery-status-view',
       url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view`,
-      init: { method: 'POST', headers, body: JSON.stringify({ page: 0, size: 5, invoiceNumber: nf }) },
+      init: { method: 'GET', headers },
     },
     {
       nome: 'status-all',
