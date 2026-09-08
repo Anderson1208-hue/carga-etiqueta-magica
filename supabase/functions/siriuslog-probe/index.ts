@@ -42,13 +42,13 @@ Deno.serve(async (req) => {
   }
 
   let nf = '758306'
+  let somente: string | null = null
   try {
     const body = await req.json()
     if (body?.nf) nf = String(body.nf)
+    if (body?.somente) somente = String(body.somente)
   } catch { /* sem body */ }
   out.nf = nf
-  let somente: string | null = null
-  try { const b = await req.clone().json(); if (b?.somente) somente = String(b.somente) } catch { /* noop */ }
 
   const jar: Jar = {}
   const passos: unknown[] = []
