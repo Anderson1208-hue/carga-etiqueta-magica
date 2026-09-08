@@ -194,33 +194,23 @@ Deno.serve(async (req) => {
       leituras.push(await get(p, `${BASE}/${p}`))
     }
   } else {
-    // busca via POST (consulta, não gravação): tenta corpos de filtro
-    const post = async (nome: string, url: string, body: unknown, ms = 25000) => {
-      const ctl = new AbortController()
-      const t = setTimeout(() => ctl.abort(), ms)
-      try {
-        const r = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-          signal: ctl.signal,
-        })
-        const txt = await r.text()
-        return { nome, status: r.status, tamanho: txt.length, amostra: txt.slice(0, 1200) }
-      } catch (e) {
-        return { nome, erro: String(e) }
-      } finally {
-        clearTimeout(t)
-      }
-    }
-    const alvos = [
-      ['view+invoiceNumber', `${BASE}/trip/delivery/status/view?page=0&size=5`, { invoiceNumber: nf }],
-      ['view+invoiceNumbers', `${BASE}/trip/delivery/status/view?page=0&size=5`, { invoiceNumbers: [nf] }],
-      ['view/filter', `${BASE}/trip/delivery/status/view/filter?page=0&size=5`, { invoiceNumber: nf }],
-      ['detail-history/filter', `${BASE}/delivery-invoice-detail-history/filter?page=0&size=5`, { invoiceNumber: nf }],
-    ] as const
-    for (const [nome, url, body] of alvos) {
-      leituras.push(await post(nome, url, body))
+    // Busca correta: nfe?number=... -> invoiceIds -> trip/delivery/status/view
+    const nfe = await get('nfe', `${GATEWAY}/sirius-load-composition-api/nfe?number=${nf}&size=5`)
+    leituras.push(nfe)
+    let ids: number[] = []
+    try {
+      const body = JSON.parse((nfe as { amostra?: string }).amostra ?? '{}')
+      const arr = body.content ?? body
+      if (Array.isArray(arr)) ids = arr.map((x: { id: number }) => x.id).filter(Boolean)
+    } catch { /* amostra truncada */ }
+    out.invoice_ids = ids
+    if (ids.length) {
+      leituras.push(
+        await get(
+          'view+invoiceIds',
+          `${BASE}/trip/delivery/status/view?page=0&size=5&invoiceIds=${ids.join(',')}`,
+        ),
+      )
     }
   }
   out.leituras = leituras
