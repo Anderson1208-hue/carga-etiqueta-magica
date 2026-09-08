@@ -2,3 +2,6 @@ project_id = "ddcglijsqqiaulmfadxh"
 
 [functions.validar-canhoto]
 verify_jwt = false
+
+[functions.baixa-retroativa-praxio]
+verify_jwt = false
