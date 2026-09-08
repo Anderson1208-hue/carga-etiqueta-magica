@@ -191,7 +191,8 @@ export default function TrackingPandurata() {
 
   const resumo = useMemo(() => {
     const emTransito = linhas.filter((l) => l.atual === EM_TRANSITO).length;
-    return { total: linhas.length, emTransito, naFilial: linhas.length - emTransito };
+    const semSla = linhas.filter((l) => l.previsaoOrigem === "Sem SLA cadastrado").length;
+    return { total: linhas.length, emTransito, naFilial: linhas.length - emTransito, semSla };
   }, [linhas]);
 
   function exportar() {
@@ -207,9 +208,10 @@ export default function TrackingPandurata() {
       "Status Atual": l.atual,
       "Próximo Status": l.proximo,
       "Entrega Efetiva": "",
+      // Solicitação e Confirmação da Agenda são preenchidas pela Pandurata.
       "Solicitação de Agendamento": "",
       "Confirmação da Agenda": "",
-      "Previsão de entrega": "",
+      "Previsão de entrega": fmtBR(l.previsao),
       "Chegada ao Cliente": "",
       "Previsão de chegada na filial": "",
       "Chegada na filial": "",
