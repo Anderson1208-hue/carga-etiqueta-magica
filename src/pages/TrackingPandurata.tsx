@@ -111,7 +111,7 @@ export default function TrackingPandurata() {
   const [apenasEmAberto, setApenasEmAberto] = useState(false);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["tracking-pandurata", de, ate],
+    queryKey: apenasEmAberto ? ["tracking-pandurata", "em-aberto"] : ["tracking-pandurata", de, ate],
     enabled: podeVerTrackingPandurata,
     queryFn: async (): Promise<Linha[]> => {
       // Lead time cadastrado (SLA por região da Pandurata): cidade -> prazo em dias úteis
@@ -136,15 +136,21 @@ export default function TrackingPandurata() {
       const linhas: Linha[] = [];
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
-        const { data: nfs, error } = await supabase
+        let q = supabase
           .from("notas_fiscais")
           .select(
             "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status, updated_at), agendamentos(status, data_agendamento, created_at)"
           )
           // CNPJ do emitente pode estar gravado com ou sem pontuação.
-          .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%")
-          .gte("created_at", `${de}T00:00:00`)
-          .lte("created_at", `${ate}T23:59:59`)
+          .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%");
+
+        if (!apenasEmAberto) {
+          q = q
+            .gte("created_at", `${de}T00:00:00`)
+            .lte("created_at", `${ate}T23:59:59`);
+        }
+
+        const { data: nfs, error } = await q
           .order("created_at", { ascending: true })
           .order("numero_nf", { ascending: true })
           .range(from, from + PAGE - 1);
@@ -239,9 +245,14 @@ export default function TrackingPandurata() {
         l.chegadaCliente = roteirizadaPorNf.get(l.id) ?? null;
         l.entregaEfetiva = entregaPorNf.get(l.id) ?? null;
       }
+
+      if (apenasEmAberto) {
+        return linhas.filter((l) => !l.entregaEfetiva);
+      }
       return linhas;
     },
   });
+
 
 
   const linhas = data ?? [];
