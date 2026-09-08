@@ -4,7 +4,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
 const SSO = 'https://sso.siriuslog.com'
-const GATEWAY = 'https://siriuslog.com/gateway'
+const GATEWAY = 'https://portal.siriuslog.com'
 // Valores públicos, expostos no bundle do próprio portal:
 const CLIENT_ID = 'TKwlKiwd1YHgKhqHxRbnECCRIZga'
 const CLIENT_SECRET = 'vQMfgzLe2TIgnkPz39j9gr9h7gsa'
@@ -42,9 +42,11 @@ Deno.serve(async (req) => {
   }
 
   let nf = '758306'
+  let somente: string | null = null
   try {
     const body = await req.json()
     if (body?.nf) nf = String(body.nf)
+    if (body?.somente) somente = String(body.somente)
   } catch { /* sem body */ }
   out.nf = nf
 
@@ -163,6 +165,7 @@ Deno.serve(async (req) => {
   const headers = {
     Authorization: `Bearer ${access}`,
     'Content-Type': 'application/json',
+    tenant: 'bauducco.siriuslog.com',
   }
 
   // 5) leituras (sem gravar nada)
@@ -170,7 +173,17 @@ Deno.serve(async (req) => {
     {
       nome: 'delivery-status-view',
       url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view`,
-      init: { method: 'POST', headers, body: JSON.stringify({ page: 0, size: 5, invoiceNumber: nf }) },
+      init: { method: 'GET', headers },
+    },
+    {
+      nome: 'busca-por-nf',
+      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view?page=0&size=5&invoiceNumber=${nf}`,
+      init: { method: 'GET', headers },
+    },
+    {
+      nome: 'historico-nf',
+      url: `${GATEWAY}/sirius-national-tracking-api/v1/delivery-invoice-detail-history/filter?page=0&size=5&invoiceNumber=${nf}`,
+      init: { method: 'GET', headers },
     },
     {
       nome: 'status-all',
@@ -184,7 +197,8 @@ Deno.serve(async (req) => {
     },
   ]
   const leituras: unknown[] = []
-  for (const t of tentativas) {
+  const filtro = (() => { try { return null } catch { return null } })()
+  for (const t of tentativas.filter((x) => !somente || x.nome === somente)) {
     try {
       const r = await fetch(t.url, t.init as RequestInit)
       const txt = await r.text()
