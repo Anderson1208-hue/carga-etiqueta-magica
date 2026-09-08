@@ -2332,6 +2332,8 @@ export type Database = {
       }
       notas_fiscais: {
         Row: {
+          baixa_retroativa_em: string | null
+          baixa_retroativa_origem: string | null
           carga_id: string
           chave_acesso: string
           cnpj_destinatario: string | null
@@ -2358,6 +2360,8 @@ export type Database = {
           volume_m3: number | null
         }
         Insert: {
+          baixa_retroativa_em?: string | null
+          baixa_retroativa_origem?: string | null
           carga_id: string
           chave_acesso: string
           cnpj_destinatario?: string | null
@@ -2384,6 +2388,8 @@ export type Database = {
           volume_m3?: number | null
         }
         Update: {
+          baixa_retroativa_em?: string | null
+          baixa_retroativa_origem?: string | null
           carga_id?: string
           chave_acesso?: string
           cnpj_destinatario?: string | null
@@ -3776,6 +3782,10 @@ export type Database = {
     }
     Functions: {
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
+      aplicar_baixa_retroativa: {
+        Args: { p_dry_run?: boolean; p_origem?: string; p_rows: Json }
+        Returns: Json
+      }
       aplicar_cubagem_produtos_nf: {
         Args: { p_dias?: number; p_simular?: boolean }
         Returns: Json
