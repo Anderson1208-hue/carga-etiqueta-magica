@@ -388,10 +388,13 @@ export default function TrackingPandurata() {
         <div className="grid gap-3 sm:grid-cols-5">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground">Notas no período</p>
+              <p className="text-xs text-muted-foreground">
+                {apenasEmAberto ? "Entregas em aberto" : "Notas no período"}
+              </p>
               <p className="text-2xl font-bold">{resumo.total}</p>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Em trânsito para filial</p>
