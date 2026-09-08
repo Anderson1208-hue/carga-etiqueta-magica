@@ -174,6 +174,16 @@ Deno.serve(async (req) => {
       init: { method: 'GET', headers },
     },
     {
+      nome: 'busca-por-nf',
+      url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/delivery/status/view?page=0&size=5&invoiceNumber=${nf}`,
+      init: { method: 'GET', headers },
+    },
+    {
+      nome: 'historico-nf',
+      url: `${GATEWAY}/sirius-national-tracking-api/v1/delivery-invoice-detail-history/filter?page=0&size=5&invoiceNumber=${nf}`,
+      init: { method: 'GET', headers },
+    },
+    {
       nome: 'status-all',
       url: `${GATEWAY}/sirius-national-tracking-api/v1/trip/status/all`,
       init: { method: 'GET', headers },
