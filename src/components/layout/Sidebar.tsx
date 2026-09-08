@@ -255,6 +255,12 @@ export function Sidebar() {
                 isActive={location.pathname === "/integracoes/okentrega"}
               />
             )}
+            {podeVerOkEntrega && (
+              <NavItem
+                item={{ name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug }}
+                isActive={location.pathname === "/integracoes/tracking-pandurata"}
+              />
+            )}
             {isAdmin && (
               <>
                 <NavItem
