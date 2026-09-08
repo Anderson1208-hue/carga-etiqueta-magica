@@ -98,6 +98,8 @@ type Linha = {
   chegadaCliente: string | null;
   /** Data (ISO) da entrega efetiva (baixa com status entregue). */
   entregaEfetiva: string | null;
+  /** Data (ISO) em que a carga foi aberta (mercadoria disponível na filial). */
+  chegadaFilial: string | null;
 };
 
 
