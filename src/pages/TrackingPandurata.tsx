@@ -346,13 +346,26 @@ export default function TrackingPandurata() {
           <CardContent className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label>De</Label>
-              <Input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={de}
+                onChange={(e) => setDe(e.target.value)}
+                disabled={apenasEmAberto}
+                className="w-40"
+              />
             </div>
             <div className="space-y-1">
               <Label>Até</Label>
-              <Input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={ate}
+                onChange={(e) => setAte(e.target.value)}
+                disabled={apenasEmAberto}
+                className="w-40"
+              />
             </div>
             <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+
               {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               Atualizar
             </Button>
