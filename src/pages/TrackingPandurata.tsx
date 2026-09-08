@@ -111,7 +111,7 @@ export default function TrackingPandurata() {
   const [apenasEmAberto, setApenasEmAberto] = useState(false);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ["tracking-pandurata", de, ate],
+    queryKey: apenasEmAberto ? ["tracking-pandurata", "em-aberto"] : ["tracking-pandurata", de, ate],
     enabled: podeVerTrackingPandurata,
     queryFn: async (): Promise<Linha[]> => {
       // Lead time cadastrado (SLA por região da Pandurata): cidade -> prazo em dias úteis
@@ -136,15 +136,21 @@ export default function TrackingPandurata() {
       const linhas: Linha[] = [];
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
-        const { data: nfs, error } = await supabase
+        let q = supabase
           .from("notas_fiscais")
           .select(
             "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status, updated_at), agendamentos(status, data_agendamento, created_at)"
           )
           // CNPJ do emitente pode estar gravado com ou sem pontuação.
-          .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%")
-          .gte("created_at", `${de}T00:00:00`)
-          .lte("created_at", `${ate}T23:59:59`)
+          .or("cnpj_emitente.like.70940994%,cnpj_emitente.like.70.940.994%,razao_social_emitente.ilike.%pandurata%");
+
+        if (!apenasEmAberto) {
+          q = q
+            .gte("created_at", `${de}T00:00:00`)
+            .lte("created_at", `${ate}T23:59:59`);
+        }
+
+        const { data: nfs, error } = await q
           .order("created_at", { ascending: true })
           .order("numero_nf", { ascending: true })
           .range(from, from + PAGE - 1);
@@ -239,9 +245,14 @@ export default function TrackingPandurata() {
         l.chegadaCliente = roteirizadaPorNf.get(l.id) ?? null;
         l.entregaEfetiva = entregaPorNf.get(l.id) ?? null;
       }
+
+      if (apenasEmAberto) {
+        return linhas.filter((l) => !l.entregaEfetiva);
+      }
       return linhas;
     },
   });
+
 
 
   const linhas = data ?? [];
@@ -264,7 +275,7 @@ export default function TrackingPandurata() {
 
   function exportar() {
     if (!linhasFiltradas.length) {
-      toast.error("Nada para exportar no período selecionado");
+      toast.error(apenasEmAberto ? "Nenhuma entrega em aberto da Pandurata" : "Nada para exportar no período selecionado");
       return;
     }
     const dados = linhasFiltradas.map((l) => ({
@@ -289,9 +300,13 @@ export default function TrackingPandurata() {
     ws["!cols"] = COLUNAS.map((c) => ({ wch: Math.max(12, c.length + 2) }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "sheet");
-    XLSX.writeFile(wb, `status-entregas-pandurata-${de}_a_${ate}.xlsx`);
+    const nomeArquivo = apenasEmAberto
+      ? `status-entregas-pandurata-em-aberto-${hojeISO()}.xlsx`
+      : `status-entregas-pandurata-${de}_a_${ate}.xlsx`;
+    XLSX.writeFile(wb, nomeArquivo);
     toast.success(`${dados.length} nota(s) exportada(s)`);
   }
+
 
   if (carregandoAcesso) {
     return (
@@ -331,13 +346,26 @@ export default function TrackingPandurata() {
           <CardContent className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label>De</Label>
-              <Input type="date" value={de} onChange={(e) => setDe(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={de}
+                onChange={(e) => setDe(e.target.value)}
+                disabled={apenasEmAberto}
+                className="w-40"
+              />
             </div>
             <div className="space-y-1">
               <Label>Até</Label>
-              <Input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="w-40" />
+              <Input
+                type="date"
+                value={ate}
+                onChange={(e) => setAte(e.target.value)}
+                disabled={apenasEmAberto}
+                className="w-40"
+              />
             </div>
             <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+
               {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               Atualizar
             </Button>
@@ -360,10 +388,13 @@ export default function TrackingPandurata() {
         <div className="grid gap-3 sm:grid-cols-5">
           <Card>
             <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground">Notas no período</p>
+              <p className="text-xs text-muted-foreground">
+                {apenasEmAberto ? "Entregas em aberto" : "Notas no período"}
+              </p>
               <p className="text-2xl font-bold">{resumo.total}</p>
             </CardContent>
           </Card>
+
           <Card>
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Em trânsito para filial</p>
@@ -422,17 +453,22 @@ export default function TrackingPandurata() {
                   {!isFetching && !linhas.length && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        Nenhuma nota da Pandurata no período.
+                        {apenasEmAberto
+                          ? "Nenhuma entrega em aberto da Pandurata."
+                          : "Nenhuma nota da Pandurata no período."}
                       </TableCell>
                     </TableRow>
                   )}
                   {!isFetching && linhas.length && !linhasFiltradas.length && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        Todas as notas do período já foram entregues.
+                        {apenasEmAberto
+                          ? "Não há entregas em aberto no filtro atual."
+                          : "Todas as notas do período já foram entregues."}
                       </TableCell>
                     </TableRow>
                   )}
+
                   {linhasFiltradas.map((l) => (
                     <TableRow key={l.id}>
                       <TableCell className="font-medium">{l.numero_nf}</TableCell>
