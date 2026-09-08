@@ -105,12 +105,33 @@ export default function TrackingPandurata() {
     queryKey: ["tracking-pandurata", de, ate],
     enabled: podeVerOkEntrega,
     queryFn: async (): Promise<Linha[]> => {
+      // Lead time cadastrado (SLA por região da Pandurata): cidade -> prazo em dias úteis
+      const { data: regioes, error: eReg } = await supabase
+        .from("embarcador_regioes")
+        .select("id, embarcador_regiao_cidades(uf, municipio_norm), embarcador_regiao_sla(prazo_dias_uteis, vigente_de, vigente_ate, ativo)")
+        .eq("embarcador_id", PANDURATA_EMBARCADOR_ID)
+        .eq("ativo", true);
+      if (eReg) throw eReg;
+      const prazoPorCidade = new Map<string, number>();
+      for (const r of (regioes ?? []) as any[]) {
+        const slas = (r.embarcador_regiao_sla ?? [])
+          .filter((s: any) => s.ativo)
+          .sort((a: any, b: any) => String(b.vigente_de).localeCompare(String(a.vigente_de)));
+        const prazo = slas[0]?.prazo_dias_uteis;
+        if (prazo == null) continue;
+        for (const c of r.embarcador_regiao_cidades ?? []) {
+          prazoPorCidade.set(`${String(c.uf).toUpperCase()}|${normCidade(c.municipio_norm)}`, prazo);
+        }
+      }
+
       const linhas: Linha[] = [];
       const PAGE = 1000;
       for (let from = 0; ; from += PAGE) {
         const { data: nfs, error } = await supabase
           .from("notas_fiscais")
-          .select("id, numero_nf, dest_razao_social, dest_cidade, created_at, carga_id, cargas(status)")
+          .select(
+            "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, created_at, carga_id, cargas(status), agendamentos(status, data_agendamento, created_at)"
+          )
           .like("cnpj_emitente", "70940994%")
           .gte("created_at", `${de}T00:00:00`)
           .lte("created_at", `${ate}T23:59:59`)
@@ -123,15 +144,41 @@ export default function TrackingPandurata() {
           const statusCarga =
             (nf as unknown as { cargas?: { status?: string } | null }).cargas?.status ?? null;
           const { atual, proximo } = statusPandurata(statusCarga);
+
+          // Previsão de entrega: data do agendamento quando houver; senão, fim do lead time.
+          const ags = ((nf as any).agendamentos ?? []) as { data_agendamento: string | null; created_at: string }[];
+          const agendada = ags
+            .filter((a) => !!a.data_agendamento)
+            .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+
+          let previsao: string | null = null;
+          let previsaoOrigem = "";
+          if (agendada?.data_agendamento) {
+            previsao = String(agendada.data_agendamento).slice(0, 10);
+            previsaoOrigem = "Agendamento";
+          } else {
+            const chave = `${String(nf.dest_uf ?? "").toUpperCase()}|${normCidade(nf.dest_cidade)}`;
+            const prazo = prazoPorCidade.get(chave);
+            if (prazo == null) {
+              previsaoOrigem = "Sem SLA cadastrado";
+            } else {
+              previsao = fmtISO(addDiasUteis(new Date(`${nf.created_at.slice(0, 10)}T00:00:00`), prazo));
+              previsaoOrigem = `Lead time (${prazo} d.ú.)`;
+            }
+          }
+
           linhas.push({
             id: nf.id,
             numero_nf: nf.numero_nf,
             dest: nf.dest_razao_social ?? "—",
             cidade: nf.dest_cidade ?? "—",
+            uf: nf.dest_uf ?? "",
             entrada: nf.created_at,
             statusCarga,
             atual,
             proximo,
+            previsao,
+            previsaoOrigem,
           });
         }
         if (lote.length < PAGE) break;
