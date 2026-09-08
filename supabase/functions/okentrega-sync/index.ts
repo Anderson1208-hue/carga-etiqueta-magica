@@ -121,6 +121,9 @@ Deno.serve(async (req) => {
     limite?: number;
     queue_id?: string;
     testar_login?: boolean;
+    // Liberação por conferência humana: exige queue_id e mantém as demais
+    // barreiras (NF correta + texto legível).
+    aprovacao_manual?: boolean;
     // Mantido apenas para rejeitar clientes antigos: imagens externas não
     // passam pela validação obrigatória do servidor.
     imagem_base64?: string;
