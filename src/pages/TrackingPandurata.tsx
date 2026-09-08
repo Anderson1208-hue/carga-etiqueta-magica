@@ -357,7 +357,7 @@ export default function TrackingPandurata() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-5">
           <Card>
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Notas no período</p>
@@ -374,6 +374,12 @@ export default function TrackingPandurata() {
             <CardContent className="pt-6">
               <p className="text-xs text-muted-foreground">Na filial da transportadora</p>
               <p className="text-2xl font-bold">{resumo.naFilial}</p>
+            </CardContent>
+          </Card>
+          <Card className={resumo.emAberto ? "border-amber-500" : undefined}>
+            <CardContent className="pt-6">
+              <p className="text-xs text-muted-foreground">Entregas em aberto</p>
+              <p className="text-2xl font-bold">{resumo.emAberto}</p>
             </CardContent>
           </Card>
           <Card className={resumo.semSla ? "border-destructive" : undefined}>
