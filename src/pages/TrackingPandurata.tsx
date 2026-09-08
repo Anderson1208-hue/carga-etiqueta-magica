@@ -185,13 +185,52 @@ export default function TrackingPandurata() {
             proximo,
             previsao,
             previsaoOrigem,
+            chegadaCliente: null,
+            entregaEfetiva: null,
           });
         }
         if (lote.length < PAGE) break;
       }
+
+      // Chegada ao Cliente = data da roteirização da nota (data do veículo que a expediu).
+      // Entrega Efetiva = data da baixa com status entregue.
+      const ids = linhas.map((l) => l.id);
+      const roteirizadaPorNf = new Map<string, string>();
+      const entregaPorNf = new Map<string, string>();
+      const CH = 300;
+      for (let i = 0; i < ids.length; i += CH) {
+        const chunk = ids.slice(i, i + CH);
+        const [{ data: vnfs, error: eV }, { data: baixas, error: eB }] = await Promise.all([
+          supabase.from("veiculo_nfs").select("nf_id, veiculos(data)").in("nf_id", chunk),
+          supabase
+            .from("baixas_entrega")
+            .select("nf_id, status, registrado_em")
+            .in("nf_id", chunk)
+            .ilike("status", "ENTREG%"),
+        ]);
+        if (eV) throw eV;
+        if (eB) throw eB;
+        for (const v of (vnfs ?? []) as any[]) {
+          const d = v.veiculos?.data ? String(v.veiculos.data).slice(0, 10) : null;
+          if (!d) continue;
+          const atualD = roteirizadaPorNf.get(v.nf_id);
+          if (!atualD || d < atualD) roteirizadaPorNf.set(v.nf_id, d);
+        }
+        for (const b of (baixas ?? []) as any[]) {
+          if (!b.registrado_em) continue;
+          const d = String(b.registrado_em).slice(0, 10);
+          const atualD = entregaPorNf.get(b.nf_id);
+          if (!atualD || d > atualD) entregaPorNf.set(b.nf_id, d);
+        }
+      }
+      for (const l of linhas) {
+        l.chegadaCliente = roteirizadaPorNf.get(l.id) ?? null;
+        l.entregaEfetiva = entregaPorNf.get(l.id) ?? null;
+      }
       return linhas;
     },
   });
+
 
   const linhas = data ?? [];
 
