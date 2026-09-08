@@ -93,11 +93,19 @@ Deno.serve(async (req) => {
       username: user,
       password: pass,
       sessionDataKey,
+      tocommonauth: 'true',
     }),
   })
   saveCookies(res, jar)
   loc = res.headers.get('location')
-  passos.push({ passo: 'commonauth', status: res.status, location: loc?.slice(0, 250) })
+  const locParams = loc ? Object.fromEntries(new URL(loc.startsWith('http') ? loc : `${SSO}${loc}`).searchParams) : {}
+  passos.push({
+    passo: 'commonauth',
+    status: res.status,
+    authFailure: locParams.authFailure ?? null,
+    authFailureMsg: locParams.authFailureMsg ?? null,
+    destino: (loc ?? '').split('?')[0],
+  })
 
   // 3) seguir redirects até capturar o code
   let code: string | null = null
