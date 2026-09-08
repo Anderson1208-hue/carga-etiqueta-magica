@@ -81,47 +81,54 @@ Deno.serve(async (req) => {
     return json()
   }
 
-  // 2) autenticação de usuário
-  res = await fetch(`${SSO}/commonauth`, {
-    method: 'POST',
-    redirect: 'manual',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      cookie: cookieHeader(jar),
-    },
-    body: new URLSearchParams({
-      username: user,
-      password: pass,
-      sessionDataKey,
-      tocommonauth: 'true',
-    }),
-  })
-  saveCookies(res, jar)
-  loc = res.headers.get('location')
-  const locParams = loc ? Object.fromEntries(new URL(loc.startsWith('http') ? loc : `${SSO}${loc}`).searchParams) : {}
-  passos.push({
-    passo: 'commonauth',
-    status: res.status,
-    authFailure: locParams.authFailure ?? null,
-    authFailureMsg: locParams.authFailureMsg ?? null,
-    destino: (loc ?? '').split('?')[0],
-  })
-
-  // 3) seguir redirects até capturar o code
+  // 2) autenticação de usuário (testa variações de identificador)
+  const variantes = [user, `${user}@carbon.super`, user.split('@')[0], user.toLowerCase()]
+    .filter((v, i, a) => a.indexOf(v) === i)
   let code: string | null = null
-  let hops = 0
-  while (loc && hops < 6) {
-    hops++
-    const abs = loc.startsWith('http') ? loc : `${SSO}${loc}`
-    const u = new URL(abs.replace('/#/', '/'))
-    code = u.searchParams.get('code')
+  const tentativasLogin: unknown[] = []
+
+  for (const uname of variantes) {
+    res = await fetch(`${SSO}/commonauth`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        cookie: cookieHeader(jar),
+      },
+      body: new URLSearchParams({
+        username: uname,
+        password: pass,
+        sessionDataKey,
+        tocommonauth: 'true',
+      }),
+    })
+    saveCookies(res, jar)
+    loc = res.headers.get('location')
+    const lp = loc ? Object.fromEntries(new URL(loc.startsWith('http') ? loc : `${SSO}${loc}`).searchParams) : {}
+    tentativasLogin.push({
+      usuario_mascarado: uname.replace(/[^@.]/g, '*'),
+      falha: lp.authFailure ?? null,
+      motivo: lp.authFailureMsg ?? null,
+    })
+    if (lp.authFailure === 'true') continue
+
+    // seguir redirects até capturar o code
+    let hops = 0
+    while (loc && hops < 6) {
+      hops++
+      const abs = loc.startsWith('http') ? loc : `${SSO}${loc}`
+      const u = new URL(abs.replace('/#/', '/'))
+      code = u.searchParams.get('code')
+      if (code) break
+      if (abs.startsWith('https://bauducco.siriuslog.com')) break
+      const r = await fetch(abs, { redirect: 'manual', headers: { cookie: cookieHeader(jar) } })
+      saveCookies(r, jar)
+      loc = r.headers.get('location')
+    }
     if (code) break
-    if (abs.startsWith('https://bauducco.siriuslog.com')) break
-    const r = await fetch(abs, { redirect: 'manual', headers: { cookie: cookieHeader(jar) } })
-    saveCookies(r, jar)
-    loc = r.headers.get('location')
-    passos.push({ passo: `redirect-${hops}`, status: r.status, location: loc?.slice(0, 250) })
   }
+  out.tentativas_login = tentativasLogin
+
   out.code_obtido = !!code
   if (!code) {
     out.erro = 'authorization_code_nao_obtido'
