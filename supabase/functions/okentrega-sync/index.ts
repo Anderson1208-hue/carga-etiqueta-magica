@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
     | "producao";
   const envioAtivo = cfg?.envio_ativo ?? false;
   // Pandurata exige a faixa do recibo. Outros modos não possuem a barreira
-  // completa (NF + legibilidade + assinatura) e não são autorizados no envio.
+  // completa (NF + canhoto inteiro + legibilidade) e não são autorizados no envio.
   const modoImagem: ModoImagem = "recibo";
   const maxTentativas = cfg?.max_tentativas ?? 5;
   const entregadorId = ambiente === "producao" ? cfg?.entregador_id_producao : cfg?.entregador_id_homolog;
