@@ -175,7 +175,7 @@ Deno.serve(async (req) => {
     try {
       const r = await fetch(url, { method: 'GET', headers, signal: ctl.signal })
       const txt = await r.text()
-      return { nome, status: r.status, tamanho: txt.length, amostra: txt.slice(0, 900) }
+      return { nome, status: r.status, tamanho: txt.length, amostra: txt.slice(0, 2500) }
     } catch (e) {
       return { nome, erro: String(e) }
     } finally {
