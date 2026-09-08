@@ -252,12 +252,13 @@ export default function TrackingPandurata() {
       NF: Number(l.numero_nf) || l.numero_nf,
       "Status Atual": l.atual,
       "Próximo Status": l.proximo,
-      "Entrega Efetiva": "",
+      "Entrega Efetiva": fmtBR(l.entregaEfetiva),
       // Solicitação e Confirmação da Agenda são preenchidas pela Pandurata.
       "Solicitação de Agendamento": "",
       "Confirmação da Agenda": "",
       "Previsão de entrega": fmtBR(l.previsao),
-      "Chegada ao Cliente": "",
+      "Chegada ao Cliente": fmtBR(l.chegadaCliente),
+
       "Previsão de chegada na filial": "",
       "Chegada na filial": "",
       "Saída na filial": "",
