@@ -94,7 +94,12 @@ type Linha = {
   previsao: string | null;
   /** "Agendamento" ou "Lead time (N d.ú.)" ou "Sem SLA cadastrado". */
   previsaoOrigem: string;
+  /** Data (ISO) da roteirização da nota (data do veículo em que ela foi expedida). */
+  chegadaCliente: string | null;
+  /** Data (ISO) da entrega efetiva (baixa com status entregue). */
+  entregaEfetiva: string | null;
 };
+
 
 export default function TrackingPandurata() {
   const { podeVerOkEntrega, isLoading: carregandoAcesso } = useAcessoOkEntrega();
