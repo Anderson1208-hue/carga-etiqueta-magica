@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     // 2) Remove notas ja concluidas e as que estouraram o limite de tentativas.
     const { data: fila } = await sb
       .from('fila_tracking_pandurata')
-      .select('numero_nf, concluido_em, tentativas')
+      .select('numero_nf, concluido_em, tentativas, ultima_tentativa_em')
     const filaMap = new Map((fila ?? []).map((f) => [String(f.numero_nf), f]))
     const pendentes = todas.filter((nf) => {
       const f = filaMap.get(nf)
@@ -94,6 +94,15 @@ Deno.serve(async (req) => {
     if (novas.length) {
       await sb.from('fila_tracking_pandurata').upsert(novas, { onConflict: 'numero_nf' })
     }
+
+    // Rotaciona: notas nunca tentadas primeiro, depois as mais antigas.
+    // Assim o limite por rodada nao trava sempre nas mesmas notas.
+    pendentes.sort((a, b) => {
+      const ta = filaMap.get(a)?.ultima_tentativa_em ?? ''
+      const tb = filaMap.get(b)?.ultima_tentativa_em ?? ''
+      if (ta === tb) return a.localeCompare(b)
+      return ta < tb ? -1 : 1
+    })
 
     const lote = pendentes.slice(0, cfg.limite_por_rodada ?? 40)
     out.modo = modo
