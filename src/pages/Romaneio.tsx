@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -30,7 +31,7 @@ import { calculateBoxes } from "@/lib/xml-parser";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc, Store, Box, Weight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +78,8 @@ interface NotaFiscalData {
   destCep?: string;
   dataEmissao: string | null;
   macroRegiao: number;
+  pesoBruto: number;
+  volumeM3: number;
   itens: {
     cProd: string;
     xProd: string;
@@ -131,6 +134,15 @@ export default function Romaneio() {
     return notasFiscais.filter((nf) => nf.macroRegiao === parseInt(selectedMR));
   }, [notasFiscais, selectedMR]);
 
+  // Dashboard metrics for the selected load / MR filter
+  const metrics = useMemo(() => {
+    const totalNfs = filteredNFs.length;
+    const lojas = new Set(filteredNFs.map((nf) => nf.cnpjDestinatario).filter(Boolean)).size;
+    const pesoTotal = filteredNFs.reduce((acc, nf) => acc + nf.pesoBruto, 0);
+    const volumeTotal = filteredNFs.reduce((acc, nf) => acc + nf.volumeM3, 0);
+    return { totalNfs, lojas, pesoTotal, volumeTotal };
+  }, [filteredNFs]);
+
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
@@ -177,6 +189,8 @@ export default function Romaneio() {
             dest_uf,
             dest_cep,
             data_emissao,
+            peso_bruto,
+            volume_m3,
             itens_nf(
               c_prod,
               x_prod,
@@ -233,6 +247,8 @@ export default function Romaneio() {
         destCep: nf.dest_cep || undefined,
         dataEmissao: nf.data_emissao,
         macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
+        pesoBruto: Number(nf.peso_bruto || 0),
+        volumeM3: Number(nf.volume_m3 || 0),
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
@@ -645,6 +661,60 @@ export default function Romaneio() {
             )}
           </div>
         </div>
+
+        {/* Dashboard da carga */}
+        {selectedCarga && notasFiscais.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{metrics.totalNfs}</p>
+                  <p className="text-xs text-muted-foreground">Notas fiscais</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                  <Store className="w-5 h-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{metrics.lojas}</p>
+                  <p className="text-xs text-muted-foreground">Lojas</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                  <Box className="w-5 h-5 text-warning" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {metrics.volumeTotal.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Volume (m³)</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
+                  <Weight className="w-5 h-5 text-info" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {metrics.pesoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Peso bruto (kg)</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Nota de Carga por NF */}
         {selectedCarga && notasFiscais.length > 0 && (
