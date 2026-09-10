@@ -23,11 +23,23 @@ const CHAIN = [
   { id: 2, nome: 'Aguardando descarga' },
   { id: 17, nome: 'Entrega realizada aguardando canhoto' },
 ]
+// Status finais/paralelos do portal: nao devem ser regredidos nem alterados por nos.
+const FINAIS = [
+  'entrega realizada aguardando baixa edi',
+  'entrega realizada e baixada no sap',
+  'recusa aguardando instrução embarcador',
+  'devolução total com autorização',
+  'canhoto retido no cliente',
+]
 const idxPorNome = (n: string | null) => {
   if (!n) return 0
-  const i = CHAIN.findIndex((c) => c.nome.toLowerCase() === n.trim().toLowerCase())
+  const alvo = n.trim().toLowerCase()
+  if (FINAIS.includes(alvo)) return 99
+  const i = CHAIN.findIndex((c) => c.nome.toLowerCase() === alvo)
   return i < 0 ? 0 : i
 }
+const hojeBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10)
+const maxData = (a: string | null, b: string) => (a && a > b ? a : b)
 
 type Jar = Record<string, string>
 function saveCookies(res: Response, jar: Jar) {
@@ -188,16 +200,50 @@ Deno.serve(async (req) => {
       if (l.data_rot) alvo = 2 // Em transito para cliente
       if (l.baixa_entregue) alvo = 4 // Entrega realizada aguardando canhoto
       r.status_alvo = CHAIN[alvo].nome
-      if (alvo <= atual) { r.situacao = 'ja_atualizado'; resultados.push(r); continue }
+      if (alvo <= atual) {
+        r.situacao = atual === 99 ? 'status_final_no_portal' : 'ja_atualizado'
+        resultados.push(r); continue
+      }
 
       const passos: unknown[] = []
-      for (let i = atual + 1; i <= alvo; i++) {
-        const payload: Record<string, unknown> = { tripInvoiceDetailedStatusId: CHAIN[i].id }
-        if (i === 1) {
-          payload.branchArrivalDate = iso(l.carga_updated)
-          if (!inv.estimatedDeliveryDate) payload.estimatedDeliveryDate = iso(l.previsao, '18:00:00')
+
+      // O portal exige que a previsao de chegada na filial esteja gravada ANTES de sair do status 21.
+      if (atual === 0 && !inv.branchEstimatedArrivalDate) {
+        const chegada = l.carga_updated ?? l.data_rot ?? hojeBR()
+        // Endpoint de "current-status": grava apenas datas, sem mudar de status.
+        // No status 21 o portal so aceita a previsao de chegada na filial.
+        const pre: Record<string, unknown> = { branchEstimatedArrivalDate: iso(chegada) }
+        if (dryRun) {
+          passos.push({ etapa: 'previsoes', enviaria: pre })
+        } else {
+          const rp = await fetch(`${TRACK}/delivery-invoice-detail/${detailId}/current-status`, {
+            method: 'PATCH', headers, body: JSON.stringify(pre),
+          })
+          const tp = await rp.text()
+          passos.push({ etapa: 'previsoes', enviado: pre, http: rp.status, resposta: tp.slice(0, 300) })
         }
-        if (i === 2) payload.branchDepartureDate = iso(l.data_rot, '08:00:00')
+      }
+
+      for (let i = atual + 1; i <= alvo; i++) {
+        const payload: Record<string, unknown> = {
+          tripId,
+          tripInvoiceDetailedStatusId: CHAIN[i].id,
+        }
+        if (i === 1) {
+          const chegada = l.carga_updated ?? l.data_rot ?? hojeBR()
+          payload.branchArrivalDate = iso(chegada)
+          payload.branchEstimatedArrivalDate =
+            (inv.branchEstimatedArrivalDate as string) ?? iso(chegada)
+          payload.estimatedDeliveryDate =
+            (inv.estimatedDeliveryDate as string) ?? iso(maxData(l.previsao, hojeBR()), '18:00:00')
+        }
+        if (i === 2) {
+          payload.branchDepartureDate = iso(l.data_rot, '08:00:00')
+          // O portal exige previsao de entrega >= hoje nesta transicao.
+          const prev = inv.estimatedDeliveryDate ? String(inv.estimatedDeliveryDate).slice(0, 10) : null
+          const alvoPrev = maxData(maxData(prev, l.previsao ?? ''), hojeBR())
+          if (!prev || prev < hojeBR()) payload.estimatedDeliveryDate = iso(alvoPrev, '18:00:00')
+        }
         if (i === 3) payload.customerArrivalDate = iso(l.baixa_entregue ?? l.data_rot, '10:00:00')
         if (i === 4) payload.deliveryDate = iso(l.baixa_entregue)
         if (dryRun) { passos.push({ status_destino: CHAIN[i].nome, enviaria: payload }); continue }
