@@ -241,7 +241,12 @@ Deno.serve(async (req) => {
 
   // Modo A: mudar status detalhado (opcionalmente com uma data) - PATCH no recurso
   if (statusId) {
-    const dataExtra = campo && valor && CAMPOS.includes(campo) ? { [campo]: valor } : {}
+    const dataExtra: Record<string, string> =
+      campo && valor && CAMPOS.includes(campo) ? { [campo]: valor } : {}
+    const extras = (body.campos ?? {}) as Record<string, string>
+    for (const [k, v] of Object.entries(extras)) {
+      if (CAMPOS.includes(k) && typeof v === 'string' && v) dataExtra[k] = v
+    }
     const tentativas: unknown[] = []
     const payloads: Record<string, unknown>[] = [
       { tripInvoiceDetailedStatusId: statusId, ...dataExtra },
