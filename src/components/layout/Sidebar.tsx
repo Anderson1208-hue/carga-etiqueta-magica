@@ -180,6 +180,7 @@ export function Sidebar() {
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
+  const trackingActive = trackingItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
   const cadastrosActive = cadastrosItems.some((i) => location.pathname === i.href);
@@ -222,6 +223,15 @@ export function Sidebar() {
             pathname={location.pathname}
             groupActive={transporteActive}
           />
+          {podeVerTrackingPandurata && (
+            <NavGroupFlyout
+              label="Tracking"
+              icon={Radar}
+              items={trackingItems}
+              pathname={location.pathname}
+              groupActive={trackingActive}
+            />
+          )}
           <NavGroupFlyout
             label="Torre de Controle"
             icon={Eye}
@@ -259,12 +269,6 @@ export function Sidebar() {
               <NavItem
                 item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
                 isActive={location.pathname === "/integracoes/okentrega"}
-              />
-            )}
-            {podeVerTrackingPandurata && (
-              <NavItem
-                item={{ name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug }}
-                isActive={location.pathname === "/integracoes/tracking-pandurata"}
               />
             )}
             {isAdmin && (
