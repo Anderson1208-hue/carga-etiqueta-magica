@@ -238,6 +238,8 @@ export default function Romaneio() {
         destCep: nf.dest_cep || undefined,
         dataEmissao: nf.data_emissao,
         macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
+        pesoBruto: Number(nf.peso_bruto || 0),
+        volumeM3: Number(nf.volume_m3 || 0),
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
