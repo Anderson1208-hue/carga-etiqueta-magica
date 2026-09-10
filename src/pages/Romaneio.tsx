@@ -134,6 +134,15 @@ export default function Romaneio() {
     return notasFiscais.filter((nf) => nf.macroRegiao === parseInt(selectedMR));
   }, [notasFiscais, selectedMR]);
 
+  // Dashboard metrics for the selected load / MR filter
+  const metrics = useMemo(() => {
+    const totalNfs = filteredNFs.length;
+    const lojas = new Set(filteredNFs.map((nf) => nf.cnpjDestinatario).filter(Boolean)).size;
+    const pesoTotal = filteredNFs.reduce((acc, nf) => acc + nf.pesoBruto, 0);
+    const volumeTotal = filteredNFs.reduce((acc, nf) => acc + nf.volumeM3, 0);
+    return { totalNfs, lojas, pesoTotal, volumeTotal };
+  }, [filteredNFs]);
+
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
