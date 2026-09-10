@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
       })
       const txt = await r.text()
-      return { nome, status: r.status, corpo: txt.slice(0, 4000) }
+      return { nome, status: r.status, corpo: txt.slice(0, 4000), _full: txt }
     } catch (e) {
       return { nome, erro: String(e) }
     } finally {
@@ -165,10 +165,10 @@ Deno.serve(async (req) => {
 
   // localizar a nota
   const nfe = await call('nfe', `${GATEWAY}/sirius-load-composition-api/nfe?number=${nf}&size=5`)
-  out.busca_nf = nfe
+  out.busca_nf = { nome: (nfe as {nome:string}).nome, status: (nfe as {status?:number}).status }
   let ids: number[] = []
   try {
-    const b = JSON.parse((nfe as { corpo?: string }).corpo ?? '{}')
+    const b = JSON.parse((nfe as { _full?: string })._full ?? '{}')
     const arr = b.content ?? b
     if (Array.isArray(arr)) ids = arr.map((x: { id: number }) => x.id).filter(Boolean)
   } catch { /* corpo truncado */ }
@@ -182,11 +182,11 @@ Deno.serve(async (req) => {
     'status/view',
     `${TRACK}/trip/delivery/status/view?page=0&size=5&invoiceIds=${ids.join(',')}`,
   )
-  out.registro = view
+  out.registro = { status: (view as {status?:number}).status, corpo: (view as {corpo?:string}).corpo }
 
   let reg: Record<string, unknown> | null = null
   try {
-    const b = JSON.parse((view as { corpo?: string }).corpo ?? '{}')
+    const b = JSON.parse((view as { _full?: string })._full ?? '{}')
     const arr = b.content ?? b
     if (Array.isArray(arr) && arr.length) reg = arr[0]
   } catch { /* truncado */ }
@@ -198,9 +198,9 @@ Deno.serve(async (req) => {
   let detailId: number | null = null
   if (tripId) {
     const det = await call('status/detail', `${TRACK}/trip/delivery/status/detail/${tripId}`)
-    out.detalhe_viagem = det
+    out.detalhe_viagem = { status: (det as {status?:number}).status }
     try {
-      const b = JSON.parse((det as { corpo?: string }).corpo ?? '{}')
+      const b = JSON.parse((det as { _full?: string })._full ?? '{}')
       const invs = b.invoices ?? b.deliveryInvoiceDetails ?? b.content ?? []
       if (Array.isArray(invs)) {
         out.notas_da_viagem = invs.map((x: Record<string, unknown>) => ({
@@ -241,7 +241,12 @@ Deno.serve(async (req) => {
 
   // Modo A: mudar status detalhado (opcionalmente com uma data) - PATCH no recurso
   if (statusId) {
-    const dataExtra = campo && valor && CAMPOS.includes(campo) ? { [campo]: valor } : {}
+    const dataExtra: Record<string, string> =
+      campo && valor && CAMPOS.includes(campo) ? { [campo]: valor } : {}
+    const extras = (body.campos ?? {}) as Record<string, string>
+    for (const [k, v] of Object.entries(extras)) {
+      if (CAMPOS.includes(k) && typeof v === 'string' && v) dataExtra[k] = v
+    }
     const tentativas: unknown[] = []
     const payloads: Record<string, unknown>[] = [
       { tripInvoiceDetailedStatusId: statusId, ...dataExtra },
