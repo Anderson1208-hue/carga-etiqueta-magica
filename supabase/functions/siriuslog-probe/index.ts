@@ -212,6 +212,7 @@ Deno.serve(async (req) => {
         }))
         const hit = invs.find((x: Record<string, unknown>) =>
           String(x.invoiceNumber ?? x.number ?? '') === nf)
+        if (body.cru) out.nota_crua = hit ?? invs[0] ?? null
         detailId = (hit?.invoiceDetailId ?? hit?.id ?? null) as number | null
       }
     } catch { /* truncado */ }
