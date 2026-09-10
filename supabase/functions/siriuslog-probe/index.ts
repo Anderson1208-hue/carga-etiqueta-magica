@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
         ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
       })
       const txt = await r.text()
-      return { nome, status: r.status, corpo: txt.slice(0, 4000) }
+      return { nome, status: r.status, corpo: txt.slice(0, 4000), _full: txt }
     } catch (e) {
       return { nome, erro: String(e) }
     } finally {
