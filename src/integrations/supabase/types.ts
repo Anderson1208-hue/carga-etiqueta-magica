@@ -3781,6 +3781,10 @@ export type Database = {
       }
     }
     Functions: {
+      add_dias_uteis: {
+        Args: { p_base: string; p_dias: number }
+        Returns: string
+      }
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
       aplicar_baixa_retroativa: {
         Args: { p_dry_run?: boolean; p_origem?: string; p_rows: Json }
@@ -4162,6 +4166,18 @@ export type Database = {
       rota_baixa_aderencia: {
         Args: { _min_pings?: number; _monitoramento_rota_id: string }
         Returns: boolean
+      }
+      siriuslog_plano: {
+        Args: { p_ate: string; p_de: string }
+        Returns: {
+          baixa_entregue: string
+          carga_status: string
+          carga_updated: string
+          data_rot: string
+          numero_nf: string
+          previsao: string
+          previsao_origem: string
+        }[]
       }
     }
     Enums: {
