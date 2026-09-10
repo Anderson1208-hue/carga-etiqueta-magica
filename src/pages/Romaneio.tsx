@@ -78,6 +78,8 @@ interface NotaFiscalData {
   destCep?: string;
   dataEmissao: string | null;
   macroRegiao: number;
+  pesoBruto: number;
+  volumeM3: number;
   itens: {
     cProd: string;
     xProd: string;
