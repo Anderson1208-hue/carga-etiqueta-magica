@@ -180,6 +180,8 @@ export default function Romaneio() {
             dest_uf,
             dest_cep,
             data_emissao,
+            peso_bruto,
+            volume_m3,
             itens_nf(
               c_prod,
               x_prod,
