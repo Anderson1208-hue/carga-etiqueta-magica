@@ -760,6 +760,39 @@ export type Database = {
         }
         Relationships: []
       }
+      config_tracking_pandurata: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_inicial: string
+          id: boolean
+          limite_por_rodada: number
+          max_tentativas: number
+          pausado_motivo: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_inicial?: string
+          id?: boolean
+          limite_por_rodada?: number
+          max_tentativas?: number
+          pausado_motivo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_inicial?: string
+          id?: boolean
+          limite_por_rodada?: number
+          max_tentativas?: number
+          pausado_motivo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       configuracao_fiscal_emitente: {
         Row: {
           ambiente: string
@@ -1628,6 +1661,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      execucoes_tracking_pandurata: {
+        Row: {
+          concluidas: number
+          created_at: string
+          detalhe: Json | null
+          em_execucao: boolean
+          erro: string | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          lease_expira_em: string
+          modo: string
+          processadas: number
+          recusadas: number
+          updated_at: string
+        }
+        Insert: {
+          concluidas?: number
+          created_at?: string
+          detalhe?: Json | null
+          em_execucao?: boolean
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          lease_expira_em?: string
+          modo?: string
+          processadas?: number
+          recusadas?: number
+          updated_at?: string
+        }
+        Update: {
+          concluidas?: number
+          created_at?: string
+          detalhe?: Json | null
+          em_execucao?: boolean
+          erro?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          lease_expira_em?: string
+          modo?: string
+          processadas?: number
+          recusadas?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fila_tracking_pandurata: {
+        Row: {
+          concluido_em: string | null
+          created_at: string
+          id: string
+          invoice_detail_id: number | null
+          motivo_conclusao: string | null
+          numero_nf: string
+          status_enviado: string | null
+          status_portal: string | null
+          tentativas: number
+          trip_id: number | null
+          ultima_tentativa_em: string | null
+          ultimo_erro: string | null
+          updated_at: string
+        }
+        Insert: {
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          invoice_detail_id?: number | null
+          motivo_conclusao?: string | null
+          numero_nf: string
+          status_enviado?: string | null
+          status_portal?: string | null
+          tentativas?: number
+          trip_id?: number | null
+          ultima_tentativa_em?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Update: {
+          concluido_em?: string | null
+          created_at?: string
+          id?: string
+          invoice_detail_id?: number | null
+          motivo_conclusao?: string | null
+          numero_nf?: string
+          status_enviado?: string | null
+          status_portal?: string | null
+          tentativas?: number
+          trip_id?: number | null
+          ultima_tentativa_em?: string | null
+          ultimo_erro?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       geocode_cache: {
         Row: {
@@ -4178,6 +4307,14 @@ export type Database = {
           previsao: string
           previsao_origem: string
         }[]
+      }
+      tracking_pandurata_e_dia_util: {
+        Args: { p_data: string }
+        Returns: boolean
+      }
+      tracking_pandurata_iniciar_rodada: {
+        Args: { p_modo: string }
+        Returns: string
       }
     }
     Enums: {
