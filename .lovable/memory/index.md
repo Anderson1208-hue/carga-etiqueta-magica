@@ -122,3 +122,4 @@ type: reference
 
 
 - [IBAC Piloto por Placa](mem://funcionalidades/ibac-piloto-por-placa) — Escopo por placa/data (LNA5B11, DTB9J73 25/08/2026); ocorrência na sincronização da baixa, imagem só após encerrar prestação de contas.
+- [Rotina Tracking Pandurata](mem://arquitetura/integracao-erp/siriuslog-rotina-diaria) — fila diária Sirius Log, cron 10:30 dias úteis, interruptor desligado por padrão.
