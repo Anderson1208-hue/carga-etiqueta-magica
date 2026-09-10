@@ -1,6 +1,7 @@
 // Rotina diaria de atualizacao do tracking Pandurata no portal Sirius Log.
 // Regras:
-//  - considera apenas notas a partir de config.data_inicial (01/09/2026);
+//  - considera notas com MOVIMENTACAO de status a partir de config.data_inicial,
+//    independente da data de emissao da nota (carga aberta, expedicao, baixa);
 //  - notas concluidas (entregues/finais) saem da fila e nunca sao reenviadas;
 //  - so grava no portal quando config.ativo = true; caso contrario roda em SIMULACAO;
 //  - roda apenas em dia util (RJ) quando chamada pelo agendador;

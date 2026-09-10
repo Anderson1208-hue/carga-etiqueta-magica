@@ -13,6 +13,6 @@ Tabelas:
 
 Funções SQL: `tracking_pandurata_iniciar_rodada(text)` (trava, retorna NULL se já rodando) e `tracking_pandurata_e_dia_util(date)` (usa `add_dias_uteis`).
 
-Regras: só notas >= `data_inicial`; notas que chegam a "Entrega realizada..." ou status final do portal recebem `concluido_em` e saem da fila para sempre; fila é rotacionada por `ultima_tentativa_em` para o limite por rodada não travar nas mesmas notas; com `ativo=false` (ou `{"simular":true}`) roda em simulação e NADA é enviado.
+Regras: entram notas cuja **movimentação de status** (carga aberta / expedição na rota / baixa de entrega) é >= `data_inicial`, independente da data de emissão da NF (regra em `siriuslog_plano`, alterada em 10/09/2026); notas que chegam a "Entrega realizada..." ou status final do portal recebem `concluido_em` e saem da fila para sempre; fila é rotacionada por `ultima_tentativa_em` para o limite por rodada não travar nas mesmas notas; com `ativo=false` (ou `{"simular":true}`) roda em simulação e NADA é enviado.
 
 Agendamento: cron `tracking-pandurata-diario`, `30 13 * * 1-5` (10:30 BRT); guarda de feriado RJ dentro da função.
