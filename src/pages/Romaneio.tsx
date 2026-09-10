@@ -662,6 +662,60 @@ export default function Romaneio() {
           </div>
         </div>
 
+        {/* Dashboard da carga */}
+        {selectedCarga && notasFiscais.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{metrics.totalNfs}</p>
+                  <p className="text-xs text-muted-foreground">Notas fiscais</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+                  <Store className="w-5 h-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{metrics.lojas}</p>
+                  <p className="text-xs text-muted-foreground">Lojas</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                  <Box className="w-5 h-5 text-warning" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {metrics.volumeTotal.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Volume (m³)</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
+                  <Weight className="w-5 h-5 text-info" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {metrics.pesoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Peso bruto (kg)</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Nota de Carga por NF */}
         {selectedCarga && notasFiscais.length > 0 && (
           <div className="wms-card p-4">
