@@ -17,6 +17,10 @@ Gravação (validada em 08/09/2026, NF 758306, detailId 96244):
 - **Falha 422:** `PATCH .../current-status` só com data, sem avançar status ("Data de saída na filial não pode ser alterada no status ...").
 - Regra: data só é aceita junto com a transição de status correspondente.
 
+Transicao 21 -> 22 (Na filial da transportadora): o portal EXIGE `estimatedDeliveryDate` junto com
+`branchArrivalDate` (422 "Data prevista de entrega e obrigatoria..." se faltar). Validado em 10/09/2026,
+NF 759913, detailId 99955 -> HTTP 204. A sonda aceita `{"campos":{...}}` para enviar varias datas.
+
 Campos de data: `scheduleRequestDate`, `deliverySchedulingDate`, `estimatedDeliveryDate`, `customerArrivalDate`, `deliveryDate`, `branchEstimatedArrivalDate`, `branchArrivalDate`, `branchDepartureDate`.
 
 Ciclo completo validado (NF 758306, detailId 96244, 08/09/2026) — cada passo 1 PATCH, HTTP 204:
