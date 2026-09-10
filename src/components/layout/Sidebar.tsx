@@ -72,6 +72,10 @@ const transporteItems = [
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
+const trackingItems = [
+  { name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug },
+];
+
 const torreControleItems = [
   { name: "Torre de Controle", href: "/torre-controle", icon: Radar },
   { name: "Acompanhamento Rápido", href: "/acompanhamento-rotas", icon: Radio },
