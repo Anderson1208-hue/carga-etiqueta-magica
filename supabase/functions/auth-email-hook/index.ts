@@ -39,7 +39,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 const SITE_NAME = "Carga Fácil"
 const SENDER_DOMAIN = "imagens.tlmlogistica.com.br"
 const ROOT_DOMAIN = "tlmlogistica.com.br"
-const FROM_DOMAIN = "tlmlogistica.com.br" // Domain shown in From address (may be root or sender subdomain)
+const FROM_DOMAIN = "imagens.tlmlogistica.com.br" // Domain shown in From address (may be root or sender subdomain)
 
 function redactEmail(email: string | null | undefined): string {
   if (!email) return '***'
