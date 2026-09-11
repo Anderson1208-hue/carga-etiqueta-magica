@@ -25,22 +25,49 @@ Deno.serve(async (req) => {
       "06042467001900": "b76a5990-40ae-489c-bd84-ce9937050760",
     };
 
-    let ok = 0;
-    const erros: string[] = [];
-    const CHUNK = 400;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const lote = rows.slice(i, i + CHUNK).map((r) => ({
-        ...r,
-        embarcador_id: embMap[String(r.cnpj_embarcador)] ?? null,
-      }));
-      const { error } = await admin.rpc("importar_produtos_lote", {
-        payload: { produtos: lote },
-      });
-      if (error) erros.push(`${i}: ${error.message}`);
-      else ok += lote.length;
+    const existentes = new Map<string, string>();
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await admin
+        .from("produtos")
+        .select("id, cnpj_embarcador, codigo")
+        .in("cnpj_embarcador", Object.keys(embMap))
+        .order("codigo")
+        .range(from, from + 999);
+      if (error) throw error;
+      (data ?? []).forEach((p) =>
+        existentes.set(`${p.cnpj_embarcador}|${String(p.codigo).trim().toLowerCase()}`, p.id)
+      );
+      if (!data || data.length < 1000) break;
     }
 
-    return new Response(JSON.stringify({ total: rows.length, ok, erros }), {
+    let inseridos = 0;
+    let atualizados = 0;
+    const erros: string[] = [];
+    const novos: Record<string, unknown>[] = [];
+    const upd: Record<string, unknown>[] = [];
+
+    for (const r of rows) {
+      const base = { ...r, embarcador_id: embMap[String(r.cnpj_embarcador)] ?? null };
+      const id = existentes.get(
+        `${r.cnpj_embarcador}|${String(r.codigo).trim().toLowerCase()}`,
+      );
+      if (id) upd.push({ ...base, id });
+      else novos.push(base);
+    }
+
+    const CHUNK = 400;
+    for (let i = 0; i < novos.length; i += CHUNK) {
+      const { error } = await admin.from("produtos").insert(novos.slice(i, i + CHUNK));
+      if (error) erros.push(`insert ${i}: ${error.message}`);
+      else inseridos += Math.min(CHUNK, novos.length - i);
+    }
+    for (let i = 0; i < upd.length; i += CHUNK) {
+      const { error } = await admin.from("produtos").upsert(upd.slice(i, i + CHUNK));
+      if (error) erros.push(`update ${i}: ${error.message}`);
+      else atualizados += Math.min(CHUNK, upd.length - i);
+    }
+
+    return new Response(JSON.stringify({ total: rows.length, inseridos, atualizados, erros }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
