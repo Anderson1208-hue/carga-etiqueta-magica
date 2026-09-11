@@ -12,6 +12,7 @@ import { BackButton } from "@/components/layout/BackButton";
 
 const IS_NATIVE_APK = Capacitor.isNativePlatform();
 import Login from "./pages/Login";
+import Unsubscribe from "./pages/Unsubscribe";
 import Dashboard from "./pages/Dashboard";
 import Cargas from "./pages/Cargas";
 import Romaneio from "./pages/Romaneio";
@@ -172,6 +173,7 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
       <Route
         path="/"
         element={

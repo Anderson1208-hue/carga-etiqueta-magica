@@ -1,0 +1,1 @@
+alter table public.email_unsubscribe_tokens add constraint email_unsubscribe_tokens_email_key unique (email);
