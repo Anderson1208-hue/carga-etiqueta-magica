@@ -108,13 +108,19 @@ Deno.serve(async (req) => {
       return ta < tb ? -1 : 1
     })
 
-    const lote = pendentes.slice(0, cfg.limite_por_rodada ?? 40)
+    // Nesta execucao (cadeia de passos) cada nota e tentada no maximo uma vez.
+    const naoTentadas = pendentes.filter((nf) => {
+      const t = filaMap.get(nf)?.ultima_tentativa_em
+      return !t || String(t) < inicio
+    })
+
+    const lote = naoTentadas.slice(0, cfg.limite_por_rodada ?? 40)
     out.modo = modo
     out.data_inicial = cfg.data_inicial
     out.total_no_periodo = todas.length
     out.pendentes = pendentes.length
     out.processadas_nesta_rodada = lote.length
-    out.restantes_na_fila = Math.max(0, pendentes.length - lote.length)
+    out.restantes_na_fila = Math.max(0, naoTentadas.length - lote.length)
 
     if (!lote.length) {
       await encerrar({ processadas: 0, concluidas: 0, recusadas: 0 })
