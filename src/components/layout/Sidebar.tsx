@@ -23,6 +23,7 @@ import {
   Package,
   MapPin,
   CalendarClock,
+  CalendarDays,
   FileSearch,
   Users,
   Radio,
@@ -64,12 +65,16 @@ const transporteItems = [
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
-  { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
   { name: "Canhotos Pendentes", href: "/canhotos-pendentes", icon: FileWarning },
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
+];
+
+const agendasItems = [
+  { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
+  { name: "Cadastro de Agendas", href: "/agendas/cadastro", icon: CalendarDays },
 ];
 
 const trackingItems = [
@@ -114,18 +119,74 @@ function NavItem({ item, isActive, onClick }: { item: { name: string; href: stri
   );
 }
 
+function NavSubGroup({
+  label,
+  icon: Icon,
+  items,
+  pathname,
+}: {
+  label: string;
+  icon: React.ElementType;
+  items: typeof depositoItems;
+  pathname: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const active = items.some((i) => pathname === i.href);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium transition-colors",
+            active
+              ? "bg-sidebar-accent text-sidebar-primary"
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+        >
+          <Icon className="w-5 h-5" />
+          <span className="flex-1 text-left">{label}</span>
+          <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="w-60 p-2 bg-sidebar text-sidebar-foreground border-sidebar-border"
+      >
+        <p className="px-2 pt-1 pb-2 text-xs uppercase tracking-wide text-sidebar-foreground/50">
+          {label}
+        </p>
+        <div className="space-y-0.5">
+          {items.map((item) => (
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={pathname === item.href}
+              onClick={() => setOpen(false)}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function NavGroupFlyout({
   label,
   icon: Icon,
   items,
   pathname,
   groupActive,
+  subgroups,
 }: {
   label: string;
   icon: React.ElementType;
   items: typeof depositoItems;
   pathname: string;
   groupActive: boolean;
+  subgroups?: { label: string; icon: React.ElementType; items: typeof depositoItems }[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -163,6 +224,15 @@ function NavGroupFlyout({
               onClick={() => setOpen(false)}
             />
           ))}
+          {subgroups?.map((sg) => (
+            <NavSubGroup
+              key={sg.label}
+              label={sg.label}
+              icon={sg.icon}
+              items={sg.items}
+              pathname={pathname}
+            />
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -180,6 +250,7 @@ export function Sidebar() {
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
+  const agendasActive = agendasItems.some((i) => location.pathname === i.href);
   const trackingActive = trackingItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
@@ -221,7 +292,8 @@ export function Sidebar() {
             icon={MapPin}
             items={transporteItems}
             pathname={location.pathname}
-            groupActive={transporteActive}
+            groupActive={transporteActive || agendasActive}
+            subgroups={[{ label: "Agendas", icon: CalendarDays, items: agendasItems }]}
           />
           {podeVerTrackingPandurata && (
             <NavGroupFlyout

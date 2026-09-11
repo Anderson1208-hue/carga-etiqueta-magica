@@ -23,6 +23,7 @@ import Programacao from "./pages/Programacao";
 import BaixaEntrega from "./pages/BaixaEntrega";
 import HistoricoEntregas from "./pages/HistoricoEntregas";
 import Agendamento from "./pages/Agendamento";
+import CadastroAgendas from "./pages/CadastroAgendas";
 import Enderecamento from "./pages/Enderecamento";
 import ConsultaNF from "./pages/ConsultaNF";
 import MonitoramentoRotas from "./pages/MonitoramentoRotas";
@@ -257,6 +258,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Agendamento />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/agendas/cadastro"
+        element={
+          <ProtectedRoute>
+            <CadastroAgendas />
           </ProtectedRoute>
         }
       />
