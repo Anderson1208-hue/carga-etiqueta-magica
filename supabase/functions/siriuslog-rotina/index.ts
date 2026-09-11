@@ -30,6 +30,8 @@ Deno.serve(async (req) => {
   // Continuacao automatica: cada rodada dispara a proxima enquanto houver fila.
   const passo = Number(body.passo ?? 1)
   const MAX_PASSOS = 30
+  // Marca de inicio da cadeia: cada nota e tentada no maximo uma vez por execucao.
+  const inicio = String(body.inicio ?? new Date().toISOString())
 
   const out: Record<string, unknown> = {}
   const json = (s = 200) =>
