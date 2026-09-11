@@ -31,7 +31,7 @@ import { calculateBoxes } from "@/lib/xml-parser";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
-import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc, Store, Box, Weight } from "lucide-react";
+import { FileText, Download, Loader2, Printer, Search, ArrowLeft, FileSpreadsheet, ClipboardList, List, CheckSquare, SortAsc, Store, Box, Weight, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -140,7 +140,8 @@ export default function Romaneio() {
     const lojas = new Set(filteredNFs.map((nf) => nf.cnpjDestinatario).filter(Boolean)).size;
     const pesoTotal = filteredNFs.reduce((acc, nf) => acc + nf.pesoBruto, 0);
     const volumeTotal = filteredNFs.reduce((acc, nf) => acc + nf.volumeM3, 0);
-    return { totalNfs, lojas, pesoTotal, volumeTotal };
+    const skus = new Set(filteredNFs.flatMap((nf) => (nf.itens || []).map((i) => i.cProd))).size;
+    return { totalNfs, lojas, skus, pesoTotal, volumeTotal };
   }, [filteredNFs]);
 
   async function loadCargas() {
@@ -664,7 +665,7 @@ export default function Romaneio() {
 
         {/* Dashboard da carga */}
         {selectedCarga && notasFiscais.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -684,6 +685,17 @@ export default function Romaneio() {
                 <div>
                   <p className="text-2xl font-bold">{metrics.lojas}</p>
                   <p className="text-xs text-muted-foreground">Lojas</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Package className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{metrics.skus}</p>
+                  <p className="text-xs text-muted-foreground">SKUs</p>
                 </div>
               </CardContent>
             </Card>
