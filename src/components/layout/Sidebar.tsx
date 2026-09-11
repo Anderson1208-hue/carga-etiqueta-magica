@@ -119,18 +119,74 @@ function NavItem({ item, isActive, onClick }: { item: { name: string; href: stri
   );
 }
 
+function NavSubGroup({
+  label,
+  icon: Icon,
+  items,
+  pathname,
+}: {
+  label: string;
+  icon: React.ElementType;
+  items: typeof depositoItems;
+  pathname: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const active = items.some((i) => pathname === i.href);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium transition-colors",
+            active
+              ? "bg-sidebar-accent text-sidebar-primary"
+              : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+        >
+          <Icon className="w-5 h-5" />
+          <span className="flex-1 text-left">{label}</span>
+          <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="right"
+        align="start"
+        sideOffset={8}
+        className="w-60 p-2 bg-sidebar text-sidebar-foreground border-sidebar-border"
+      >
+        <p className="px-2 pt-1 pb-2 text-xs uppercase tracking-wide text-sidebar-foreground/50">
+          {label}
+        </p>
+        <div className="space-y-0.5">
+          {items.map((item) => (
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={pathname === item.href}
+              onClick={() => setOpen(false)}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function NavGroupFlyout({
   label,
   icon: Icon,
   items,
   pathname,
   groupActive,
+  subgroups,
 }: {
   label: string;
   icon: React.ElementType;
   items: typeof depositoItems;
   pathname: string;
   groupActive: boolean;
+  subgroups?: { label: string; icon: React.ElementType; items: typeof depositoItems }[];
 }) {
   const [open, setOpen] = useState(false);
 
