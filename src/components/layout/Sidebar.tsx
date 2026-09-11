@@ -71,6 +71,11 @@ const transporteItems = [
   { name: "Histórico Entregas", href: "/historico-entregas", icon: History },
 ];
 
+const agendasItems = [
+  { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
+  { name: "Cadastro de Agendas", href: "/agendas/cadastro", icon: CalendarDays },
+];
+
 const trackingItems = [
   { name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug },
 ];
