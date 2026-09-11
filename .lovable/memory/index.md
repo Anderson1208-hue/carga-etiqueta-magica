@@ -21,6 +21,7 @@ type: reference
 - [EDI Cacau m³](mem://funcionalidades/cadastros/edi-cacau-cubagem-notfis) — IBAC: importar NOTFIS na linha da carga; m³ = peso cubado ÷ 300.
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Match cProd zeros](mem://logica/match-cprod-zeros-a-esquerda) — c_prod da NF vem zero-padded; join com produtos.codigo sempre com ltrim(...,'0').
+- [Produtos Arcor/Bagley](mem://funcionalidades/cadastros/produtos-arcor-bagley) — Planilha Siebel: código = Part Num, m³/peso da planilha, Arcor+Bagley no mesmo arquivo.
 - [Contagem de Caixas](mem://logica/contagem-caixas) — 1 un = 1 caixa. Centralized logic, grouped by cProd.
 - [IBAC Endpoints](mem://funcionalidades/ibac-endpoint-canhoto-separado) — Ocorrência vs. somente-imagem (canhoto) em endpoints distintos; evita HTTP 409.
 - [Integração por Emitente](mem://constraints/integracao-por-emitente-cnpj) — Cada integração só transmite NFs do próprio emitente (raiz CNPJ); fora de escopo = cancelado na fila.
