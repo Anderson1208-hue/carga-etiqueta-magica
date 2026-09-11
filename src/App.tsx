@@ -172,6 +172,7 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
       <Route
         path="/"
         element={
