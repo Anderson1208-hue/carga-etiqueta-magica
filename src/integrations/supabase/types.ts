@@ -680,22 +680,36 @@ export type Database = {
         Row: {
           cnpj: string
           created_at: string
+          embarcador_id: string | null
           emitente: string | null
           id: string
+          status: string
         }
         Insert: {
           cnpj: string
           created_at?: string
+          embarcador_id?: string | null
           emitente?: string | null
           id?: string
+          status?: string
         }
         Update: {
           cnpj?: string
           created_at?: string
+          embarcador_id?: string | null
           emitente?: string | null
           id?: string
+          status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cnpj_agenda_automatica_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cnpj_envio_canhoto_auto: {
         Row: {
