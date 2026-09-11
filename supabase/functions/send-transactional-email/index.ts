@@ -334,7 +334,6 @@ Deno.serve(async (req) => {
   try {
     sendResult = await sendLovableEmail(
       {
-        run_id: messageId,
         to: effectiveRecipient,
         from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
         sender_domain: SENDER_DOMAIN,
@@ -343,7 +342,7 @@ Deno.serve(async (req) => {
         text: plainText,
         purpose: 'transactional',
         label: templateName,
-        idempotency_key: idempotencyKey,
+        idempotency_key: idempotencyKey ?? messageId,
         unsubscribe_token: unsubscribeToken,
       },
       { apiKey: lovableApiKey, idempotencyKey: idempotencyKey ?? messageId },
