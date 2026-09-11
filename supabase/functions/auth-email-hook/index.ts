@@ -1,6 +1,6 @@
 import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
-import { parseEmailWebhookPayload } from 'npm:@lovable.dev/email-js'
+import { parseEmailWebhookPayload, sendLovableEmail } from 'npm:@lovable.dev/email-js'
 import { WebhookError, verifyWebhookRequest } from 'npm:@lovable.dev/webhooks-js'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { SignupEmail } from '../_shared/email-templates/signup.tsx'
@@ -259,28 +259,34 @@ async function handleWebhook(req: Request): Promise<Response> {
     status: 'pending',
   })
 
-  const { error: enqueueError } = await supabase.rpc('enqueue_email', {
-    queue_name: 'auth_emails',
-    payload: {
-      run_id,
-      message_id: messageId,
-      to: payload.data.email,
-      from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
-      reply_to: `Carga Fácil <faturamento@tlmlogistica.com.br>`,
-      sender_domain: SENDER_DOMAIN,
-      subject: EMAIL_SUBJECTS[emailType] || 'Notification',
-      html,
-      text,
-      purpose: 'transactional',
-      label: emailType,
-      queued_at: new Date().toISOString(),
-    },
-  })
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
+  if (!lovableApiKey) {
+    console.error('Missing LOVABLE_API_KEY')
+    return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
-  if (enqueueError) {
-    console.error('Failed to enqueue auth email', {
-      code: enqueueError.code,
-      message: enqueueError.message,
+  try {
+    await sendLovableEmail(
+      {
+        run_id,
+        to: payload.data.email,
+        from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
+        reply_to: `Carga Fácil <faturamento@tlmlogistica.com.br>`,
+        sender_domain: SENDER_DOMAIN,
+        subject: EMAIL_SUBJECTS[emailType] || 'Notification',
+        html,
+        text,
+        purpose: 'transactional',
+        label: emailType,
+      },
+      { apiKey: lovableApiKey, idempotencyKey: messageId },
+    )
+  } catch (sendError) {
+    console.error('Failed to send auth email', {
+      message: sendError instanceof Error ? sendError.message : String(sendError),
       run_id,
       emailType,
     })
@@ -289,15 +295,22 @@ async function handleWebhook(req: Request): Promise<Response> {
       template_name: emailType,
       recipient_email: payload.data.email,
       status: 'failed',
-      error_message: 'Failed to enqueue email',
+      error_message: sendError instanceof Error ? sendError.message : 'Failed to send email',
     })
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
+    return new Response(JSON.stringify({ error: 'Failed to send email' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  console.log('Auth email enqueued', { emailType, email_redacted: redactEmail(payload.data.email), run_id })
+  await supabase.from('email_send_log').insert({
+    message_id: messageId,
+    template_name: emailType,
+    recipient_email: payload.data.email,
+    status: 'sent',
+  })
+
+  console.log('Auth email sent', { emailType, email_redacted: redactEmail(payload.data.email), run_id })
 
   return new Response(
     JSON.stringify({ success: true, queued: true }),
