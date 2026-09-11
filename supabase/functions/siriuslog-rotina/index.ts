@@ -27,6 +27,11 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const forcarSimulacao = body.simular === true
   const ignorarDiaUtil = body.ignorar_dia_util === true
+  // Continuacao automatica: cada rodada dispara a proxima enquanto houver fila.
+  const passo = Number(body.passo ?? 1)
+  const MAX_PASSOS = 30
+  // Marca de inicio da cadeia: cada nota e tentada no maximo uma vez por execucao.
+  const inicio = String(body.inicio ?? new Date().toISOString())
 
   const out: Record<string, unknown> = {}
   const json = (s = 200) =>
@@ -105,13 +110,19 @@ Deno.serve(async (req) => {
       return ta < tb ? -1 : 1
     })
 
-    const lote = pendentes.slice(0, cfg.limite_por_rodada ?? 40)
+    // Nesta execucao (cadeia de passos) cada nota e tentada no maximo uma vez.
+    const naoTentadas = pendentes.filter((nf) => {
+      const t = filaMap.get(nf)?.ultima_tentativa_em
+      return !t || String(t) < inicio
+    })
+
+    const lote = naoTentadas.slice(0, cfg.limite_por_rodada ?? 40)
     out.modo = modo
     out.data_inicial = cfg.data_inicial
     out.total_no_periodo = todas.length
     out.pendentes = pendentes.length
     out.processadas_nesta_rodada = lote.length
-    out.restantes_na_fila = Math.max(0, pendentes.length - lote.length)
+    out.restantes_na_fila = Math.max(0, naoTentadas.length - lote.length)
 
     if (!lote.length) {
       await encerrar({ processadas: 0, concluidas: 0, recusadas: 0 })
@@ -186,8 +197,35 @@ Deno.serve(async (req) => {
     out.concluidas = concluidas
     out.recusadas = recusadas
     out.resultados = resultados
-    await encerrar({ processadas: resultados.length, concluidas, recusadas, detalhe: { resumo: dados.modo } })
+    await encerrar({ processadas: resultados.length, concluidas, recusadas, detalhe: { resumo: dados.modo, passo } })
     out.situacao = gravar ? 'processado' : 'simulado (nada foi enviado)'
+    out.passo = passo
+
+    // Continuacao: se ainda ha fila, dispara a proxima rodada automaticamente.
+    const restantes = Number(out.restantes_na_fila ?? 0)
+    if (restantes > 0 && passo < MAX_PASSOS) {
+      out.continuacao = `disparado passo ${passo + 1}`
+      const p = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/siriuslog-rotina`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          passo: passo + 1,
+          inicio,
+          ignorar_dia_util: true,
+          simular: forcarSimulacao,
+        }),
+      }).catch(() => undefined)
+      // @ts-ignore runtime do edge
+      if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(p)
+      else await p
+    } else if (restantes > 0) {
+      out.continuacao = 'limite_de_passos_atingido'
+    } else {
+      out.continuacao = 'fila_esvaziada'
+    }
     return json()
   } catch (e) {
     await encerrar({ erro: String(e) })
