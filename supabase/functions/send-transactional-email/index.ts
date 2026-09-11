@@ -289,6 +289,22 @@ Deno.serve(async (req) => {
     )
   }
 
+  // 3b. Optional: turn a private storage path into a signed URL the email can show.
+  // Attachments are not supported, so images travel as signed links (7 days).
+  if (typeof templateData.fotoPath === 'string' && templateData.fotoPath) {
+    const bucket = typeof templateData.fotoBucket === 'string' ? templateData.fotoBucket : 'comprovantes'
+    const { data: signed, error: signError } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(templateData.fotoPath, 60 * 60 * 24 * 7)
+    if (signError || !signed?.signedUrl) {
+      console.error('Failed to sign image URL', { message: signError?.message })
+    } else {
+      templateData = { ...templateData, imageUrl: signed.signedUrl }
+    }
+    delete (templateData as Record<string, unknown>).fotoPath
+    delete (templateData as Record<string, unknown>).fotoBucket
+  }
+
   // 4. Render React Email template to HTML and plain text
   const html = await renderAsync(
     React.createElement(template.component, templateData)
