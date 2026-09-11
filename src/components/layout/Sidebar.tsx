@@ -224,6 +224,15 @@ function NavGroupFlyout({
               onClick={() => setOpen(false)}
             />
           ))}
+          {subgroups?.map((sg) => (
+            <NavSubGroup
+              key={sg.label}
+              label={sg.label}
+              icon={sg.icon}
+              items={sg.items}
+              pathname={pathname}
+            />
+          ))}
         </div>
       </PopoverContent>
     </Popover>
