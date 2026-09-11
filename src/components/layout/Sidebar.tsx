@@ -250,6 +250,7 @@ export function Sidebar() {
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
+  const agendasActive = agendasItems.some((i) => location.pathname === i.href);
   const trackingActive = trackingItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
