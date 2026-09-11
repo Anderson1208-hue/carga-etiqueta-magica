@@ -189,8 +189,34 @@ Deno.serve(async (req) => {
     out.concluidas = concluidas
     out.recusadas = recusadas
     out.resultados = resultados
-    await encerrar({ processadas: resultados.length, concluidas, recusadas, detalhe: { resumo: dados.modo } })
+    await encerrar({ processadas: resultados.length, concluidas, recusadas, detalhe: { resumo: dados.modo, passo } })
     out.situacao = gravar ? 'processado' : 'simulado (nada foi enviado)'
+    out.passo = passo
+
+    // Continuacao: se ainda ha fila, dispara a proxima rodada automaticamente.
+    const restantes = Number(out.restantes_na_fila ?? 0)
+    if (restantes > 0 && passo < MAX_PASSOS) {
+      out.continuacao = `disparado passo ${passo + 1}`
+      const p = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/siriuslog-rotina`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          passo: passo + 1,
+          ignorar_dia_util: true,
+          simular: forcarSimulacao,
+        }),
+      }).catch(() => undefined)
+      // @ts-ignore runtime do edge
+      if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(p)
+      else await p
+    } else if (restantes > 0) {
+      out.continuacao = 'limite_de_passos_atingido'
+    } else {
+      out.continuacao = 'fila_esvaziada'
+    }
     return json()
   } catch (e) {
     await encerrar({ erro: String(e) })
