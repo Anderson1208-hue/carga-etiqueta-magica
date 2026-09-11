@@ -213,6 +213,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           passo: passo + 1,
+          inicio,
           ignorar_dia_util: true,
           simular: forcarSimulacao,
         }),
