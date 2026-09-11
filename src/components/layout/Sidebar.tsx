@@ -64,7 +64,6 @@ const transporteItems = [
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
-  { name: "Agendamento", href: "/agendamento", icon: CalendarClock },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
