@@ -27,6 +27,9 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const forcarSimulacao = body.simular === true
   const ignorarDiaUtil = body.ignorar_dia_util === true
+  // Continuacao automatica: cada rodada dispara a proxima enquanto houver fila.
+  const passo = Number(body.passo ?? 1)
+  const MAX_PASSOS = 30
 
   const out: Record<string, unknown> = {}
   const json = (s = 200) =>
