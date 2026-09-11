@@ -1,0 +1,3 @@
+CREATE POLICY "Operators can insert cnpj_agenda" ON public.cnpj_agenda_automatica FOR INSERT TO authenticated WITH CHECK (public.is_active_operator());
+CREATE POLICY "Operators can update cnpj_agenda" ON public.cnpj_agenda_automatica FOR UPDATE TO authenticated USING (public.is_active_operator()) WITH CHECK (public.is_active_operator());
+CREATE POLICY "Operators can delete cnpj_agenda" ON public.cnpj_agenda_automatica FOR DELETE TO authenticated USING (public.is_active_operator());
