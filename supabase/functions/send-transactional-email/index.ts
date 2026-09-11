@@ -2,6 +2,7 @@ import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
 // Configuration baked in at scaffold time — do NOT change these manually.
@@ -303,10 +304,9 @@ Deno.serve(async (req) => {
       ? template.subject(templateData)
       : template.subject
 
-  // 5. Enqueue the pre-rendered email for async processing by the dispatcher.
-  // The dispatcher (process-email-queue) handles sending, retries, and rate-limit backoff.
+  // 5. Send via Lovable's managed email service (no local queue needed)
 
-  // Log pending BEFORE enqueue so we have a record even if enqueue crashes
+  // Log pending BEFORE send so we have a record even if the send crashes
   await supabase.from('email_send_log').insert({
     message_id: messageId,
     template_name: templateName,
@@ -314,28 +314,43 @@ Deno.serve(async (req) => {
     status: 'pending',
   })
 
-  const { error: enqueueError } = await supabase.rpc('enqueue_email', {
-    queue_name: 'transactional_emails',
-    payload: {
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')
+  if (!lovableApiKey) {
+    console.error('Missing LOVABLE_API_KEY')
+    await supabase.from('email_send_log').insert({
       message_id: messageId,
-      to: effectiveRecipient,
-      from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
-      sender_domain: SENDER_DOMAIN,
-      subject: resolvedSubject,
-      html,
-      text: plainText,
-      purpose: 'transactional',
-      label: templateName,
-      idempotency_key: idempotencyKey,
-      unsubscribe_token: unsubscribeToken,
-      queued_at: new Date().toISOString(),
-    },
-  })
+      template_name: templateName,
+      recipient_email: effectiveRecipient,
+      status: 'failed',
+      error_message: 'Missing email API key',
+    })
+    return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
 
-  if (enqueueError) {
-    console.error('Failed to enqueue email', {
-      code: enqueueError.code,
-      message: enqueueError.message,
+  let sendResult: { error?: { message?: string } } | null = null
+  try {
+    sendResult = await sendLovableEmail(
+      {
+        run_id: messageId,
+        to: effectiveRecipient,
+        from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
+        sender_domain: SENDER_DOMAIN,
+        subject: resolvedSubject,
+        html,
+        text: plainText,
+        purpose: 'transactional',
+        label: templateName,
+        idempotency_key: idempotencyKey,
+        unsubscribe_token: unsubscribeToken,
+      },
+      { apiKey: lovableApiKey, idempotencyKey: idempotencyKey ?? messageId },
+    )
+  } catch (sendError) {
+    console.error('Failed to send email', {
+      message: sendError instanceof Error ? sendError.message : String(sendError),
       templateName,
       recipient_redacted: redactEmail(effectiveRecipient),
     })
@@ -345,16 +360,23 @@ Deno.serve(async (req) => {
       template_name: templateName,
       recipient_email: effectiveRecipient,
       status: 'failed',
-      error_message: 'Failed to enqueue email',
+      error_message: sendError instanceof Error ? sendError.message : 'Failed to send email',
     })
 
-    return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
+    return new Response(JSON.stringify({ error: 'Failed to send email' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
-  console.log('Transactional email enqueued', { templateName, recipient_redacted: redactEmail(effectiveRecipient) })
+  await supabase.from('email_send_log').insert({
+    message_id: messageId,
+    template_name: templateName,
+    recipient_email: effectiveRecipient,
+    status: 'sent',
+  })
+
+  console.log('Transactional email sent', { templateName, recipient_redacted: redactEmail(effectiveRecipient) })
 
   return new Response(
     JSON.stringify({ success: true, queued: true }),
