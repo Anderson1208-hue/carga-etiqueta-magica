@@ -307,8 +307,13 @@ export function Sidebar() {
             icon={MapPin}
             items={transporteItems}
             pathname={location.pathname}
-            groupActive={transporteActive || agendasActive}
-            subgroups={[{ label: "Agendas", icon: CalendarDays, items: agendasItems }]}
+            groupActive={transporteActive || agendasActive || integracaoActive}
+            subgroups={[
+              { label: "Agendas", icon: CalendarDays, items: agendasItems },
+              ...(integracaoItems.length
+                ? [{ label: "Integração", icon: Plug, items: integracaoItems }]
+                : []),
+            ]}
           />
           {podeVerTrackingPandurata && (
             <NavGroupFlyout
