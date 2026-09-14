@@ -145,9 +145,10 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Operadores de galpão: sempre abrem direto na Conferência Interna.
+// Contas compartilhadas do galpão sempre abrem direto na Conferência Interna.
+// Operadores nominais, como Pedro, seguem o acesso normal no computador;
+// no celular, o MobileRedirect mantém o direcionamento operacional.
 const CONFERENCIA_FIRST_EMAILS = [
-  "pedro.martins@tlmlogistica.com.br",
   "deposito@tlmlogistica.com.br",
   "arquivostlm@tlmlogistica.com.br",
 ];
