@@ -1649,6 +1649,72 @@ export type Database = {
           },
         ]
       }
+      envios_canhoto_manuais: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          criado_por_email: string | null
+          destinatarios: string[]
+          emails_enviados: number
+          enviado_em: string | null
+          erro: string | null
+          filtro: Json
+          id: string
+          itens: Json | null
+          observacao: string | null
+          partes: Json
+          progresso_offset: number
+          status: string
+          total_com_canhoto: number
+          total_notas: number
+          total_sem_canhoto: number
+          updated_at: string
+          xlsx_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          criado_por_email?: string | null
+          destinatarios: string[]
+          emails_enviados?: number
+          enviado_em?: string | null
+          erro?: string | null
+          filtro?: Json
+          id?: string
+          itens?: Json | null
+          observacao?: string | null
+          partes?: Json
+          progresso_offset?: number
+          status?: string
+          total_com_canhoto?: number
+          total_notas?: number
+          total_sem_canhoto?: number
+          updated_at?: string
+          xlsx_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          criado_por_email?: string | null
+          destinatarios?: string[]
+          emails_enviados?: number
+          enviado_em?: string | null
+          erro?: string | null
+          filtro?: Json
+          id?: string
+          itens?: Json | null
+          observacao?: string | null
+          partes?: Json
+          progresso_offset?: number
+          status?: string
+          total_com_canhoto?: number
+          total_notas?: number
+          total_sem_canhoto?: number
+          updated_at?: string
+          xlsx_path?: string | null
+        }
+        Relationships: []
+      }
       etiquetas: {
         Row: {
           c_prod: string
