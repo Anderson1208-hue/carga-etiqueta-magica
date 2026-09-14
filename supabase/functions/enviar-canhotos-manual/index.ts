@@ -193,6 +193,27 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const acao = body?.acao ?? "passo";
 
+    // ---------------- links assinados de um envio já concluído ----------------
+    if (acao === "links") {
+      const id = typeof body?.envio_id === "string" ? body.envio_id : null;
+      if (!id) return json({ ok: false, error: "envio_id obrigatório." }, 400);
+      const { data: reg } = await supabase
+        .from("envios_canhoto_manuais")
+        .select("partes, xlsx_path")
+        .eq("id", id)
+        .maybeSingle();
+      if (!reg) return json({ ok: false, error: "Envio não encontrado." }, 404);
+      async function url(path?: string | null) {
+        if (!path) return "";
+        const { data } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_TTL);
+        return data?.signedUrl ?? "";
+      }
+      const partes: any[] = (reg.partes as any[]) ?? [];
+      const out: { volume: number; pdf: string; zip: string }[] = [];
+      for (const parte of partes) out.push({ volume: parte.volume, pdf: await url(parte.pdf), zip: await url(parte.zip) });
+      return json({ ok: true, xlsx: await url(reg.xlsx_path), partes: out });
+    }
+
     // ---------------- prévia ----------------
     if (acao === "previa") {
       const filtro = normalizarFiltro(body?.filtro);

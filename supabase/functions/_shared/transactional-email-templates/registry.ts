@@ -16,8 +16,10 @@ export interface TemplateEntry {
 
 import { template as testeEnvio } from './teste-envio.tsx'
 import { template as canhotoTeste } from './canhoto-teste.tsx'
+import { template as canhotosEnvioManual } from './canhotos-envio-manual.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'teste-envio': testeEnvio,
   'canhoto-teste': canhotoTeste,
+  'canhotos-envio-manual': canhotosEnvioManual,
 }
