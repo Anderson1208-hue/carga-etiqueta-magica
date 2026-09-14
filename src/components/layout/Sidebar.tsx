@@ -5,6 +5,7 @@ import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
+import { useAcessoEnvioCanhoto } from "@/hooks/useAcessoEnvioCanhoto";
 
 import {
   Truck,
@@ -251,7 +252,16 @@ export function Sidebar() {
   const { podeVerIbac } = useAcessoIbac();
   const { podeVerOkEntrega } = useAcessoOkEntrega();
   const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
+  const { podeEnviarCanhoto } = useAcessoEnvioCanhoto();
 
+  const integracaoItems = integracaoItemsBase.filter((i) =>
+    i.href === "/integracoes/ibac"
+      ? podeVerIbac
+      : i.href === "/integracoes/okentrega"
+        ? podeVerOkEntrega
+        : podeEnviarCanhoto,
+  );
+  const integracaoActive = integracaoItems.some((i) => location.pathname === i.href);
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
@@ -335,18 +345,6 @@ export function Sidebar() {
                   isActive={location.pathname === "/comercial/tarifas-regiao"}
                 />
               </>
-            )}
-            {podeVerIbac && (
-              <NavItem
-                item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
-                isActive={location.pathname === "/integracoes/ibac"}
-              />
-            )}
-            {podeVerOkEntrega && (
-              <NavItem
-                item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
-                isActive={location.pathname === "/integracoes/okentrega"}
-              />
             )}
             {isAdmin && (
               <>
