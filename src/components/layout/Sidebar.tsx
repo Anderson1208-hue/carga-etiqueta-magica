@@ -40,8 +40,7 @@ import {
   Upload,
   Receipt,
   Calculator,
-  
-  
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -79,6 +78,12 @@ const agendasItems = [
 
 const trackingItems = [
   { name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug },
+];
+
+const integracaoItemsBase = [
+  { name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug },
+  { name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug },
+  { name: "Envio de Canhoto", href: "/integracoes/envio-canhoto", icon: Mail },
 ];
 
 const torreControleItems = [
