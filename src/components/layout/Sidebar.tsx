@@ -5,6 +5,7 @@ import { useGestaoComercial } from "@/hooks/useGestaoComercial";
 import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
+import { useAcessoEnvioCanhoto } from "@/hooks/useAcessoEnvioCanhoto";
 
 import {
   Truck,
@@ -40,8 +41,7 @@ import {
   Upload,
   Receipt,
   Calculator,
-  
-  
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -79,6 +79,12 @@ const agendasItems = [
 
 const trackingItems = [
   { name: "Tracking Pandurata", href: "/integracoes/tracking-pandurata", icon: Plug },
+];
+
+const integracaoItemsBase = [
+  { name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug },
+  { name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug },
+  { name: "Envio de Canhoto", href: "/integracoes/envio-canhoto", icon: Mail },
 ];
 
 const torreControleItems = [
@@ -246,7 +252,16 @@ export function Sidebar() {
   const { podeVerIbac } = useAcessoIbac();
   const { podeVerOkEntrega } = useAcessoOkEntrega();
   const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
+  const { podeEnviarCanhoto } = useAcessoEnvioCanhoto();
 
+  const integracaoItems = integracaoItemsBase.filter((i) =>
+    i.href === "/integracoes/ibac"
+      ? podeVerIbac
+      : i.href === "/integracoes/okentrega"
+        ? podeVerOkEntrega
+        : podeEnviarCanhoto,
+  );
+  const integracaoActive = integracaoItems.some((i) => location.pathname === i.href);
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
@@ -292,8 +307,13 @@ export function Sidebar() {
             icon={MapPin}
             items={transporteItems}
             pathname={location.pathname}
-            groupActive={transporteActive || agendasActive}
-            subgroups={[{ label: "Agendas", icon: CalendarDays, items: agendasItems }]}
+            groupActive={transporteActive || agendasActive || integracaoActive}
+            subgroups={[
+              { label: "Agendas", icon: CalendarDays, items: agendasItems },
+              ...(integracaoItems.length
+                ? [{ label: "Integração", icon: Plug, items: integracaoItems }]
+                : []),
+            ]}
           />
           {podeVerTrackingPandurata && (
             <NavGroupFlyout
@@ -330,18 +350,6 @@ export function Sidebar() {
                   isActive={location.pathname === "/comercial/tarifas-regiao"}
                 />
               </>
-            )}
-            {podeVerIbac && (
-              <NavItem
-                item={{ name: "Integração IBAC", href: "/integracoes/ibac", icon: Plug }}
-                isActive={location.pathname === "/integracoes/ibac"}
-              />
-            )}
-            {podeVerOkEntrega && (
-              <NavItem
-                item={{ name: "Integração OK Entrega", href: "/integracoes/okentrega", icon: Plug }}
-                isActive={location.pathname === "/integracoes/okentrega"}
-              />
             )}
             {isAdmin && (
               <>

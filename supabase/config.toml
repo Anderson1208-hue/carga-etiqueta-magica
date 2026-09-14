@@ -13,3 +13,5 @@ project_id = "ddcglijsqqiaulmfadxh"
   verify_jwt = false
   [functions.handle-email-suppression]
   verify_jwt = false
+  [functions.enviar-canhotos-manual]
+  verify_jwt = true

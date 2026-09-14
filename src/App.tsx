@@ -52,6 +52,7 @@ import Produtos from "./pages/Produtos";
 import ProdutosChegada from "./pages/ProdutosChegada";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
 import IntegracaoOkEntrega from "./pages/IntegracaoOkEntrega";
+import EnvioCanhoto from "./pages/EnvioCanhoto";
 import TrackingPandurata from "./pages/TrackingPandurata";
 
 import PreCte from "./pages/PreCte";
@@ -394,6 +395,7 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/integracoes/ibac" element={<ProtectedRoute><IntegracaoIbac /></ProtectedRoute>} />
       <Route path="/integracoes/okentrega" element={<ProtectedRoute><IntegracaoOkEntrega /></ProtectedRoute>} />
+      <Route path="/integracoes/envio-canhoto" element={<ProtectedRoute><EnvioCanhoto /></ProtectedRoute>} />
       <Route path="/integracoes/tracking-pandurata" element={<ProtectedRoute><TrackingPandurata /></ProtectedRoute>} />
 
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
