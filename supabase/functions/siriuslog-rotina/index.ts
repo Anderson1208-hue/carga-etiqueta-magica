@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
         ultima_tentativa_em: agora,
         ultimo_erro: httpErro
           ? String(httpErro.resposta ?? httpErro.http)
-          : (gravar && !ultimoOk && !CONCLUI.has(situacao))
+          : (gravar && !ultimoOk && !CONCLUI.has(situacao) && situacao !== 'ja_atualizado')
             ? `sem_status_enviado: situacao=${situacao || 'desconhecida'}` +
               `${r.invoiceDetailId ? '' : ' | sem_invoice_detail_id'}` +
               `${passos.length ? ` | passos=${passos.length}` : ' | nenhum_passo_executado'}`
