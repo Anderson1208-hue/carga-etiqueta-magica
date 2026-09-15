@@ -180,7 +180,13 @@ Deno.serve(async (req) => {
         trip_id: (r.viagem as number) ?? null,
         status_portal: statusPortal,
         ultima_tentativa_em: agora,
-        ultimo_erro: httpErro ? String(httpErro.resposta ?? httpErro.http) : null,
+        ultimo_erro: httpErro
+          ? String(httpErro.resposta ?? httpErro.http)
+          : (gravar && !ultimoOk && !CONCLUI.has(situacao))
+            ? `sem_status_enviado: situacao=${situacao || 'desconhecida'}` +
+              `${r.invoiceDetailId ? '' : ' | sem_invoice_detail_id'}` +
+              `${passos.length ? ` | passos=${passos.length}` : ' | nenhum_passo_executado'}`
+            : null,
       }
       if (gravar && ultimoOk) patch.status_enviado = String(ultimoOk.status_destino ?? '')
       if (concluir) {
