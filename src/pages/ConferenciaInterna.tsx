@@ -1492,7 +1492,29 @@ export default function ConferenciaInterna() {
 
               </div>
             </div>
-            <MobileLogoutButton />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={voltarParaLista}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Outra NF
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  voltarParaLista();
+                  navigate("/cargas");
+                }}
+                className="gap-1"
+              >
+                Lançar nota
+              </Button>
+              <MobileLogoutButton />
+            </div>
           </div>
         </header>
 
