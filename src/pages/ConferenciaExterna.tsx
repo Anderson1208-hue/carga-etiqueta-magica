@@ -78,8 +78,22 @@ const OCORRENCIAS: { value: OcorrenciaTipo; label: string; icon: React.ReactNode
 
 type ViewMode = "vehicle-select" | "nf-list" | "scanning" | "baixa";
 
+interface FechamentoStatus {
+  placa: string;
+  fechada_em: string | null;
+  com_pendencia: boolean;
+  pendencia_motivo: string | null;
+  total_nfs: number;
+  total_escopo: number;
+  fora_escopo: number;
+  conferidas_escopo: number;
+  faltando_escopo: number;
+  nfs_faltando: { numero_nf: string; total: number; conferidas: number }[];
+  nfs_escopo: string[];
+}
+
 export default function ConferenciaExterna() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +133,14 @@ export default function ConferenciaExterna() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Fechamento da conferência por placa (escopo IBAC)
+  const [fechamento, setFechamento] = useState<FechamentoStatus | null>(null);
+  const [loadingFechamento, setLoadingFechamento] = useState(false);
+  const [fechando, setFechando] = useState(false);
+  const [mostrarPendencia, setMostrarPendencia] = useState(false);
+  const [motivoPendencia, setMotivoPendencia] = useState("");
+
+
   useEffect(() => {
     loadVeiculos();
     captureGPS();
@@ -144,9 +166,57 @@ export default function ConferenciaExterna() {
     const veiculo = veiculos.find((v) => v.id === veiculoId);
     if (!veiculo) return;
     setSelectedVeiculo(veiculo);
-    await loadNfsForVeiculo(veiculoId);
+    setMostrarPendencia(false);
+    setMotivoPendencia("");
+    await Promise.all([loadNfsForVeiculo(veiculoId), loadFechamento(veiculoId)]);
     setViewMode("nf-list");
   }
+
+  async function loadFechamento(veiculoId: string) {
+    setLoadingFechamento(true);
+    try {
+      const { data, error } = await (supabase as any).rpc(
+        "conferencia_externa_status_veiculo",
+        { p_veiculo_id: veiculoId },
+      );
+      if (error) throw error;
+      setFechamento(data as FechamentoStatus);
+    } catch (error) {
+      console.error("[ConferenciaExterna] Erro no status de fechamento:", error);
+      setFechamento(null);
+    } finally {
+      setLoadingFechamento(false);
+    }
+  }
+
+  async function fecharConferencia(forcar: boolean) {
+    if (!selectedVeiculo) return;
+    setFechando(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("fechar_conferencia_veiculo", {
+        p_veiculo_id: selectedVeiculo.id,
+        p_forcar: forcar,
+        p_motivo: forcar ? motivoPendencia : null,
+      });
+      if (error) throw error;
+      setFechamento(data as FechamentoStatus);
+      setMostrarPendencia(false);
+      setMotivoPendencia("");
+      toast({
+        title: forcar ? "Conferência fechada com pendência" : "Conferência do veículo fechada",
+        description: `Placa ${selectedVeiculo.placa} liberada para expedição.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Não foi possível fechar",
+        description: error?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setFechando(false);
+    }
+  }
+
 
   async function loadNfsForVeiculo(veiculoId: string) {
     setLoadingNfs(true);
@@ -578,11 +648,15 @@ export default function ConferenciaExterna() {
       setLastResult(null);
       setScanHistory([]);
       resetBaixaForm();
-      if (selectedVeiculo) loadNfsForVeiculo(selectedVeiculo.id);
+      if (selectedVeiculo) {
+        loadNfsForVeiculo(selectedVeiculo.id);
+        loadFechamento(selectedVeiculo.id);
+      }
     } else if (viewMode === "nf-list") {
       setViewMode("vehicle-select");
       setSelectedVeiculo(null);
       setNfs([]);
+      setFechamento(null);
     }
   }
 
@@ -696,6 +770,110 @@ export default function ConferenciaExterna() {
             </Card>
           </div>
 
+          {/* Fechamento da conferência por placa (escopo IBAC) */}
+          {fechamento && fechamento.total_escopo > 0 && (
+            <Card className={fechamento.fechada_em ? "border-green-600" : "border-orange-500"}>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">Conferência do veículo</p>
+                    <p className="text-xs text-muted-foreground">
+                      {fechamento.total_escopo} nota(s) do escopo IBAC ·{" "}
+                      {fechamento.conferidas_escopo} conferida(s) · {fechamento.faltando_escopo} faltando
+                    </p>
+                  </div>
+                  {fechamento.fechada_em ? (
+                    <Badge className={fechamento.com_pendencia ? "bg-orange-600 text-xs" : "bg-green-600 text-xs"}>
+                      {fechamento.com_pendencia ? "Fechada c/ pendência" : "Conferido"}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      {fechamento.faltando_escopo > 0
+                        ? `Faltam ${fechamento.faltando_escopo}`
+                        : "Pronto p/ fechar"}
+                    </Badge>
+                  )}
+                </div>
+
+                {fechamento.fora_escopo > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {fechamento.fora_escopo} nota(s) de outros embarcadores não contam para o fechamento.
+                  </p>
+                )}
+
+                {!fechamento.fechada_em && fechamento.nfs_faltando.length > 0 && (
+                  <div className="rounded-md bg-muted/50 p-2 space-y-1">
+                    <p className="text-[11px] font-medium">Faltando bipar:</p>
+                    {fechamento.nfs_faltando.slice(0, 8).map((f) => (
+                      <p key={f.numero_nf} className="text-[11px] text-muted-foreground">
+                        NF {f.numero_nf} — {f.conferidas}/{f.total} caixas
+                      </p>
+                    ))}
+                    {fechamento.nfs_faltando.length > 8 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        e mais {fechamento.nfs_faltando.length - 8} nota(s)…
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {fechamento.fechada_em ? (
+                  <p className="text-xs text-muted-foreground">
+                    Fechada em{" "}
+                    {new Date(fechamento.fechada_em).toLocaleString("pt-BR")}
+                    {fechamento.pendencia_motivo ? ` • Motivo: ${fechamento.pendencia_motivo}` : ""}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full"
+                      disabled={fechando || loadingFechamento || fechamento.faltando_escopo > 0}
+                      onClick={() => fecharConferencia(false)}
+                    >
+                      {fechando ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-1" />}
+                      Fechar conferência do veículo
+                    </Button>
+
+                    {fechamento.faltando_escopo > 0 && isAdmin && (
+                      <>
+                        {!mostrarPendencia ? (
+                          <Button variant="outline" size="sm" className="w-full" onClick={() => setMostrarPendencia(true)}>
+                            Fechar com pendência (admin)
+                          </Button>
+                        ) : (
+                          <div className="space-y-2">
+                            <Textarea
+                              placeholder="Motivo da pendência (nota retirada da carga, avaria, sobra de galpão...)"
+                              value={motivoPendencia}
+                              onChange={(e) => setMotivoPendencia(e.target.value)}
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="flex-1"
+                                disabled={fechando || motivoPendencia.trim().length < 5}
+                                onClick={() => fecharConferencia(true)}
+                              >
+                                Confirmar fechamento
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => setMostrarPendencia(false)}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+
+
           {loadingNfs ? (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -722,6 +900,10 @@ export default function ConferenciaExterna() {
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-muted-foreground" />
                           <span className="font-semibold text-sm">NF {nf.numero_nf}</span>
+                          {fechamento && fechamento.total_escopo > 0 &&
+                            !fechamento.nfs_escopo?.includes(nf.numero_nf) && (
+                              <Badge variant="secondary" className="text-[10px]">Fora do escopo</Badge>
+                            )}
                         </div>
                         {isDone ? (
                           <Badge variant="default" className="bg-green-600 text-xs">
