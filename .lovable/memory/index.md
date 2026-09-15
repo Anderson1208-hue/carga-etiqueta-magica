@@ -4,6 +4,8 @@ description: Project memory index
 type: reference
 ---
 # Project Memory
+<!-- - [Fechamento Conferência Placa](mem://funcionalidades/operacao/fechamento-conferencia-por-placa) — 2ª conferência fechada por veículo, escopo IBAC, forçar só admin -->
+
 
 ## Core
 - **Dates:** Append `T00:00:00` to all date strings before processing to prevent UTC timezone shifts.
