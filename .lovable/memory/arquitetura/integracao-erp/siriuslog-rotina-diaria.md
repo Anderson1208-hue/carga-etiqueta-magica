@@ -15,4 +15,6 @@ Funções SQL: `tracking_pandurata_iniciar_rodada(text)` (trava, retorna NULL se
 
 Regras: entram notas cuja **movimentação de status** (carga aberta / expedição na rota / baixa de entrega) é >= `data_inicial`, independente da data de emissão da NF (regra em `siriuslog_plano`, alterada em 10/09/2026); notas que chegam a "Entrega realizada..." ou status final do portal recebem `concluido_em` e saem da fila para sempre; fila é rotacionada por `ultima_tentativa_em` para o limite por rodada não travar nas mesmas notas; com `ativo=false` (ou `{"simular":true}`) roda em simulação e NADA é enviado.
 
+**Tentativas (15/09/2026):** `tentativas` só incrementa quando houve envio real ao portal (HTTP 204) ou recusa (http>=300). Nota `ja_atualizado` (portal já no status alvo) é só conferida e NÃO consome tentativa — antes disso 74 notas travaram no max_tentativas sem erro e foram zeradas manualmente.
+
 Agendamento: cron `tracking-pandurata-diario`, `30 13 * * 1-5` (10:30 BRT); guarda de feriado RJ dentro da função.

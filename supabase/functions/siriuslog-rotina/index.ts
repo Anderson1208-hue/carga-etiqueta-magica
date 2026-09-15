@@ -195,8 +195,11 @@ Deno.serve(async (req) => {
       }
 
       const anterior = filaMap.get(nf)
+      // Tentativa so conta quando houve envio real ao portal (204) ou recusa (http>=300).
+      // Nota "ja atualizada" nao consome tentativa: foi apenas conferida.
+      const consumiuTentativa = gravar && (ultimoOk != null || httpErro != null)
       const { error: eUp } = await sb.from('fila_tracking_pandurata')
-        .upsert({ ...patch, tentativas: (anterior?.tentativas ?? 0) + (gravar ? 1 : 0) }, { onConflict: 'numero_nf' })
+        .upsert({ ...patch, tentativas: (anterior?.tentativas ?? 0) + (consumiuTentativa ? 1 : 0) }, { onConflict: 'numero_nf' })
       if (eUp) out.aviso_fila = eUp.message
     }
 
