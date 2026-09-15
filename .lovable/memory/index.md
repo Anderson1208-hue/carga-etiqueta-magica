@@ -5,6 +5,8 @@ type: reference
 ---
 # Project Memory
 
+
+
 ## Core
 - **Dates:** Append `T00:00:00` to all date strings before processing to prevent UTC timezone shifts.
 - **UI & Formats:** Natural sorting for NF, cProd, CEP, CNPJ. Strip leading zeros from `cProd` in UI (keep in DB/QR). Highlight "CHOCOLATE" loads in red.
@@ -49,6 +51,7 @@ type: reference
 - [Coordenadas do CD](mem://arquitetura/banco-de-dados/coordenadas-cd-central) — Fixed coordinates (-22.8783, -43.3367).
 - [Conferência 2 Etapas](mem://arquitetura/fluxo-conferencia-duas-etapas) — Workflow for Galpão (Interna) vs Motorista (Externa).
 - [Conferência Externa](mem://funcionalidades/operacao/conferencia-externa-mobile) — Motorista app requirements and validation.
+- [Fechamento Conferência Placa](mem://funcionalidades/operacao/fechamento-conferencia-por-placa) — 2ª conferência fechada por veículo, escopo IBAC, forçar só admin.
 - [Conferência Interna](mem://funcionalidades/operacao/conferencia-interna-mobile) — Galpão direct search and label scanning.
 - [Conferência Offline](mem://funcionalidades/operacao/conferencia-interna-offline) — IndexedDB caching for no-signal areas.
 - [Offline Fotos + Auto-sync](mem://funcionalidades/operacao/offline-fotos-autosync) — Foto persistida no IDB, sync automático ao voltar online, badge no bottom nav.
