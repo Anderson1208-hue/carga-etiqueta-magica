@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +85,7 @@ interface ScanResult {
 
 
 export default function ConferenciaInterna() {
+  const navigate = useNavigate();
   const { user, isAdmin, profile } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1999,7 +2001,18 @@ export default function ConferenciaInterna() {
               v2026.07.27e
             </span>
           </div>
-          <MobileLogoutButton />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate("/cargas")}
+              className="gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Lançar nota
+            </Button>
+            <MobileLogoutButton />
+          </div>
         </div>
       </header>
 
