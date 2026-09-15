@@ -85,6 +85,7 @@ interface ScanResult {
 
 
 export default function ConferenciaInterna() {
+  const navigate = useNavigate();
   const { user, isAdmin, profile } = useAuth();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
