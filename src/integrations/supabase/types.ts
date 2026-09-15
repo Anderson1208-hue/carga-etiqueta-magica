@@ -3900,6 +3900,10 @@ export type Database = {
           capacidade_kg: number | null
           capacidade_m3: number | null
           combustivel: string | null
+          conferencia_externa_com_pendencia: boolean
+          conferencia_externa_fechada_em: string | null
+          conferencia_externa_fechada_por: string | null
+          conferencia_externa_pendencia_motivo: string | null
           created_at: string
           created_by: string | null
           data: string
@@ -3930,6 +3934,10 @@ export type Database = {
           capacidade_kg?: number | null
           capacidade_m3?: number | null
           combustivel?: string | null
+          conferencia_externa_com_pendencia?: boolean
+          conferencia_externa_fechada_em?: string | null
+          conferencia_externa_fechada_por?: string | null
+          conferencia_externa_pendencia_motivo?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -3960,6 +3968,10 @@ export type Database = {
           capacidade_kg?: number | null
           capacidade_m3?: number | null
           combustivel?: string | null
+          conferencia_externa_com_pendencia?: boolean
+          conferencia_externa_fechada_em?: string | null
+          conferencia_externa_fechada_por?: string | null
+          conferencia_externa_pendencia_motivo?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -4111,6 +4123,10 @@ export type Database = {
           tem_foto: boolean
         }[]
       }
+      conferencia_externa_status_veiculo: {
+        Args: { p_veiculo_id: string }
+        Returns: Json
+      }
       confianca_origem: {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
         Returns: number
@@ -4138,6 +4154,10 @@ export type Database = {
         Returns: Json
       }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
+      fechar_conferencia_veiculo: {
+        Args: { p_forcar?: boolean; p_motivo?: string; p_veiculo_id: string }
+        Returns: Json
+      }
       fn_ibac_enqueue: {
         Args: {
           p_baixa_id: string
