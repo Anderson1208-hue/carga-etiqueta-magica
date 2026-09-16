@@ -67,7 +67,9 @@ interface Veiculo {
   placa: string;
   motorista: string;
   data: string;
+  conferencia_interna_fechada_em?: string | null;
 }
+
 
 interface VeiculoFechamento {
   placa: string;
