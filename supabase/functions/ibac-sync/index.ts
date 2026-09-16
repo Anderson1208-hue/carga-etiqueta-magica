@@ -41,6 +41,28 @@ const JPEG_QUALIDADE = 72;
 const MAX_PROFUNDIDADE = 20;
 const COOLDOWN_MS = 1500;
 
+// Fatia obrigatória para consultas `.in(...)`: listas longas estouram o tamanho
+// da URL do PostgREST, a resposta volta vazia e a fila inteira era reprovada.
+const FATIA_IN = 100;
+async function buscarEmFatias<T>(
+  supabase: any,
+  tabela: string,
+  colunas: string,
+  coluna: string,
+  valores: string[],
+): Promise<T[]> {
+  const saida: T[] = [];
+  for (let i = 0; i < valores.length; i += FATIA_IN) {
+    const fatia = valores.slice(i, i + FATIA_IN);
+    const { data, error } = await supabase.from(tabela).select(colunas).in(coluna, fatia).limit(FATIA_IN * 20);
+    if (error) throw new Error(`Falha ao consultar ${tabela}: ${error.message}`);
+    saida.push(...((data ?? []) as T[]));
+  }
+  return saida;
+}
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
