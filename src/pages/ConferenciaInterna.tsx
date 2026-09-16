@@ -338,18 +338,38 @@ export default function ConferenciaInterna() {
   async function loadVeiculos() {
     setLoadingVeiculos(true);
     try {
-      const { data } = await supabase
-        .from("veiculos")
-        .select("id, placa, motorista, data")
-        .in("status", ["pendente", "em_rota"])
-        .order("created_at", { ascending: false });
-      setVeiculos(data || []);
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+      const { data: vnfs, error: vnfsError } = await supabase
+        .from("veiculo_nfs")
+        .select("veiculo_id")
+        .gte("created_at", since.toISOString())
+        .limit(2000);
+
+      if (vnfsError) throw vnfsError;
+
+      const veiculoIds = Array.from(new Set((vnfs || []).map((v) => v.veiculo_id).filter(Boolean)));
+
+      let data: any[] = [];
+      if (veiculoIds.length > 0) {
+        const { data: veicData, error: veicError } = await supabase
+          .from("veiculos")
+          .select("id, placa, motorista, data, conferencia_interna_fechada_em")
+          .in("id", veiculoIds)
+          .in("status", ["pendente", "em_rota"])
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (veicError) throw veicError;
+        data = veicData || [];
+      }
+      setVeiculos(data);
     } catch (error) {
       console.error("Erro ao carregar veículos:", error);
     } finally {
       setLoadingVeiculos(false);
     }
   }
+
 
   async function loadFechamentoVeiculo(veiculoId: string) {
     setLoadingFechamento(true);
