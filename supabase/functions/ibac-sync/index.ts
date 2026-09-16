@@ -41,6 +41,28 @@ const JPEG_QUALIDADE = 72;
 const MAX_PROFUNDIDADE = 20;
 const COOLDOWN_MS = 1500;
 
+// Fatia obrigatória para consultas `.in(...)`: listas longas estouram o tamanho
+// da URL do PostgREST, a resposta volta vazia e a fila inteira era reprovada.
+const FATIA_IN = 100;
+async function buscarEmFatias<T>(
+  supabase: any,
+  tabela: string,
+  colunas: string,
+  coluna: string,
+  valores: string[],
+): Promise<T[]> {
+  const saida: T[] = [];
+  for (let i = 0; i < valores.length; i += FATIA_IN) {
+    const fatia = valores.slice(i, i + FATIA_IN);
+    const { data, error } = await supabase.from(tabela).select(colunas).in(coluna, fatia).limit(FATIA_IN * 20);
+    if (error) throw new Error(`Falha ao consultar ${tabela}: ${error.message}`);
+    saida.push(...((data ?? []) as T[]));
+  }
+  return saida;
+}
+
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -117,7 +139,7 @@ Deno.serve(async (req) => {
     // data_piloto (dia do teste controlado); datas posteriores entram sem restrição.
     let qVeic = supabase.from("veiculos").select("id, placa, data");
     if (dataPiloto) qVeic = qVeic.gte("data", dataPiloto);
-    const { data: veicsPiloto } = await qVeic;
+    const { data: veicsPiloto, error: errVeic } = await qVeic;
     const idsVeic = (veicsPiloto ?? [])
       .filter((v: any) =>
         dataPiloto && String(v.data) === String(dataPiloto)
@@ -126,24 +148,34 @@ Deno.serve(async (req) => {
       )
       .map((v: any) => v.id);
 
-    if (idsVeic.length === 0) {
+    // Pré-filtro no banco só vale para listas curtas: acima disso a URL do
+    // PostgREST estoura (HTTP 400/414) e a consulta volta vazia — o que antes
+    // zerava a fila silenciosamente e travava TODO o envio. Nesses casos (e em
+    // qualquer erro) abandonamos o pré-filtro e ampliamos a janela; o filtro por
+    // placa/data/prestação continua sendo aplicado em memória logo abaixo.
+    const ampliarJanela = () => {
+      nfIdsPiloto = null;
+      janelaEventos = Math.max(janelaEventos, 1000);
+      janelaCanhotos = Math.max(janelaCanhotos, 1000);
+    };
+
+    if (errVeic || idsVeic.length > 200) {
+      ampliarJanela();
+    } else if (idsVeic.length === 0) {
       nfIdsPiloto = [];
     } else {
-      const { data: vinc } = await supabase
+      const { data: vinc, error: errVinc } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
         .in("veiculo_id", idsVeic)
         .limit(50000);
-      nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
-    }
-
-    // Lista grande de nf_id estoura o tamanho da URL do PostgREST (HTTP 400).
-    // Nesse caso abandonamos o pré-filtro no banco e ampliamos a janela — o
-    // filtro por placa/data continua sendo aplicado em memória logo abaixo.
-    if (nfIdsPiloto && nfIdsPiloto.length > 200) {
-      nfIdsPiloto = null;
-      janelaEventos = Math.max(janelaEventos, 500);
-      janelaCanhotos = Math.max(janelaCanhotos, 500);
+      if (errVinc) {
+        ampliarJanela();
+      } else {
+        const ids = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
+        if (ids.length > 200) ampliarJanela();
+        else nfIdsPiloto = ids;
+      }
     }
   }
 
@@ -259,21 +291,23 @@ Deno.serve(async (req) => {
     const veiculoPorNf = new Map<string, { placa: string; data: string | null; prestacao_contas_em: string | null }>();
 
     if (nfIds.length > 0) {
-      const { data: vinculos } = await supabase
-        .from("veiculo_nfs")
-        .select("nf_id, veiculo_id")
-        .in("nf_id", nfIds);
+      // Listas longas em `.in()` estouram a URL do PostgREST e voltam vazias —
+      // o que reprovava TODA a fila como "fora do piloto". Sempre em fatias.
+      const vinculos = await buscarEmFatias<{ nf_id: string; veiculo_id: string }>(
+        supabase,
+        "veiculo_nfs",
+        "nf_id, veiculo_id",
+        "nf_id",
+        nfIds,
+      );
 
-      const veicIds = [...new Set((vinculos ?? []).map((v: any) => v.veiculo_id).filter(Boolean))];
-      const { data: veics } = veicIds.length
-        ? await supabase
-            .from("veiculos")
-            .select("id, placa, data, prestacao_contas_em")
-            .in("id", veicIds)
-        : { data: [] as any[] };
+      const veicIds = [...new Set(vinculos.map((v: any) => v.veiculo_id).filter(Boolean))] as string[];
+      const veics = veicIds.length
+        ? await buscarEmFatias<any>(supabase, "veiculos", "id, placa, data, prestacao_contas_em", "id", veicIds)
+        : [];
 
       const porId = new Map((veics ?? []).map((v: any) => [v.id, v]));
-      for (const v of vinculos ?? []) {
+      for (const v of vinculos) {
         const veic = porId.get((v as any).veiculo_id);
         if (veic) veiculoPorNf.set((v as any).nf_id, veic as any);
       }
@@ -333,14 +367,12 @@ Deno.serve(async (req) => {
     const nfIdsEsc = [...new Set(pendentes.map((i) => i.nf_id).filter(Boolean))] as string[];
     const emitentePorNf = new Map<string, string>();
     if (nfIdsEsc.length > 0) {
-      const { data: nfsEsc } = await supabase
-        .from("notas_fiscais")
-        .select("id, cnpj_emitente")
-        .in("id", nfIdsEsc);
-      for (const nf of nfsEsc ?? []) {
+      const nfsEsc = await buscarEmFatias<any>(supabase, "notas_fiscais", "id, cnpj_emitente", "id", nfIdsEsc);
+      for (const nf of nfsEsc) {
         emitentePorNf.set((nf as any).id, String((nf as any).cnpj_emitente ?? "").replace(/\D/g, "").slice(0, 8));
       }
     }
+
 
     const foraIds: string[] = [];
     pendentes = pendentes.filter((item) => {
@@ -700,11 +732,19 @@ Deno.serve(async (req) => {
       .lt("tentativas", maxTentativas);
     if ((restantes ?? 0) > 0) {
       proximoSalto = true;
-      setTimeout(() => {
-        supabase.functions
-          .invoke("ibac-sync", { body: { profundidade: profundidade + 1 } })
-          .catch((e) => console.error("[ibac-sync] Falha no auto-encadeamento:", e));
-      }, COOLDOWN_MS);
+      // setTimeout puro morria junto com o worker ao devolver a resposta — a
+      // corrente parava no 1º salto e a fila andava só 1 canhoto por cron.
+      const salto = (async () => {
+        await new Promise((r) => setTimeout(r, COOLDOWN_MS));
+        try {
+          await supabase.functions.invoke("ibac-sync", { body: { profundidade: profundidade + 1 } });
+        } catch (e) {
+          console.error("[ibac-sync] Falha no auto-encadeamento:", e);
+        }
+      })();
+      const runtime = (globalThis as any).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(salto);
+      else await salto;
     }
   }
 
