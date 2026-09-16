@@ -269,21 +269,23 @@ Deno.serve(async (req) => {
     const veiculoPorNf = new Map<string, { placa: string; data: string | null; prestacao_contas_em: string | null }>();
 
     if (nfIds.length > 0) {
-      const { data: vinculos } = await supabase
-        .from("veiculo_nfs")
-        .select("nf_id, veiculo_id")
-        .in("nf_id", nfIds);
+      // Listas longas em `.in()` estouram a URL do PostgREST e voltam vazias —
+      // o que reprovava TODA a fila como "fora do piloto". Sempre em fatias.
+      const vinculos = await buscarEmFatias<{ nf_id: string; veiculo_id: string }>(
+        supabase,
+        "veiculo_nfs",
+        "nf_id, veiculo_id",
+        "nf_id",
+        nfIds,
+      );
 
-      const veicIds = [...new Set((vinculos ?? []).map((v: any) => v.veiculo_id).filter(Boolean))];
-      const { data: veics } = veicIds.length
-        ? await supabase
-            .from("veiculos")
-            .select("id, placa, data, prestacao_contas_em")
-            .in("id", veicIds)
-        : { data: [] as any[] };
+      const veicIds = [...new Set(vinculos.map((v: any) => v.veiculo_id).filter(Boolean))] as string[];
+      const veics = veicIds.length
+        ? await buscarEmFatias<any>(supabase, "veiculos", "id, placa, data, prestacao_contas_em", "id", veicIds)
+        : [];
 
       const porId = new Map((veics ?? []).map((v: any) => [v.id, v]));
-      for (const v of vinculos ?? []) {
+      for (const v of vinculos) {
         const veic = porId.get((v as any).veiculo_id);
         if (veic) veiculoPorNf.set((v as any).nf_id, veic as any);
       }
@@ -343,14 +345,12 @@ Deno.serve(async (req) => {
     const nfIdsEsc = [...new Set(pendentes.map((i) => i.nf_id).filter(Boolean))] as string[];
     const emitentePorNf = new Map<string, string>();
     if (nfIdsEsc.length > 0) {
-      const { data: nfsEsc } = await supabase
-        .from("notas_fiscais")
-        .select("id, cnpj_emitente")
-        .in("id", nfIdsEsc);
-      for (const nf of nfsEsc ?? []) {
+      const nfsEsc = await buscarEmFatias<any>(supabase, "notas_fiscais", "id, cnpj_emitente", "id", nfIdsEsc);
+      for (const nf of nfsEsc) {
         emitentePorNf.set((nf as any).id, String((nf as any).cnpj_emitente ?? "").replace(/\D/g, "").slice(0, 8));
       }
     }
+
 
     const foraIds: string[] = [];
     pendentes = pendentes.filter((item) => {
