@@ -622,7 +622,9 @@ export default function ConferenciaInterna() {
     collectorBufferRef.current = "";
     collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
     setCollectorStage(duplaChecagem ? "cliente" : "qr");
+    setViewMode("scanning");
   }
+
 
   function voltarParaLista() {
     void flushWrites();
