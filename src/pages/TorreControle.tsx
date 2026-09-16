@@ -70,9 +70,7 @@ function minutosSemSinal(rota: MonitoramentoRota): number | null {
 export default function TorreControle() {
   const [rotas, setRotas] = useState<MonitoramentoRota[]>([]);
   const [alertasCount, setAlertasCount] = useState<Record<string, number>>({});
-  const [conferenciaInternaMap, setConferenciaInternaMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
-
   const [provisionando, setProvisionando] = useState(false);
   const [dataSelecionada, setDataSelecionada] = useState<string>(todayISO());
   const [filtro, setFiltro] = useState<FiltroStatus>("todos");
@@ -117,22 +115,7 @@ export default function TorreControle() {
       });
       setRotas(rotasDedup);
 
-      const veicIdsDedup = Array.from(new Set(rotasDedup.map((r) => r.veiculo_id).filter(Boolean)));
-      if (veicIdsDedup.length > 0) {
-        const statusMap: Record<string, any> = {};
-        await Promise.all(
-          veicIdsDedup.map(async (id) => {
-            const { data: st, error: stErr } = await (supabase as any).rpc("conferencia_interna_status_veiculo", {
-              p_veiculo_id: id,
-            });
-            if (!stErr && st) statusMap[id] = st;
-          })
-        );
-        setConferenciaInternaMap(statusMap);
-      }
-
       const rotaIds = rotasDedup.map((r) => r.id);
-
       if (rotaIds.length === 0) {
         setAlertasCount({});
       } else {
@@ -461,10 +444,8 @@ export default function TorreControle() {
               <ListaCompactaRotas
                 rotas={filteredRotas}
                 alertasCount={alertasCount}
-                conferenciaInternaMap={conferenciaInternaMap}
                 onSelect={(r) => setSelectedRotaId(r.id)}
               />
-
             )}
           </div>
         </div>
@@ -505,14 +486,12 @@ function KpiCard({
 
 // ─── Lista compacta (sem seleção) ──────────────────────────
 function ListaCompactaRotas({
-  rotas, alertasCount, conferenciaInternaMap, onSelect,
+  rotas, alertasCount, onSelect,
 }: {
   rotas: MonitoramentoRota[];
   alertasCount: Record<string, number>;
-  conferenciaInternaMap: Record<string, any>;
   onSelect: (r: MonitoramentoRota) => void;
 }) {
-
   return (
     <Card className="h-[600px] flex flex-col">
       <CardHeader className="pb-2 pt-3">
@@ -542,29 +521,9 @@ function ListaCompactaRotas({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-semibold text-sm">{r.placa}</span>
-                    <div className="flex items-center gap-1">
-                      {(() => {
-                        const conf = conferenciaInternaMap[r.veiculo_id];
-                        if (!conf || conf.total_escopo === 0) return null;
-                        if (conf.fechada_em) {
-                          return (
-                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-success text-success">
-                              Conf. OK
-                            </Badge>
-                          );
-                        }
-                        const pct = Math.round((conf.conferidas_escopo / conf.total_escopo) * 100);
-                        return (
-                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-warning text-warning">
-                            Conf. {pct}%
-                          </Badge>
-                        );
-                      })()}
-                      <RotaStatusBadge status={r.status} />
-                    </div>
+                    <RotaStatusBadge status={r.status} />
                   </div>
                   <p className="text-xs text-muted-foreground truncate">{r.motorista || "Sem motorista"}</p>
-
                   <div className="flex items-center gap-2 mt-1.5">
                     <div className="flex-1 bg-muted rounded-full h-1.5">
                       <div className="bg-primary h-1.5 rounded-full" style={{ width: `${progress}%` }} />
