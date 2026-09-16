@@ -732,11 +732,19 @@ Deno.serve(async (req) => {
       .lt("tentativas", maxTentativas);
     if ((restantes ?? 0) > 0) {
       proximoSalto = true;
-      setTimeout(() => {
-        supabase.functions
-          .invoke("ibac-sync", { body: { profundidade: profundidade + 1 } })
-          .catch((e) => console.error("[ibac-sync] Falha no auto-encadeamento:", e));
-      }, COOLDOWN_MS);
+      // setTimeout puro morria junto com o worker ao devolver a resposta — a
+      // corrente parava no 1º salto e a fila andava só 1 canhoto por cron.
+      const salto = (async () => {
+        await new Promise((r) => setTimeout(r, COOLDOWN_MS));
+        try {
+          await supabase.functions.invoke("ibac-sync", { body: { profundidade: profundidade + 1 } });
+        } catch (e) {
+          console.error("[ibac-sync] Falha no auto-encadeamento:", e);
+        }
+      })();
+      const runtime = (globalThis as any).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(salto);
+      else await salto;
     }
   }
 
