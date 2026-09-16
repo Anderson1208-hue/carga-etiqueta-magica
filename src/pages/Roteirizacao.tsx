@@ -144,6 +144,8 @@ export default function Roteirizacao() {
   const [activeTab, setActiveTab] = useState("nova-rota");
   const [veiculos, setVeiculos] = useState<any[]>([]);
   const [loadingVeiculos, setLoadingVeiculos] = useState(false);
+  const [conferenciaInternaMap, setConferenciaInternaMap] = useState<Record<string, any>>({});
+
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
@@ -1203,13 +1205,35 @@ export default function Roteirizacao() {
         });
         comNfs = new Set((vnfs || []).map((r: any) => r.veiculo_id));
       }
-      setVeiculos((data || []).filter((v) => comNfs.has(v.id)));
+      const veiculosComNfs = (data || []).filter((v) => comNfs.has(v.id));
+      setVeiculos(veiculosComNfs);
+      void loadConferenciaInternaStatus(veiculosComNfs.map((v) => v.id));
     } catch (err) {
+
       console.error("Error loading veiculos:", err);
     } finally {
       setLoadingVeiculos(false);
     }
   }
+
+  async function loadConferenciaInternaStatus(veiculoIds: string[]) {
+    if (!veiculoIds.length) return;
+    try {
+      const results: Record<string, any> = {};
+      await Promise.all(
+        veiculoIds.map(async (id) => {
+          const { data, error } = await (supabase as any).rpc("conferencia_interna_status_veiculo", {
+            p_veiculo_id: id,
+          });
+          if (!error && data) results[id] = data;
+        })
+      );
+      setConferenciaInternaMap(results);
+    } catch (err) {
+      console.error("Error loading conferencia interna status:", err);
+    }
+  }
+
 
   /**
    * Constrói o mapa CNPJ → ordem de entrega para um veículo.
@@ -2644,7 +2668,28 @@ export default function Roteirizacao() {
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
                                 {v.status}
                               </Badge>
+                              {(() => {
+                                const conf = conferenciaInternaMap[v.id];
+                                if (!conf) return null;
+                                if (conf.fechada_em) {
+                                  return (
+                                    <Badge variant="outline" className="text-xs border-success text-success">
+                                      Conferido {conf.com_pendencia && "c/ pend."}
+                                    </Badge>
+                                  );
+                                }
+                                if (conf.total_escopo > 0) {
+                                  const pct = Math.round((conf.conferidas_escopo / conf.total_escopo) * 100);
+                                  return (
+                                    <Badge variant="outline" className="text-xs border-warning text-warning">
+                                      Conf. {pct}%
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
                               <Button
+
                                 variant="outline"
                                 size="sm"
                                 className="h-8 px-2"

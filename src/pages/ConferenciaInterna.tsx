@@ -6,8 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -48,6 +50,7 @@ import {
   ChevronDown,
   ClipboardList,
   Eraser,
+  Truck,
 } from "lucide-react";
 
 interface CargaResumo {
@@ -57,6 +60,27 @@ interface CargaResumo {
   data: string;
   totalEtiquetas: number;
   conferidosInterno: number;
+}
+
+interface Veiculo {
+  id: string;
+  placa: string;
+  motorista: string;
+  data: string;
+}
+
+interface VeiculoFechamento {
+  placa: string;
+  fechada_em: string | null;
+  com_pendencia: boolean;
+  pendencia_motivo: string | null;
+  total_nfs: number;
+  total_escopo: number;
+  fora_escopo: number;
+  conferidas_escopo: number;
+  faltando_escopo: number;
+  nfs_faltando: { numero_nf: string; total: number; conferidas: number }[];
+  nfs_escopo: string[];
 }
 
 interface NfProgress {
@@ -82,6 +106,9 @@ interface ScanResult {
   caixa?: string;
   pendencia?: string;
 }
+
+type ConferenciaView = "search" | "vehicle-select" | "nf-list" | "scanning";
+
 
 
 export default function ConferenciaInterna() {
@@ -128,6 +155,22 @@ export default function ConferenciaInterna() {
   // Etapa da conferência interna: 1 = Separação (dupla bipagem) | 2 = Expedição/carregamento (só QR)
   const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
+
+  // Etapa 2 amarrada por veículo
+  const [viewMode, setViewMode] = useState<ConferenciaView>("search");
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [loadingVeiculos, setLoadingVeiculos] = useState(false);
+  const [selectedVeiculo, setSelectedVeiculo] = useState<Veiculo | null>(null);
+  const [veiculoNfs, setVeiculoNfs] = useState<NfListItem[]>([]);
+  const [veiculoCargaIds, setVeiculoCargaIds] = useState<Set<string>>(new Set());
+  const [loadingVeiculoNfs, setLoadingVeiculoNfs] = useState(false);
+  const [fechamento, setFechamento] = useState<VeiculoFechamento | null>(null);
+  const [loadingFechamento, setLoadingFechamento] = useState(false);
+  const [fechando, setFechando] = useState(false);
+  const [mostrarPendencia, setMostrarPendencia] = useState(false);
+  const [motivoPendencia, setMotivoPendencia] = useState("");
+
+
   const [limpando, setLimpando] = useState(false);
   const podeLimparNf =
     isAdmin || profile?.email?.toLowerCase() === "gessica.rodrigues@tlmlogistica.com.br";
@@ -291,8 +334,162 @@ export default function ConferenciaInterna() {
     }
   }
 
+  // ---- ETAPA 2: VEÍCULO / EXPEDIÇÃO ----
+  async function loadVeiculos() {
+    setLoadingVeiculos(true);
+    try {
+      const { data } = await supabase
+        .from("veiculos")
+        .select("id, placa, motorista, data")
+        .in("status", ["pendente", "em_rota"])
+        .order("created_at", { ascending: false });
+      setVeiculos(data || []);
+    } catch (error) {
+      console.error("Erro ao carregar veículos:", error);
+    } finally {
+      setLoadingVeiculos(false);
+    }
+  }
+
+  async function loadFechamentoVeiculo(veiculoId: string) {
+    setLoadingFechamento(true);
+    try {
+      const { data, error } = await (supabase as any).rpc(
+        "conferencia_interna_status_veiculo",
+        { p_veiculo_id: veiculoId }
+      );
+      if (error) throw error;
+      setFechamento(data as VeiculoFechamento);
+    } catch (error) {
+      console.error("[ConferenciaInterna] Erro no status de fechamento:", error);
+      setFechamento(null);
+    } finally {
+      setLoadingFechamento(false);
+    }
+  }
+
+  async function fecharConferenciaVeiculo(forcar: boolean) {
+    if (!selectedVeiculo) return;
+    setFechando(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("fechar_conferencia_interna_veiculo", {
+        p_veiculo_id: selectedVeiculo.id,
+        p_forcar: forcar,
+        p_motivo: forcar ? motivoPendencia : null,
+      });
+      if (error) throw error;
+      setFechamento(data as VeiculoFechamento);
+      setMostrarPendencia(false);
+      setMotivoPendencia("");
+      toast({
+        title: forcar ? "Expedição fechada com pendência" : "Veículo liberado para saída",
+        description: `Placa ${selectedVeiculo.placa} expedida.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Não foi possível liberar",
+        description: error?.message ?? "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setFechando(false);
+    }
+  }
+
+  async function loadNfsForVeiculo(veiculoId: string) {
+    setLoadingVeiculoNfs(true);
+    try {
+      const { data: vnfs, error: vnfsError } = await supabase
+        .from("veiculo_nfs")
+        .select("nf_id, carga_origem_id")
+        .eq("veiculo_id", veiculoId)
+        .limit(2000);
+
+      if (vnfsError) throw vnfsError;
+      if (!vnfs || vnfs.length === 0) {
+        setVeiculoNfs([]);
+        return;
+      }
+
+      const nfIds = vnfs.map((v) => v.nf_id);
+      const nfCargaMap = new Map(vnfs.map((v) => [v.nf_id, v.carga_origem_id]));
+      const uniqueCargaIds = [...new Set(vnfs.map((v) => v.carga_origem_id))];
+
+      const { data: nfsData, error: nfsError } = await supabase
+        .from("notas_fiscais")
+        .select("id, numero_nf")
+        .in("id", nfIds)
+        .limit(2000);
+
+      if (nfsError) throw nfsError;
+
+      const progressResults = await Promise.all(
+        uniqueCargaIds.map((cargaId) =>
+          supabase.rpc("get_conferencia_progress", { p_carga_id: cargaId })
+        )
+      );
+
+      const progressMap = new Map<string, { total: number; conferidas: number }>();
+      uniqueCargaIds.forEach((cargaId, idx) => {
+        const progressData = progressResults[idx].data as any;
+        if (progressData?.nfs) {
+          (progressData.nfs as any[]).forEach((nfProgress: any) => {
+            progressMap.set(`${nfProgress.numero_nf}_${cargaId}`, {
+              total: nfProgress.total || 0,
+              conferidas: nfProgress.conferidas || 0,
+            });
+          });
+        }
+      });
+
+      const result: NfListItem[] = (nfsData || []).map((nf) => {
+        const cargaId = nfCargaMap.get(nf.id) || "";
+        const progress = progressMap.get(`${nf.numero_nf}_${cargaId}`) || { total: 0, conferidas: 0 };
+        return {
+          numeroNf: nf.numero_nf,
+          cargaId,
+          placa: selectedVeiculo?.placa || "",
+          motorista: selectedVeiculo?.motorista || "",
+          total: progress.total,
+          conferidas: progress.conferidas,
+        };
+      });
+
+      result.sort((a, b) => a.numeroNf.localeCompare(b.numeroNf));
+      setVeiculoNfs(result);
+      setVeiculoCargaIds(new Set(uniqueCargaIds));
+    } catch (error) {
+
+      console.error("[ConferenciaInterna] Erro ao carregar NFs do veículo:", error);
+      toast({ title: "Erro ao carregar NFs", variant: "destructive" });
+      setVeiculoNfs([]);
+    } finally {
+      setLoadingVeiculoNfs(false);
+    }
+  }
+
+  function selectVeiculo(veiculo: Veiculo) {
+    setSelectedVeiculo(veiculo);
+    setMostrarPendencia(false);
+    setMotivoPendencia("");
+    void loadNfsForVeiculo(veiculo.id);
+    void loadFechamentoVeiculo(veiculo.id);
+    setViewMode("nf-list");
+  }
+
+  function voltarParaVeiculos() {
+    void flushWrites();
+    setSelectedVeiculo(null);
+    setVeiculoNfs([]);
+    setFechamento(null);
+    setMostrarPendencia(false);
+    setMotivoPendencia("");
+    setViewMode("vehicle-select");
+  }
+
   // ---- OFFLINE FUNCTIONS ----
   async function downloadAllForOffline() {
+
     setDownloading(true);
     setDownloadProgress(0);
     try {
@@ -442,7 +639,11 @@ export default function ConferenciaInterna() {
     collectorStageRef.current = duplaChecagem ? "cliente" : "qr";
     setCollectorStage(duplaChecagem ? "cliente" : "qr");
     setQrInput("");
+    if (etapa === 2 && selectedVeiculo) {
+      setViewMode("nf-list");
+    }
   }
+
 
   function focusClienteProximaLeitura() {
     if (!tecladoManual) {
@@ -814,11 +1015,17 @@ export default function ConferenciaInterna() {
       }
 
 
-      // Validate carga
-      if (qrCargaId !== selectedCarga.id) {
+      // Validate carga (Etapa 2 amarrada ao veículo aceita qualquer carga do veículo)
+      if (etapa === 2 && selectedVeiculo) {
+        if (!veiculoCargaIds.has(qrCargaId)) {
+          const result: ScanResult = { type: "warning", message: "Etiqueta fora do veículo", details: `Esta etiqueta não pertence ao veículo ${selectedVeiculo.placa}` };
+          addToHistory(reportResult(result)); playSound("warning"); return;
+        }
+      } else if (qrCargaId !== selectedCarga.id) {
         const result: ScanResult = { type: "warning", message: "Etiqueta de outra carga", details: "Esta etiqueta pertence a outra carga" };
         addToHistory(reportResult(result)); playSound("warning"); return;
       }
+
 
       // Validate NF
       if (numeroNf !== selectedNf) {
@@ -2007,7 +2214,7 @@ export default function ConferenciaInterna() {
     );
   }
 
-  // ---- LIST VIEW (search only) ----
+  // ---- LIST VIEW ----
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-10 bg-sidebar text-sidebar-foreground p-4 shadow-lg">
@@ -2020,10 +2227,21 @@ export default function ConferenciaInterna() {
               {isOnline ? "Online" : "Offline"}
             </Badge>
             <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-              v2026.07.27e
+              v2026.09.16
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {viewMode === "nf-list" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={voltarParaVeiculos}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Veículos
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -2039,85 +2257,313 @@ export default function ConferenciaInterna() {
       </header>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
-        {/* Quick NF search */}
-        <Card>
-          <CardContent className="pt-4">
-            <label className="text-sm font-medium text-muted-foreground mb-2 block">
-              Busca rápida por NF
-            </label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nº da NF..."
-                value={searchNf}
-                onChange={(e) => setSearchNf(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") buscarNfDireta(); }}
-                className="flex-1 text-lg"
-                inputMode="numeric"
-              />
-              <Button onClick={buscarNfDireta} disabled={searchLoading || !searchNf.trim()}>
-                {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Etapa selector */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={etapa === 1 ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setEtapa(1); setViewMode("search"); setSelectedVeiculo(null); setVeiculoNfs([]); setFechamento(null); }}
+          >
+            Etapa 1 • Separação
+          </Button>
+          <Button
+            variant={etapa === 2 ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setEtapa(2); setViewMode("vehicle-select"); loadVeiculos(); }}
+          >
+            Etapa 2 • Expedição
+          </Button>
+        </div>
 
-        {/* Offline Controls */}
-        <Card>
-          <CardContent className="pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <WifiOff className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Modo Offline</span>
-              </div>
-              <Switch
-                checked={offlineMode}
-                onCheckedChange={setOfflineMode}
-                disabled={!hasLocalData && !offlineMode}
-              />
-            </div>
+        {etapa === 1 && (
+          <>
+            {/* Quick NF search */}
+            <Card>
+              <CardContent className="pt-4">
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                  Busca rápida por NF
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Nº da NF..."
+                    value={searchNf}
+                    onChange={(e) => setSearchNf(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") buscarNfDireta(); }}
+                    className="flex-1 text-lg"
+                    inputMode="numeric"
+                  />
+                  <Button onClick={buscarNfDireta} disabled={searchLoading || !searchNf.trim()}>
+                    {searchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-            {isOnline && !offlineMode && (
-              <Button onClick={downloadAllForOffline} disabled={downloading} variant="outline" className="w-full" size="sm">
-                {downloading ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Baixando... {downloadProgress}%</>
-                ) : (
-                  <><Download className="w-4 h-4 mr-2" />Baixar dados para offline</>
+            {/* Offline Controls */}
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <WifiOff className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Modo Offline</span>
+                  </div>
+                  <Switch
+                    checked={offlineMode}
+                    onCheckedChange={setOfflineMode}
+                    disabled={!hasLocalData && !offlineMode}
+                  />
+                </div>
+
+                {isOnline && !offlineMode && (
+                  <Button onClick={downloadAllForOffline} disabled={downloading} variant="outline" className="w-full" size="sm">
+                    {downloading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Baixando... {downloadProgress}%</>
+                    ) : (
+                      <><Download className="w-4 h-4 mr-2" />Baixar dados para offline</>
+                    )}
+                  </Button>
                 )}
-              </Button>
-            )}
 
-            {!hasLocalData && !offlineMode && (
-              <p className="text-xs text-muted-foreground">
-                Baixe os dados antes de entrar na câmara refrigerada.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+                {!hasLocalData && !offlineMode && (
+                  <p className="text-xs text-muted-foreground">
+                    Baixe os dados antes de entrar na câmara refrigerada.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Sync Banner */}
-        {isOnline && pendingSyncCount > 0 && !offlineMode && (
-          <div className="bg-warning/20 border-2 border-warning rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-warning text-sm">{pendingSyncCount} conferência(s) pendente(s)</p>
-                <p className="text-xs text-muted-foreground">Registradas offline, prontas para transmitir.</p>
+            {/* Sync Banner */}
+            {isOnline && pendingSyncCount > 0 && !offlineMode && (
+              <div className="bg-warning/20 border-2 border-warning rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-warning text-sm">{pendingSyncCount} conferência(s) pendente(s)</p>
+                    <p className="text-xs text-muted-foreground">Registradas offline, prontas para transmitir.</p>
+                  </div>
+                  <Button size="sm" onClick={syncPendingScans} disabled={syncing} className="bg-warning text-warning-foreground hover:bg-warning/90">
+                    {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                    Transmitir
+                  </Button>
+                </div>
               </div>
-              <Button size="sm" onClick={syncPendingScans} disabled={syncing} className="bg-warning text-warning-foreground hover:bg-warning/90">
-                {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
-                Transmitir
-              </Button>
-            </div>
-          </div>
+            )}
+
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Digite o número da NF acima para iniciar a separação.</p>
+              </CardContent>
+            </Card>
+          </>
         )}
 
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">Digite o número da NF acima para iniciar a conferência.</p>
-          </CardContent>
-        </Card>
+        {etapa === 2 && viewMode === "vehicle-select" && (
+          <>
+            <Card>
+              <CardContent className="pt-4">
+                <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <Truck className="w-4 h-4" />
+                  Selecione a placa para expedição
+                </h2>
+                {loadingVeiculos ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : veiculos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum veículo pendente de expedição.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {veiculos.map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => selectVeiculo(v)}
+                        className="w-full text-left p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold">{v.placa}</p>
+                            <p className="text-xs text-muted-foreground">{v.motorista || "Sem motorista"}</p>
+                          </div>
+                          <ChevronLeft className="w-4 h-4 rotate-180 text-muted-foreground" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                <Truck className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Na expedição o operador escolhe a placa e só pode bipar as notas daquele veículo.</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {etapa === 2 && viewMode === "nf-list" && selectedVeiculo && (
+          <>
+            {/* Painel de fechamento do veículo */}
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-5 h-5" />
+                    <h2 className="font-semibold">Placa {selectedVeiculo.placa}</h2>
+                  </div>
+                  {fechamento?.fechada_em ? (
+                    <Badge variant="outline" className="text-success border-success">Expedido</Badge>
+                  ) : fechamento?.faltando_escopo === 0 ? (
+                    <Badge variant="outline" className="text-success border-success">Pronto</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-warning border-warning">Faltam {fechamento?.faltando_escopo ?? "—"}</Badge>
+                  )}
+                </div>
+
+                {loadingFechamento || !fechamento ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded bg-muted p-2">
+                        <p className="text-xs text-muted-foreground">Notas escopo</p>
+                        <p className="font-bold">{fechamento.total_escopo}</p>
+                      </div>
+                      <div className="rounded bg-muted p-2">
+                        <p className="text-xs text-muted-foreground">Conferidas</p>
+                        <p className="font-bold text-success">{fechamento.conferidas_escopo}</p>
+                      </div>
+                      <div className="rounded bg-muted p-2">
+                        <p className="text-xs text-muted-foreground">Faltando</p>
+                        <p className="font-bold text-warning">{fechamento.faltando_escopo}</p>
+                      </div>
+                    </div>
+
+                    {fechamento.faltando_escopo > 0 && (
+                      <div className="rounded border border-warning/50 bg-warning/10 p-2 text-sm">
+                        <p className="font-medium text-warning flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          Ainda faltam {fechamento.faltando_escopo} nota(s) do escopo IBAC
+                        </p>
+                        {fechamento.nfs_faltando.length > 0 && (
+                          <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                            {fechamento.nfs_faltando.map((nf) => (
+                              <li key={nf.numero_nf}>NF {nf.numero_nf}: {nf.conferidas} de {nf.total}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    {fechamento.com_pendencia && fechamento.pendencia_motivo && (
+                      <div className="rounded border border-destructive/50 bg-destructive/10 p-2 text-sm">
+                        <p className="font-medium text-destructive">Fechado com pendência</p>
+                        <p className="text-xs text-muted-foreground">{fechamento.pendencia_motivo}</p>
+                      </div>
+                    )}
+
+                    {fechamento.fechada_em ? (
+                      <Button disabled className="w-full" variant="outline">
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Veículo já liberado
+                      </Button>
+                    ) : fechamento.faltando_escopo === 0 ? (
+                      <Button onClick={() => fecharConferenciaVeiculo(false)} disabled={fechando} className="w-full">
+                        {fechando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                        Liberar veículo para saída
+                      </Button>
+                    ) : (
+                      <>
+                        {!mostrarPendencia ? (
+                          <Button
+                            variant="outline"
+                            className="w-full border-warning text-warning hover:bg-warning/10"
+                            onClick={() => setMostrarPendencia(true)}
+                            disabled={!isAdmin}
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                            Liberar com pendência (admin)
+                          </Button>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="text-xs font-medium">Motivo da pendência</label>
+                            <Textarea
+                              value={motivoPendencia}
+                              onChange={(e) => setMotivoPendencia(e.target.value)}
+                              placeholder="Ex.: nota retirada da carga, avaria, sobra de galpão..."
+                              className="min-h-[80px]"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => { setMostrarPendencia(false); setMotivoPendencia(""); }}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="flex-1"
+                                disabled={fechando || motivoPendencia.trim().length < 5}
+                                onClick={() => fecharConferenciaVeiculo(true)}
+                              >
+                                {fechando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+                                Confirmar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Lista de NFs do veículo */}
+            <Card>
+              <CardContent className="pt-4">
+                <h2 className="text-sm font-medium text-muted-foreground mb-2">Notas do veículo</h2>
+                {loadingVeiculoNfs ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : veiculoNfs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma NF encontrada para este veículo.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {veiculoNfs.map((nf) => {
+                      const pct = nf.total > 0 ? Math.round((nf.conferidas / nf.total) * 100) : 0;
+                      return (
+                        <button
+                          key={nf.numeroNf}
+                          onClick={() => { iniciarConferenciaNf(nf); setViewMode("scanning"); }}
+                          className="w-full text-left p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-semibold">NF {nf.numeroNf}</span>
+                            <Badge variant={pct === 100 && nf.total > 0 ? "default" : "outline"} className="text-xs">
+                              {pct === 100 && nf.total > 0 ? "Conferida" : `${nf.conferidas}/${nf.total}`}
+                            </Badge>
+                          </div>
+                          <Progress value={pct} className="h-2" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
       <MobileBottomNav />
     </div>
   );
 }
+

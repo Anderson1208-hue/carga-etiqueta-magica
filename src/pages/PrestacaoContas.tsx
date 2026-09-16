@@ -66,7 +66,11 @@ interface VeiculoLista {
   data: string;
   prestacao_contas_em: string | null;
   total_baixas: number;
+  conferencia_interna_fechada_em?: string | null;
+  conferencia_interna_com_pendencia?: boolean;
+  conferencia_interna_status?: string | null;
 }
+
 
 interface BaixaItem {
   id: string;
@@ -244,7 +248,7 @@ export default function PrestacaoContas() {
     try {
       const { data: veics, error } = await supabase
         .from("veiculos")
-        .select("id, placa, motorista, data, prestacao_contas_em")
+        .select("id, placa, motorista, data, prestacao_contas_em, conferencia_interna_fechada_em, conferencia_interna_com_pendencia")
         .eq("data", data)
         .order("placa");
 
@@ -262,9 +266,24 @@ export default function PrestacaoContas() {
         });
       }
 
+      const statusMap: Record<string, any> = {};
+      if (ids.length > 0) {
+        await Promise.all(
+          ids.map(async (id) => {
+            const { data: st, error: stErr } = await (supabase as any).rpc("conferencia_interna_status_veiculo", {
+              p_veiculo_id: id,
+            });
+            if (!stErr && st) statusMap[id] = st;
+          })
+        );
+      }
+
       const lista: VeiculoLista[] = (veics || []).map((v: any) => ({
         ...v,
         total_baixas: countMap[v.id] || 0,
+        conferencia_interna_status: statusMap[v.id]
+          ? `${Math.round((statusMap[v.id].conferidas_escopo / Math.max(statusMap[v.id].total_escopo, 1)) * 100)}%`
+          : null,
       }));
       setVeiculos(lista);
     } catch (err: any) {
@@ -273,6 +292,7 @@ export default function PrestacaoContas() {
       setLoading(false);
     }
   }
+
 
   async function carregarBaixas(veiculo: VeiculoLista) {
     setVeiculoSel(veiculo);
@@ -767,11 +787,22 @@ export default function PrestacaoContas() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-semibold">{v.placa}</span>
-                            {encerrado ? (
-                              <Badge variant="secondary" className="gap-1"><Lock className="w-3 h-3" /> Encerrado</Badge>
-                            ) : (
-                              <Badge variant="outline">{v.total_baixas} baixas</Badge>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {v.conferencia_interna_fechada_em ? (
+                                <Badge variant="outline" className="text-xs border-success text-success">
+                                  Conf. OK
+                                </Badge>
+                              ) : v.conferencia_interna_status ? (
+                                <Badge variant="outline" className="text-xs border-warning text-warning">
+                                  Conf. {v.conferencia_interna_status}
+                                </Badge>
+                              ) : null}
+                              {encerrado ? (
+                                <Badge variant="secondary" className="gap-1"><Lock className="w-3 h-3" /> Encerrado</Badge>
+                              ) : (
+                                <Badge variant="outline">{v.total_baixas} baixas</Badge>
+                              )}
+                            </div>
                           </div>
                           {v.motorista && (
                             <p className="text-xs text-muted-foreground truncate">{v.motorista}</p>
@@ -779,6 +810,7 @@ export default function PrestacaoContas() {
                         </button>
                       );
                     })}
+
                   </div>
                 )}
               </CardContent>
