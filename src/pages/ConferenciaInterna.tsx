@@ -357,8 +357,10 @@ export default function ConferenciaInterna() {
           .select("id, placa, motorista, data, conferencia_interna_fechada_em")
           .in("id", veiculoIds)
           .in("status", ["pendente", "em_rota"])
+          .is("conferencia_interna_fechada_em", null)
           .order("created_at", { ascending: false })
           .limit(200);
+
         if (veicError) throw veicError;
         data = veicData || [];
       }
