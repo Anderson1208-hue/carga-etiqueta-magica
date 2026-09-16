@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     // data_piloto (dia do teste controlado); datas posteriores entram sem restrição.
     let qVeic = supabase.from("veiculos").select("id, placa, data");
     if (dataPiloto) qVeic = qVeic.gte("data", dataPiloto);
-    const { data: veicsPiloto } = await qVeic;
+    const { data: veicsPiloto, error: errVeic } = await qVeic;
     const idsVeic = (veicsPiloto ?? [])
       .filter((v: any) =>
         dataPiloto && String(v.data) === String(dataPiloto)
@@ -126,24 +126,34 @@ Deno.serve(async (req) => {
       )
       .map((v: any) => v.id);
 
-    if (idsVeic.length === 0) {
+    // Pré-filtro no banco só vale para listas curtas: acima disso a URL do
+    // PostgREST estoura (HTTP 400/414) e a consulta volta vazia — o que antes
+    // zerava a fila silenciosamente e travava TODO o envio. Nesses casos (e em
+    // qualquer erro) abandonamos o pré-filtro e ampliamos a janela; o filtro por
+    // placa/data/prestação continua sendo aplicado em memória logo abaixo.
+    const ampliarJanela = () => {
+      nfIdsPiloto = null;
+      janelaEventos = Math.max(janelaEventos, 1000);
+      janelaCanhotos = Math.max(janelaCanhotos, 1000);
+    };
+
+    if (errVeic || idsVeic.length > 200) {
+      ampliarJanela();
+    } else if (idsVeic.length === 0) {
       nfIdsPiloto = [];
     } else {
-      const { data: vinc } = await supabase
+      const { data: vinc, error: errVinc } = await supabase
         .from("veiculo_nfs")
         .select("nf_id")
         .in("veiculo_id", idsVeic)
         .limit(50000);
-      nfIdsPiloto = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
-    }
-
-    // Lista grande de nf_id estoura o tamanho da URL do PostgREST (HTTP 400).
-    // Nesse caso abandonamos o pré-filtro no banco e ampliamos a janela — o
-    // filtro por placa/data continua sendo aplicado em memória logo abaixo.
-    if (nfIdsPiloto && nfIdsPiloto.length > 200) {
-      nfIdsPiloto = null;
-      janelaEventos = Math.max(janelaEventos, 500);
-      janelaCanhotos = Math.max(janelaCanhotos, 500);
+      if (errVinc) {
+        ampliarJanela();
+      } else {
+        const ids = [...new Set((vinc ?? []).map((v: any) => v.nf_id).filter(Boolean))] as string[];
+        if (ids.length > 200) ampliarJanela();
+        else nfIdsPiloto = ids;
+      }
     }
   }
 
