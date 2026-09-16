@@ -629,7 +629,6 @@ export default function ConferenciaInterna() {
   function voltarParaLista() {
     void flushWrites();
     setSelectedCarga(null);
-
     setSelectedNf(null);
     setNfProgress(null);
     setLastResult(null);
@@ -642,9 +641,12 @@ export default function ConferenciaInterna() {
     setCollectorStage(duplaChecagem ? "cliente" : "qr");
     setQrInput("");
     if (etapa === 2 && selectedVeiculo) {
+      void loadNfsForVeiculo(selectedVeiculo.id);
+      void loadFechamentoVeiculo(selectedVeiculo.id);
       setViewMode("nf-list");
     }
   }
+
 
 
   function focusClienteProximaLeitura() {
