@@ -3904,6 +3904,10 @@ export type Database = {
           conferencia_externa_fechada_em: string | null
           conferencia_externa_fechada_por: string | null
           conferencia_externa_pendencia_motivo: string | null
+          conferencia_interna_com_pendencia: boolean
+          conferencia_interna_fechada_em: string | null
+          conferencia_interna_fechada_por: string | null
+          conferencia_interna_pendencia_motivo: string | null
           created_at: string
           created_by: string | null
           data: string
@@ -3938,6 +3942,10 @@ export type Database = {
           conferencia_externa_fechada_em?: string | null
           conferencia_externa_fechada_por?: string | null
           conferencia_externa_pendencia_motivo?: string | null
+          conferencia_interna_com_pendencia?: boolean
+          conferencia_interna_fechada_em?: string | null
+          conferencia_interna_fechada_por?: string | null
+          conferencia_interna_pendencia_motivo?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -3972,6 +3980,10 @@ export type Database = {
           conferencia_externa_fechada_em?: string | null
           conferencia_externa_fechada_por?: string | null
           conferencia_externa_pendencia_motivo?: string | null
+          conferencia_interna_com_pendencia?: boolean
+          conferencia_interna_fechada_em?: string | null
+          conferencia_interna_fechada_por?: string | null
+          conferencia_interna_pendencia_motivo?: string | null
           created_at?: string
           created_by?: string | null
           data?: string
@@ -4127,6 +4139,10 @@ export type Database = {
         Args: { p_veiculo_id: string }
         Returns: Json
       }
+      conferencia_interna_status_veiculo: {
+        Args: { p_veiculo_id: string }
+        Returns: Json
+      }
       confianca_origem: {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
         Returns: number
@@ -4154,6 +4170,10 @@ export type Database = {
         Returns: Json
       }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
+      fechar_conferencia_interna_veiculo: {
+        Args: { p_forcar?: boolean; p_motivo?: string; p_veiculo_id: string }
+        Returns: Json
+      }
       fechar_conferencia_veiculo: {
         Args: { p_forcar?: boolean; p_motivo?: string; p_veiculo_id: string }
         Returns: Json
