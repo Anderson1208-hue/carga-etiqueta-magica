@@ -717,6 +717,38 @@ Deno.serve(async (req) => {
           });
         }
       }
+
+      // 3) Fila travada: há pendentes elegíveis e NADA foi enviado na última hora.
+      // Este é o alerta que faltava em 16/09/2026, quando um filtro defeituoso
+      // zerou os candidatos e a fila ficou 24h parada sem nenhum erro registrado.
+      const umaHoraAtras = new Date(Date.now() - 60 * 60_000).toISOString();
+      const { count: elegiveisCount } = await supabase
+        .from("ibac_eventos_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pendente")
+        .lt("tentativas", maxTentativas);
+      const { count: enviosHora } = await supabase
+        .from("ibac_eventos_queue")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "enviado")
+        .gte("enviado_em", umaHoraAtras);
+
+      if (envioAtivo && (elegiveisCount ?? 0) > 0 && (enviosHora ?? 0) === 0) {
+        const { data: jaExiste } = await supabase
+          .from("ibac_alertas")
+          .select("id")
+          .eq("tipo", "fila_travada")
+          .gte("created_at", cooldownIso)
+          .limit(1);
+        if (!jaExiste || jaExiste.length === 0) {
+          await supabase.from("ibac_alertas").insert({
+            tipo: "fila_travada",
+            mensagem: `Fila IBAC parada: ${elegiveisCount} itens aguardando e nenhum envio concluído na última hora.`,
+            valor_atual: elegiveisCount,
+            limite: 0,
+          });
+        }
+      }
     }
   } catch (err) {
     console.error("[ibac-sync] Falha ao verificar alertas:", err);
