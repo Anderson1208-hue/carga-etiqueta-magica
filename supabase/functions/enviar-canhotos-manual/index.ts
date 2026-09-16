@@ -94,59 +94,114 @@ function normalizarFiltro(bruto: any): Filtro {
   };
 }
 
-async function buscarBaixas(supabase: any, filtro: Filtro): Promise<Linha[]> {
-  const linhas: Linha[] = [];
-  for (let pagina = 0; ; pagina++) {
-    let q = supabase
-      .from("baixas_entrega")
-      .select(
-        "id, foto_path, foto_recibo_path, registrado_em, recebedor_nome, ocorrencia, observacao, " +
-          "canhoto_pendente_motivo, canhoto_pendente_obs, status, " +
-          "notas_fiscais!inner(numero_nf, dest_razao_social, dest_cidade, dest_uf, razao_social_emitente), " +
-          "veiculos(placa, motorista)",
-      )
-      .order("registrado_em", { ascending: true })
-      .order("id", { ascending: true })
-      .range(pagina * PAGINA, pagina * PAGINA + PAGINA - 1);
+function fatias<T>(arr: T[], n = 100): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
+}
 
-    if (filtro.nfs?.length) {
-      q = q.in("notas_fiscais.numero_nf", filtro.nfs);
-    } else {
+/**
+ * Consulta em etapas simples (sem joins/filtros aninhados no PostgREST, que
+ * estouravam o tempo limite do banco):
+ *   1) resolve as notas fiscais (por número e/ou emitente);
+ *   2) busca as baixas por nf_id em fatias de 100;
+ *   3) busca as placas dos veículos em fatias de 100.
+ */
+async function buscarBaixas(supabase: any, filtro: Filtro): Promise<Linha[]> {
+  const camposNf = "id, numero_nf, dest_razao_social, dest_cidade, dest_uf, razao_social_emitente";
+  const notas = new Map<string, any>();
+
+  if (filtro.nfs?.length) {
+    for (const lote of fatias(filtro.nfs)) {
+      let q = supabase.from("notas_fiscais").select(camposNf).in("numero_nf", lote);
+      if (filtro.embarcador) q = q.ilike("razao_social_emitente", `%${filtro.embarcador}%`);
+      const { data, error } = await q;
+      if (error) throw new Error(`Falha ao buscar notas: ${error.message}`);
+      for (const n of data ?? []) notas.set(n.id, n);
+    }
+  }
+
+  const baixas: any[] = [];
+  const camposBaixa =
+    "id, nf_id, veiculo_id, foto_path, foto_recibo_path, registrado_em, recebedor_nome, ocorrencia, " +
+    "observacao, canhoto_pendente_motivo, canhoto_pendente_obs, status";
+
+  if (filtro.nfs?.length) {
+    if (!notas.size) return [];
+    for (const lote of fatias([...notas.keys()])) {
+      const { data, error } = await supabase
+        .from("baixas_entrega")
+        .select(camposBaixa)
+        .in("nf_id", lote)
+        .order("registrado_em", { ascending: true });
+      if (error) throw new Error(`Falha ao buscar baixas: ${error.message}`);
+      baixas.push(...(data ?? []));
+    }
+  } else {
+    for (let pagina = 0; ; pagina++) {
+      let q = supabase
+        .from("baixas_entrega")
+        .select(camposBaixa)
+        .order("registrado_em", { ascending: true })
+        .order("id", { ascending: true })
+        .range(pagina * PAGINA, pagina * PAGINA + PAGINA - 1);
       if (filtro.data_inicio) q = q.gte("registrado_em", `${filtro.data_inicio}T03:00:00.000Z`);
       if (filtro.data_fim) {
         const fim = new Date(`${filtro.data_fim}T03:00:00.000Z`);
         fim.setUTCDate(fim.getUTCDate() + 1);
         q = q.lt("registrado_em", fim.toISOString());
       }
+      const { data, error } = await q;
+      if (error) throw new Error(`Falha ao buscar baixas: ${error.message}`);
+      if (!data?.length) break;
+      baixas.push(...data);
+      if (data.length < PAGINA) break;
+      if (baixas.length >= 5000) break;
     }
-    if (filtro.embarcador) q = q.ilike("notas_fiscais.razao_social_emitente", `%${filtro.embarcador}%`);
-
-    const { data, error } = await q;
-    if (error) throw new Error(`Falha ao buscar baixas: ${error.message}`);
-    if (!data?.length) break;
-    for (const b of data as any[]) {
-      linhas.push({
-        path: b.foto_path || b.foto_recibo_path || null,
-        registrado_em: b.registrado_em,
-        recebedor_nome: b.recebedor_nome,
-        ocorrencia: b.ocorrencia,
-        observacao: b.observacao,
-        canhoto_pendente_motivo: b.canhoto_pendente_motivo,
-        canhoto_pendente_obs: b.canhoto_pendente_obs,
-        status: b.status,
-        numero_nf: b.notas_fiscais?.numero_nf ?? "",
-        dest: b.notas_fiscais?.dest_razao_social ?? "",
-        cidade: b.notas_fiscais?.dest_cidade ?? "",
-        uf: b.notas_fiscais?.dest_uf ?? "",
-        emitente: b.notas_fiscais?.razao_social_emitente ?? "",
-        placa: b.veiculos?.placa ?? "",
-        motorista: b.veiculos?.motorista ?? "",
-      });
+    const ids = [...new Set(baixas.map((b) => b.nf_id).filter(Boolean))];
+    for (const lote of fatias(ids)) {
+      const { data, error } = await supabase.from("notas_fiscais").select(camposNf).in("id", lote);
+      if (error) throw new Error(`Falha ao buscar notas: ${error.message}`);
+      for (const n of data ?? []) notas.set(n.id, n);
     }
-    if (data.length < PAGINA) break;
-    if (linhas.length >= LIMITE_NOTAS + 1) break;
   }
-  return linhas;
+
+  // veículos (placa/motorista)
+  const veiculos = new Map<string, any>();
+  const vIds = [...new Set(baixas.map((b) => b.veiculo_id).filter(Boolean))];
+  for (const lote of fatias(vIds)) {
+    const { data } = await supabase.from("veiculos").select("id, placa, motorista").in("id", lote);
+    for (const v of data ?? []) veiculos.set(v.id, v);
+  }
+
+  const linhas: Linha[] = [];
+  for (const b of baixas) {
+    const nf = notas.get(b.nf_id);
+    if (!nf) continue; // fora do filtro de emitente/nota
+    if (filtro.embarcador && !(nf.razao_social_emitente ?? "").toLowerCase().includes(filtro.embarcador.toLowerCase())) {
+      continue;
+    }
+    const v = veiculos.get(b.veiculo_id);
+    linhas.push({
+      path: b.foto_path || b.foto_recibo_path || null,
+      registrado_em: b.registrado_em,
+      recebedor_nome: b.recebedor_nome,
+      ocorrencia: b.ocorrencia,
+      observacao: b.observacao,
+      canhoto_pendente_motivo: b.canhoto_pendente_motivo,
+      canhoto_pendente_obs: b.canhoto_pendente_obs,
+      status: b.status,
+      numero_nf: nf.numero_nf ?? "",
+      dest: nf.dest_razao_social ?? "",
+      cidade: nf.dest_cidade ?? "",
+      uf: nf.dest_uf ?? "",
+      emitente: nf.razao_social_emitente ?? "",
+      placa: v?.placa ?? "",
+      motorista: v?.motorista ?? "",
+    });
+  }
+  linhas.sort((a, b) => String(a.registrado_em).localeCompare(String(b.registrado_em)));
+  return linhas.slice(0, LIMITE_NOTAS + 1);
 }
 
 async function jpegReduzido(bytes: Uint8Array) {
