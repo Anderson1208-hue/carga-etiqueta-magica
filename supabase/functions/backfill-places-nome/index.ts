@@ -126,30 +126,31 @@ Deno.serve(async (req) => {
     // a fachada — o que o Google indexa — é sempre "Cacau Show". Todo
     // destinatário que recebe NF do emitente IBAC é buscado por nome fantasia
     // Cacau Show + logradouro/número.
-    const IBAC_EMITENTE_RAIZ = '61472205';
+    // Emitentes do grupo: IBAC (61472205) e IBAE (42431457, Linhares/ES).
+    const CACAU_EMITENTE_RAIZES = ['61472205', '42431457'];
     const APELIDO_IBAC = 'Cacau Show';
     const cnpjsIbac = new Set<string>();
-    {
+    for (const raiz of CACAU_EMITENTE_RAIZES) {
       let from = 0; const page = 1000;
       while (true) {
         const { data: nfs, error: nfErr } = await supabase
           .from('notas_fiscais')
           .select('cnpj_destinatario, cnpj_emitente')
-          .ilike('cnpj_emitente', `%${IBAC_EMITENTE_RAIZ.slice(0, 2)}.${IBAC_EMITENTE_RAIZ.slice(2, 5)}.${IBAC_EMITENTE_RAIZ.slice(5, 8)}%`)
+          .ilike('cnpj_emitente', `%${raiz.slice(0, 2)}.${raiz.slice(2, 5)}.${raiz.slice(5, 8)}%`)
           .range(from, from + page - 1);
-        if (nfErr) { console.error('nfs ibac err', nfErr); break; }
+        if (nfErr) { console.error('nfs cacau err', nfErr); break; }
         if (!nfs || nfs.length === 0) break;
         for (const nf of nfs) {
           const emit = String(nf.cnpj_emitente ?? '').replace(/\D/g, '');
-          if (emit.slice(0, 8) !== IBAC_EMITENTE_RAIZ) continue;
+          if (emit.slice(0, 8) !== raiz) continue;
           const dest = String(nf.cnpj_destinatario ?? '').replace(/\D/g, '');
           if (dest) cnpjsIbac.add(dest);
         }
         if (nfs.length < page) break;
         from += page;
       }
-      console.log('destinatarios IBAC (Cacau Show):', cnpjsIbac.size);
     }
+    console.log('destinatarios IBAC/IBAE (Cacau Show):', cnpjsIbac.size);
 
 
     // Anexar rank e filtrar por min_baixas_90d
