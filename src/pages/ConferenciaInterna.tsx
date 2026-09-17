@@ -21,6 +21,7 @@ import {
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import {
   useOfflineConferencia,
   type OfflineEtiqueta,
@@ -147,9 +148,9 @@ export default function ConferenciaInterna() {
 
   // Dupla checagem (bipe do cliente + bipe do nosso QR)
   const [duplaChecagem, setDuplaChecagem] = useState(false);
-  // Dupla bipagem é regra de negócio exclusiva da IBAC (única com etiqueta QR
-  // pareada por caixa). null = emitente ainda desconhecido (ex.: offline).
-  const CNPJ_IBAC = "61472205000407";
+  // Dupla bipagem é regra de negócio dos emitentes do grupo Cacau Show
+  // (IBAC e IBAE — os únicos com etiqueta QR pareada por caixa).
+  // null = emitente ainda desconhecido (ex.: offline).
   const [nfEhIbac, setNfEhIbac] = useState<boolean | null>(null);
   const [codigoCliente, setCodigoCliente] = useState("");
   const clienteInputRef = useRef<HTMLInputElement>(null);
@@ -582,7 +583,7 @@ export default function ConferenciaInterna() {
           .eq("numero_nf", numeroNf)
           .maybeSingle();
         const digitos = ((nfRow as any)?.cnpj_emitente || "").replace(/\D/g, "");
-        setNfEhIbac(digitos ? digitos === CNPJ_IBAC : null);
+        setNfEhIbac(digitos ? isEmitenteCacau(digitos) : null);
       }
 
       const divergencias = rows.filter((r) => r.status === "divergencia").length;
@@ -1663,7 +1664,7 @@ export default function ConferenciaInterna() {
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
                       Dupla Checagem
-                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC)</span>}
+                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC/IBAE)</span>}
                     </label>
                     <Switch
                       id="dupla-check"
@@ -1694,7 +1695,7 @@ export default function ConferenciaInterna() {
               </div>
               {etapa === 1 && nfEhIbac === true && (
                 <p className="text-xs text-primary mt-1">
-                  NF da IBAC: dupla bipagem obrigatória (definida pelo emitente).
+                  NF da IBAC/IBAE: dupla bipagem obrigatória (definida pelo emitente).
                 </p>
               )}
               {etapa === 1 && nfEhIbac === false && (
