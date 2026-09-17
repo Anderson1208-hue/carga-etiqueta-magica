@@ -1664,7 +1664,7 @@ export default function ConferenciaInterna() {
                   <div className="flex items-center gap-1.5">
                     <label htmlFor="dupla-check" className="text-xs text-muted-foreground cursor-pointer select-none">
                       Dupla Checagem
-                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC)</span>}
+                      {nfEhIbac === true && <span className="ml-1 text-primary">(IBAC/IBAE)</span>}
                     </label>
                     <Switch
                       id="dupla-check"
@@ -1695,7 +1695,7 @@ export default function ConferenciaInterna() {
               </div>
               {etapa === 1 && nfEhIbac === true && (
                 <p className="text-xs text-primary mt-1">
-                  NF da IBAC: dupla bipagem obrigatória (definida pelo emitente).
+                  NF da IBAC/IBAE: dupla bipagem obrigatória (definida pelo emitente).
                 </p>
               )}
               {etapa === 1 && nfEhIbac === false && (
