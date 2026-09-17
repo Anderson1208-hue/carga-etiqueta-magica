@@ -2192,6 +2192,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ibac_log_envios_novo: {
+        Row: {
+          created_at: string | null
+          duracao_ms: number | null
+          endpoint: string | null
+          id: string
+          queue_id: string | null
+          request_body: Json | null
+          response_body: Json | null
+          response_status: number | null
+          sucesso: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          duracao_ms?: number | null
+          endpoint?: string | null
+          id?: string
+          queue_id?: string | null
+          request_body?: Json | null
+          response_body?: Json | null
+          response_status?: number | null
+          sucesso?: boolean | null
+        }
+        Relationships: []
+      }
       itens_nf: {
         Row: {
           c_prod: string
