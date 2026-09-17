@@ -582,7 +582,7 @@ export default function ConferenciaInterna() {
           .eq("numero_nf", numeroNf)
           .maybeSingle();
         const digitos = ((nfRow as any)?.cnpj_emitente || "").replace(/\D/g, "");
-        setNfEhIbac(digitos ? digitos === CNPJ_IBAC : null);
+        setNfEhIbac(digitos ? isEmitenteCacau(digitos) : null);
       }
 
       const divergencias = rows.filter((r) => r.status === "divergencia").length;
