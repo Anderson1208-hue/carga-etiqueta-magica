@@ -21,6 +21,7 @@ type: reference
 
 
 ## Memories
+- [Hershey / Confirma Fácil](mem://arquitetura/integracao-erp/hershey-confirma-facil) — Endpoints, contrato do login sondado e pendências (docs, credenciais de API, liberação de IP).
 - [EDI Cacau m³](mem://funcionalidades/cadastros/edi-cacau-cubagem-notfis) — IBAC: importar NOTFIS na linha da carga; m³ = peso cubado ÷ 300.
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Match cProd zeros](mem://logica/match-cprod-zeros-a-esquerda) — c_prod da NF vem zero-padded; join com produtos.codigo sempre com ltrim(...,'0').
