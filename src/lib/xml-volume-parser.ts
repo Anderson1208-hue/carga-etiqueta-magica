@@ -1,3 +1,5 @@
+import { CACAU_EMITENTE_REGEX, isEmitenteCacau } from "./embarcadores-cacau";
+
 export interface NFeVolumeParsed {
   chaveAcesso: string;
   numeroNf: string;
