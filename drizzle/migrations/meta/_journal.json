@@ -8,6 +8,13 @@
       "when": 1789671104505,
       "tag": "0000_criar_ibac_log_envios_enxuto",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789671232826,
+      "tag": "0001_restaurar_statement_timeout_postgres",
+      "breakpoints": true
     }
   ]
 }

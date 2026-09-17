@@ -2158,42 +2158,6 @@ export type Database = {
       }
       ibac_log_envios: {
         Row: {
-          created_at: string
-          duracao_ms: number | null
-          endpoint: string | null
-          id: string
-          queue_id: string | null
-          request_body: Json | null
-          response_body: Json | null
-          response_status: number | null
-          sucesso: boolean
-        }
-        Insert: {
-          created_at?: string
-          duracao_ms?: number | null
-          endpoint?: string | null
-          id?: string
-          queue_id?: string | null
-          request_body?: Json | null
-          response_body?: Json | null
-          response_status?: number | null
-          sucesso?: boolean
-        }
-        Update: {
-          created_at?: string
-          duracao_ms?: number | null
-          endpoint?: string | null
-          id?: string
-          queue_id?: string | null
-          request_body?: Json | null
-          response_body?: Json | null
-          response_status?: number | null
-          sucesso?: boolean
-        }
-        Relationships: []
-      }
-      ibac_log_envios_novo: {
-        Row: {
           created_at: string | null
           duracao_ms: number | null
           endpoint: string | null
