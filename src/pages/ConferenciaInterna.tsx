@@ -21,6 +21,7 @@ import {
 import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import {
   useOfflineConferencia,
   type OfflineEtiqueta,
