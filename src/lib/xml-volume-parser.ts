@@ -47,16 +47,16 @@ function extractVolumeM3(xmlDoc: Document, fornecedor: string): number {
   const isPandur = /pandur(?:ata)?/i.test(fornecedor);
   const volNodes = getElementsByLocalName(xmlDoc, ["vol", "volume", "volumes"]);
 
-  // IBAC: nunca ler m³ do XML. Cubagem entra por planilha.
-  // Regra aplicada a partir de 06/07/2026.
+  // IBAC / IBAE: nunca ler m³ do XML. Cubagem entra por planilha.
+  // Regra aplicada a partir de 06/07/2026 (IBAE segue a mesma regra).
   const emitCnpj = xmlDoc
     .querySelector("emit CNPJ")?.textContent?.replace(/\D/g, "") ?? "";
-  let isIbac = /\bibac\b/i.test(fornecedor) || emitCnpj.startsWith("61472205");
+  let isIbac = CACAU_EMITENTE_REGEX.test(fornecedor) || isEmitenteCacau(emitCnpj);
   if (!isIbac) {
     for (const volNode of volNodes) {
       const marca = getChildByLocalName(volNode, ["marca", "xmarca"])
         ?.textContent?.trim() ?? "";
-      if (/\bibac\b/i.test(marca)) { isIbac = true; break; }
+      if (CACAU_EMITENTE_REGEX.test(marca)) { isIbac = true; break; }
     }
   }
   if (isIbac) return 0;
