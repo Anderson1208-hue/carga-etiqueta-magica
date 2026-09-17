@@ -614,10 +614,20 @@ Deno.serve(async (req) => {
 
     const duracao = Date.now() - t0;
 
+    // Nunca gravar a imagem base64 no log técnico (crescimento descontrolado do banco).
+    // Mantém metadados de auditoria e apenas o tamanho da imagem enviada.
+    const bodyLog: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+    if (Array.isArray((bodyLog as any).imagens)) {
+      const imgs = (bodyLog as any).imagens as string[];
+      bodyLog.imagens_qtd = imgs.length;
+      bodyLog.imagens_bytes = imgs.reduce((s, i) => s + (i?.length ?? 0), 0);
+      delete (bodyLog as any).imagens;
+    }
+
     await supabase.from("ibac_log_envios").insert({
       queue_id: item.id,
       endpoint: endpointDestino,
-      request_body: body,
+      request_body: bodyLog as any,
       response_status: respStatus,
       response_body: respBody as any,
       duracao_ms: duracao,
