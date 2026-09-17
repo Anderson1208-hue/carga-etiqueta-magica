@@ -795,12 +795,29 @@ export default function ConferenciaInterna() {
           setTimeout(() => clienteInputRef.current?.focus(), 50);
           return;
         }
+        // Blindagem: o 1º bipe precisa ser o código do cliente, nunca a nossa
+        // etiqueta. O nosso QR embute o cProd no payload (cargaId;nf;cProd;...),
+        // então sem esta guarda bipar a NOSSA etiqueta no campo do cliente
+        // passava no teste "contém o cProd" abaixo.
+        if (cliente.includes(";") || isQrPayloadCompleto(cliente)) {
+          const result: ScanResult = {
+            type: "error",
+            message: "Bipe o código do cliente, não a nossa etiqueta",
+            details: "O 1º bipe é o código de barras do cliente; o 2º é a etiqueta TLM",
+          };
+          addToHistory(reportResult(result)); playSound("error");
+          setCodigoCliente("");
+          setTimeout(() => clienteInputRef.current?.focus(), 50);
+          return;
+        }
         const clienteNorm = cliente.replace(/^0+/, "");
         const nossoNorm = (cProd || "").replace(/^0+/, "");
-        // Match direto pelo cProd (ou cProd contido no EAN-13, cobre GTIN que embute o código)
+        // Match direto pelo cProd (ou cProd contido no EAN-13, cobre GTIN que embute o código).
+        // EAN/GTIN é sempre numérico — exigir só dígitos impede que texto livre
+        // (ou pedaço de QR) "contenha" o cProd e passe na validação.
         const match =
           clienteNorm === nossoNorm ||
-          (clienteNorm.length >= 12 && clienteNorm.includes(nossoNorm) && nossoNorm.length >= 4);
+          (/^\d{12,14}$/.test(clienteNorm) && clienteNorm.includes(nossoNorm) && nossoNorm.length >= 4);
         if (!match) {
           const result: ScanResult = {
             type: "error",
