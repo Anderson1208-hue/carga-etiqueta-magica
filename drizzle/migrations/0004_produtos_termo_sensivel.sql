@@ -1,0 +1,2 @@
+ALTER TABLE public.produtos ADD COLUMN IF NOT EXISTS termo_sensivel BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_produtos_termo_sensivel ON public.produtos (cnpj_embarcador) WHERE termo_sensivel;
