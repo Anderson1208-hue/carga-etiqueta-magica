@@ -9,6 +9,7 @@ type: reference
 
 ## Core
 - **Grupo Cacau Show:** IBAC (raiz 61472205) e IBAE (raiz 42431457, Linhares/ES) seguem regras idênticas. Ver [mem://funcionalidades/embarcador-ibae-espelha-ibac].
+- **Cubagem automática:** triggers preenchem m³/peso das NFs pelo cadastro de produtos; exceções Pandurata, IBAC, IBAE e Docile. Ver [mem://logica/cubagem-automatica-cadastro].
 - **Dates:** Append `T00:00:00` to all date strings before processing to prevent UTC timezone shifts.
 - **UI & Formats:** Natural sorting for NF, cProd, CEP, CNPJ. Strip leading zeros from `cProd` in UI (keep in DB/QR). Highlight "CHOCOLATE" loads in red.
 - **Performance:** Clean up photo URLs with `URL.revokeObjectURL` on mobile. Use batch limits, pauses, and deterministic ordering for large queries.
