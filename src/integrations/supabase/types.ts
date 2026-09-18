@@ -3217,6 +3217,7 @@ export type Database = {
           status_comercial: string | null
           temperatura_max_c: number | null
           temperatura_min_c: number | null
+          termo_sensivel: boolean
           tipo_pallet: string | null
           unidade: string | null
           updated_at: string
@@ -3277,6 +3278,7 @@ export type Database = {
           status_comercial?: string | null
           temperatura_max_c?: number | null
           temperatura_min_c?: number | null
+          termo_sensivel?: boolean
           tipo_pallet?: string | null
           unidade?: string | null
           updated_at?: string
@@ -3337,6 +3339,7 @@ export type Database = {
           status_comercial?: string | null
           temperatura_max_c?: number | null
           temperatura_min_c?: number | null
+          termo_sensivel?: boolean
           tipo_pallet?: string | null
           unidade?: string | null
           updated_at?: string

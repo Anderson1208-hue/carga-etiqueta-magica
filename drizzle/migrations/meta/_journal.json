@@ -29,6 +29,13 @@
       "when": 1789746923165,
       "tag": "0003_cubagem_backfill_ao_cadastrar_produto",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789751145342,
+      "tag": "0004_produtos_termo_sensivel",
+      "breakpoints": true
     }
   ]
 }
