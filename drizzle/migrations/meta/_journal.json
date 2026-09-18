@@ -15,6 +15,13 @@
       "when": 1789671232826,
       "tag": "0001_restaurar_statement_timeout_postgres",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789746903981,
+      "tag": "0002_cubagem_automatica_por_cadastro",
+      "breakpoints": true
     }
   ]
 }
