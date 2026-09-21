@@ -129,7 +129,7 @@ export default function Etiquetas() {
           .from("etiquetas")
           .select(`
             *,
-            notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario, dest_bairro)
+            notas_fiscais!etiquetas_nf_id_fkey(cnpj_destinatario, dest_bairro, dest_cidade)
           `)
           .eq("carga_id", cargaId)
           .order("c_prod", { ascending: true })
