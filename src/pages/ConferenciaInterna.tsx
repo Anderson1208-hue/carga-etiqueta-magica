@@ -22,6 +22,7 @@ import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
+import { ExpedicaoPorPlaca, type VeiculoExpedicao } from "@/components/conferencia/ExpedicaoPorPlaca";
 import {
   useOfflineConferencia,
   type OfflineEtiqueta,
@@ -129,6 +130,8 @@ export default function ConferenciaInterna() {
   // Etapa da conferência interna: 1 = Separação (dupla bipagem) | 2 = Expedição/carregamento (só QR)
   const [etapa, setEtapa] = useState<1 | 2>(1);
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
+  // Etapa 2: placa do veículo roteirizado em expedição (mantida ao voltar da NF)
+  const [veiculoExpedicao, setVeiculoExpedicao] = useState<VeiculoExpedicao | null>(null);
   const [limpando, setLimpando] = useState(false);
   const podeLimparNf =
     isAdmin || profile?.email?.toLowerCase() === "gessica.rodrigues@tlmlogistica.com.br";
@@ -2057,7 +2060,37 @@ export default function ConferenciaInterna() {
       </header>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto pb-24">
+        {/* Seletor de etapa: Etapa 2 é conduzida pela placa do veículo roteirizado */}
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant={etapa === 1 ? "default" : "outline"} size="sm" onClick={() => setEtapa(1)}>
+            Etapa 1 • Separação
+          </Button>
+          <Button variant={etapa === 2 ? "default" : "outline"} size="sm" onClick={() => setEtapa(2)}>
+            Etapa 2 • Expedição
+          </Button>
+        </div>
+
+        {etapa === 2 && (
+          <ExpedicaoPorPlaca
+            veiculo={veiculoExpedicao}
+            onSelectVeiculo={setVeiculoExpedicao}
+            isAdmin={isAdmin}
+            onAbrirNf={(v, n) =>
+              iniciarConferenciaNf({
+                numeroNf: n.numeroNf,
+                cargaId: n.cargaId,
+                placa: v.placa,
+                motorista: v.motorista ?? "",
+                total: n.total,
+                conferidas: n.conferidas,
+              })
+            }
+          />
+        )}
+
         {/* Quick NF search */}
+        {etapa === 1 && (<>
+
         <Card>
           <CardContent className="pt-4">
             <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -2078,6 +2111,7 @@ export default function ConferenciaInterna() {
             </div>
           </CardContent>
         </Card>
+        </>)}
 
         {/* Offline Controls */}
         <Card>
