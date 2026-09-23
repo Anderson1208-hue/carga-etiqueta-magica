@@ -50,7 +50,8 @@ function hojeISO(offsetDias = 0) {
 }
 
 export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin }: Props) {
-  const [data, setData] = useState(hojeISO());
+  // Expedição acontece na véspera (à noite) para a rota do dia seguinte
+  const [data, setData] = useState(hojeISO(1));
   const [veiculos, setVeiculos] = useState<VeiculoExpedicao[]>([]);
   const [loadingLista, setLoadingLista] = useState(false);
   const [filtro, setFiltro] = useState("");
