@@ -447,10 +447,6 @@ export async function prepararCanhoto(
     }
 
     const faixa = (tira as Image).resize(OKE_LARGURA, OKE_ALTURA);
-
-
-
-    const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
     // Realce para leitura (P&B + contraste), igual ao preparo do app.
     try {
       faixa.saturation(0);
