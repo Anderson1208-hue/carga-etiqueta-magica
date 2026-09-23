@@ -4150,6 +4150,7 @@ export type Database = {
         Args: { origem: Database["public"]["Enums"]["origem_coordenada"] }
         Returns: number
       }
+      contar_canhotos_pendentes: { Args: never; Returns: number }
       detectar_paradas_nao_programadas: { Args: never; Returns: Json }
       detectar_paradas_suspeitas: {
         Args: { p_rota_id: string }
@@ -4278,10 +4279,12 @@ export type Database = {
         Args: never
         Returns: {
           baixa_id: string
+          cnpj_emitente: string
           data_rota: string
           dest_cidade: string
           dest_razao_social: string
           dias_corridos: number
+          embarcador: string
           marcado_em: string
           marcado_por_nome: string
           motivo: string
@@ -4290,6 +4293,7 @@ export type Database = {
           numero_nf: string
           observacao: string
           ocorrencia: string
+          origem: string
           placa: string
           prazo_vencido: boolean
           registrado_em: string

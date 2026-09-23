@@ -6,6 +6,8 @@ import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
 import { useAcessoEnvioCanhoto } from "@/hooks/useAcessoEnvioCanhoto";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 import {
   Truck,
@@ -107,6 +109,25 @@ const relatoriosItems = [
   { name: "Agend. por Fornecedor", href: "/relatorios/agendamentos-fornecedor", icon: FileSpreadsheet },
 ];
 
+function CanhotosPendentesBadge() {
+  const { data } = useQuery({
+    queryKey: ["contar_canhotos_pendentes"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("contar_canhotos_pendentes");
+      if (error) return 0;
+      return Number(data ?? 0);
+    },
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
+  });
+  if (!data) return null;
+  return (
+    <span className="ml-auto rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground">
+      {data}
+    </span>
+  );
+}
+
 function NavItem({ item, isActive, onClick }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean; onClick?: () => void }) {
   return (
     <Link
@@ -121,6 +142,7 @@ function NavItem({ item, isActive, onClick }: { item: { name: string; href: stri
     >
       <item.icon className="w-5 h-5" />
       {item.name}
+      {item.href === "/canhotos-pendentes" && <CanhotosPendentesBadge />}
     </Link>
   );
 }
