@@ -24,7 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle, FileWarning, Loader2, RefreshCw, Upload } from "lucide-react";
+import { AlertTriangle, Download, FileWarning, Loader2, RefreshCw, Upload } from "lucide-react";
+import * as XLSX from "xlsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { blobCanhotoRecibo, previewCanhotoOkEntrega } from "@/lib/okentrega-canhoto";
@@ -36,6 +38,9 @@ interface PendenteRow {
   numero_nf: string | null;
   dest_razao_social: string | null;
   dest_cidade: string | null;
+  embarcador: string | null;
+  cnpj_emitente: string | null;
+  origem: string | null;
   veiculo_id: string | null;
   placa: string | null;
   motorista: string | null;
@@ -55,6 +60,10 @@ export default function CanhotosPendentes() {
   const [rows, setRows] = useState<PendenteRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [busca, setBusca] = useState("");
+  const [fEmb, setFEmb] = useState("todos");
+  const [fPrazo, setFPrazo] = useState("todos");
+  const [dIni, setDIni] = useState("");
+  const [dFim, setDFim] = useState("");
   const [alvo, setAlvo] = useState<PendenteRow | null>(null);
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -78,16 +87,56 @@ export default function CanhotosPendentes() {
     carregar();
   }, [carregar]);
 
+  const embarcadores = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.embarcador ?? "—"))).sort(),
+    [rows],
+  );
+
   const filtradas = useMemo(() => {
     const t = busca.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((r) =>
-      [r.numero_nf, r.placa, r.motorista, r.dest_razao_social, r.dest_cidade]
-        .some((v) => (v ?? "").toLowerCase().includes(t)),
-    );
-  }, [rows, busca]);
+    return rows.filter((r) => {
+      if (fEmb !== "todos" && (r.embarcador ?? "—") !== fEmb) return false;
+      if (fPrazo === "atrasado" && !r.prazo_vencido) return false;
+      if (fPrazo === "no_prazo" && r.prazo_vencido) return false;
+      const d = r.data_rota ?? r.registrado_em?.slice(0, 10) ?? "";
+      if (dIni && d < dIni) return false;
+      if (dFim && d > dFim) return false;
+      if (!t) return true;
+      return [r.numero_nf, r.placa, r.motorista, r.dest_razao_social, r.dest_cidade, r.embarcador]
+        .some((v) => (v ?? "").toLowerCase().includes(t));
+    });
+  }, [rows, busca, fEmb, fPrazo, dIni, dFim]);
 
-  const vencidas = rows.filter((r) => r.prazo_vencido).length;
+  const vencidas = filtradas.filter((r) => r.prazo_vencido).length;
+
+  const ranking = (key: (r: PendenteRow) => string) => {
+    const m = new Map<string, number>();
+    filtradas.forEach((r) => m.set(key(r), (m.get(key(r)) ?? 0) + 1));
+    return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  };
+  const rankMotorista = ranking((r) => `${r.motorista ?? "—"} (${r.placa ?? "—"})`);
+  const rankEmbarcador = ranking((r) => r.embarcador ?? "—");
+
+  function exportar() {
+    const dados = filtradas.map((r) => ({
+      NF: r.numero_nf,
+      Embarcador: r.embarcador,
+      Cliente: r.dest_razao_social,
+      Cidade: r.dest_cidade,
+      Placa: r.placa,
+      Motorista: r.motorista,
+      "Data rota": r.data_rota ? format(new Date(r.data_rota + "T00:00:00"), "dd/MM/yyyy") : "",
+      Origem: r.origem === "manual" ? "Prestação de contas" : "Baixa sem canhoto",
+      Motivo: CANHOTO_MOTIVO_LABEL[r.motivo ?? ""] ?? r.motivo,
+      Observação: r.observacao,
+      "Dias em aberto": r.dias_corridos,
+      Situação: r.prazo_vencido ? "Atrasado" : "No prazo",
+    }));
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Canhotos pendentes");
+    XLSX.writeFile(wb, `canhotos-pendentes-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  }
 
   function abrirUpload(row: PendenteRow) {
     setAlvo(row);
@@ -171,7 +220,7 @@ export default function CanhotosPendentes() {
             <div>
               <h1 className="text-2xl font-bold">Canhotos pendentes de recuperação</h1>
               <p className="text-sm text-muted-foreground">
-                Entregas encerradas cujo canhoto físico não voltou com o motorista. Prazo de recuperação: 2 dias úteis.
+                Entregas encerradas cujo canhoto físico não voltou com o motorista. Sem limite de dias; atrasado após 2 dias úteis.
               </p>
             </div>
           </div>
@@ -182,15 +231,50 @@ export default function CanhotosPendentes() {
               placeholder="NF, placa, motorista, cliente"
               className="w-64"
             />
+            <Button variant="outline" size="sm" onClick={exportar} disabled={!filtradas.length}>
+              <Download className="w-4 h-4 mr-1" /> Excel
+            </Button>
             <Button variant="outline" size="sm" onClick={carregar} disabled={loading}>
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             </Button>
           </div>
         </div>
 
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <p className="text-[11px] text-muted-foreground">Embarcador</p>
+            <Select value={fEmb} onValueChange={setFEmb}>
+              <SelectTrigger className="w-56 h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {embarcadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-[11px] text-muted-foreground">Situação</p>
+            <Select value={fPrazo} onValueChange={setFPrazo}>
+              <SelectTrigger className="w-40 h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="no_prazo">No prazo</SelectItem>
+                <SelectItem value="atrasado">Atrasado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-[11px] text-muted-foreground">Rota de</p>
+            <Input type="date" value={dIni} onChange={(e) => setDIni(e.target.value)} className="h-8 w-40" />
+          </div>
+          <div>
+            <p className="text-[11px] text-muted-foreground">até</p>
+            <Input type="date" value={dFim} onChange={(e) => setDFim(e.target.value)} className="h-8 w-40" />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Card><CardContent className="py-4 text-center">
-            <p className="text-2xl font-bold">{rows.length}</p>
+            <p className="text-2xl font-bold">{filtradas.length}</p>
             <p className="text-xs text-muted-foreground">Canhotos pendentes</p>
           </CardContent></Card>
           <Card><CardContent className="py-4 text-center">
@@ -198,9 +282,23 @@ export default function CanhotosPendentes() {
             <p className="text-xs text-muted-foreground">Fora do prazo (2 dias úteis)</p>
           </CardContent></Card>
           <Card><CardContent className="py-4 text-center">
-            <p className="text-2xl font-bold">{new Set(rows.map((r) => r.placa)).size}</p>
+            <p className="text-2xl font-bold">{new Set(filtradas.map((r) => r.placa)).size}</p>
             <p className="text-xs text-muted-foreground">Placas envolvidas</p>
           </CardContent></Card>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-3">
+          {[{ t: "Mais pendências por motorista", d: rankMotorista }, { t: "Mais pendências por embarcador", d: rankEmbarcador }].map((b) => (
+            <Card key={b.t}>
+              <CardHeader className="py-2"><CardTitle className="text-sm">{b.t}</CardTitle></CardHeader>
+              <CardContent className="pb-3 space-y-1 text-xs">
+                {b.d.map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2"><span className="truncate">{k}</span><span className="font-bold">{v}</span></div>
+                ))}
+                {!b.d.length && <p className="text-muted-foreground">—</p>}
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         <Card>
@@ -217,7 +315,7 @@ export default function CanhotosPendentes() {
                     <TableHead>Placa / Motorista</TableHead>
                     <TableHead>Rota</TableHead>
                     <TableHead>Motivo</TableHead>
-                    <TableHead>Marcado por</TableHead>
+                    <TableHead>Registrado por</TableHead>
                     <TableHead>Atraso</TableHead>
                     <TableHead className="text-right">Ação</TableHead>
                   </TableRow>
@@ -228,7 +326,7 @@ export default function CanhotosPendentes() {
                       <TableCell className="font-mono whitespace-nowrap">{r.numero_nf ?? "—"}</TableCell>
                       <TableCell className="max-w-[220px]">
                         <p className="truncate font-medium">{r.dest_razao_social ?? "—"}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{r.dest_cidade ?? ""}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{r.dest_cidade ?? ""} · {r.embarcador ?? ""}</p>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         <p className="font-semibold">{r.placa ?? "—"}</p>
@@ -238,7 +336,7 @@ export default function CanhotosPendentes() {
                         {r.data_rota ? format(new Date(r.data_rota + "T00:00:00"), "dd/MM/yyyy") : "—"}
                       </TableCell>
                       <TableCell className="max-w-[200px]">
-                        <p>{CANHOTO_MOTIVO_LABEL[r.motivo ?? ""] ?? r.motivo ?? "—"}</p>
+                        <p>{r.origem === "automatico" ? "Baixa sem canhoto" : (CANHOTO_MOTIVO_LABEL[r.motivo ?? ""] ?? r.motivo ?? "—")}</p>
                         {r.observacao && <p className="text-[11px] text-muted-foreground truncate">{r.observacao}</p>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
