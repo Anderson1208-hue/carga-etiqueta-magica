@@ -43,6 +43,13 @@
       "when": 1790199773804,
       "tag": "0005_canhotos_pendentes_automatico",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790199950837,
+      "tag": "0006_canhotos_pendentes_excluir_praxio",
+      "breakpoints": true
     }
   ]
 }
