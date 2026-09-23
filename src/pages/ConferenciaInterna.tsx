@@ -2111,6 +2111,7 @@ export default function ConferenciaInterna() {
             </div>
           </CardContent>
         </Card>
+        </>)}
 
         {/* Offline Controls */}
         <Card>
