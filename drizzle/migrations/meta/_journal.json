@@ -36,6 +36,13 @@
       "when": 1789751145342,
       "tag": "0004_produtos_termo_sensivel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790199773804,
+      "tag": "0005_canhotos_pendentes_automatico",
+      "breakpoints": true
     }
   ]
 }
