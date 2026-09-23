@@ -364,7 +364,7 @@ export async function prepararCanhoto(
   originais: Uint8Array,
   modo: ModoImagem = "contain",
   qualidade = 85,
-  opts: { numeroNf?: string; aprovadoManualmente?: boolean } = {},
+  opts: { numeroNf?: string; aprovadoManualmente?: boolean; aprovadoPrestacao?: boolean } = {},
 ): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string; validacao?: Record<string, unknown> }> {
   const src = await Image.decode(originais);
 
@@ -446,18 +446,7 @@ export async function prepararCanhoto(
       validacao = { aprovado_prestacao: true, reprovacao_automatica: msg };
     }
 
-    const t = tira as Image;
-    const escala = Math.min(OKE_LARGURA / t.width, OKE_ALTURA / t.height);
-    const faixa = (t.width / t.height > 4)
-      ? t.resize(OKE_LARGURA, OKE_ALTURA)
-      : (() => {
-          const lw = Math.max(1, Math.round(t.width * escala));
-          const lh = Math.max(1, Math.round(t.height * escala));
-          const c = new Image(OKE_LARGURA, OKE_ALTURA);
-          c.fill(0xffffffff);
-          c.composite(t.resize(lw, lh), Math.round((OKE_LARGURA - lw) / 2), Math.round((OKE_ALTURA - lh) / 2));
-          return c;
-        })();
+    const faixa = (tira as Image).resize(OKE_LARGURA, OKE_ALTURA);
 
 
 
