@@ -151,6 +151,12 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
   }, [veiculo, carregarLista]);
 
   useEffect(() => {
+    if (veiculo && veiculo.data !== data) {
+      onSelectVeiculo(null);
+    }
+  }, [data, onSelectVeiculo, veiculo]);
+
+  useEffect(() => {
     if (veiculo) {
       setMostrarForcar(false);
       setMotivo("");
@@ -237,7 +243,9 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
         </div>
         <div>
           <div className="font-mono text-xl font-bold">{veiculo.placa}</div>
-          <div className="text-xs text-muted-foreground">{veiculo.motorista ?? ""}</div>
+          <div className="text-xs text-muted-foreground">
+            {veiculo.motorista ?? ""} · Rota de {new Date(`${veiculo.data}T00:00:00`).toLocaleDateString("pt-BR")}
+          </div>
         </div>
 
         {loadingVeiculo || !status ? (
