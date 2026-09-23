@@ -57,6 +57,13 @@
       "when": 1790200249822,
       "tag": "0007_fix_listar_canhotos_pendentes_full_name",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790205026373,
+      "tag": "0008_reentrega_cacau_libera_rebipagem_expedicao",
+      "breakpoints": true
     }
   ]
 }
