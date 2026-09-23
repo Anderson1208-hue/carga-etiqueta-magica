@@ -12,3 +12,5 @@ type: feature
 - `okentrega_config.blocklist_nfs`: NFs que NUNCA podem ser transmitidas (digitação manual no portal do cliente). Respeitado no enfileirar e no sync. Status `bloqueado` permitido em `okentrega_queue`.
 - Bloqueadas (digitação manual no portal, 01-02/09/2026): 754898, 757000, 755540, 755537, 758217, 759515, 747081, 749728, 749516, 751022, 746921. A NF 749515 foi bloqueada por engano (erro de digitação de 759515) e foi desbloqueada e transmitida em 02/09/2026 (ocorrência 18909144).
 - `okentrega-enfileirar` aceita `{"dry_run": true}`; `okentrega-sync` também (não envia, mostra o payload).
+
+- **Regra 23/09/2026 (Anderson):** foto que passou pela prestação de contas sem ser excluída é enviada mesmo se a checagem automática reprovar (origem `+aprovado_prestacao`). Só bloqueia quando a IA lê número de OUTRA NF no canhoto.
