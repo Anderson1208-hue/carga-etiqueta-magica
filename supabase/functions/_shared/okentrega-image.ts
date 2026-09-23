@@ -373,6 +373,8 @@ export async function prepararCanhoto(
   let validacao: Record<string, unknown> | undefined;
 
   if (modo === "recibo") {
+    let tira: Image | null = null;
+    try {
     // Fail-closed: sem validação inteligente não há transmissão automática.
     // O recorte geométrico permanece apenas como utilitário interno e nunca é
     // usado como autorização para enviar ao cliente.
@@ -391,14 +393,14 @@ export async function prepararCanhoto(
       return t;
     };
 
-    let tira = recortar(1);
+    tira = recortar(1);
     let chk = await conferirFaixa(tira, opts.numeroNf);
     // Canhoto cortado é o motivo real das recusas: alarga o recorte e reconfere.
     if (!chk.completo) {
       const alargada = recortar(1.25);
+      tira = alargada; // no fallback da prestação, usar sempre o recorte com mais folga
       const chk2 = await conferirFaixa(alargada, opts.numeroNf);
       if (chk2.completo) {
-        tira = alargada;
         chk = chk2;
         origem = "recibo:visao+alargado";
       }
@@ -409,10 +411,15 @@ export async function prepararCanhoto(
     }
     const esperado = String(opts.numeroNf ?? "").replace(/\D/g, "").replace(/^0+/, "");
     const lido = String(chk.nfLida ?? "").replace(/^0+/, "");
+    if (lido && esperado && lido !== esperado) {
+      throw new CanhotoIlegivelError(
+        `[CANHOTO_OUTRA_NF] Canhoto da foto é de outra nota (lido ${chk.nfLida}, esperado ${esperado}).`,
+      );
+    }
     // Conferência humana (administrador) pode liberar o caso em que a visão
     // apontou "cortado" mas o canhoto está de fato inteiro e legível.
     const exigeCompleto = !opts.aprovadoManualmente;
-    if ((exigeCompleto && !chk.completo) || !chk.legivel || !lido || (esperado && lido !== esperado)) {
+    if ((exigeCompleto && !chk.completo) || !chk.legivel || !lido) {
       throw new CanhotoIlegivelError(
         `[CANHOTO_ILEGIVEL] Validação final reprovada: canhoto inteiro=${chk.completo}, legível=${chk.legivel}, nf=${chk.nfLida ?? "não lida"}.`,
       );
@@ -424,6 +431,34 @@ export async function prepararCanhoto(
       numero_nf_localizado: localizado.nfLida,
       ...(opts.aprovadoManualmente ? { aprovado_manualmente: true } : {}),
     };
+    } catch (e) {
+      // Regra operacional (23/09/2026): foto que passou pela prestação de contas
+      // sem ser excluída é considerada aprovada pela conferência humana e segue
+      // mesmo com reprovação da checagem automática. Só bloqueia canhoto de OUTRA NF.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!opts.aprovadoPrestacao || msg.includes("outra nota")) throw e;
+      if (!tira) {
+        // Visão não localizou o canhoto: envia a foto inteira deitada na faixa.
+        const girada = src.height > src.width ? (src.rotate(90) as Image) : src;
+        tira = girada;
+      }
+      origem += "+aprovado_prestacao";
+      validacao = { aprovado_prestacao: true, reprovacao_automatica: msg };
+    }
+
+    const t = tira as Image;
+    const escala = Math.min(OKE_LARGURA / t.width, OKE_ALTURA / t.height);
+    const faixa = (t.width / t.height > 4)
+      ? t.resize(OKE_LARGURA, OKE_ALTURA)
+      : (() => {
+          const lw = Math.max(1, Math.round(t.width * escala));
+          const lh = Math.max(1, Math.round(t.height * escala));
+          const c = new Image(OKE_LARGURA, OKE_ALTURA);
+          c.fill(0xffffffff);
+          c.composite(t.resize(lw, lh), Math.round((OKE_LARGURA - lw) / 2), Math.round((OKE_ALTURA - lh) / 2));
+          return c;
+        })();
+
 
 
     const faixa = tira.resize(OKE_LARGURA, OKE_ALTURA);
