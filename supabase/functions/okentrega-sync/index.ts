@@ -30,6 +30,34 @@ const BASES = {
 // e o worker estoura o limite de recursos se acumular mais de um canhoto por run.
 const BATCH_SIZE = 1;
 
+// Fotos acima deste tamanho estouram CPU/memória do worker no decode.
+// Baixamos uma cópia reduzida (máx. 2000 px) gerada pelo storage; o original
+// no bucket permanece intacto. Se a transformação falhar, usa o original.
+const LIMITE_FOTO_BYTES = 2.5 * 1024 * 1024;
+
+async function baixarFotoLeve(supabase: any, path: string): Promise<{ data: Blob | null; error: any }> {
+  const orig = await supabase.storage.from("comprovantes").download(path);
+  if (orig.error || !orig.data || orig.data.size <= LIMITE_FOTO_BYTES) return orig;
+  try {
+    const red = await supabase.storage
+      .from("comprovantes")
+      .download(path, { transform: { width: 2000, height: 2000, resize: "contain", quality: 90 } });
+    if (!red.error && red.data && red.data.size > 0 && red.data.size < orig.data.size) {
+      const ab = new Uint8Array(await red.data.arrayBuffer());
+      // A transformação pode devolver WebP; o decoder só aceita JPEG/PNG.
+      const jpegOuPng = (ab[0] === 0xff && ab[1] === 0xd8) || (ab[0] === 0x89 && ab[1] === 0x50);
+      if (jpegOuPng) {
+        console.log(`[okentrega] foto reduzida ${orig.data.size} -> ${ab.length} bytes (${path})`);
+        return { data: new Blob([ab], { type: "image/jpeg" }), error: null };
+      }
+    }
+    console.warn(`[okentrega] redução indisponível para ${path}: ${red.error?.message ?? "formato não suportado"}`);
+  } catch (e) {
+    console.warn(`[okentrega] falha ao reduzir ${path}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return orig;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
