@@ -2236,6 +2236,33 @@ export type Database = {
           },
         ]
       }
+      monitor_espaco_tabelas: {
+        Row: {
+          alerta: boolean
+          bytes: number
+          id: number
+          medido_em: string
+          motivo: string | null
+          tabela: string
+        }
+        Insert: {
+          alerta?: boolean
+          bytes: number
+          id?: number
+          medido_em?: string
+          motivo?: string | null
+          tabela: string
+        }
+        Update: {
+          alerta?: boolean
+          bytes?: number
+          id?: number
+          medido_em?: string
+          motivo?: string | null
+          tabela?: string
+        }
+        Relationships: []
+      }
       monitoramento_config: {
         Row: {
           batch_max_posicoes: number
@@ -4321,6 +4348,7 @@ export type Database = {
           ultima_emissao: string
         }[]
       }
+      medir_espaco_banco: { Args: never; Returns: undefined }
       okentrega_reservar_item: {
         Args: { p_queue_id?: string }
         Returns: {
@@ -4416,6 +4444,7 @@ export type Database = {
         Args: { p_veiculo_id: string }
         Returns: Json
       }
+      purgar_etiquetas_entregues: { Args: { _lote?: number }; Returns: number }
       registrar_canhoto_pendente: {
         Args: { p_baixa_id: string; p_motivo: string; p_obs?: string }
         Returns: undefined
@@ -4492,6 +4521,7 @@ export type Database = {
           tarifa_por_ton: number
         }[]
       }
+      reter_logs_tecnicos: { Args: never; Returns: undefined }
       reverter_admins_expirados: { Args: never; Returns: number }
       revogar_admin_temporario: {
         Args: { _user_id: string }
