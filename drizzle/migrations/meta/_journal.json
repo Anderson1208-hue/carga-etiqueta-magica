@@ -78,6 +78,13 @@
       "when": 1790257120236,
       "tag": "0010_okentrega_761006_revisao_foto_pesada",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790263061092,
+      "tag": "0011_trava_tamanho_logs_tecnicos",
+      "breakpoints": true
     }
   ]
 }
