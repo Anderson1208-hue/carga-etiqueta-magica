@@ -391,8 +391,10 @@ Deno.serve(async (req) => {
     if (erroPreparo) {
       if (!dryRun) {
         // Canhoto ilegível/errado não melhora com retentativa: vai direto para
-        // exceção (conferência manual) em vez de gastar 5 tentativas.
-        const statusPreparo = "revisao";
+        // exceção (conferência manual). Falha temporária (visão 429/indisponível,
+        // download) volta para a fila e tenta de novo até 5 vezes.
+        const temporario = /VALIDACAO_INDISPONIVEL|Falha ao baixar/.test(erroPreparo);
+        const statusPreparo = temporario && (item.tentativas ?? 0) + 1 < 5 ? "pendente" : "revisao";
         await supabase
           .from("okentrega_queue")
           .update({

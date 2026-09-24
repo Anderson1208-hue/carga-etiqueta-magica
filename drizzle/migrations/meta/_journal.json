@@ -64,6 +64,20 @@
       "when": 1790205026373,
       "tag": "0008_reentrega_cacau_libera_rebipagem_expedicao",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790257011398,
+      "tag": "0009_okentrega_libera_travadas_e_reenfileira",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790257120236,
+      "tag": "0010_okentrega_761006_revisao_foto_pesada",
+      "breakpoints": true
     }
   ]
 }
