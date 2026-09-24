@@ -41,7 +41,7 @@ async function baixarFotoLeve(supabase: any, path: string): Promise<{ data: Blob
   try {
     const red = await supabase.storage
       .from("comprovantes")
-      .download(path, { transform: { width: 2000, height: 2000, resize: "contain", quality: 90 } });
+      .download(path, { transform: { width: 2000, height: 2000, resize: "contain", quality: 90, format: "origin" } });
     if (!red.error && red.data && red.data.size > 0 && red.data.size < orig.data.size) {
       const ab = new Uint8Array(await red.data.arrayBuffer());
       // A transformação pode devolver WebP; o decoder só aceita JPEG/PNG.
