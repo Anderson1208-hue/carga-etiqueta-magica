@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
     const fotoPath = (it?.payload as any)?.foto_path;
     if (!fotoPath) return json({ status: "sem_foto" }, 400);
-    const { data: file, error: dlErr } = await supabase.storage.from("comprovantes").download(String(fotoPath));
+    const { data: file, error: dlErr } = await baixarFotoLeve(supabase, String(fotoPath));
     if (dlErr || !file) return json({ status: "erro_download", mensagem: dlErr?.message }, 500);
     const buf = new Uint8Array(await file.arrayBuffer());
     if ((opts as any).original) {
@@ -358,9 +358,7 @@ Deno.serve(async (req) => {
     if (opts.imagem_base64) {
       erroPreparo = "[CANHOTO_ILEGIVEL] Imagem externa sem validação do servidor. Gere a prévia validada antes do envio.";
     } else if (p.foto_path) {
-      const { data: file, error: dlErr } = await supabase.storage
-        .from("comprovantes")
-        .download(String(p.foto_path));
+      const { data: file, error: dlErr } = await baixarFotoLeve(supabase, String(p.foto_path));
       if (dlErr || !file) {
         erroPreparo = `Falha ao baixar canhoto: ${dlErr?.message ?? "arquivo vazio"}`;
       } else {
