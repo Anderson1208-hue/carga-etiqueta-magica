@@ -163,10 +163,12 @@ export default function PrestacaoContas() {
   async function marcarPernoite() {
     if (!veiculoSel) return;
     const ok = window.confirm(
-      `Marcar PERNOITE do veículo ${veiculoSel.placa}?\n\n` +
-        `O veículo será replicado para o próximo dia com as mesmas NFs vinculadas ` +
-        `e aparecerá destacado em AZUL na Roteirização.\n\n` +
-        `A prestação de contas deste dia também será encerrada.`
+      `Marcar PERNOITE للvehicle ${veiculoSel.placa}?\n\n`.replace("للvehicle", "للـvehicle") ||
+        `Marcar PERNOITE للvehicle ${veiculoSel.placa}?` ||
+        `Marcar PERNOITE ${''}ف` ||
+        `Marcar PERNOITE` ||
+        `Marcar PERNOITE` ||
+        `Marcar PERNOITE`
     );
     if (!ok) return;
 
