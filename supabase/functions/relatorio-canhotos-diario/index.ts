@@ -310,10 +310,23 @@ Deno.serve(async (req) => {
     // Redimensionar (imagescript, JS puro) consome quase todo o orçamento de CPU
     // da invocação: nada de montar PDF/ZIP na mesma rodada.
     if (offset < itens.length) {
-      if (encadear) await reinvocar(supabase, dia, enviarEmail);
       const l = itens[offset];
       let falha: string | null = null;
-      const original = await baixarStorage(supabase, BUCKET_FOTOS, l.path!);
+      // Trava anti-loop: se esta mesma imagem já derrubou 2 rodadas (falta de
+      // memória), pula como "não lida" em vez de tentar para sempre.
+      const guard = ((atual?.itens as any)?.tentativa ?? {}) as { offset?: number; n?: number };
+      const n = guard.offset === offset ? (guard.n ?? 0) : 0;
+      const pular = n >= 2;
+      if (!pular) {
+        await supabase
+          .from("relatorios_canhotos_diarios")
+          .update({ itens: { com_foto: itens, sem_foto: semFoto, tentativa: { offset, n: n + 1 } } })
+          .eq("data_referencia", dia);
+      } else {
+        console.warn("imagem pulada após falhas repetidas", l.numero_nf);
+      }
+      if (encadear) await reinvocar(supabase, dia, enviarEmail);
+      const original = pular ? null : await baixarStorage(supabase, BUCKET_FOTOS, l.path!);
       if (!original) {
         falha = l.numero_nf;
       } else {

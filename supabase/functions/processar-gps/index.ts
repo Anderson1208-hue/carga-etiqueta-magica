@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       source = "legacy-js",
     } = body;
 
-    const monitoramento_rota_id = firstString(
+    let monitoramento_rota_id = firstString(
       body.monitoramento_rota_id,
       extras.monitoramento_rota_id,
       body.params?.monitoramento_rota_id,
@@ -151,6 +151,10 @@ Deno.serve(async (req) => {
       !monitoramento_rota_id ||
       (latitude == null && (!batch || batch.length === 0))
     ) {
+      console.warn("[processar-gps] descartado: dados incompletos", {
+        tem_rota: !!monitoramento_rota_id,
+        tem_lat: latitude != null,
+      });
       return new Response(JSON.stringify({ error: "Dados incompletos" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -162,11 +166,43 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: rotaAtual } = await supabase
+    let { data: rotaAtual } = await supabase
       .from("monitoramento_rotas")
-      .select("ultima_atualizacao, status, data")
+      .select("id, placa, ultima_atualizacao, status, data")
       .eq("id", monitoramento_rota_id)
       .maybeSingle();
+
+    // Redirecionamento: celular preso numa rota antiga/encerrada (ex.: pernoite,
+    // app não reabriu). Se existir rota de HOJE da mesma placa, usa ela.
+    const hojeSp = toSaoPauloDate(new Date());
+    const rotaOriginalId = monitoramento_rota_id;
+    if (
+      rotaAtual?.placa &&
+      (normalizeDateOnly(rotaAtual.data) !== hojeSp ||
+        !["aguardando", "ativa"].includes(rotaAtual.status as string))
+    ) {
+      const { data: rotaHoje } = await supabase
+        .from("monitoramento_rotas")
+        .select("id, placa, ultima_atualizacao, status, data")
+        .eq("placa", rotaAtual.placa)
+        .eq("data", hojeSp)
+        .in("status", ["aguardando", "ativa"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (rotaHoje) {
+        console.log("[processar-gps] redirecionado para rota de hoje", {
+          placa: rotaAtual.placa,
+          de: rotaOriginalId,
+          para: rotaHoje.id,
+        });
+        monitoramento_rota_id = rotaHoje.id;
+        rotaAtual = rotaHoje;
+      }
+    }
+    if (!rotaAtual) {
+      console.warn("[processar-gps] descartado: rota inexistente", { rota: rotaOriginalId });
+    }
 
     const rotaData = normalizeDateOnly(rotaAtual?.data);
 
@@ -196,6 +232,12 @@ Deno.serve(async (req) => {
       );
 
     if (validPositions.length === 0) {
+      console.warn("[processar-gps] descartado: pontos de outro dia", {
+        rota: monitoramento_rota_id,
+        placa: rotaAtual?.placa,
+        rota_data: rotaData,
+        pontos: positions.length,
+      });
       return new Response(
         JSON.stringify({
           status: "ok",
@@ -218,6 +260,12 @@ Deno.serve(async (req) => {
         .eq("status", "aguardando");
       rotaAtual.status = "ativa";
     } else if (rotaAtual?.status !== "ativa") {
+      console.warn("[processar-gps] descartado: rota não ativa", {
+        rota: monitoramento_rota_id,
+        placa: rotaAtual?.placa,
+        status: rotaAtual?.status,
+        rota_data: rotaData,
+      });
       return new Response(
         JSON.stringify({
           status: "ok",
