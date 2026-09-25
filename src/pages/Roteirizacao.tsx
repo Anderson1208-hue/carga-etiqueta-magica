@@ -1190,6 +1190,30 @@ export default function Roteirizacao() {
       const { data, error } = await query;
       if (error) throw error;
 
+      // PERNOITE: o motorista continua usando o código do dia original.
+      // Seguimos a cadeia pernoite_origem_id até o veículo de origem e
+      // exibimos/geramos PDFs com o código original, escondendo o novo.
+      const pernoiteIds = (data || []).filter((v) => v.pernoite_origem_id).map((v) => v.id);
+      const codigosPernoite: Record<string, string> = {};
+      if (pernoiteIds.length > 0) {
+        for (const pid of pernoiteIds) {
+          let cursorId: string | null = pid;
+          let codigoOriginal: string | null = null;
+          for (let i = 0; i < 10 && cursorId; i++) {
+            const { data: origem } = await supabase
+              .from("veiculos")
+              .select("access_code, pernoite_origem_id")
+              .eq("id", cursorId)
+              .maybeSingle();
+            if (!origem) break;
+            codigoOriginal = origem.access_code || codigoOriginal;
+            cursorId = origem.pernoite_origem_id || null;
+          }
+          if (codigoOriginal) codigosPernoite[pid] = codigoOriginal;
+        }
+      }
+      setCodigoExibicaoPernoite(codigosPernoite);
+
       // Filtra veículos que não têm mais NFs vinculadas (rotas esvaziadas)
       const ids = (data || []).map((v) => v.id);
       let comNfs = new Set<string>(ids);
