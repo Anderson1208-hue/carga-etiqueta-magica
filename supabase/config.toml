@@ -15,3 +15,6 @@ project_id = "ddcglijsqqiaulmfadxh"
   verify_jwt = false
   [functions.enviar-canhotos-manual]
   verify_jwt = true
+
+[functions.alerta-espaco-banco]
+verify_jwt = false
