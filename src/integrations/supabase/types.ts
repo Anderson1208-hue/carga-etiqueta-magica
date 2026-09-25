@@ -4532,6 +4532,10 @@ export type Database = {
         Args: { _min_pings?: number; _monitoramento_rota_id: string }
         Returns: boolean
       }
+      sincronizar_rota_torre_veiculo: {
+        Args: { p_veiculo_id: string }
+        Returns: Json
+      }
       siriuslog_plano: {
         Args: { p_ate: string; p_de: string }
         Returns: {
