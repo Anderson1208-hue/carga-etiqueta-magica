@@ -146,6 +146,7 @@ export default function Roteirizacao() {
   const [codigoExibicaoPernoite, setCodigoExibicaoPernoite] = useState<Record<string, string>>({});
   const [loadingVeiculos, setLoadingVeiculos] = useState(false);
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
+  const codigoParaExibir = (v: any) => codigoExibicaoPernoite[v.id] || v.access_code;
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
   const [veiculoSearch, setVeiculoSearch] = useState("");
@@ -2661,9 +2662,12 @@ export default function Roteirizacao() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              {v.access_code && (
-                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                  {v.access_code}
+                              {codigoParaExibir(v) && (
+                                <code
+                                  className="text-xs font-mono bg-muted px-2 py-1 rounded"
+                                  title={v.pernoite ? "Same code as the original day (pernoite)" : "Driver access code"}
+                                >
+                                  {codigoParaExibir(v)}
                                 </code>
                               )}
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
