@@ -143,6 +143,7 @@ export default function Roteirizacao() {
   // Tab & Vehicles listing
   const [activeTab, setActiveTab] = useState("nova-rota");
   const [veiculos, setVeiculos] = useState<any[]>([]);
+  const [codigoExibicaoPernoite, setCodigoExibicaoPernoite] = useState<Record<string, string>>({});
   const [loadingVeiculos, setLoadingVeiculos] = useState(false);
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
