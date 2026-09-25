@@ -143,8 +143,10 @@ export default function Roteirizacao() {
   // Tab & Vehicles listing
   const [activeTab, setActiveTab] = useState("nova-rota");
   const [veiculos, setVeiculos] = useState<any[]>([]);
+  const [codigoExibicaoPernoite, setCodigoExibicaoPernoite] = useState<Record<string, string>>({});
   const [loadingVeiculos, setLoadingVeiculos] = useState(false);
   const [filtroAno, setFiltroAno] = useState(String(new Date().getFullYear()));
+  const codigoParaExibir = (v: any) => codigoExibicaoPernoite[v.id] || v.access_code;
   const [filtroMes, setFiltroMes] = useState(String(new Date().getMonth() + 1));
   const [filtroDia, setFiltroDia] = useState("all");
   const [veiculoSearch, setVeiculoSearch] = useState("");
@@ -1190,6 +1192,30 @@ export default function Roteirizacao() {
       const { data, error } = await query;
       if (error) throw error;
 
+      // PERNOITE: o motorista continua usando o código do dia original.
+      // Seguimos a cadeia pernoite_origem_id até o veículo de origem e
+      // exibimos/geramos PDFs com o código original, escondendo o novo.
+      const pernoiteIds = (data || []).filter((v) => v.pernoite_origem_id).map((v) => v.id);
+      const codigosPernoite: Record<string, string> = {};
+      if (pernoiteIds.length > 0) {
+        for (const pid of pernoiteIds) {
+          let cursorId: string | null = pid;
+          let codigoOriginal: string | null = null;
+          for (let i = 0; i < 10 && cursorId; i++) {
+            const { data: origem } = await supabase
+              .from("veiculos")
+              .select("access_code, pernoite_origem_id")
+              .eq("id", cursorId)
+              .maybeSingle();
+            if (!origem) break;
+            codigoOriginal = origem.access_code || codigoOriginal;
+            cursorId = origem.pernoite_origem_id || null;
+          }
+          if (codigoOriginal) codigosPernoite[pid] = codigoOriginal;
+        }
+      }
+      setCodigoExibicaoPernoite(codigosPernoite);
+
       // Filtra veículos que não têm mais NFs vinculadas (rotas esvaziadas)
       const ids = (data || []).map((v) => v.id);
       let comNfs = new Set<string>(ids);
@@ -1402,7 +1428,7 @@ export default function Roteirizacao() {
           placa: veiculo.placa,
           motorista: veiculo.motorista || "",
           data: veiculo.data,
-          accessCode: veiculo.access_code,
+          accessCode: codigoParaExibir(veiculo),
           nfs,
           totalEntregasRota: totalRotaDia || undefined,
         });
@@ -1500,7 +1526,7 @@ export default function Roteirizacao() {
         placa: veiculo.placa,
         motorista: veiculo.motorista || "",
         data: veiculo.data,
-        accessCode: veiculo.access_code,
+        accessCode: codigoParaExibir(veiculo),
         nfs,
         totalEntregasRota: totalEntregasResumo || undefined,
       });
@@ -2636,9 +2662,12 @@ export default function Roteirizacao() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
-                              {v.access_code && (
-                                <code className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                  {v.access_code}
+                              {codigoParaExibir(v) && (
+                                <code
+                                  className="text-xs font-mono bg-muted px-2 py-1 rounded"
+                                  title={v.pernoite ? "Same code as the original day (pernoite)" : "Driver access code"}
+                                >
+                                  {codigoParaExibir(v)}
                                 </code>
                               )}
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">

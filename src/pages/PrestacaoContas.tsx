@@ -166,6 +166,7 @@ export default function PrestacaoContas() {
       `Marcar PERNOITE do veículo ${veiculoSel.placa}?\n\n` +
         `O veículo será replicado para o próximo dia com as mesmas NFs vinculadas ` +
         `e aparecerá destacado em AZUL na Roteirização.\n\n` +
+        `O motorista continuará usando o MESMO código de acesso nos dois dias.\n\n` +
         `A prestação de contas deste dia também será encerrada.`
     );
     if (!ok) return;
