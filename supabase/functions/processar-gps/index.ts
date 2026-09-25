@@ -147,6 +147,41 @@ Deno.serve(async (req) => {
       body.created_at,
     );
 
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // GPS sem rota: tenta identificar o caminhão pela placa enviada e gravar
+    // na rota de HOJE dessa placa.
+    if (!monitoramento_rota_id) {
+      const placaRaw = firstString(body.placa, extras.placa, body.params?.placa);
+      const placa = placaRaw?.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+      if (placa) {
+        const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+        const { data: rotaPlaca } = await supabase
+          .from("monitoramento_rotas")
+          .select("id")
+          .eq("placa", placa)
+          .eq("data", hoje)
+          .in("status", ["aguardando", "ativa"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (rotaPlaca) {
+          console.log("[processar-gps] GPS sem rota associado pela placa", { placa, rota: rotaPlaca.id });
+          monitoramento_rota_id = rotaPlaca.id;
+        }
+      }
+      if (!monitoramento_rota_id) {
+        console.warn("[processar-gps] sem rota: campos recebidos", {
+          chaves: Object.keys(body ?? {}),
+          extras: Object.keys(extras ?? {}),
+          params: Object.keys(body.params ?? {}),
+        });
+      }
+    }
+
     if (
       !monitoramento_rota_id ||
       (latitude == null && (!batch || batch.length === 0))
@@ -160,11 +195,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
 
     let { data: rotaAtual } = await supabase
       .from("monitoramento_rotas")

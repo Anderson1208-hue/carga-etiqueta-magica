@@ -251,11 +251,30 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     let rotaAtiva = rotaAtivaPorVeiculo;
+
+    // Sem rota da Torre para este veículo: cria agora (mesma regra da Torre).
+    // Evita GPS "sem rota" quando o veículo foi roteirizado depois de a Torre
+    // ser aberta, ou em pernoite.
+    if (!rotaAtiva) {
+      const { data: prov, error: provErr } = await supabase.rpc(
+        "provisionar_torre_veiculo",
+        { p_veiculo_id: veiculo.id },
+      );
+      if (provErr) {
+        console.warn("[motorista-acesso] provisionamento falhou", { placa: veiculo.placa, erro: provErr.message });
+      } else if ((prov as { status?: string; rota_id?: string })?.status === "ok") {
+        console.log("[motorista-acesso] rota da Torre criada no login", { placa: veiculo.placa });
+        rotaAtiva = { id: (prov as { rota_id: string }).rota_id };
+      }
+    }
+
+    // Fallback por placa, SOMENTE do mesmo dia do veículo (nunca rota antiga).
     if (!rotaAtiva) {
       const { data: rotaAtivaPorPlaca } = await supabase
         .from("monitoramento_rotas")
         .select("id")
         .eq("placa", veiculo.placa)
+        .eq("data", veiculo.data)
         .in("status", ["ativa", "aguardando"])
         .order("created_at", { ascending: false })
         .limit(1)
