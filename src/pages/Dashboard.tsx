@@ -62,6 +62,17 @@ async function loadDashboard() {
     supabase.from("ibac_log_envios").select("sucesso").gte("created_at", ontem24h),
   ]);
 
+  // Alerta de saúde do GPS: rotas de hoje sem nenhum sinal nos últimos 30 min
+  const limiteSinal = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const rotasHojeRes = await supabase
+    .from("monitoramento_rotas")
+    .select("ultima_atualizacao")
+    .eq("data", hojeStr)
+    .in("status", ["aguardando", "ativa"]);
+  const rotasSemGps = (rotasHojeRes.data ?? []).filter(
+    (r: { ultima_atualizacao: string | null }) => !r.ultima_atualizacao || r.ultima_atualizacao < limiteSinal,
+  ).length;
+
   const alertasPorTipo: Record<string, number> = {};
   (alertasRes.data ?? []).forEach((a: { tipo: string }) => {
     alertasPorTipo[a.tipo] = (alertasPorTipo[a.tipo] ?? 0) + 1;
@@ -129,6 +140,7 @@ async function loadDashboard() {
 
   return {
     cargasAbertas: cargasAbertasRes.count ?? 0,
+    rotasSemGps,
     nfsHoje: nfsHojeRes.count ?? 0,
     aguardandoConferencia: aguardandoConfRes.count ?? 0,
     paradasPendentes: paradasPendRes.count ?? 0,
@@ -171,6 +183,7 @@ export default function Dashboard() {
         {/* Banner de saúde */}
         <HealthBanner
           items={[
+            { label: "rotas de hoje sem GPS há 30 min ou mais", count: d?.rotasSemGps ?? 0, to: "/torre-controle" },
             { label: "alertas não lidos na Torre", count: d?.alertasTotal ?? 0, to: "/torre-controle" },
             { label: "eventos IBAC com erro", count: d?.ibacErros ?? 0, to: "/integracoes/ibac" },
           ]}
