@@ -4440,6 +4440,7 @@ export type Database = {
         Returns: undefined
       }
       provisionar_torre_dia: { Args: { p_data?: string }; Returns: Json }
+      provisionar_torre_sistema: { Args: never; Returns: Json }
       provisionar_torre_veiculo: {
         Args: { p_veiculo_id: string }
         Returns: Json

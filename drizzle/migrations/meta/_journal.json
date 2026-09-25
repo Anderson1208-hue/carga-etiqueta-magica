@@ -92,6 +92,13 @@
       "when": 1790267733437,
       "tag": "0012_travas_espaco_retencao",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790365874152,
+      "tag": "0013_provisionar_torre_automatico",
+      "breakpoints": true
     }
   ]
 }
