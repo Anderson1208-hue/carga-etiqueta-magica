@@ -99,6 +99,13 @@
       "when": 1790365874152,
       "tag": "0013_provisionar_torre_automatico",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790366425222,
+      "tag": "0014_sincronizar_rota_torre_roteirizacao",
+      "breakpoints": true
     }
   ]
 }
