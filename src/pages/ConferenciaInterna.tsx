@@ -22,7 +22,7 @@ import { CameraScanner } from "@/components/conferencia/CameraScanner";
 import { MobileLogoutButton } from "@/components/layout/MobileLogoutButton";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
-import { ExpedicaoPorPlaca, type VeiculoExpedicao } from "@/components/conferencia/ExpedicaoPorPlaca";
+import { ExpedicaoPorPlaca, type VeiculoExpedicao, type NfExpedicao } from "@/components/conferencia/ExpedicaoPorPlaca";
 import {
   useOfflineConferencia,
   type OfflineEtiqueta,
@@ -132,6 +132,9 @@ export default function ConferenciaInterna() {
   const [selectedNf, setSelectedNf] = useState<string | null>(null);
   // Etapa 2: placa do veículo roteirizado em expedição (mantida ao voltar da NF)
   const [veiculoExpedicao, setVeiculoExpedicao] = useState<VeiculoExpedicao | null>(null);
+  // Fila da placa (Etapa 2): ao fechar uma NF, abre a próxima pendente na sequência de entrega
+  const filaExpedicaoRef = useRef<{ veiculo: VeiculoExpedicao; fila: NfExpedicao[] } | null>(null);
+  const avancandoNfRef = useRef<string | null>(null);
   const [limpando, setLimpando] = useState(false);
   const podeLimparNf =
     isAdmin || profile?.email?.toLowerCase() === "gessica.rodrigues@tlmlogistica.com.br";
@@ -432,6 +435,7 @@ export default function ConferenciaInterna() {
   }
 
   function voltarParaLista() {
+    filaExpedicaoRef.current = null;
     void flushWrites();
     setSelectedCarga(null);
 
@@ -1367,6 +1371,7 @@ export default function ConferenciaInterna() {
           addToHistory(completeResult);
           playSound("success");
         }, 500);
+        if (etapa === 2) avancarProximaNfPlaca(selectedNf);
       }
     } catch (error) {
       console.error("[ConferenciaInterna] Erro ao recarregar progresso:", error);
@@ -1375,6 +1380,30 @@ export default function ConferenciaInterna() {
     if (faltamAberto) {
       loadEtiquetasFaltantes();
     }
+  }
+
+  function avancarProximaNfPlaca(nfConcluida: string) {
+    const f = filaExpedicaoRef.current;
+    if (!f || avancandoNfRef.current === nfConcluida) return;
+    avancandoNfRef.current = nfConcluida;
+    const proxima = f.fila.shift();
+    window.setTimeout(() => {
+      void flushWrites();
+      if (!proxima) {
+        filaExpedicaoRef.current = null;
+        toast({ title: `Todas as notas da placa ${f.veiculo.placa} conferidas`, description: "Volte à placa para liberar o veículo." });
+        return;
+      }
+      toast({ title: `Próxima: NF ${proxima.numeroNf}`, description: proxima.ordemEntrega < 9999 ? `${proxima.ordemEntrega}ª entrega` : undefined });
+      iniciarConferenciaNf({
+        numeroNf: proxima.numeroNf,
+        cargaId: proxima.cargaId,
+        placa: f.veiculo.placa,
+        motorista: f.veiculo.motorista ?? "",
+        total: proxima.total,
+        conferidas: proxima.conferidas,
+      });
+    }, 1500);
   }
 
   async function loadEtiquetasFaltantes() {
@@ -2082,7 +2111,9 @@ export default function ConferenciaInterna() {
             veiculo={veiculoExpedicao}
             onSelectVeiculo={setVeiculoExpedicao}
             isAdmin={isAdmin}
-            onAbrirNf={(v, n) =>
+            onAbrirNf={(v, n, fila) => {
+              filaExpedicaoRef.current = { veiculo: v, fila: [...fila] };
+              avancandoNfRef.current = null;
               iniciarConferenciaNf({
                 numeroNf: n.numeroNf,
                 cargaId: n.cargaId,
@@ -2090,8 +2121,8 @@ export default function ConferenciaInterna() {
                 motorista: v.motorista ?? "",
                 total: n.total,
                 conferidas: n.conferidas,
-              })
-            }
+              });
+            }}
           />
         )}
 
