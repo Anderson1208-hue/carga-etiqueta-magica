@@ -134,3 +134,4 @@ type: reference
 - [Rotina Tracking Pandurata](mem://arquitetura/integracao-erp/siriuslog-rotina-diaria) — fila diária Sirius Log, cron 10:30 dias úteis, interruptor desligado por padrão.
 - [E-mail canhotos manual](mem://constraints/relatorio-canhotos-email-manual) — Relatório diário gera arquivos mas NÃO envia e-mail sem autorização expressa do Anderson.
 - [Envio de Canhoto sob demanda](mem://funcionalidades/operacao/envio-canhoto-sob-demanda) — Tela /integracoes/envio-canhoto: filtro embarcador/período/NFs, PDF+ZIP em volumes de 10, planilha de sem-foto, links 90 dias, histórico em envios_canhoto_manuais; acesso = lista OK Entrega + admins.
+- [Peso da caixa 1000137](mem://logica/peso-caixa-cod-1000137) — CX MONTEBELLO MARSH TRADICIONAL 90GX12UN (IBAC): 1,491 kg bruto / 1,080 kg líquido / 0,009 m³ por caixa; ainda sem cadastro em produtos.
