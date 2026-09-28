@@ -89,26 +89,58 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
   const carregarVeiculo = useCallback(async (v: VeiculoExpedicao) => {
     setLoadingVeiculo(true);
     try {
-      const [{ data: st, error: e1 }, { data: vns, error: e2 }, { data: rotas }] = await Promise.all([
+      const [{ data: st, error: e1 }, { data: vns, error: e2 }] = await Promise.all([
         supabase.rpc("conferencia_interna_status_veiculo" as any, { p_veiculo_id: v.id }),
         supabase
           .from("veiculo_nfs")
           .select("carga_origem_id, notas_fiscais!inner(numero_nf, cnpj_destinatario)")
           .eq("veiculo_id", v.id),
-        supabase
-          .from("monitoramento_rotas")
-          .select("id, monitoramento_paradas(ordem, cnpj_destinatario)")
-          .eq("veiculo_id", v.id)
-          .order("created_at", { ascending: false })
-          .limit(1),
       ]);
-      // Sequência de entrega: ordem da parada do destinatário na rota do veículo
-      const ordemPorCnpj = new Map<string, number>();
+      if (e1) throw e1;
+      if (e2) throw e2;
       const soDig = (x: string) => (x || "").replace(/\D/g, "");
-      ((rotas as any)?.[0]?.monitoramento_paradas ?? []).forEach((p: any) => {
-        const k = soDig(p.cnpj_destinatario);
-        if (k && !ordemPorCnpj.has(k)) ordemPorCnpj.set(k, p.ordem ?? 9999);
-      });
+      // Sequência de entrega: mesma regra da Roteirização (rota que cobre mais
+      // destinatários do veículo primeiro; demais rotas completam; numeração 1..N do veículo)
+      const cnpjsVeiculo = new Set<string>(
+        (vns ?? []).map((r: any) => soDig(r.notas_fiscais?.cnpj_destinatario)).filter(Boolean),
+      );
+      const cargaIds = [...new Set((vns ?? []).map((r: any) => r.carga_origem_id).filter(Boolean))];
+      const ordemPorCnpj = new Map<string, number>();
+      if (cargaIds.length) {
+        const { data: rots } = await supabase
+          .from("roteirizacoes")
+          .select("id, created_at")
+          .in("carga_id", cargaIds)
+          .order("created_at", { ascending: false });
+        if (rots?.length) {
+          const { data: pars } = await supabase
+            .from("roteirizacao_paradas")
+            .select("cnpj_destinatario, ordem, roteirizacao_id")
+            .in("roteirizacao_id", rots.map((r: any) => r.id))
+            .order("ordem", { ascending: true });
+          const porRot = new Map<string, { cnpj: string; ordem: number }[]>();
+          (pars ?? []).forEach((p: any) => {
+            const c = soDig(p.cnpj_destinatario);
+            if (!c) return;
+            const arr = porRot.get(p.roteirizacao_id) ?? [];
+            arr.push({ cnpj: c, ordem: p.ordem });
+            porRot.set(p.roteirizacao_id, arr);
+          });
+          const ranked = rots
+            .map((r: any) => {
+              const ps = porRot.get(r.id) ?? [];
+              return { ps, cov: new Set(ps.filter((p) => cnpjsVeiculo.has(p.cnpj)).map((p) => p.cnpj)).size, t: new Date(r.created_at).getTime() };
+            })
+            .sort((x, y) => y.cov - x.cov || y.t - x.t);
+          const ordenados: string[] = [];
+          for (const r of ranked) {
+            for (const p of [...r.ps].sort((x, y) => x.ordem - y.ordem)) {
+              if (cnpjsVeiculo.has(p.cnpj) && !ordenados.includes(p.cnpj)) ordenados.push(p.cnpj);
+            }
+          }
+          ordenados.forEach((c, i) => ordemPorCnpj.set(c, i + 1));
+        }
+      }
       const ordemPorNf = new Map<string, number>();
       if (e1) throw e1;
       if (e2) throw e2;
