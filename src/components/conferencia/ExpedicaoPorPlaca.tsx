@@ -21,6 +21,7 @@ export interface NfExpedicao {
   total: number;
   conferidas: number;
   emEscopo: boolean;
+  ordemEntrega: number;
 }
 
 interface StatusVeiculo {
@@ -39,7 +40,7 @@ interface StatusVeiculo {
 interface Props {
   veiculo: VeiculoExpedicao | null;
   onSelectVeiculo: (v: VeiculoExpedicao | null) => void;
-  onAbrirNf: (v: VeiculoExpedicao, nf: NfExpedicao) => void;
+  onAbrirNf: (v: VeiculoExpedicao, nf: NfExpedicao, fila: NfExpedicao[]) => void;
   isAdmin: boolean;
 }
 
@@ -88,13 +89,27 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
   const carregarVeiculo = useCallback(async (v: VeiculoExpedicao) => {
     setLoadingVeiculo(true);
     try {
-      const [{ data: st, error: e1 }, { data: vns, error: e2 }] = await Promise.all([
+      const [{ data: st, error: e1 }, { data: vns, error: e2 }, { data: rotas }] = await Promise.all([
         supabase.rpc("conferencia_interna_status_veiculo" as any, { p_veiculo_id: v.id }),
         supabase
           .from("veiculo_nfs")
-          .select("carga_origem_id, notas_fiscais!inner(numero_nf)")
+          .select("carga_origem_id, notas_fiscais!inner(numero_nf, cnpj_destinatario)")
           .eq("veiculo_id", v.id),
+        supabase
+          .from("monitoramento_rotas")
+          .select("id, monitoramento_paradas(ordem, cnpj_destinatario)")
+          .eq("veiculo_id", v.id)
+          .order("created_at", { ascending: false })
+          .limit(1),
       ]);
+      // Sequência de entrega: ordem da parada do destinatário na rota do veículo
+      const ordemPorCnpj = new Map<string, number>();
+      const soDig = (x: string) => (x || "").replace(/\D/g, "");
+      ((rotas as any)?.[0]?.monitoramento_paradas ?? []).forEach((p: any) => {
+        const k = soDig(p.cnpj_destinatario);
+        if (k && !ordemPorCnpj.has(k)) ordemPorCnpj.set(k, p.ordem ?? 9999);
+      });
+      const ordemPorNf = new Map<string, number>();
       if (e1) throw e1;
       if (e2) throw e2;
       const s = st as unknown as StatusVeiculo;
@@ -106,6 +121,7 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
       (vns ?? []).forEach((r: any) => {
         const nf = String(r.notas_fiscais?.numero_nf ?? "");
         if (!nf) return;
+        ordemPorNf.set(nf, ordemPorCnpj.get(soDig(r.notas_fiscais?.cnpj_destinatario)) ?? 9999);
         const arr = porCarga.get(r.carga_origem_id) ?? [];
         arr.push(nf);
         porCarga.set(r.carga_origem_id, arr);
@@ -127,16 +143,15 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
         });
         numeros.forEach((n) => {
           const a = agg.get(n) ?? { t: 0, c: 0 };
-          lista.push({ cargaId, numeroNf: n, total: a.t, conferidas: a.c, emEscopo: escopo.has(n) });
+          lista.push({ cargaId, numeroNf: n, total: a.t, conferidas: a.c, emEscopo: escopo.has(n), ordemEntrega: ordemPorNf.get(n) ?? 9999 });
         });
       }
-      lista.sort((a, b) => {
-        const fa = a.total === 0 || a.conferidas < a.total;
-        const fb = b.total === 0 || b.conferidas < b.total;
-        if (a.emEscopo !== b.emEscopo) return a.emEscopo ? -1 : 1;
-        if (fa !== fb) return fa ? -1 : 1;
-        return a.numeroNf.localeCompare(b.numeroNf, "pt-BR", { numeric: true });
-      });
+      // Entrega a entrega; dentro da entrega, a maior nota primeiro
+      lista.sort((a, b) =>
+        a.ordemEntrega - b.ordemEntrega ||
+        b.total - a.total ||
+        a.numeroNf.localeCompare(b.numeroNf, "pt-BR", { numeric: true }),
+      );
       setNfs(lista);
     } catch (e: any) {
       console.error(e);
@@ -319,11 +334,20 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
                 return (
                   <button
                     key={`${n.cargaId}-${n.numeroNf}`}
-                    onClick={() => onAbrirNf(veiculo, n)}
+                    onClick={() => {
+                      const idx = nfs.indexOf(n);
+                      const fila = [...nfs.slice(idx + 1), ...nfs.slice(0, idx)].filter(
+                        (x) => x.total > 0 && x.conferidas < x.total,
+                      );
+                      onAbrirNf(veiculo, n, fila);
+                    }}
                     disabled={n.total === 0}
                     className="w-full flex items-center justify-between rounded-md border px-3 py-2 text-left hover:bg-muted disabled:opacity-60"
                   >
-                    <span className="font-mono">NF {n.numeroNf}</span>
+                    <span className="font-mono">
+                      {n.ordemEntrega < 9999 && <span className="text-xs text-muted-foreground mr-2">{n.ordemEntrega}ª</span>}
+                      NF {n.numeroNf}
+                    </span>
                     <span className="flex items-center gap-2">
                       {!n.emEscopo && <Badge variant="outline" className="text-[10px]">fora do escopo</Badge>}
                       <span className={`text-xs ${ok ? "text-primary" : "text-muted-foreground"}`}>
