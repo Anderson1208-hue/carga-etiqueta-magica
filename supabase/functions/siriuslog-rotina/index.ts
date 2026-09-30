@@ -26,7 +26,11 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const forcarSimulacao = body.simular === true
-  const ignorarDiaUtil = body.ignorar_dia_util === true
+  // Envio imediato de notas especificas (ex.: carga aberta no sistema). Roda em qualquer dia.
+  const nfsAlvo = Array.isArray(body.nfs)
+    ? (body.nfs as unknown[]).map(String).filter((s) => /^\d{1,12}$/.test(s)).slice(0, 500)
+    : null
+  const ignorarDiaUtil = body.ignorar_dia_util === true || nfsAlvo !== null
   // Continuacao automatica: cada rodada dispara a proxima enquanto houver fila.
   const passo = Number(body.passo ?? 1)
   const MAX_PASSOS = 30
@@ -64,9 +68,15 @@ Deno.serve(async (req) => {
   const gravar = cfg.ativo === true && !forcarSimulacao
   const modo = gravar ? 'gravacao' : 'simulacao'
 
-  // Trava: uma rodada por vez.
-  const { data: rodadaId, error: eLock } = await sb.rpc('tracking_pandurata_iniciar_rodada', { p_modo: modo })
-  if (eLock) { out.erro = eLock.message; return json(500) }
+  // Trava: uma rodada por vez. Envio imediato espera a rodada em andamento terminar (ate ~2 min).
+  let rodadaId: unknown = null
+  for (let t = 0; t < (nfsAlvo ? 8 : 1); t++) {
+    const { data, error: eLock } = await sb.rpc('tracking_pandurata_iniciar_rodada', { p_modo: modo })
+    if (eLock) { out.erro = eLock.message; return json(500) }
+    rodadaId = data
+    if (rodadaId) break
+    await new Promise((r) => setTimeout(r, 15000))
+  }
   if (!rodadaId) { out.situacao = 'rodada_em_andamento'; return json() }
 
   const encerrar = async (patch: Record<string, unknown>) => {
@@ -81,18 +91,25 @@ Deno.serve(async (req) => {
       p_de: cfg.data_inicial, p_ate: hoje,
     })
     if (ePlano) throw new Error(`plano: ${ePlano.message}`)
-    const todas = ((plano ?? []) as Record<string, string | null>[]).map((l) => String(l.numero_nf))
+    let todas = ((plano ?? []) as Record<string, string | null>[]).map((l) => String(l.numero_nf))
+    if (nfsAlvo) todas = todas.filter((nf) => nfsAlvo.includes(nf))
 
-    // 2) Remove notas ja concluidas e as que estouraram o limite de tentativas.
+    // 2) Remove notas ja concluidas e as que estouraram o limite de FALHAS DO DIA.
+    // "tentativas" = falhas seguidas no dia; zera no dia seguinte e a cada envio aceito.
+    // Assim nenhuma nota fica presa na fila para sempre.
     const { data: fila } = await sb
       .from('fila_tracking_pandurata')
       .select('numero_nf, concluido_em, tentativas, ultima_tentativa_em')
     const filaMap = new Map((fila ?? []).map((f) => [String(f.numero_nf), f]))
+    const diaBR = (ts: string | null | undefined) =>
+      ts ? new Date(new Date(ts).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10) : ''
+    const falhasHoje = (f: { tentativas: number | null; ultima_tentativa_em: string | null } | undefined) =>
+      f && diaBR(f.ultima_tentativa_em) === hoje ? (f.tentativas ?? 0) : 0
     const pendentes = todas.filter((nf) => {
       const f = filaMap.get(nf)
       if (!f) return true
       if (f.concluido_em) return false
-      return (f.tentativas ?? 0) < (cfg.max_tentativas ?? 3)
+      return falhasHoje(f) < (cfg.max_tentativas ?? 3)
     })
 
     // 3) Garante linha na fila para toda nota nova.
@@ -195,11 +212,14 @@ Deno.serve(async (req) => {
       }
 
       const anterior = filaMap.get(nf)
-      // Tentativa so conta quando houve envio real ao portal (204) ou recusa (http>=300).
-      // Nota "ja atualizada" nao consome tentativa: foi apenas conferida.
-      const consumiuTentativa = gravar && (ultimoOk != null || httpErro != null)
+      // Conta so FALHAS (recusa do portal ou erro). Envio aceito ou nota ja em dia zera o contador.
+      // Antes, cada envio aceito tambem contava: nota que avancava 3 dias seguidos travava sem erro.
+      const falhou = gravar && (httpErro != null || situacao === 'erro')
+      const tentativas = !gravar
+        ? (anterior?.tentativas ?? 0)
+        : falhou ? falhasHoje(anterior) + 1 : 0
       const { error: eUp } = await sb.from('fila_tracking_pandurata')
-        .upsert({ ...patch, tentativas: (anterior?.tentativas ?? 0) + (consumiuTentativa ? 1 : 0) }, { onConflict: 'numero_nf' })
+        .upsert({ ...patch, tentativas }, { onConflict: 'numero_nf' })
       if (eUp) out.aviso_fila = eUp.message
     }
 
@@ -225,6 +245,7 @@ Deno.serve(async (req) => {
           inicio,
           ignorar_dia_util: true,
           simular: forcarSimulacao,
+          ...(nfsAlvo ? { nfs: nfsAlvo } : {}),
         }),
       }).catch(() => undefined)
       // @ts-ignore runtime do edge

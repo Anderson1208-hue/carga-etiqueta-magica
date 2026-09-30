@@ -23,20 +23,20 @@ const CHAIN = [
   { id: 2, nome: 'Aguardando descarga' },
   { id: 17, nome: 'Entrega realizada aguardando canhoto' },
 ]
-// Status finais/paralelos do portal: nao devem ser regredidos nem alterados por nos.
-const FINAIS = [
-  'entrega realizada aguardando baixa edi',
-  'entrega realizada e baixada no sap',
-  'recusa aguardando instrução embarcador',
-  'devolução total com autorização',
-  'canhoto retido no cliente',
-]
+// Status do portal FORA da nossa cadeia. Nunca tentamos mudar a partir deles.
+// Situacoes intermediarias do cliente (check-in/doca) equivalem a "Aguardando descarga".
+const INTERMEDIARIOS = ['veículo no cliente check-in', 'veiculo no cliente check-in', 'veículo na doca', 'veiculo na doca']
 const idxPorNome = (n: string | null) => {
   if (!n) return 0
   const alvo = n.trim().toLowerCase()
-  if (FINAIS.includes(alvo)) return 99
   const i = CHAIN.findIndex((c) => c.nome.toLowerCase() === alvo)
-  return i < 0 ? 0 : i
+  if (i >= 0) return i
+  if (INTERMEDIARIOS.includes(alvo)) return 3
+  // Qualquer outro nome (baixa de EDI, baixada no SAP, recusa, devolucao, canhoto retido,
+  // reentrega, ou nome novo do portal) e tratado como final: nao mexemos.
+  // Antes, "Entrega realizada aguardando baixa DE EDI" nao batia com a lista e a rotina
+  // tentava voltar a nota para "Na filial" (recusa 422 todo dia).
+  return 99
 }
 const hojeBR = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10)
 const maxData = (a: string | null, b: string) => (a && a > b ? a : b)
