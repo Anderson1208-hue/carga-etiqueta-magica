@@ -2236,6 +2236,48 @@ export type Database = {
           },
         ]
       }
+      log_tentativas_tracking_pandurata: {
+        Row: {
+          criado_em: string
+          erro: string | null
+          http: number | null
+          id: number
+          modo: string
+          numero_nf: string
+          origem: string
+          passo: number | null
+          situacao: string | null
+          status_alvo: string | null
+          status_portal: string | null
+        }
+        Insert: {
+          criado_em?: string
+          erro?: string | null
+          http?: number | null
+          id?: never
+          modo?: string
+          numero_nf: string
+          origem?: string
+          passo?: number | null
+          situacao?: string | null
+          status_alvo?: string | null
+          status_portal?: string | null
+        }
+        Update: {
+          criado_em?: string
+          erro?: string | null
+          http?: number | null
+          id?: never
+          modo?: string
+          numero_nf?: string
+          origem?: string
+          passo?: number | null
+          situacao?: string | null
+          status_alvo?: string | null
+          status_portal?: string | null
+        }
+        Relationships: []
+      }
       monitor_espaco_tabelas: {
         Row: {
           alerta: boolean

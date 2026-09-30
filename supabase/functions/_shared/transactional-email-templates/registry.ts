@@ -19,6 +19,7 @@ import { template as canhotoTeste } from './canhoto-teste.tsx'
 import { template as canhotosEnvioManual } from './canhotos-envio-manual.tsx'
 import { template as alertaEspacoBanco } from './alerta-espaco-banco.tsx'
 import { template as alertaSaudeGps } from './alerta-saude-gps.tsx'
+import { template as siriuslogPendencias } from './siriuslog-pendencias.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'teste-envio': testeEnvio,
@@ -26,4 +27,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'canhotos-envio-manual': canhotosEnvioManual,
   'alerta-espaco-banco': alertaEspacoBanco,
   'alerta-saude-gps': alertaSaudeGps,
+  'siriuslog-pendencias': siriuslogPendencias,
 }
