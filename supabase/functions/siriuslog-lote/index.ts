@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
         // Desde 30/09/2026 o portal preenche a previsao de entrega sozinho e recusa (422)
         // quando ela vem no envio. Nesse caso reenvia o mesmo passo sem esse campo.
         if (resp.status === 422 && 'estimatedDeliveryDate' in payload && /preenchida automaticamente/i.test(txt)) {
-          passos.push({ status_destino: CHAIN[i].nome, enviado: payload, http: resp.status, resposta: txt.slice(0, 300) })
+          passos.push({ status_destino: CHAIN[i].nome, reenvio_sem_previsao: true, http_primeira_tentativa: resp.status })
           delete payload.estimatedDeliveryDate
           resp = await fetch(`${TRACK}/delivery-invoice-detail/${detailId}`, {
             method: 'PATCH', headers, body: JSON.stringify(payload),
