@@ -319,6 +319,7 @@ Deno.serve(async (req) => {
         if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(envio)
         else await envio
       }
+      }
     }
     return json()
   } catch (e) {
