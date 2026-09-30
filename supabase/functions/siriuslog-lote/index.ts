@@ -195,11 +195,14 @@ Deno.serve(async (req) => {
       r.status_portal = atualNome
       const atual = idxPorNome(atualNome)
 
-      // alvo conforme nossos dados
-      let alvo = 1 // Na filial
+      // alvo conforme nossos dados.
+      // "Na filial" so quando a carga foi ABERTA no nosso sistema (carga fechada = NF so cadastrada).
+      let alvo = 0
+      if (l.carga_status && l.carga_status !== 'fechada') alvo = 1 // Na filial
       if (l.data_rot) alvo = 2 // Em transito para cliente
       if (l.baixa_entregue) alvo = 4 // Entrega realizada aguardando canhoto
       r.status_alvo = CHAIN[alvo].nome
+      if (alvo === 0) { r.situacao = 'aguardando_abertura_carga'; resultados.push(r); continue }
       if (alvo <= atual) {
         r.situacao = atual === 99 ? 'status_final_no_portal' : 'ja_atualizado'
         resultados.push(r); continue
