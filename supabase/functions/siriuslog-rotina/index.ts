@@ -271,11 +271,20 @@ Deno.serve(async (req) => {
     }
 
     // Fim da cadeia da 2ª rodada (15:00): e-mail com as notas que continuam sem
-    // envio e o motivo de cada recusa. No máximo 1 e-mail por dia (chave única).
-    if (origem === 'tarde' && gravar) {
-      const { data: problema } = await sb
-        .from('fila_tracking_pandurata')
-        .select('numero_nf, ultimo_erro, status_portal, tentativas, ultima_tentativa_em, concluido_em')
+    // envio e o motivo de cada recusa. No máximo 1 e-mail por dia.
+    if (origem === 'tarde' && gravar && (restantes === 0 || passo >= MAX_PASSOS)) {
+      const { data: jaEnviado } = await sb
+        .from('email_send_log')
+        .select('id')
+        .eq('template_name', 'siriuslog-pendencias')
+        .gte('created_at', `${hoje}T00:00:00-03:00`)
+        .limit(1)
+      if (jaEnviado?.length) {
+        out.email_pendencias = 'ja_enviado_hoje'
+      } else {
+        const { data: problema } = await sb
+          .from('fila_tracking_pandurata')
+          .select('numero_nf, ultimo_erro, status_portal, tentativas, ultima_tentativa_em, concluido_em')
       const semEnviar = (problema ?? []).filter((f) =>
         !f.concluido_em &&
         !!f.ultima_tentativa_em &&
