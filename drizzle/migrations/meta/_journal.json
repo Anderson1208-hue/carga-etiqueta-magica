@@ -113,6 +113,13 @@
       "when": 1790368194071,
       "tag": "0015_alerta_espaco_email",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790789429983,
+      "tag": "0016_siriuslog_segunda_rodada_e_log_tentativas",
+      "breakpoints": true
     }
   ]
 }

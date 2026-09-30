@@ -26,6 +26,8 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>
   const forcarSimulacao = body.simular === true
+  // Origem da rodada: cron (manhã), tarde (2ª rodada), carga_aberta, manual.
+  const origem = String(body.origem ?? 'manual')
   // Envio imediato de notas especificas (ex.: carga aberta no sistema). Roda em qualquer dia.
   const nfsAlvo = Array.isArray(body.nfs)
     ? (body.nfs as unknown[]).map(String).filter((s) => /^\d{1,12}$/.test(s)).slice(0, 500)
@@ -221,6 +223,16 @@ Deno.serve(async (req) => {
       const { error: eUp } = await sb.from('fila_tracking_pandurata')
         .upsert({ ...patch, tentativas }, { onConflict: 'numero_nf' })
       if (eUp) out.aviso_fila = eUp.message
+      // Histórico da tentativa: guarda o motivo exato de cada recusa/erro.
+      await sb.from('log_tentativas_tracking_pandurata').insert({
+        numero_nf: nf,
+        origem, modo, passo,
+        situacao: situacao || null,
+        status_alvo: alvo || null,
+        status_portal: statusPortal,
+        http: httpErro ? Number(httpErro.http) : (ultimoOk ? 204 : null),
+        erro: (patch.ultimo_erro as string | null) ?? null,
+      })
     }
 
     out.concluidas = concluidas
@@ -243,6 +255,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           passo: passo + 1,
           inicio,
+          origem,
           ignorar_dia_util: true,
           simular: forcarSimulacao,
           ...(nfsAlvo ? { nfs: nfsAlvo } : {}),
@@ -255,6 +268,48 @@ Deno.serve(async (req) => {
       out.continuacao = 'limite_de_passos_atingido'
     } else {
       out.continuacao = 'fila_esvaziada'
+    }
+
+    // Fim da cadeia da 2ª rodada (15:00): e-mail com as notas que continuam sem
+    // envio e o motivo de cada recusa. No máximo 1 e-mail por dia (chave única).
+    if (origem === 'tarde' && gravar) {
+      const { data: problema } = await sb
+        .from('fila_tracking_pandurata')
+        .select('numero_nf, ultimo_erro, status_portal, tentativas, ultima_tentativa_em, concluido_em')
+      const semEnviar = (problema ?? []).filter((f) =>
+        !f.concluido_em &&
+        !!f.ultima_tentativa_em &&
+        String(f.ultima_tentativa_em) >= inicio &&
+        diaBR(f.ultima_tentativa_em) === hoje &&
+        ((f.ultimo_erro ?? '') !== '' || (f.tentativas ?? 0) > 0),
+      )
+      out.email_pendencias = semEnviar.length
+      if (semEnviar.length) {
+        const quando = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+        const envio = fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/send-transactional-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({
+            templateName: 'siriuslog-pendencias',
+            idempotencyKey: `siriuslog-tarde-${hoje}`,
+            templateData: {
+              quando,
+              total: semEnviar.length,
+              notas: semEnviar.slice(0, 120).map((f) => ({
+                nf: f.numero_nf,
+                status: f.status_portal ?? '',
+                erro: (f.ultimo_erro ?? '').slice(0, 180),
+              })),
+            },
+          }),
+        }).catch(() => undefined)
+        // @ts-ignore runtime do edge
+        if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(envio)
+        else await envio
+      }
     }
     return json()
   } catch (e) {
