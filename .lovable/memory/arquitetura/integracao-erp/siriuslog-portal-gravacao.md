@@ -20,6 +20,8 @@ Gravação (validada em 08/09/2026, NF 758306, detailId 96244):
 Transicao 21 -> 22 (Na filial da transportadora): o portal EXIGE `estimatedDeliveryDate` junto com
 `branchArrivalDate` (422 "Data prevista de entrega e obrigatoria..." se faltar). Validado em 10/09/2026,
 NF 759913, detailId 99955 -> HTTP 204. A sonda aceita `{"campos":{...}}` para enviar varias datas.
+MUDOU em 30/09/2026: o portal passou a recusar (422 "Data prevista de entrega é preenchida automaticamente...")
+quando `estimatedDeliveryDate` vem no envio. `siriuslog-lote` reenvia o mesmo passo sem o campo nesse caso.
 
 Campos de data: `scheduleRequestDate`, `deliverySchedulingDate`, `estimatedDeliveryDate`, `customerArrivalDate`, `deliveryDate`, `branchEstimatedArrivalDate`, `branchArrivalDate`, `branchDepartureDate`.
 
