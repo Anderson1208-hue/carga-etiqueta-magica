@@ -245,6 +245,7 @@ Deno.serve(async (req) => {
           inicio,
           ignorar_dia_util: true,
           simular: forcarSimulacao,
+          ...(nfsAlvo ? { nfs: nfsAlvo } : {}),
         }),
       }).catch(() => undefined)
       // @ts-ignore runtime do edge
