@@ -20,3 +20,9 @@ Tentativas (30/09/2026): `tentativas` = FALHAS do dia (recusa/erro). Envio aceit
 Envio imediato (autorizado 30/09/2026): trigger `tg_tracking_pandurata_carga_aberta` em `cargas` (status → aberta) chama `siriuslog-rotina` com `{nfs:[...]}` das NFs Pandurata da carga; roda em qualquer dia; espera até ~2 min se houver rodada em andamento.
 
 Agendamento: cron `tracking-pandurata-diario`, `30 13 * * 1-5` (10:30 BRT); guarda de feriado RJ dentro da função.
+
+Segunda rodada (30/09/2026, autorizado pelo Anderson): cron `tracking-pandurata-tarde` `0 18 * * 1-5` (15:00 BRT) chama `siriuslog-rotina` com `{origem:'tarde'}`; a função valida dia útil. Continuações carregam `origem` para o histórico.
+
+E-mail de pendências: no fim da cadeia da 2ª rodada (restantes=0 ou limite de passos), se houver notas tentadas na rodada ainda sem envio (concluido_em null, tentada hoje, com ultimo_erro ou tentativas>0), envia template `siriuslog-pendencias` (registry) para **arquivostlm@tlmlogistica.com.br** (destinatário fixo no template; NÃO anderson.teixeira). Máx. 1/dia: guarda checa `email_send_log` por template antes de enviar (idempotencyKey `siriuslog-tarde-<data>` não dedup sozinho — 2 envios em 30/09).
+
+Histórico de recusas: `public.log_tentativas_tracking_pandurata` (numero_nf, criado_em, origem, modo, passo, situacao, status_alvo, status_portal, http, erro) gravado a cada tentativa; RLS habilitada, só service_role.
