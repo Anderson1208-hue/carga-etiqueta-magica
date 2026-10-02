@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
 
     const { data: baixa, error: bErr } = await supabase
       .from("baixas_entrega")
-      .select("id, foto_path, nf_id, notas_fiscais:nf_id(numero_nf)")
+      .select("id, foto_path, nf_id, validacao_status, validacao_problemas, notas_fiscais:nf_id(numero_nf)")
       .eq("id", baixa_id)
       .maybeSingle();
 
@@ -154,19 +154,37 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Checagem por IA só uma vez por foto: se esta mesma foto já foi avaliada, devolve o resultado guardado.
+    const anterior = (baixa as any).validacao_problemas;
+    if (baixa.validacao_status && anterior?.foto_path === baixa.foto_path) {
+      return new Response(
+        JSON.stringify({ success: true, cache: true, status: baixa.validacao_status, nf_match: anterior.nf_match }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const numeroNfEsperado = (baixa as any).notas_fiscais?.numero_nf
       ? String((baixa as any).notas_fiscais.numero_nf).replace(/\D/g, "").replace(/^0+/, "")
       : null;
 
-    const { data: signed, error: sErr } = await supabase.storage
+    // Imagem reduzida para a IA (menos custo); se a redução não estiver disponível, usa a original.
+    let signedUrl: string | null = null;
+    const reduzida = await supabase.storage
       .from("comprovantes")
-      .createSignedUrl(baixa.foto_path, 300);
-
-    if (sErr || !signed?.signedUrl) {
-      throw new Error("Falha ao gerar URL da foto");
+      .createSignedUrl(baixa.foto_path, 300, { transform: { width: 1280, quality: 75 } });
+    if (!reduzida.error && reduzida.data?.signedUrl) {
+      const teste = await fetch(reduzida.data.signedUrl, { method: "HEAD" }).catch(() => null);
+      if (teste?.ok) signedUrl = reduzida.data.signedUrl;
+    }
+    if (!signedUrl) {
+      const { data: signed, error: sErr } = await supabase.storage
+        .from("comprovantes")
+        .createSignedUrl(baixa.foto_path, 300);
+      if (sErr || !signed?.signedUrl) throw new Error("Falha ao gerar URL da foto");
+      signedUrl = signed.signedUrl;
     }
 
-    const result = await validarComIA(signed.signedUrl);
+    const result = await validarComIA(signedUrl);
 
     // Cross-check NF detectada vs esperada
     let status = result.status;
@@ -196,6 +214,7 @@ Deno.serve(async (req) => {
           numero_nf_detectado: result.numero_nf_detectado,
           numero_nf_esperado: numeroNfEsperado,
           nf_match: nfMatch,
+          foto_path: baixa.foto_path,
         },
         validacao_em: new Date().toISOString(),
       })
