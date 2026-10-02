@@ -179,11 +179,8 @@ export default function HistoricoEntregas() {
 
     if (baixa.foto_path) {
       setFotoLoading(true);
-      const { data } = await supabase.storage
-        .from("comprovantes")
-        .createSignedUrl(baixa.foto_path, 300); // 5 min URL
-
-      setFotoUrl(data?.signedUrl || null);
+      const url = await (await import("@/lib/foto-leve")).urlFotoLeve(baixa.foto_path, 300);
+      setFotoUrl(url);
       setFotoLoading(false);
     }
   }

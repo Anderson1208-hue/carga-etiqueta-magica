@@ -311,11 +311,9 @@ export default function PrestacaoContas() {
 
   async function verFoto(path: string) {
     try {
-      const { data, error } = await supabase.storage
-        .from("comprovantes")
-        .createSignedUrl(path, 300);
-      if (error) throw error;
-      setFotoUrl(data.signedUrl);
+      const url = await (await import("@/lib/foto-leve")).urlFotoLeve(path, 300);
+      if (!url) throw new Error("Foto não encontrada");
+      setFotoUrl(url);
     } catch (err: any) {
       toast({ title: "Erro ao abrir foto", description: err?.message, variant: "destructive" });
     }

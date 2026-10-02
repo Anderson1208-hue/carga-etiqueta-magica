@@ -130,11 +130,9 @@ export default function ConsultaNF() {
     setLoadingCanhoto(true);
     setCanhotoUrl(null);
     try {
-      const { data, error } = await supabase.storage
-        .from("comprovantes")
-        .createSignedUrl(path, 3600);
-      if (error) throw error;
-      if (data?.signedUrl) setCanhotoUrl(data.signedUrl);
+      const url = await (await import("@/lib/foto-leve")).urlFotoLeve(path, 3600);
+      if (!url) throw new Error("Foto não encontrada");
+      setCanhotoUrl(url);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Erro ao carregar canhoto", description: err.message });
     } finally {
