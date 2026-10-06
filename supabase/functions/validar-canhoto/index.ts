@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
 
     // Checagem por IA só uma vez por foto: se esta mesma foto já foi avaliada, devolve o resultado guardado.
     const anterior = (baixa as any).validacao_problemas;
-    if (baixa.validacao_status && anterior?.foto_path === baixa.foto_path) {
+    if (baixa.validacao_status && anterior?.foto_path === baixa.foto_path && anterior?.versao === 2) {
       return new Response(
         JSON.stringify({ success: true, cache: true, status: baixa.validacao_status, nf_match: anterior.nf_match }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
           numero_nf_esperado: numeroNfEsperado,
           nf_match: nfMatch,
           foto_path: baixa.foto_path,
+          versao: 2,
         },
         validacao_em: new Date().toISOString(),
       })
