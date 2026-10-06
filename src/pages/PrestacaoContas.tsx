@@ -1189,11 +1189,24 @@ export default function PrestacaoContas() {
 
         {/* Foto modal */}
         <Dialog open={!!fotoUrl} onOpenChange={(o) => !o && setFotoUrl(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden">
             <DialogHeader>
               <DialogTitle>Foto do canhoto</DialogTitle>
             </DialogHeader>
-            {fotoUrl && <img src={fotoUrl} alt="Canhoto" className="w-full rounded-md" />}
+            {fotoUrl && (
+              <>
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+                  <img src={fotoUrl} alt="Canhoto" className="max-h-[calc(90dvh-10rem)] max-w-full rounded-md object-contain" />
+                </div>
+                <DialogFooter>
+                  <Button asChild variant="outline">
+                    <a href={fotoUrl} target="_blank" rel="noopener noreferrer">
+                      <ImageIcon className="mr-2 h-4 w-4" /> Ampliar imagem
+                    </a>
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
 
