@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
     let signedUrl: string | null = null;
     const reduzida = await supabase.storage
       .from("comprovantes")
-      .createSignedUrl(baixa.foto_path, 300, { transform: { width: 1280, quality: 75 } });
+      .createSignedUrl(baixa.foto_path, 300, { transform: { width: 1280, height: 1280, resize: "contain", quality: 75 } });
     if (!reduzida.error && reduzida.data?.signedUrl) {
       const teste = await fetch(reduzida.data.signedUrl, { method: "HEAD" }).catch(() => null);
       if (teste?.ok) signedUrl = reduzida.data.signedUrl;
