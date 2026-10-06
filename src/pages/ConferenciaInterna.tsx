@@ -870,7 +870,7 @@ export default function ConferenciaInterna() {
           const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
           addToHistory(reportResult(result)); playSound("error"); return;
         }
-        const etiqueta = await findEtiquetaByQr(qrData.trim());
+        const etiqueta = await findEtiquetaByQr(qrPayload);
 
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
