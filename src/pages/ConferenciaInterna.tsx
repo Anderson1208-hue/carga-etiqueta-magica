@@ -775,12 +775,26 @@ export default function ConferenciaInterna() {
     };
 
     try {
-      const qrPayload = qrData.trim();
+      let qrPayload = qrData.trim();
       const parts = qrPayload.split(";");
 
       if (parts.length < 6) {
         const result: ScanResult = { type: "error", message: "QR Code inválido", details: "Formato não reconhecido" };
         addToHistory(reportResult(result)); playSound("error"); return;
+      }
+
+      // Carga apagada e reimportada: a etiqueta impressa guarda o id da carga
+      // antiga. Se a chave de 44 dígitos (única por NF) e o resto do QR batem,
+      // reescreve o payload com a carga aberta. A existência exata do payload
+      // continua sendo validada adiante (cache/banco), então nada passa errado.
+      if (
+        selectedCarga &&
+        parts[0] !== selectedCarga.id &&
+        /^\d{44}$/.test(parts[5]) &&
+        parts[5].includes(parts[1])
+      ) {
+        parts[0] = selectedCarga.id;
+        qrPayload = parts.join(";");
       }
 
       const [qrCargaId, numeroNf, cProd, seqStr, totalStr] = parts;
@@ -856,7 +870,7 @@ export default function ConferenciaInterna() {
           const result: ScanResult = { type: "error", message: "Etapa 2 exige conexão", details: "A expedição precisa gravar online. Volte para Etapa 1 ou conecte-se." };
           addToHistory(reportResult(result)); playSound("error"); return;
         }
-        const etiqueta = await findEtiquetaByQr(qrData.trim());
+        const etiqueta = await findEtiquetaByQr(qrPayload);
 
         if (!etiqueta) {
           const result: ScanResult = { type: "error", message: "Etiqueta não encontrada (offline)", details: `NF ${numeroNf} - Cód ${cProd} - Caixa ${seqStr}/${totalStr}` };
