@@ -8,7 +8,7 @@ export async function urlFotoLeve(path: string, expiraSeg: number, bucket = "com
   try {
     const { data } = await supabase.storage
       .from(bucket)
-      .createSignedUrl(path, expiraSeg, { transform: { width: 1400, quality: 70 } });
+      .createSignedUrl(path, expiraSeg, { transform: { width: 1400, height: 1400, resize: "contain", quality: 70 } });
     if (data?.signedUrl) {
       const r = await fetch(data.signedUrl, { method: "HEAD" }).catch(() => null);
       if (r?.ok) return data.signedUrl;
