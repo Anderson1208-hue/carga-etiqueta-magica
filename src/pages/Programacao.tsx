@@ -43,6 +43,7 @@ import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/Tip
 import * as XLSX from "xlsx";
 import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
+import { AgendasFuturasDialog } from "@/components/preparacao/AgendasFuturasDialog";
 
 interface NfDisponivel {
   id: string;
@@ -1089,6 +1090,9 @@ export default function Programacao() {
                                           <Badge className="text-xs shrink-0 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                             ⭐ PRIORIDADE — AGENDADA{proxAgendamento ? ` ${format(new Date(proxAgendamento + "T00:00:00"), "dd/MM")}` : ""}
                                           </Badge>
+                                        )}
+                                        {hasAgendamento && first.cnpj_destinatario && (
+                                          <AgendasFuturasDialog cnpj={first.cnpj_destinatario} nome={first.dest_razao_social} />
                                         )}
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
