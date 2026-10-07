@@ -241,7 +241,7 @@ export default function Programacao() {
         const ag = agendamentoMap.get(nf.id);
         const bloqueada = ag && (
           ['AGUARDANDO AGENDA', 'AGUARDANDO REAGENDA', 'DEVOLUCAO', 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO'].includes(ag.status) ||
-          (ehAgendada(ag) && (!ag.data_agendamento || ag.data_agendamento > limiteLiberacao))
+          (ehAgendada(ag) && !!ag.data_agendamento && ag.data_agendamento > limiteLiberacao)
         );
         if (!bloqueada) cnpjsLiberados.add(nf.cnpj_destinatario);
       }
