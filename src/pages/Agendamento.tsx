@@ -57,7 +57,7 @@ import { generateAgendamentosResumoPDF, type AgendamentoResumoItem } from "@/lib
 import { generateAgendamentosResumoExcel } from "@/lib/agendamentos-resumo-excel";
 import { calculateBoxes } from "@/lib/xml-parser";
 
-type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "REENTREGA" | "DEVOLUCAO";
+type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO" | "REENTREGA" | "DEVOLUCAO";
 
 interface NfResult {
   id: string;
@@ -96,6 +96,7 @@ const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.Rea
   { value: "AGENDAMENTO", label: "Agendamento", icon: <CalendarCheck className="w-4 h-4" />, color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", requiresDate: true },
   { value: "AGUARDANDO AGENDA", label: "Aguardando Agenda", icon: <Clock className="w-4 h-4" />, color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200", requiresDate: false },
   { value: "AGUARDANDO REAGENDA", label: "Aguardando Reagenda", icon: <Clock className="w-4 h-4" />, color: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100", requiresDate: false },
+  { value: "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO", label: "Entrega Imediata aguardando definição", icon: <Clock className="w-4 h-4 shrink-0" />, color: "bg-muted text-muted-foreground", requiresDate: false },
   { value: "REENTREGA", label: "Reentrega", icon: <RotateCcw className="w-4 h-4" />, color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", requiresDate: true },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];
@@ -442,7 +443,7 @@ export default function Agendamento() {
       const { error } = await supabase.from("agendamentos").insert({
         nf_id: selectedNf.id,
         status: finalStatus,
-        data_agendamento: agDate ? format(agDate, "yyyy-MM-dd") : null,
+        data_agendamento: agStatus !== "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO" && agDate ? format(agDate, "yyyy-MM-dd") : null,
         observacao: agObs || null,
         created_by: user.id,
       });
@@ -492,7 +493,7 @@ export default function Agendamento() {
       const inserts = Array.from(selectedNfIds).map(nfId => ({
         nf_id: nfId,
         status: finalStatus,
-        data_agendamento: bulkDate ? format(bulkDate, "yyyy-MM-dd") : null,
+        data_agendamento: bulkStatus !== "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO" && bulkDate ? format(bulkDate, "yyyy-MM-dd") : null,
         observacao: bulkObs || null,
         created_by: user.id,
       }));
