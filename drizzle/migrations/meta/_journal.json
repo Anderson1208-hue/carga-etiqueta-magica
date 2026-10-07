@@ -120,6 +120,13 @@
       "when": 1790789429983,
       "tag": "0016_siriuslog_segunda_rodada_e_log_tentativas",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791404709508,
+      "tag": "0017_agendamento_status_entrega_imediata",
+      "breakpoints": true
     }
   ]
 }
