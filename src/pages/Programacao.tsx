@@ -72,6 +72,7 @@ interface NfDisponivel {
   data_agendamento: string | null;
   antecipacao?: boolean;
   entrega_imediata?: boolean;
+  status_agendamento?: string | null;
   
 }
 
@@ -292,6 +293,7 @@ export default function Programacao() {
             tem_agendamento: !antecipadas.has(nf.id) && ehAgendada(agendamentoMap.get(nf.id)),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
             antecipacao: antecipadas.has(nf.id),
+            status_agendamento: agendamentoMap.get(nf.id)?.status ?? null,
             entrega_imediata: agendamentoMap.get(nf.id)?.status === 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO',
           };
         });
@@ -1179,9 +1181,14 @@ export default function Programacao() {
                                             NF {nf.numero_nf}
                                           </span>
                                           <TipoCargaBadge tipoCarga={nf.carga_tipo_carga} />
+                                          {!nf.status_agendamento && (
+                                            <Badge variant="outline" className="text-[10px] h-4 px-1 text-muted-foreground">
+                                              SEM AGENDAMENTO
+                                            </Badge>
+                                          )}
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
-                                              AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                              {nf.status_agendamento === 'REENTREGA' ? 'REENTREGA' : 'AGENDADA'}{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
                                             </Badge>
                                           )}
                                           {nf.entrega_imediata && (
