@@ -71,6 +71,7 @@ interface NfDisponivel {
   tem_agendamento: boolean;
   data_agendamento: string | null;
   antecipacao?: boolean;
+  entrega_imediata?: boolean;
   
 }
 
@@ -291,6 +292,7 @@ export default function Programacao() {
             tem_agendamento: !antecipadas.has(nf.id) && ehAgendada(agendamentoMap.get(nf.id)),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
             antecipacao: antecipadas.has(nf.id),
+            entrega_imediata: agendamentoMap.get(nf.id)?.status === 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO',
           };
         });
 
@@ -1103,6 +1105,11 @@ export default function Programacao() {
                                         <Badge variant="outline" className="text-xs shrink-0">
                                           {nfsEntrega.length} NF{nfsEntrega.length > 1 ? "s" : ""}
                                         </Badge>
+                                        {nfsEntrega.some((n) => n.entrega_imediata) && (
+                                          <Badge variant="outline" className="text-xs shrink-0 border-destructive text-destructive">
+                                            ENTREGA IMEDIATA – AGUARDANDO DEFINIÇÃO
+                                          </Badge>
+                                        )}
                                         {hasAgendamento && (
                                           <Badge className="text-xs shrink-0 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                             ⭐ PRIORIDADE — AGENDADA{proxAgendamento ? ` ${format(new Date(proxAgendamento + "T00:00:00"), "dd/MM")}` : ""}
@@ -1175,6 +1182,11 @@ export default function Programacao() {
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                               AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                            </Badge>
+                                          )}
+                                          {nf.entrega_imediata && (
+                                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-destructive text-destructive">
+                                              ENTREGA IMEDIATA – AGUARDANDO DEFINIÇÃO
                                             </Badge>
                                           )}
                                           {nf.antecipacao && (
