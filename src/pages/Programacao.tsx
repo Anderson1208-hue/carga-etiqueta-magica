@@ -239,7 +239,11 @@ export default function Programacao() {
       for (const nf of nfs) {
         if (assignedIds.has(nf.id) || !nf.cnpj_destinatario) continue;
         const ag = agendamentoMap.get(nf.id);
-        if (ehAgendada(ag) && ag!.data_agendamento && ag!.data_agendamento <= limiteLiberacao) cnpjsLiberados.add(nf.cnpj_destinatario);
+        const bloqueada = ag && (
+          ['AGUARDANDO AGENDA', 'AGUARDANDO REAGENDA', 'DEVOLUCAO', 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO'].includes(ag.status) ||
+          (ehAgendada(ag) && !!ag.data_agendamento && ag.data_agendamento > limiteLiberacao)
+        );
+        if (!bloqueada) cnpjsLiberados.add(nf.cnpj_destinatario);
       }
       const antecipadas = new Set<string>();
 
@@ -250,6 +254,10 @@ export default function Programacao() {
           if (ag) {
             // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
             if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'AGUARDANDO REAGENDA' || ag.status === 'DEVOLUCAO') return false;
+            // ENTREGA IMEDIATA: só aparece se o CNPJ tiver outra nota liberada
+            if (ag.status === 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO') {
+              return !!nf.cnpj_destinatario && cnpjsLiberados.has(nf.cnpj_destinatario);
+            }
             // AGENDAMENTO ou REENTREGA: libera na véspera (data <= amanhã)
             if (ehAgendada(ag) && ag.data_agendamento && ag.data_agendamento > limiteLiberacao) {
               if (nf.cnpj_destinatario && cnpjsLiberados.has(nf.cnpj_destinatario)) {
