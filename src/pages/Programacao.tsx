@@ -43,7 +43,6 @@ import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/Tip
 import * as XLSX from "xlsx";
 import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
-import { AgendasFuturasDialog } from "@/components/preparacao/AgendasFuturasDialog";
 
 interface NfDisponivel {
   id: string;
@@ -71,6 +70,7 @@ interface NfDisponivel {
   razao_social_emitente: string;
   tem_agendamento: boolean;
   data_agendamento: string | null;
+  antecipacao?: boolean;
   
 }
 
@@ -231,6 +231,16 @@ export default function Programacao() {
       const proximoDiaUtil = proximoDiaUtilApos(hoje);
       const limiteLiberacao = format(proximoDiaUtil, "yyyy-MM-dd");
 
+      const ehAgendada = (ag?: { status: string }) => !!ag && (ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA');
+      // CNPJs com agenda liberada hoje: suas agendas futuras entram como opção de antecipação.
+      const cnpjsLiberados = new Set<string>();
+      for (const nf of nfs) {
+        if (assignedIds.has(nf.id) || !nf.cnpj_destinatario) continue;
+        const ag = agendamentoMap.get(nf.id);
+        if (ehAgendada(ag) && ag!.data_agendamento && ag!.data_agendamento <= limiteLiberacao) cnpjsLiberados.add(nf.cnpj_destinatario);
+      }
+      const antecipadas = new Set<string>();
+
       const available: NfDisponivel[] = nfs
         .filter((nf) => {
           if (assignedIds.has(nf.id)) return false;
@@ -239,7 +249,13 @@ export default function Programacao() {
             // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
             if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'AGUARDANDO REAGENDA' || ag.status === 'DEVOLUCAO') return false;
             // AGENDAMENTO ou REENTREGA: libera na véspera (data <= amanhã)
-            if ((ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA') && ag.data_agendamento && ag.data_agendamento > limiteLiberacao) return false;
+            if (ehAgendada(ag) && ag.data_agendamento && ag.data_agendamento > limiteLiberacao) {
+              if (nf.cnpj_destinatario && cnpjsLiberados.has(nf.cnpj_destinatario)) {
+                antecipadas.add(nf.id);
+                return true;
+              }
+              return false;
+            }
           }
           return true;
         })
@@ -272,8 +288,9 @@ export default function Programacao() {
             carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
             razao_social_emitente: (nf as any).razao_social_emitente || "",
-            tem_agendamento: !!(agendamentoMap.get(nf.id) && (agendamentoMap.get(nf.id)!.status === 'AGENDAMENTO' || agendamentoMap.get(nf.id)!.status === 'REENTREGA')),
+            tem_agendamento: !antecipadas.has(nf.id) && ehAgendada(agendamentoMap.get(nf.id)),
             data_agendamento: agendamentoMap.get(nf.id)?.data_agendamento ?? null,
+            antecipacao: antecipadas.has(nf.id),
           };
         });
 
@@ -1091,9 +1108,6 @@ export default function Programacao() {
                                             ⭐ PRIORIDADE — AGENDADA{proxAgendamento ? ` ${format(new Date(proxAgendamento + "T00:00:00"), "dd/MM")}` : ""}
                                           </Badge>
                                         )}
-                                        {hasAgendamento && first.cnpj_destinatario && (
-                                          <AgendasFuturasDialog cnpj={first.cnpj_destinatario} nome={first.dest_razao_social} />
-                                        )}
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                         <MapPin className="w-3 h-3 shrink-0" />
@@ -1161,6 +1175,11 @@ export default function Programacao() {
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
                                               AGENDADA{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                            </Badge>
+                                          )}
+                                          {nf.antecipacao && (
+                                            <Badge variant="outline" className="text-[10px] h-4 px-1 border-primary text-primary">
+                                              ANTECIPAÇÃO – agenda {nf.data_agendamento ? format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM") : ""}
                                             </Badge>
                                           )}
                                           <span className="text-xs text-muted-foreground">
