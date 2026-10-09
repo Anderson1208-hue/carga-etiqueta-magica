@@ -2,7 +2,7 @@
 
 - [x] Organizar o menu em pastas e subpastas laterais, preservando funções e permissões; sem implementar faturamento. Verificado com acesso de Anderson, incluindo menu recolhido.
 
-- [ ] Restaurar o acesso de todos os operadores e confirmar o login após a recuperação do serviço.
+- [x] Acesso dos operadores confirmado: 24 liberados e 5 bloqueados — Anderson confirmou que os bloqueios são intencionais e devem continuar.
 - [x] Reorganizar a tabela de etiquetas: executada em 02/10 às 23:59. Espaço caiu de 1228 MB para 478 MB (09/10), com 603.400 etiquetas preservadas.
 - [x] Fotos leves nas telas, IA uma vez por foto, rotinas de 2 min só seg–sex, limpeza diária do histórico técnico.
 - [ ] Aumentar o banco para 30 GB em outra janela, separada da reorganização. Data ainda a definir.
