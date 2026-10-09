@@ -2278,6 +2278,68 @@ export type Database = {
         }
         Relationships: []
       }
+      macro_regiao_termos: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          id: string
+          macro_numero: number
+          termo: string
+          termo_norm: string
+          tipo: string
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          id?: string
+          macro_numero: number
+          termo: string
+          termo_norm: string
+          tipo: string
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          id?: string
+          macro_numero?: number
+          termo?: string
+          termo_norm?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "macro_regiao_termos_macro_numero_fkey"
+            columns: ["macro_numero"]
+            isOneToOne: false
+            referencedRelation: "macro_regioes"
+            referencedColumns: ["numero"]
+          },
+        ]
+      }
+      macro_regioes: {
+        Row: {
+          ativa: boolean
+          atualizado_em: string
+          atualizado_por: string | null
+          nome: string
+          numero: number
+        }
+        Insert: {
+          ativa?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          nome: string
+          numero: number
+        }
+        Update: {
+          ativa?: boolean
+          atualizado_em?: string
+          atualizado_por?: string | null
+          nome?: string
+          numero?: number
+        }
+        Relationships: []
+      }
       monitor_espaco_tabelas: {
         Row: {
           alerta: boolean

@@ -44,6 +44,7 @@ import {
   Receipt,
   Calculator,
   Mail,
+  Map as MapIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -98,6 +99,7 @@ const torreControleItems = [
 const cadastrosItems = [
   { name: "Embarcadores", href: "/embarcadores", icon: Building2 },
   { name: "Destinatários", href: "/destinatarios", icon: Contact },
+  { name: "Macro Regiões", href: "/macro-regioes", icon: MapIcon },
   { name: "Produtos", href: "/produtos", icon: Package },
   { name: "Cadastro na Chegada", href: "/produtos/chegada", icon: Package },
 ];
