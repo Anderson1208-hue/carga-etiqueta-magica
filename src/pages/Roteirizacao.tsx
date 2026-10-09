@@ -1625,7 +1625,9 @@ export default function Roteirizacao() {
 
       const blob = await generateNotaDeCargaPDF(
         { data: veiculo.data, placa: veiculo.placa, motorista: veiculo.motorista || "" },
-        notasFiscais
+        notasFiscais,
+        "default",
+        { resumoPorEntregaCacau: true }
       );
       downloadBlob(blob, `nota_carga_${veiculo.placa}_${veiculo.data}.pdf`);
       toast({ title: "PDF gerado", description: `Nota de Carga do veículo ${veiculo.placa}` });

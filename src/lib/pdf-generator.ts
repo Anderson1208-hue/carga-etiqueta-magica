@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
 import { getMacroRegiaoLabel } from "@/lib/macro-regioes";
+import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 
 interface RomaneioItem {
   cProd: string;
@@ -190,7 +191,8 @@ export async function generateRomaneioPDF(
 export async function generateNotaDeCargaPDF(
   carregamentoInfo: { data: string; placa: string; motorista: string },
   notasFiscais: NotaFiscalPDF[],
-  sortMode: "default" | "nf-ascending" = "default"
+  sortMode: "default" | "nf-ascending" = "default",
+  options: { resumoPorEntregaCacau?: boolean } = {}
 ): Promise<Blob> {
   const A4_WIDTH = 210;
   const A4_HEIGHT = 297;
@@ -224,10 +226,22 @@ export async function generateNotaDeCargaPDF(
     return numericSort(a.numeroNf, b.numeroNf);
   });
 
+  // IBAC/IBAE: resumo por entrega (somente quando solicitado — Roteirização).
+  const cacauNFs = options.resumoPorEntregaCacau
+    ? sortedNFs.filter((nf) => isEmitenteCacau(nf.cnpjEmitente))
+    : [];
+  const normalNFs = options.resumoPorEntregaCacau
+    ? sortedNFs.filter((nf) => !isEmitenteCacau(nf.cnpjEmitente))
+    : sortedNFs;
+
+  if (cacauNFs.length > 0) {
+    renderResumoEntregasCacau(doc, carregamentoInfo, cacauNFs);
+  }
+
   let currentMR: number | null = null;
 
-  sortedNFs.forEach((nf, nfIndex) => {
-    if (nfIndex > 0) {
+  normalNFs.forEach((nf, nfIndex) => {
+    if (nfIndex > 0 || cacauNFs.length > 0) {
       doc.addPage();
     }
 
@@ -450,6 +464,146 @@ export async function generateNotaDeCargaPDF(
   });
 
   return doc.output("blob");
+}
+
+function renderResumoEntregasCacau(
+  doc: jsPDF,
+  info: { data: string; placa: string; motorista: string },
+  nfs: NotaFiscalPDF[]
+): void {
+  const PW = 210;
+  const PH = 297;
+  const M = 10;
+  const CW = PW - 2 * M;
+  const col = { nf: M + 2, cod: M + 24, desc: M + 52, cx: PW - M - 2 };
+
+  // Agrupa por entrega (ordem da rota; sem ordem → CNPJ), preservando a ordem já ordenada
+  const grupos: { key: string; ordem?: number; nfs: NotaFiscalPDF[] }[] = [];
+  const idx = new Map<string, number>();
+  for (const nf of nfs) {
+    const key = nf.ordemEntrega ? `o${nf.ordemEntrega}` : `c${nf.cnpjDestinatario || nf.numeroNf}`;
+    if (!idx.has(key)) {
+      idx.set(key, grupos.length);
+      grupos.push({ key, ordem: nf.ordemEntrega, nfs: [] });
+    }
+    grupos[idx.get(key)!].nfs.push(nf);
+  }
+  const totalEntregas = nfs.find((n) => n.totalEntregas)?.totalEntregas;
+  const sumCx = (nf: NotaFiscalPDF) => nf.itens.reduce((s, it) => s + it.qtdCaixas, 0);
+  const totalCx = nfs.reduce((s, nf) => s + sumCx(nf), 0);
+
+  let y = M;
+  const drawPageHeader = () => {
+    doc.setFillColor(60, 60, 60);
+    doc.rect(0, 0, PW, 18, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("RESUMO POR ENTREGA — IBAC / IBAE", M, 8);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const [yy, mm, dd] = (info.data || "").slice(0, 10).split("-");
+    doc.text(`${info.placa} | ${info.motorista || "Sem motorista"} | ${dd}/${mm}/${yy}`, M, 14);
+    doc.setTextColor(30, 30, 30);
+    y = 22;
+  };
+  const drawTableHeader = () => {
+    doc.setFillColor(60, 60, 60);
+    doc.rect(M, y, CW, 6, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text("NF", col.nf, y + 4.2);
+    doc.text("CÓD", col.cod, y + 4.2);
+    doc.text("PRODUTO", col.desc, y + 4.2);
+    doc.text("CX", col.cx, y + 4.2, { align: "right" });
+    doc.setTextColor(30, 30, 30);
+    y += 7;
+  };
+  const newPage = () => {
+    doc.addPage();
+    drawPageHeader();
+  };
+  const ensure = (h: number) => {
+    if (y + h > PH - 12) newPage();
+  };
+
+  drawPageHeader();
+  doc.setFillColor(230, 230, 230);
+  doc.rect(M, y, CW, 7, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text(`${grupos.length} entregas  •  ${nfs.length} NFs  •  ${totalCx} caixas`, M + 3, y + 5);
+  y += 10;
+
+  grupos.forEach((g, gi) => {
+    const first = g.nfs[0];
+    const cxEntrega = g.nfs.reduce((s, nf) => s + sumCx(nf), 0);
+    ensure(30);
+
+    // Cabeçalho da entrega
+    doc.setFillColor(255, 230, 0);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.rect(M, y, CW, 8, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    const ord = g.ordem ?? gi + 1;
+    const tot = totalEntregas ? ` DE ${totalEntregas}` : "";
+    doc.text(truncateText(`${ord}ª ENTREGA${tot} — ${first.destRazaoSocial || first.cnpjDestinatario || "—"}`, 70), M + 2, y + 5.5);
+    const resumo = `${g.nfs.length} NFs | ${cxEntrega} cx`;
+    doc.text(resumo, PW - M - 2, y + 5.5, { align: "right" });
+    y += 9;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    const end = buildEnderecoCompleto(first);
+    doc.text(truncateText(`${end || "—"}  •  MR ${first.macroRegiao ?? 99}`, 120), M + 2, y + 3);
+    y += 5;
+    drawTableHeader();
+
+    for (const nf of g.nfs) {
+      const itens = [...nf.itens].sort((a, b) => numericSort(a.cProd, b.cProd));
+      let firstRow = true;
+      for (const it of itens) {
+        if (y + 5 > PH - 12) {
+          newPage();
+          drawTableHeader();
+          firstRow = true;
+        }
+        doc.setFontSize(7);
+        if (firstRow) {
+          doc.setFont("helvetica", "bold");
+          doc.text(nf.numeroNf, col.nf, y + 3);
+          if (nf.reentrega) {
+            doc.setTextColor(200, 30, 30);
+            doc.text("REENTREGA", col.nf, y + 6.2);
+            doc.setTextColor(30, 30, 30);
+          }
+          firstRow = false;
+        }
+        doc.setFont("helvetica", "normal");
+        doc.text(truncateText(formatCProdDisplay(it.cProd), 14), col.cod, y + 3);
+        doc.text(truncateText(it.xProd || "", 70), col.desc, y + 3);
+        doc.text(String(it.qtdCaixas), col.cx, y + 3, { align: "right" });
+        y += 4.5;
+      }
+      ensure(6);
+      doc.setDrawColor(200, 200, 200);
+      doc.line(M, y, PW - M, y);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.text(`Total NF ${nf.numeroNf}: ${sumCx(nf)} cx`, col.cx, y + 3.5, { align: "right" });
+      y += 6;
+    }
+
+    ensure(8);
+    doc.setFillColor(230, 230, 230);
+    doc.rect(M, y, CW, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(`TOTAL DA ENTREGA ${ord}: ${cxEntrega} cx`, col.cx, y + 4.2, { align: "right" });
+    y += 10;
+  });
 }
 
 export async function generateEtiquetasPDF(
