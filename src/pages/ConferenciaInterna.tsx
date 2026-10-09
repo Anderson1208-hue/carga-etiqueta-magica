@@ -1534,7 +1534,7 @@ export default function ConferenciaInterna() {
 
   const nfPercent =
     nfProgress && nfProgress.total > 0
-      ? Math.round((nfProgress.conferidas / nfProgress.total) * 100)
+      ? Math.floor((nfProgress.conferidas / nfProgress.total) * 100)
       : 0;
 
   // ---- SCANNING VIEW ----
