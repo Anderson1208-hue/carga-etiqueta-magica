@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] Organizar o menu em pastas e subpastas laterais, preservando funções e permissões; sem implementar faturamento. Verificado com acesso de Anderson, incluindo menu recolhido.
+
 - [ ] Restaurar o acesso de todos os operadores e confirmar o login após a recuperação do serviço.
 - [ ] Reorganizar a tabela de etiquetas: agendada para 02/10 às 23:59 (Brasília). Conferir o resultado no dia 03/10.
 - [x] Fotos leves nas telas, IA uma vez por foto, rotinas de 2 min só seg–sex, limpeza diária do histórico técnico.

@@ -45,6 +45,8 @@ import {
   Calculator,
   Mail,
   Map as MapIcon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -130,11 +132,13 @@ function CanhotosPendentesBadge() {
   );
 }
 
-function NavItem({ item, isActive, onClick }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean; onClick?: () => void }) {
+function NavItem({ item, isActive, onClick, compact = false }: { item: { name: string; href: string; icon: React.ElementType }; isActive: boolean; onClick?: () => void; compact?: boolean }) {
   return (
     <Link
       to={item.href}
       onClick={onClick}
+      title={compact ? item.name : undefined}
+      aria-label={item.name}
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
         isActive
@@ -142,8 +146,8 @@ function NavItem({ item, isActive, onClick }: { item: { name: string; href: stri
           : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
       )}
     >
-      <item.icon className="w-5 h-5" />
-      {item.name}
+      <item.icon className="w-5 h-5 shrink-0" />
+      {!compact && item.name}
       {item.href === "/canhotos-pendentes" && <CanhotosPendentesBadge />}
     </Link>
   );
@@ -166,7 +170,7 @@ function NavSubGroup({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button variant="ghost"
           className={cn(
             "flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium transition-colors",
             active
@@ -177,7 +181,7 @@ function NavSubGroup({
           <Icon className="w-5 h-5" />
           <span className="flex-1 text-left">{label}</span>
           <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         side="right"
@@ -210,6 +214,7 @@ function NavGroupFlyout({
   pathname,
   groupActive,
   subgroups,
+  compact = false,
 }: {
   label: string;
   icon: React.ElementType;
@@ -217,13 +222,14 @@ function NavGroupFlyout({
   pathname: string;
   groupActive: boolean;
   subgroups?: { label: string; icon: React.ElementType; items: typeof depositoItems }[];
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button variant="ghost" title={compact ? label : undefined} aria-label={label}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-semibold transition-colors",
             groupActive
@@ -231,10 +237,10 @@ function NavGroupFlyout({
               : "text-sidebar-foreground/90 hover:bg-sidebar-accent"
           )}
         >
-          <Icon className="w-5 h-5" />
-          <span className="flex-1 text-left">{label}</span>
-          <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />
-        </button>
+          <Icon className="w-5 h-5 shrink-0" />
+          {!compact && <span className="flex-1 text-left">{label}</span>}
+          {!compact && <ChevronRight className={cn("w-4 h-4 transition-transform", open && "rotate-90")} />}
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         side="right"
@@ -277,6 +283,7 @@ export function Sidebar() {
   const { podeVerOkEntrega } = useAcessoOkEntrega();
   const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
   const { podeEnviarCanhoto } = useAcessoEnvioCanhoto();
+  const [collapsed, setCollapsed] = useState(false);
 
   const integracaoItems = integracaoItemsBase.filter((i) =>
     i.href === "/integracoes/ibac"
@@ -285,139 +292,88 @@ export function Sidebar() {
         ? podeVerOkEntrega
         : podeEnviarCanhoto,
   );
-  const integracaoActive = integracaoItems.some((i) => location.pathname === i.href);
 
   const depositoActive = depositoItems.some((i) => location.pathname === i.href);
   const transporteActive = transporteItems.some((i) => location.pathname === i.href);
   const agendasActive = agendasItems.some((i) => location.pathname === i.href);
-  const trackingActive = trackingItems.some((i) => location.pathname === i.href);
   const torreActive = torreControleItems.some((i) => location.pathname === i.href);
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
   const cadastrosActive = cadastrosItems.some((i) => location.pathname === i.href);
 
+  const financeiroItems = [transporteItems[4]];
+  const comercialItems = podeGestaoComercial ? [
+    { name: "Regiões e SLA", href: "/comercial/sla-fornecedor", icon: Calculator },
+    { name: "Tarifas por Região", href: "/comercial/tarifas-regiao", icon: HandCoins },
+  ] : [];
+  const fiscalItems = isAdmin ? [
+    { name: "Config. Fiscal", href: "/fiscal/configuracao", icon: Receipt },
+    { name: "Motoristas (Fiscal)", href: "/fiscal/motoristas", icon: Receipt },
+    { name: "Convênios Fiscais", href: "/fiscal/convenios", icon: Receipt },
+    { name: "Tabelas de Frete", href: "/fiscal/tabelas-frete", icon: Receipt },
+  ] : [];
+  const administracaoItems = [
+    { name: "Operadores", href: "/operadores", icon: Users },
+    { name: "Auditoria", href: "/auditoria", icon: ShieldCheck },
+  ];
+  const integracoes = [
+    ...integracaoItems,
+    ...(podeVerTrackingPandurata ? trackingItems : []),
+    ...(isAdmin ? [{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }] : []),
+  ];
+  const activeIn = (items: typeof depositoItems) => items.some((item) => item.href === location.pathname);
+
   return (
-    <div className="flex flex-col h-full w-64 bg-sidebar text-sidebar-foreground">
+    <div className={cn("flex flex-col h-full shrink-0 bg-sidebar text-sidebar-foreground", collapsed ? "w-16" : "w-64")}>
       {/* Logo / Brand */}
-      <div className="flex items-center gap-3 px-6 h-16 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
+      <div className={cn("flex items-center gap-2 h-16 shrink-0 border-b border-sidebar-border", collapsed ? "justify-center" : "px-3")}>
+        {!collapsed && <div className="w-8 h-8 shrink-0 rounded-lg bg-sidebar-primary flex items-center justify-center">
           <Truck className="w-5 h-5 text-sidebar-primary-foreground" />
-        </div>
-        <span className="font-semibold text-lg">WMS Recebimento</span>
+        </div>}
+        {!collapsed && <span className="font-semibold text-sm flex-1">WMS Recebimento</span>}
+        <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expandir menu" : "Recolher menu"} title={collapsed ? "Expandir menu" : "Recolher menu"}>
+          {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+        </Button>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav aria-label="Menu principal" className={cn("flex-1 py-4 space-y-1 overflow-y-auto", collapsed ? "px-1" : "px-3")}>
         {topNav.map((item) => (
-          <NavItem key={item.href} item={item} isActive={location.pathname === item.href} />
+          <NavItem key={item.href} item={item} isActive={location.pathname === item.href} compact={collapsed} />
         ))}
 
         <div className="pt-2 space-y-1">
           <NavGroupFlyout
-            label="Cadastros"
-            icon={Building2}
-            items={cadastrosItems}
-            pathname={location.pathname}
-            groupActive={cadastrosActive}
-          />
-          <NavGroupFlyout
-            label="Depósito"
-            icon={Package}
-            items={depositoItems}
-            pathname={location.pathname}
-            groupActive={depositoActive}
-          />
-          <NavGroupFlyout
-            label="Transporte"
-            icon={MapPin}
-            items={transporteItems}
-            pathname={location.pathname}
-            groupActive={transporteActive || agendasActive || integracaoActive}
+            label="Operação" icon={Truck} items={[]} pathname={location.pathname}
+            compact={collapsed} groupActive={depositoActive || transporteActive || agendasActive}
             subgroups={[
+              { label: "Depósito", icon: Warehouse, items: depositoItems },
+              { label: "Transporte", icon: Route, items: transporteItems.filter((item) => item.href !== "/pre-cte") },
               { label: "Agendas", icon: CalendarDays, items: agendasItems },
-              ...(integracaoItems.length
-                ? [{ label: "Integração", icon: Plug, items: integracaoItems }]
-                : []),
             ]}
           />
-          {podeVerTrackingPandurata && (
-            <NavGroupFlyout
-              label="Tracking"
-              icon={Radar}
-              items={trackingItems}
-              pathname={location.pathname}
-              groupActive={trackingActive}
-            />
-          )}
-          <NavGroupFlyout
-            label="Torre de Controle"
-            icon={Eye}
-            items={torreControleItems}
-            pathname={location.pathname}
-            groupActive={torreActive}
-          />
-          <NavGroupFlyout
-            label="Relatórios"
-            icon={BarChart3}
-            items={relatoriosItems}
-            pathname={location.pathname}
-            groupActive={relatoriosActive}
-          />
-          <div className="pt-2 space-y-0.5">
-            {podeGestaoComercial && (
-              <>
-                <NavItem
-                  item={{ name: "Regiões e SLA", href: "/comercial/sla-fornecedor", icon: Calculator }}
-                  isActive={location.pathname === "/comercial/sla-fornecedor"}
-                />
-                <NavItem
-                  item={{ name: "Tarifas por Região", href: "/comercial/tarifas-regiao", icon: HandCoins }}
-                  isActive={location.pathname === "/comercial/tarifas-regiao"}
-                />
-              </>
-            )}
-            {isAdmin && (
-              <>
-                <NavItem
-                  item={{ name: "Operadores", href: "/operadores", icon: Users }}
-                  isActive={location.pathname === "/operadores"}
-                />
-                <NavItem
-                  item={{ name: "Auditoria", href: "/auditoria", icon: ShieldCheck }}
-                  isActive={location.pathname === "/auditoria"}
-                />
-
-
-
-                <NavItem
-                  item={{ name: "Importar OCOREN", href: "/integracoes/ocoren", icon: Upload }}
-                  isActive={location.pathname === "/integracoes/ocoren"}
-                />
-                <NavItem
-                  item={{ name: "Config. Fiscal", href: "/fiscal/configuracao", icon: Receipt }}
-                  isActive={location.pathname === "/fiscal/configuracao"}
-                />
-                <NavItem
-                  item={{ name: "Motoristas (Fiscal)", href: "/fiscal/motoristas", icon: Receipt }}
-                  isActive={location.pathname === "/fiscal/motoristas"}
-                />
-                <NavItem
-                  item={{ name: "Convênios Fiscais", href: "/fiscal/convenios", icon: Receipt }}
-                  isActive={location.pathname === "/fiscal/convenios"}
-                />
-                <NavItem
-                  item={{ name: "Tabelas de Frete", href: "/fiscal/tabelas-frete", icon: Receipt }}
-                  isActive={location.pathname === "/fiscal/tabelas-frete"}
-                />
-
-              </>
-            )}
-          </div>
+          <NavGroupFlyout label="Monitoramento" icon={Eye} items={torreControleItems}
+            pathname={location.pathname} compact={collapsed} groupActive={torreActive} />
+          {integracoes.length > 0 && <NavGroupFlyout label="Integrações" icon={Plug}
+            items={integracoes} pathname={location.pathname} compact={collapsed} groupActive={activeIn(integracoes)} />}
+          <NavGroupFlyout label="Cadastros" icon={Building2} items={cadastrosItems}
+            pathname={location.pathname} compact={collapsed} groupActive={cadastrosActive} />
+          <NavGroupFlyout label="Relatórios" icon={BarChart3} items={relatoriosItems}
+            pathname={location.pathname} compact={collapsed} groupActive={relatoriosActive} />
+          <NavGroupFlyout label="Financeiro e Fiscal" icon={Receipt} items={financeiroItems}
+            pathname={location.pathname} compact={collapsed}
+            groupActive={activeIn(financeiroItems) || activeIn(comercialItems) || activeIn(fiscalItems)}
+            subgroups={[
+              ...(comercialItems.length ? [{ label: "Comercial", icon: HandCoins, items: comercialItems }] : []),
+              ...(fiscalItems.length ? [{ label: "Fiscal", icon: Receipt, items: fiscalItems }] : []),
+            ]} />
+          {isAdmin && <NavGroupFlyout label="Administração" icon={ShieldCheck} items={administracaoItems}
+            pathname={location.pathname} compact={collapsed} groupActive={activeIn(administracaoItems)} />}
         </div>
       </nav>
 
       {/* User section */}
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 mb-3">
+      <div className={cn("border-t border-sidebar-border", collapsed ? "p-1" : "p-4")}>
+        <div className={cn("flex items-center gap-3 mb-3", collapsed && "hidden")}>
           <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center">
             <User className="w-5 h-5" />
           </div>
@@ -435,9 +391,11 @@ export function Sidebar() {
           size="sm"
           className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
           onClick={signOut}
+          aria-label="Sair"
+          title="Sair"
         >
           <LogOut className="w-4 h-4 mr-2" />
-          Sair
+          {!collapsed && "Sair"}
         </Button>
       </div>
     </div>
