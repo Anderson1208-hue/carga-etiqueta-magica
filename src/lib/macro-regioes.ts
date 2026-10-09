@@ -285,7 +285,7 @@ const BAIRRO_MACRO_REGIAO: Record<string, number> = {
 /**
  * Normaliza o nome do bairro removendo acentos e convertendo para uppercase.
  */
-function normalizeBairro(bairro: string): string {
+export function normalizeBairro(bairro: string): string {
   return bairro
     .trim()
     .toUpperCase()
@@ -296,7 +296,7 @@ function normalizeBairro(bairro: string): string {
 /**
  * Mapa normalizado (sem acentos, uppercase) para lookup O(1).
  */
-const NORMALIZED_MAP: Record<string, number> = (() => {
+let NORMALIZED_MAP: Record<string, number> = (() => {
   const map: Record<string, number> = {};
   for (const [key, value] of Object.entries(BAIRRO_MACRO_REGIAO)) {
     map[normalizeBairro(key)] = value;
@@ -387,37 +387,38 @@ export function getMacroRegiaoLabel(macroRegiao: number): string {
     23: "MR 23 – Itaperuna / Miracema / Aperibé",
     99: "MR 99 – Não mapeado",
   };
-  return labels[macroRegiao] || `MR ${macroRegiao}`;
+  return DB_LABELS?.[macroRegiao] || labels[macroRegiao] || `MR ${macroRegiao}`;
 }
 
 /**
  * Retorna todas as macro regiões disponíveis (para filtros).
  */
 export function getAllMacroRegioes(): { value: number; label: string }[] {
-  return [
-    { value: 1, label: getMacroRegiaoLabel(1) },
-    { value: 2, label: getMacroRegiaoLabel(2) },
-    { value: 3, label: getMacroRegiaoLabel(3) },
-    { value: 4, label: getMacroRegiaoLabel(4) },
-    { value: 5, label: getMacroRegiaoLabel(5) },
-    { value: 6, label: getMacroRegiaoLabel(6) },
-    { value: 7, label: getMacroRegiaoLabel(7) },
-    { value: 8, label: getMacroRegiaoLabel(8) },
-    { value: 9, label: getMacroRegiaoLabel(9) },
-    { value: 10, label: getMacroRegiaoLabel(10) },
-    { value: 11, label: getMacroRegiaoLabel(11) },
-    { value: 12, label: getMacroRegiaoLabel(12) },
-    { value: 13, label: getMacroRegiaoLabel(13) },
-    { value: 14, label: getMacroRegiaoLabel(14) },
-    { value: 15, label: getMacroRegiaoLabel(15) },
-    { value: 16, label: getMacroRegiaoLabel(16) },
-    { value: 17, label: getMacroRegiaoLabel(17) },
-    { value: 18, label: getMacroRegiaoLabel(18) },
-    { value: 19, label: getMacroRegiaoLabel(19) },
-    { value: 20, label: getMacroRegiaoLabel(20) },
-    { value: 21, label: getMacroRegiaoLabel(21) },
-    { value: 22, label: getMacroRegiaoLabel(22) },
-    { value: 23, label: getMacroRegiaoLabel(23) },
-    { value: 99, label: getMacroRegiaoLabel(99) },
-  ];
+  const nums = DB_LABELS
+    ? Object.keys(DB_LABELS).map(Number)
+    : Array.from({ length: 23 }, (_, i) => i + 1);
+  return [...nums.sort((a, b) => a - b), 99].map((value) => ({ value, label: getMacroRegiaoLabel(value) }));
+}
+
+/** Cadastro editável (tela Macro Regiões). Quando carregado, substitui o mapa fixo. */
+let DB_LABELS: Record<number, string> | null = null;
+
+export async function carregarMacroRegioesCadastro(): Promise<void> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const [{ data: mrs, error: e1 }, { data: termos, error: e2 }] = await Promise.all([
+      (supabase as any).from("macro_regioes").select("numero, nome, ativa"),
+      (supabase as any).from("macro_regiao_termos").select("termo_norm, macro_numero").limit(10000),
+    ]);
+    if (e1 || e2 || !mrs?.length) return;
+    const ativas = new Set<number>(mrs.filter((m: any) => m.ativa).map((m: any) => m.numero));
+    const labels: Record<number, string> = {};
+    for (const m of mrs) if (m.ativa) labels[m.numero] = m.nome;
+    const map: Record<string, number> = {};
+    for (const t of termos || []) if (ativas.has(t.macro_numero)) map[t.termo_norm] = t.macro_numero;
+    DB_LABELS = labels;
+    NORMALIZED_MAP = map;
+  } catch {
+    /* mantém mapa fixo */
+  }
 }
