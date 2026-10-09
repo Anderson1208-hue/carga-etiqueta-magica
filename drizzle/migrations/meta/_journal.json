@@ -127,6 +127,13 @@
       "when": 1791404709508,
       "tag": "0017_agendamento_status_entrega_imediata",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791573613338,
+      "tag": "0018_macro_regioes_cadastro",
+      "breakpoints": true
     }
   ]
 }
