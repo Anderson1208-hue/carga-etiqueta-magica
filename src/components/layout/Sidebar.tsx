@@ -98,6 +98,7 @@ const torreControleItems = [
 const cadastrosItems = [
   { name: "Embarcadores", href: "/embarcadores", icon: Building2 },
   { name: "Destinatários", href: "/destinatarios", icon: Contact },
+  { name: "Macro Regiões", href: "/macro-regioes", icon: Map },
   { name: "Produtos", href: "/produtos", icon: Package },
   { name: "Cadastro na Chegada", href: "/produtos/chegada", icon: Package },
 ];

@@ -48,6 +48,8 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import Embarcadores from "./pages/Embarcadores";
 import Destinatarios from "./pages/Destinatarios";
+import MacroRegioes from "./pages/MacroRegioes";
+import { carregarMacroRegioesCadastro } from "@/lib/macro-regioes";
 import Produtos from "./pages/Produtos";
 import ProdutosChegada from "./pages/ProdutosChegada";
 import IntegracaoIbac from "./pages/IntegracaoIbac";
@@ -77,6 +79,9 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, isLoading, isAdmin, signOut } = useAuth();
+  useEffect(() => {
+    if (user?.id) carregarMacroRegioesCadastro();
+  }, [user?.id]);
 
   // No APK do motorista, qualquer rota protegida cai direto na tela de código.
   // Nunca mostrar login de operador no app nativo.
@@ -390,6 +395,7 @@ function AppRoutes() {
       <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
+      <Route path="/macro-regioes" element={<ProtectedRoute><MacroRegioes /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
       <Route path="/produtos/chegada" element={<ProtectedRoute><ProdutosChegada /></ProtectedRoute>} />
