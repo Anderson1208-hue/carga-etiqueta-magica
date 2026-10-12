@@ -61,7 +61,7 @@ async function loadDashboard() {
   ] = await Promise.all([
     supabase.from("cargas").select("id", { count: "exact", head: true }).eq("status", "aberta"),
     supabase.from("notas_fiscais").select("id", { count: "exact", head: true }).gte("created_at", inicioHojeIso),
-    supabase.from("etiquetas").select("id", { count: "planned", head: true }).eq("status", "pendente"),
+    supabase.from("etiquetas").select("id", { count: "exact", head: true }).eq("status", "pendente"),
     supabase.from("veiculos").select("id, prestacao_contas_em").eq("data", hojeStr),
     supabase.from("monitoramento_paradas").select("id", { count: "exact", head: true }).in("status", ["pendente", "em_deslocamento", "no_local"]),
     supabase.from("agendamentos").select("status").gte("data_agendamento", inicioHojeIso).lt("data_agendamento", new Date(hoje.getTime() + 86400000).toISOString()),
