@@ -97,6 +97,7 @@ type: reference
 - [Endereçamento NF no CD](mem://funcionalidades/operacao/enderecamento-nf-cd) — Múltiplas posições por NF; aparecem com a MR no header do PDF Nota de Carga.
 - [Romaneio Totalizado](mem://funcionalidades/pdf/romaneio-totalizado) — Landscape PDF formatting requirements.
 - [Validação Importação](mem://seguranca/validacao-importacao) — Rules for Chaves, CNPJ, Placas.
+- [Limpeza Etiquetas](mem://logica/limpeza-etiquetas-entregues) — Auto-delete pending labels of delivered NFs (7d margin) + all labels 30d after delivery.
 - [Busca Lote e Sync](mem://arquitetura/banco-de-dados/estrategia-de-busca-em-lote) — Deterministic pagination, RPC for massive aggregations.
 - [Gestão Acesso RLS](mem://seguranca/gestao-de-acesso-operadores) — is_active_operator() and manual approval block.
 - [Rastreabilidade Tags](mem://arquitetura/banco-de-dados/status-etiqueta-rastreabilidade) — Lifecycle tracking and divergence block info.
