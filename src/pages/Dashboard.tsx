@@ -27,6 +27,14 @@ import { IbacResumo } from "@/components/dashboard/IbacResumo";
 import { RecebidosPorDia } from "@/components/dashboard/RecebidosPorDia";
 
 const REFRESH_MS = 60_000;
+const TIPOS_ALERTA = [
+  "parada_nao_programada",
+  "gps_instavel",
+  "entrega_pulada",
+  "fora_sequencia",
+  "parada_excessiva",
+  "visita_inconsistente",
+];
 
 async function loadDashboard() {
   const hoje = new Date();
@@ -73,10 +81,28 @@ async function loadDashboard() {
     (r: { ultima_atualizacao: string | null }) => !r.ultima_atualizacao || r.ultima_atualizacao < limiteSinal,
   ).length;
 
+  // A lista de alertas vem limitada a 1000 linhas; conta cada tipo com contagem exata.
+  const tiposAlerta = Array.from(
+    new Set([
+      ...TIPOS_ALERTA,
+      ...((alertasRes.data ?? []) as { tipo: string }[]).map((a) => a.tipo),
+    ]),
+  );
+  const contagensTipo = await Promise.all(
+    tiposAlerta.map((tipo) =>
+      supabase
+        .from("alertas_monitoramento")
+        .select("id", { count: "exact", head: true })
+        .eq("lido", false)
+        .eq("tipo", tipo),
+    ),
+  );
   const alertasPorTipo: Record<string, number> = {};
-  (alertasRes.data ?? []).forEach((a: { tipo: string }) => {
-    alertasPorTipo[a.tipo] = (alertasPorTipo[a.tipo] ?? 0) + 1;
+  tiposAlerta.forEach((tipo, i) => {
+    const n = contagensTipo[i].count ?? 0;
+    if (n > 0) alertasPorTipo[tipo] = n;
   });
+  const alertasTotal = Object.values(alertasPorTipo).reduce((s, n) => s + n, 0);
 
   const ibacStatuses = ibacQueueRes.data ?? [];
   const ibacPendentes = ibacStatuses.filter((r: { status: string }) => r.status === "pendente").length;
@@ -146,7 +172,7 @@ async function loadDashboard() {
     paradasPendentes: paradasPendRes.count ?? 0,
     agendHoje: agendamentos.length,
     agendConfirmados: agendamentos.filter((a: { status: string }) => a.status === "confirmado" || a.status === "agendado").length,
-    alertasTotal: (alertasRes.data ?? []).length,
+    alertasTotal,
     alertasPorTipo,
     ibacPendentes,
     ibacErros,
