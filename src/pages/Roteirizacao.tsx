@@ -1365,10 +1365,37 @@ export default function Roteirizacao() {
   const [generatingResumoDiaDate, setGeneratingResumoDiaDate] = useState<string | null>(null);
   const [generatingResumoDiaFormat, setGeneratingResumoDiaFormat] = useState<"pdf" | "xlsx" | null>(null);
 
-  async function handleGerarResumoDia(dateStr: string, veics: any[], formato: "pdf" | "xlsx" = "pdf") {
+  // Registra cada impressão/download (usuário, horário, quantidade) no histórico de auditoria.
+  async function registrarImpressao(tipo: "resumo_dia" | "nota_carga", metadata: Record<string, any>, entityId?: string) {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      await supabase.from("audit_log").insert({
+        user_id: u.user?.id ?? null,
+        user_email: u.user?.email ?? null,
+        action: "impressao",
+        entity_type: tipo,
+        entity_id: entityId ?? null,
+        metadata,
+      } as any);
+    } catch (e) {
+      console.warn("Falha ao registrar impressão", e);
+    }
+  }
+
+  async function handleGerarResumoDia(dateStr: string, veicsTela: any[], formato: "pdf" | "xlsx" = "pdf") {
     setGeneratingResumoDiaDate(dateStr);
     setGeneratingResumoDiaFormat(formato);
     try {
+      // Busca a lista ATUAL de veículos do dia no banco (a tela pode estar desatualizada
+      // se outro operador lançou veículos depois que ela foi carregada).
+      const { data: veicsAtuais, error: veicsErr } = await supabase
+        .from("veiculos")
+        .select("id, placa, motorista, data, status, access_code, created_at, pernoite, pernoite_origem_id")
+        .eq("data", dateStr)
+        .order("created_at", { ascending: true });
+      if (veicsErr) throw veicsErr;
+      const veics = veicsAtuais || [];
+      const geradoEm = new Date();
       const veiculosData: VeiculoDiaData[] = [];
       for (const veiculo of veics) {
         const { data } = await supabase
@@ -1434,13 +1461,27 @@ export default function Roteirizacao() {
         });
       }
       if (formato === "xlsx") {
-        const blob = generateResumoDiaExcel({ data: dateStr, veiculos: veiculosData });
+        const blob = generateResumoDiaExcel({ data: dateStr, veiculos: veiculosData, geradoEm });
         downloadBlob(blob, `resumo_dia_${dateStr}.xlsx`);
       } else {
-        const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData });
+        const blob = await generateResumoDiaPDF({ data: dateStr, veiculos: veiculosData, geradoEm });
         downloadBlob(blob, `resumo_dia_${dateStr}.pdf`);
       }
-      toast({ title: "Resumo do dia gerado", description: `${veics.length} veículo(s)` });
+      await registrarImpressao("resumo_dia", {
+        data_programacao: dateStr,
+        formato,
+        total_veiculos: veics.length,
+        veiculos_na_tela: veicsTela.length,
+        placas: veics.map((v: any) => v.placa),
+      });
+      const diff = veics.length - veicsTela.length;
+      toast({
+        title: "Resumo do dia gerado",
+        description: diff > 0
+          ? `${veics.length} veículo(s). Atenção: ${diff} veículo(s) novo(s) que ainda não apareciam na sua tela foram incluídos.`
+          : `${veics.length} veículo(s)`,
+      });
+      if (diff !== 0) loadVeiculos();
     } catch (err) {
       console.error("Error generating resumo dia:", err);
       toast({ title: "Erro", description: "Erro ao gerar resumo do dia", variant: "destructive" });
@@ -1630,6 +1671,11 @@ export default function Roteirizacao() {
         { resumoPorEntregaCacau: true }
       );
       downloadBlob(blob, `nota_carga_${veiculo.placa}_${veiculo.data}.pdf`);
+      await registrarImpressao("nota_carga", {
+        data_programacao: veiculo.data,
+        placa: veiculo.placa,
+        total_nfs: notasFiscais.length,
+      }, veiculo.id);
       toast({ title: "PDF gerado", description: `Nota de Carga do veículo ${veiculo.placa}` });
     } catch (err) {
       console.error("Error generating PDF:", err);

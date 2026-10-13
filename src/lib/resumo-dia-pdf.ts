@@ -33,6 +33,7 @@ export interface VeiculoDiaData {
 export interface ResumoDiaData {
   data: string; // yyyy-MM-dd
   veiculos: VeiculoDiaData[];
+  geradoEm?: Date;
 }
 
 function truncate(text: string, max: number): string {
@@ -60,6 +61,10 @@ export async function generateResumoDiaPDF(data: ResumoDiaData): Promise<Blob> {
   doc.setFont("helvetica", "normal");
   doc.text(`Data: ${dataFormatada}`, M, 19);
   doc.text(`Veículos: ${data.veiculos.length}`, M, 24.5);
+  if (data.geradoEm) {
+    const g = `Impresso em ${format(data.geradoEm, "dd/MM/yyyy HH:mm")}  •  ${data.veiculos.length} veículos`;
+    doc.text(g, PW - M - doc.getTextWidth(g), 24.5);
+  }
   y = 33;
 
   // ===== Totais gerais =====
