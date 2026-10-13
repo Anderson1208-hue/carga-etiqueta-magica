@@ -1410,6 +1410,8 @@ export default function Roteirizacao() {
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
+        // Veículo sem nenhuma NF (lançado vazio/duplicado) não entra no resumo — igual à tela.
+        if (nfIds.length === 0) continue;
         let ctesMap: Record<string, any[]> = {};
         const reentregaMap = new Map<string, string>();
         if (nfIds.length > 0) {
@@ -1473,16 +1475,16 @@ export default function Roteirizacao() {
       await registrarImpressao("resumo_dia", {
         data_programacao: dateStr,
         formato,
-        total_veiculos: veics.length,
+        total_veiculos: veiculosData.length,
         veiculos_na_tela: veicsTela.length,
         placas: veics.map((v: any) => v.placa),
       });
-      const diff = veics.length - veicsTela.length;
+      const diff = veiculosData.length - veicsTela.length;
       toast({
         title: "Resumo do dia gerado",
         description: diff > 0
-          ? `${veics.length} veículo(s). Atenção: ${diff} veículo(s) novo(s) que ainda não apareciam na sua tela foram incluídos.`
-          : `${veics.length} veículo(s)`,
+          ? `${veiculosData.length} veículo(s). Atenção: ${diff} veículo(s) novo(s) que ainda não apareciam na sua tela foram incluídos.`
+          : `${veiculosData.length} veículo(s)`,
       });
       if (diff !== 0) loadVeiculos();
     } catch (err) {
