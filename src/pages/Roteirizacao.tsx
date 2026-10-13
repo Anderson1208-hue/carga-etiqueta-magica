@@ -1410,6 +1410,8 @@ export default function Roteirizacao() {
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
+        // Veículo sem nenhuma NF (lançado vazio/duplicado) não entra no resumo — igual à tela.
+        if (nfIds.length === 0) continue;
         let ctesMap: Record<string, any[]> = {};
         const reentregaMap = new Map<string, string>();
         if (nfIds.length > 0) {
