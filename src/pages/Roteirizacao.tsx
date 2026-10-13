@@ -168,6 +168,7 @@ export default function Roteirizacao() {
   const location = useLocation();
   const navigate = useNavigate();
   const stateConsumedRef = useRef(false);
+  const loadVeiculosReqRef = useRef(0);
 
   useEffect(() => {
     loadCargas();
@@ -1166,6 +1167,7 @@ export default function Roteirizacao() {
   }, [activeTab, filtroAno, filtroMes, filtroDia]);
 
   async function loadVeiculos() {
+    const reqId = ++loadVeiculosReqRef.current;
     setLoadingVeiculos(true);
     try {
       let query = supabase
@@ -1229,11 +1231,12 @@ export default function Roteirizacao() {
         });
         comNfs = new Set((vnfs || []).map((r: any) => r.veiculo_id));
       }
+      if (reqId !== loadVeiculosReqRef.current) return; // resposta antiga: ignora
       setVeiculos((data || []).filter((v) => comNfs.has(v.id)));
     } catch (err) {
       console.error("Error loading veiculos:", err);
     } finally {
-      setLoadingVeiculos(false);
+      if (reqId === loadVeiculosReqRef.current) setLoadingVeiculos(false);
     }
   }
 
