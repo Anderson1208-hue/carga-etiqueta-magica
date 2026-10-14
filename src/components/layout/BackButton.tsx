@@ -19,8 +19,9 @@ export function BackButton() {
   if (hidden) return null;
 
   const handleBack = () => {
-    // Se não há histórico dentro do app, volta para a home.
-    if (window.history.length > 1) navigate(-1);
+    // Se a tela foi aberta direto (sem histórico dentro do app), volta para a home.
+    // window.history.length conta páginas fora do app, por isso usamos location.key.
+    if (location.key !== "default") navigate(-1);
     else navigate("/");
   };
 
