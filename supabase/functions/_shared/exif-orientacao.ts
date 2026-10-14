@@ -33,9 +33,9 @@ export function lerOrientacaoExif(b: Uint8Array): number {
 
 // deno-lint-ignore no-explicit-any
 export function endireitar(img: any, orientacao: number): any {
-  // imagescript: rotate(90) gira no sentido horário.
-  if (orientacao === 6) img.rotate(90);
-  else if (orientacao === 8) img.rotate(270);
+  // imagescript: rotate(270) endireita a orientação 6 (conferido com foto real).
+  if (orientacao === 6) img.rotate(270);
+  else if (orientacao === 8) img.rotate(90);
   else if (orientacao === 3) img.rotate(180);
   return img;
 }
