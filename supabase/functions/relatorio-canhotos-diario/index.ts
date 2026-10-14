@@ -133,7 +133,8 @@ async function buscarBaixas(supabase: any, dia: string): Promise<Linha[]> {
 }
 
 async function jpegReduzido(bytes: Uint8Array) {
-  const img = await ImageLib.decode(bytes);
+  const { lerOrientacaoExif, endireitar } = await import("../_shared/exif-orientacao.ts");
+  const img = endireitar(await ImageLib.decode(bytes), lerOrientacaoExif(bytes));
   const final = img.width > LARGURA_IMG ? img.resize(LARGURA_IMG, ImageLib.RESIZE_AUTO) : img;
   const jpeg = await final.encodeJPEG(QUALIDADE_IMG);
   return { jpeg, largura: final.width, altura: final.height };
