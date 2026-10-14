@@ -1,10 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 
-// Acompanhamento temporário (28/09 a 30/09/2026): verifica banco e GPS e
+// Acompanhamento temporário (14/10 a 21/10/2026): verifica banco e GPS e
 // envia e-mail (destinatário fixo no template) se houver problema.
 // Só lê dados; não altera nada.
-const FIM = Date.parse('2026-09-30T21:00:00Z')
+const FIM = Date.parse('2026-10-21T21:00:00Z')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
