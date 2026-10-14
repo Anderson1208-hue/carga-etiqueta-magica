@@ -366,7 +366,8 @@ export async function prepararCanhoto(
   qualidade = 85,
   opts: { numeroNf?: string; aprovadoManualmente?: boolean; aprovadoPrestacao?: boolean } = {},
 ): Promise<{ bytes: Uint8Array; largura: number; altura: number; dpi: number; origem?: string; validacao?: Record<string, unknown> }> {
-  const src = await Image.decode(originais);
+  const { lerOrientacaoExif, endireitar } = await import("./exif-orientacao.ts");
+  const src = endireitar(await Image.decode(originais), lerOrientacaoExif(originais));
 
   let final: Image;
   let origem = modo as string;

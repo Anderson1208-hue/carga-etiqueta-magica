@@ -453,7 +453,8 @@ Deno.serve(async (req) => {
           if (originais.byteLength > maxImagemKb * 1024) {
             try {
               const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
-              const img = await Image.decode(originais);
+              const { lerOrientacaoExif, endireitar } = await import("../_shared/exif-orientacao.ts");
+              const img = endireitar(await Image.decode(originais), lerOrientacaoExif(originais));
               if (img.width > MAX_LARGURA_PX) {
                 img.resize(MAX_LARGURA_PX, Image.RESIZE_AUTO);
               }
