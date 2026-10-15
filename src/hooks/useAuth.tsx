@@ -47,7 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const hasActiveTab = sessionStorage.getItem(SESSION_FLAG_KEY) === "1";
         if (!hasActiveTab) {
           try {
-            await supabase.auth.signOut();
+            // scope "local": descarta só a sessão desta aba. O padrão ("global")
+            // derrubava o login do mesmo usuário em TODAS as outras abas/computadores.
+            await supabase.auth.signOut({ scope: "local" });
           } catch (err) {
             console.warn("[Auth] signOut inicial falhou:", err);
           }
@@ -174,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     sessionStorage.removeItem(SESSION_FLAG_KEY);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setProfile(null);
   };
 
