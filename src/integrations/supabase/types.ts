@@ -4303,6 +4303,7 @@ export type Database = {
           pontos: number
         }[]
       }
+      e_dia_util_rj: { Args: { p_data: string }; Returns: boolean }
       enriquecer_cadastros_fiscais_lote: {
         Args: { payload: Json }
         Returns: Json
@@ -4316,6 +4317,7 @@ export type Database = {
         Args: { p_forcar?: boolean; p_motivo?: string; p_veiculo_id: string }
         Returns: Json
       }
+      feriados_rj: { Args: { p_ano: number }; Returns: string[] }
       fn_ibac_enqueue: {
         Args: {
           p_baixa_id: string
