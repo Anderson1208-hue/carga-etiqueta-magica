@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -87,7 +88,8 @@ export function AdicionarXmlDialog({
           }
         });
 
-        grouped.forEach((g) => {
+        // Etiquetas só para IBAC/IBAE (decisão Anderson 16/10/2026).
+        if (isEmitenteCacau(d.cnpjEmitente)) grouped.forEach((g) => {
           for (let i = 1; i <= g.total; i++) {
             etiquetas.push({
               c_prod: g.c_prod,
