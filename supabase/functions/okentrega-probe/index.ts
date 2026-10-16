@@ -96,27 +96,24 @@ Deno.serve(async (req) => {
   const base = BASES[ambiente];
   const tentativas: unknown[] = [];
   const candidatos: Array<{ nome: string; url: string; method?: string; payload?: unknown }> = [];
-  // Reenvio mínimo (sem foto): duplicado deve voltar 409 sem gravar nada —
-  // queremos ver se o corpo da resposta traz o status atual da análise.
-  if (chaveAcesso) {
-    candidatos.push({
-      nome: "POST cache mínimo {documento}",
-      url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}`,
-      method: "POST",
-      payload: { documento: chaveAcesso },
-    });
-    candidatos.push({
-      nome: "POST cache {documento, tipoocorrencia: consulta}",
-      url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}`,
-      method: "POST",
-      payload: { documento: chaveAcesso, consulta: true },
-    });
+  const doc = chaveAcesso ?? ocorrenciaId;
+  const endpoints = [
+    "ws.0.ocorrenciaentrega_api.php",
+    "ws.0.ocorrenciasentrega_api.php",
+    "ws.0.entrega_api.php",
+    "ws.0.entregas_api.php",
+    "ws.0.comprovanteentrega_api.php",
+    "ws.0.comprovantes_api.php",
+    "ws.0.consultaentrega_api.php",
+    "ws.0.consultaocorrencia_api.php",
+    "ws.0.rastreamento_api.php",
+    "ws.0.nfe_api.php",
+    "ws.0.notafiscal_api.php",
+    "ws.0.documento_api.php",
+  ];
+  for (const ep of endpoints) {
+    candidatos.push({ nome: `GET ${ep}?documento=`, url: `${base}/${ep}?access_token=${token}&documento=${doc}` });
   }
-  candidatos.push(
-    { nome: "GET consulta_api ?documento=", url: `${base}/ws.0.consulta_api.php?access_token=${token}&documento=${chaveAcesso ?? ocorrenciaId}` },
-    { nome: "GET ocorrenciaentregastatus_api ?id=", url: `${base}/ws.0.ocorrenciaentregastatus_api.php?access_token=${token}&id=${ocorrenciaId}` },
-    { nome: "GET statuscomprovante_api ?ocorrenciaentregaId=", url: `${base}/ws.0.statuscomprovante_api.php?access_token=${token}&ocorrenciaentregaId=${ocorrenciaId}` },
-  );
 
   for (const c of candidatos) {
     const ctl = new AbortController();
