@@ -120,7 +120,13 @@ Deno.serve(async (req) => {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 20000);
     try {
-      const r = await fetch(c.url, { signal: ctl.signal });
+      const r = await fetch(c.url, {
+        method: c.method ?? "GET",
+        signal: ctl.signal,
+        ...(c.payload !== undefined
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(c.payload) }
+          : {}),
+      });
       const txt = await r.text();
       tentativas.push({ nome: c.nome, http: r.status, corpo: txt.slice(0, 1500) });
     } catch (e) {
