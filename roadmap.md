@@ -10,3 +10,5 @@
 
 - [x] Desligar acompanhamento alerta-saude-gps (cron alerta-saude-gps-15min). Encerrado em 09/10; nenhum alerta de problema foi enviado nos dias de acompanhamento.
 - [ ] 15/10/2026 15h Brasília (autorizado por Anderson): (1) ampliar servidor do banco pico→micro (+~19 créditos/mês); (2) vigia externo que avisa por e-mail quando o banco não responde; (3) orientar convite de segundo responsável. Aguarda Anderson abrir a conversa no horário (o agente não executa sozinho).
+- [x] 16/10 queda do banco: corrigidas 169 regras de acesso que conferiam permissão linha a linha (consultas 5s→0,3s).
+- [ ] Domingo 18/10/2026 (autorizado por Anderson, sem movimentação): (1) ampliar servidor Tiny→Mini; (2) compactar tabela de etiquetas (479 MB, 87.544 etiquetas; ganho estimado ~360 MB; trava a tabela alguns minutos). Medir tamanho antes/depois. Aguarda Anderson abrir a conversa no domingo.
