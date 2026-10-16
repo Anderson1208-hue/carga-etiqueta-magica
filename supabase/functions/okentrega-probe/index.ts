@@ -93,22 +93,27 @@ Deno.serve(async (req) => {
 
   const base = BASES[ambiente];
   const tentativas: unknown[] = [];
-  const filtros = [
-    `{"where":{"id":${ocorrenciaId}}}`,
-    `{"where":{"ocorrenciaentregaId":${ocorrenciaId}}}`,
-    `{"where":{"documento":"${ocorrenciaId}"}}`,
-  ];
-  const candidatos: Array<{ nome: string; url: string }> = [];
-  for (const f of filtros) {
-    const enc = encodeURIComponent(f);
-    candidatos.push(
-      { nome: `GET cache filter=${f}`, url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&filter=${enc}` },
-      { nome: `GET cache/findOne filter=${f}`, url: `${base}/ws.0.ocorrenciaentregacache_api.php/findOne?access_token=${token}&filter=${enc}` },
-    );
+  const candidatos: Array<{ nome: string; url: string; method?: string; payload?: unknown }> = [];
+  // Reenvio mínimo (sem foto): duplicado deve voltar 409 sem gravar nada —
+  // queremos ver se o corpo da resposta traz o status atual da análise.
+  if (chaveAcesso) {
+    candidatos.push({
+      nome: "POST cache mínimo {documento}",
+      url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}`,
+      method: "POST",
+      payload: { documento: chaveAcesso },
+    });
+    candidatos.push({
+      nome: "POST cache {documento, tipoocorrencia: consulta}",
+      url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}`,
+      method: "POST",
+      payload: { documento: chaveAcesso, consulta: true },
+    });
   }
   candidatos.push(
-    { nome: "GET cache/{id}", url: `${base}/ws.0.ocorrenciaentregacache_api.php/${ocorrenciaId}?access_token=${token}` },
-    { nome: "GET cache listagem sem filtro", url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&filter=${encodeURIComponent('{"limit":2,"order":"id DESC"}')}` },
+    { nome: "GET consulta_api ?documento=", url: `${base}/ws.0.consulta_api.php?access_token=${token}&documento=${chaveAcesso ?? ocorrenciaId}` },
+    { nome: "GET ocorrenciaentregastatus_api ?id=", url: `${base}/ws.0.ocorrenciaentregastatus_api.php?access_token=${token}&id=${ocorrenciaId}` },
+    { nome: "GET statuscomprovante_api ?ocorrenciaentregaId=", url: `${base}/ws.0.statuscomprovante_api.php?access_token=${token}&ocorrenciaentregaId=${ocorrenciaId}` },
   );
 
   for (const c of candidatos) {
