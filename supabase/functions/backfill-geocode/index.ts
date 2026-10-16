@@ -1,5 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { operatorAccessStatus } from '../_shared/approved-operator.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/google_maps';
 
@@ -30,6 +31,12 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
     const GOOGLE_MAPS_API_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY')!;
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+    const accessStatus = await operatorAccessStatus(req.headers.get('Authorization'), supabase);
+    if (accessStatus) {
+      return new Response(JSON.stringify({ error: 'Acesso permitido somente a operadores aprovados.' }),
+        { status: accessStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const url = new URL(req.url);
     const limit = Number(url.searchParams.get('limit') ?? '500');
