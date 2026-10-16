@@ -81,6 +81,7 @@ interface NotaFiscalData {
   macroRegiao: number;
   pesoBruto: number;
   volumeM3: number;
+  qtdVolumes?: number | null;
   itens: {
     cProd: string;
     xProd: string;
@@ -251,6 +252,7 @@ export default function Romaneio() {
         macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         pesoBruto: Number(nf.peso_bruto || 0),
         volumeM3: Number(nf.volume_m3 || 0),
+        qtdVolumes: nf.qtd_volumes ?? null,
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,

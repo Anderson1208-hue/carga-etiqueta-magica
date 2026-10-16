@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { itensConferencia } from "@/lib/cesta-natalina";
+import { itensNotaDeCarga } from "@/lib/cesta-natalina";
 import { format } from "date-fns";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
@@ -1597,7 +1597,7 @@ export default function Roteirizacao() {
           notas_fiscais!inner(
             id, numero_nf, cnpj_emitente, razao_social_emitente, cnpj_destinatario,
             dest_razao_social, dest_logradouro, dest_numero, dest_bairro,
-            dest_cidade, dest_uf, dest_cep, data_emissao, peso_bruto, volume_m3,
+            dest_cidade, dest_uf, dest_cep, data_emissao, peso_bruto, volume_m3, qtd_volumes,
             itens_nf(c_prod, x_prod, q_com)
           )
         `)
@@ -1662,10 +1662,10 @@ export default function Roteirizacao() {
           enderecamentos: enderecMap.get(nf.id) || [],
           reentrega: reentregaMap.has(vnf.nf_id),
           reentregaObservacao: reentregaMap.get(vnf.nf_id) || undefined,
-          itens: itensConferencia((nf.itens_nf || []) as any[], (i: any) => i.x_prod).map((item: any) => ({
+          itens: itensNotaDeCarga((nf.itens_nf || []) as any[], (i: any) => i.x_prod, (i: any) => calculateBoxes(Number(i.q_com)), nf.qtd_volumes).map(({ item, qtdCaixas }: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
-            qtdCaixas: calculateBoxes(Number(item.q_com)),
+            qtdCaixas,
           })),
         };
       });
