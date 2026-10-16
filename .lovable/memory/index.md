@@ -85,6 +85,7 @@ type: reference
 - [Status de Entrega](mem://logica/ciclo-de-vida-status-entrega) — Delivery lifecycle trigger points.
 - [Reconciliação Parada↔Baixa](mem://logica/reconciliacao-parada-baixa) — Baixa 'entregue' reabre paradas 'pulada'/'visita_inconsistente' e finaliza. Verdade da baixa > geofence.
 - [Agendamento Regras](mem://funcionalidades/transporte/agendamento) — Schedule rules (releases day before).
+- [Dia do Comércio RJ](mem://funcionalidades/transporte/dia-do-comercio-rj) — 3ª seg de outubro (19/10/2026) não é dia útil; feriados RJ também no banco (e_dia_util_rj).
 - [Feriados RJ Dias Úteis](mem://funcionalidades/transporte/feriados-rj-dias-uteis) — Liberação considera próximo dia útil RJ (sáb/dom + feriados).
 - [Agendamento Auto](mem://logica/agendamento/automacao-cnpj) — Specific CNPJs flagged automatically via triggers.
 - [Agendamento Auto CNPJ+Emitente](mem://funcionalidades/transporte/agendamento-automatico-cnpj-emitente) — Match por par CNPJ destinatário + razão social do emitente (LIKE). emitente NULL = wildcard.
