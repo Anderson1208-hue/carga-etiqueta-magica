@@ -44,6 +44,8 @@ async function obterToken(supabase: any, ambiente: "homolog" | "producao") {
   });
   const body = await resp.json().catch(() => ({}));
   if (!resp.ok || !body?.id) throw new Error(`Login falhou (HTTP ${resp.status})`);
+  // expõe o corpo do login para a sonda (pode listar recursos/perfil disponíveis)
+  (globalThis as any).__loginBody = body;
   const ttlSeg = Number(body.ttl ?? 1209600);
   await supabase.from("okentrega_token").upsert(
     { ambiente, token: body.id, expira_em: new Date(Date.now() + ttlSeg * 1000).toISOString() },
