@@ -59,6 +59,10 @@ export function getFeriadosRJ(ano: number): Set<string> {
   // Estaduais RJ
   feriados.add(`${ano}-04-23`); // São Jorge (RJ)
   feriados.add(`${ano}-11-20`); // Zumbi/Consciência Negra (RJ — já incluso)
+  // Dia do Comércio RJ: 3ª segunda-feira de outubro
+  const primeiroOut = new Date(ano, 9, 1);
+  const deslocSeg = (8 - primeiroOut.getDay()) % 7; // dias até a 1ª segunda
+  feriados.add(fmt(new Date(ano, 9, 1 + deslocSeg + 14))); // 3ª segunda-feira
 
   return feriados;
 }
