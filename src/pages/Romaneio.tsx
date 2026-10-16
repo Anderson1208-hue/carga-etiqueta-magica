@@ -29,7 +29,6 @@ import {
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
 import { itensNotaDeCarga } from "@/lib/cesta-natalina";
-import { itensConferencia } from "@/lib/cesta-natalina";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
