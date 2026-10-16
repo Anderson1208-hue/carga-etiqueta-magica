@@ -28,6 +28,7 @@ import {
   printBlob,
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { itensConferencia } from "@/lib/cesta-natalina";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
@@ -330,7 +331,7 @@ export default function Romaneio() {
       macroRegiao: nf.macroRegiao,
       dataEmissao: nf.dataEmissao,
       enderecamentos: enderecMap.get(nf.id) || [],
-      itens: nf.itens.map((item) => ({
+      itens: itensConferencia(nf.itens, (i) => i.xProd).map((item) => ({
         cProd: item.cProd,
         xProd: item.xProd,
         qtdCaixas: calculateBoxes(item.qCom),

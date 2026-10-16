@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { itensConferencia } from "@/lib/cesta-natalina";
 import { format } from "date-fns";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
@@ -1661,7 +1662,7 @@ export default function Roteirizacao() {
           enderecamentos: enderecMap.get(nf.id) || [],
           reentrega: reentregaMap.has(vnf.nf_id),
           reentregaObservacao: reentregaMap.get(vnf.nf_id) || undefined,
-          itens: (nf.itens_nf || []).map((item: any) => ({
+          itens: itensConferencia((nf.itens_nf || []) as any[], (i: any) => i.x_prod).map((item: any) => ({
             cProd: item.c_prod,
             xProd: item.x_prod,
             qtdCaixas: calculateBoxes(Number(item.q_com)),
