@@ -1,9 +1,11 @@
+import { extrairQtdVolumes } from "./cesta-natalina";
 import { CACAU_EMITENTE_REGEX, isEmitenteCacau } from "./embarcadores-cacau";
 
 export interface NFeVolumeParsed {
   chaveAcesso: string;
   numeroNf: string;
   volumeM3: number;
+  qtdVolumes: number;
   fornecedor: string;
 }
 
@@ -29,6 +31,7 @@ export function parseNFeVolumeXML(xmlString: string): NFeVolumeParsed {
     numeroNf,
     fornecedor,
     volumeM3: extractVolumeM3(xmlDoc, fornecedor),
+    qtdVolumes: extrairQtdVolumes(xmlDoc),
   };
 }
 

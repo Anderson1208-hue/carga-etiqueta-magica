@@ -194,6 +194,7 @@ export default function Romaneio() {
             data_emissao,
             peso_bruto,
             volume_m3,
+            qtd_volumes,
             itens_nf(
               c_prod,
               x_prod,
@@ -333,10 +334,10 @@ export default function Romaneio() {
       macroRegiao: nf.macroRegiao,
       dataEmissao: nf.dataEmissao,
       enderecamentos: enderecMap.get(nf.id) || [],
-      itens: itensConferencia(nf.itens, (i) => i.xProd).map((item) => ({
+      itens: itensNotaDeCarga(nf.itens, (i) => i.xProd, (i) => calculateBoxes(i.qCom), nf.qtdVolumes).map(({ item, qtdCaixas }) => ({
         cProd: item.cProd,
         xProd: item.xProd,
-        qtdCaixas: calculateBoxes(item.qCom),
+        qtdCaixas,
       })),
     }));
   }
