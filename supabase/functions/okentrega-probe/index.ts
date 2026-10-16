@@ -63,16 +63,24 @@ Deno.serve(async (req) => {
   let ocorrenciaId = body.ocorrencia_id ? String(body.ocorrencia_id) : null;
 
   // Sem parâmetro: pega a ocorrência mais recente da fila que tenha id do portal.
-  if (!ocorrenciaId) {
-    const { data } = await supabase
+  let chaveAcesso: string | null = null;
+  {
+    const q = supabase
       .from("okentrega_queue")
-      .select("ocorrencia_entrega_id")
+      .select("ocorrencia_entrega_id, chave_acesso, numero_nf")
       .not("ocorrencia_entrega_id", "is", null)
       .eq("ambiente", ambiente)
       .order("enviado_em", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    const { data } = ocorrenciaId
+      ? await supabase
+          .from("okentrega_queue")
+          .select("ocorrencia_entrega_id, chave_acesso, numero_nf")
+          .eq("ocorrencia_entrega_id", ocorrenciaId)
+          .maybeSingle()
+      : await q.maybeSingle();
     ocorrenciaId = data?.ocorrencia_entrega_id ? String(data.ocorrencia_entrega_id) : null;
+    chaveAcesso = data?.chave_acesso ? String(data.chave_acesso) : null;
   }
   if (!ocorrenciaId) return json({ erro: "nenhuma ocorrencia_entrega_id disponível" }, 400);
 
