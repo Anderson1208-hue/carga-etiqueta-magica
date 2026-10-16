@@ -1,0 +1,2 @@
+ALTER TABLE public.notas_fiscais ADD COLUMN IF NOT EXISTS qtd_volumes integer;
+COMMENT ON COLUMN public.notas_fiscais.qtd_volumes IS 'Quantidade de volumes (<transp><vol><qVol>) do XML. Usado para cesta natalina na Nota de Carga.';
