@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] 16/10: restringir consulta de endereços/coordenadas aos operadores aprovados; verificar evidências e quantidade de acessos anteriores sem aprovação.
+- [x] 16/10: consulta de endereços/coordenadas restrita a perfis ativos na tabela e nas funções geocodificar-endereco/backfill-geocode. Cinco testes passaram; sessão aprovada consultou o cache e anônimo não recebeu dados. Histórico disponível não permite atribuir ou contar consultas anteriores das contas externas; não confundir ausência de registro com ausência de acesso.
 
 - [x] 16/10: sete contas externas e cadastro antigo do Gilson excluídos; conta @tlmlogistica.com.br preservada, ativa e com sessão mantida. Exclusão confirmada e ferramenta temporária removida.
 
