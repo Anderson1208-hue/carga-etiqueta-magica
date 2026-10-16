@@ -138,5 +138,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return json({ ambiente, ocorrencia_id: ocorrenciaId, tentativas });
+  return json({ ambiente, ocorrencia_id: ocorrenciaId, login: (globalThis as any).__loginBody ?? null, tentativas });
 });
