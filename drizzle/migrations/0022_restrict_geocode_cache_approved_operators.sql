@@ -1,0 +1,1 @@
+ALTER POLICY "Autenticados podem ler cache" ON public.geocode_cache TO authenticated USING ((SELECT public.is_active_operator()));

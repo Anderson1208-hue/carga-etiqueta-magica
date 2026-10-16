@@ -155,6 +155,13 @@
       "when": 1792178551715,
       "tag": "0021_rls_initplan_operator_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792188655811,
+      "tag": "0022_restrict_geocode_cache_approved_operators",
+      "breakpoints": true
     }
   ]
 }
