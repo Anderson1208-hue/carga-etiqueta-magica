@@ -85,13 +85,23 @@ Deno.serve(async (req) => {
 
   const base = BASES[ambiente];
   const tentativas: unknown[] = [];
-  const candidatos: Array<{ nome: string; url: string }> = [
-    { nome: "GET cache ?id=", url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&id=${ocorrenciaId}` },
-    { nome: "GET cache ?ocorrenciaentregaId=", url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&ocorrenciaentregaId=${ocorrenciaId}` },
-    { nome: "GET ocorrenciaentrega_api ?id=", url: `${base}/ws.0.ocorrenciaentrega_api.php?access_token=${token}&id=${ocorrenciaId}` },
-    { nome: "GET ocorrenciaentrega_api ?ocorrenciaentregaId=", url: `${base}/ws.0.ocorrenciaentrega_api.php?access_token=${token}&ocorrenciaentregaId=${ocorrenciaId}` },
-    { nome: "GET comprovante_api ?ocorrenciaentregaId=", url: `${base}/ws.0.comprovante_api.php?access_token=${token}&ocorrenciaentregaId=${ocorrenciaId}` },
+  const filtros = [
+    `{"where":{"id":${ocorrenciaId}}}`,
+    `{"where":{"ocorrenciaentregaId":${ocorrenciaId}}}`,
+    `{"where":{"documento":"${ocorrenciaId}"}}`,
   ];
+  const candidatos: Array<{ nome: string; url: string }> = [];
+  for (const f of filtros) {
+    const enc = encodeURIComponent(f);
+    candidatos.push(
+      { nome: `GET cache filter=${f}`, url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&filter=${enc}` },
+      { nome: `GET cache/findOne filter=${f}`, url: `${base}/ws.0.ocorrenciaentregacache_api.php/findOne?access_token=${token}&filter=${enc}` },
+    );
+  }
+  candidatos.push(
+    { nome: "GET cache/{id}", url: `${base}/ws.0.ocorrenciaentregacache_api.php/${ocorrenciaId}?access_token=${token}` },
+    { nome: "GET cache listagem sem filtro", url: `${base}/ws.0.ocorrenciaentregacache_api.php?access_token=${token}&filter=${encodeURIComponent('{"limit":2,"order":"id DESC"}')}` },
+  );
 
   for (const c of candidatos) {
     const ctl = new AbortController();
