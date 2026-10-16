@@ -4,6 +4,7 @@ import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao } from "@/lib/macro-regioes";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { salvarQtdVolumesCesta } from "@/lib/salvar-qtd-volumes";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllPages } from "@/lib/supabase-pagination";
@@ -383,6 +384,7 @@ export default function Cargas() {
       );
 
       if (rpcError) throw rpcError;
+      await salvarQtdVolumesCesta(successFiles.map((f) => f.data)).catch(() => {});
 
       const result = rpcResult as {
         status: string;

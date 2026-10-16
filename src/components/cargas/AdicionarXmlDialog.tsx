@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { XMLDropzone, ParsedFile } from "@/components/XMLDropzone";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { salvarQtdVolumesCesta } from "@/lib/salvar-qtd-volumes";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -135,6 +136,7 @@ export function AdicionarXmlDialog({
       });
 
       if (error) throw error;
+      await salvarQtdVolumesCesta(valid.map((f) => f.data)).catch(() => {});
 
       const result = data as {
         status: string;
