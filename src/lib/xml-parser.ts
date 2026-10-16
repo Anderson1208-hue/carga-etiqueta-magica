@@ -1,3 +1,4 @@
+import { extrairQtdVolumes } from "./cesta-natalina";
 // Parser for Brazilian NF-e XML files
 
 export interface DestinatarioEndereco {
@@ -24,6 +25,7 @@ export interface NFeParsed {
   pesoBruto: number;
   pesoLiquido: number;
   volumeM3: number;
+  qtdVolumes?: number;
   // Campos fiscais (Fase 1 fiscal) — opcionais, usados para enriquecer cadastros
   ieEmitente?: string | null;
   crtEmitente?: number | null;      // 1=Simples, 2=Simples excesso, 3=Regime normal, 4=MEI
@@ -175,6 +177,7 @@ export function parseNFeXML(xmlString: string): NFeParsed {
   // commonly put it em <vol><esp> ("CUBAGEM 0,025"), <infCpl>, <infAdProd>
   // ou usam <vol><nVol> com o valor da cubagem (Pandurata).
   const volumeM3 = extractVolumeM3(xmlDoc, razaoSocialEmitente);
+  const qtdVolumes = extrairQtdVolumes(xmlDoc);
 
   // Extract items (det elements)
   const detElements = xmlDoc.querySelectorAll("det");
@@ -219,6 +222,7 @@ export function parseNFeXML(xmlString: string): NFeParsed {
     pesoBruto,
     pesoLiquido,
     volumeM3,
+    qtdVolumes,
     ieEmitente,
     crtEmitente,
     ufEmitente,

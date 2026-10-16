@@ -2747,6 +2747,7 @@ export type Database = {
           pernoite_em: string | null
           peso_bruto: number | null
           peso_liquido: number | null
+          qtd_volumes: number | null
           razao_social_emitente: string
           serie: string | null
           status_entrega: string
@@ -2775,6 +2776,7 @@ export type Database = {
           pernoite_em?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
+          qtd_volumes?: number | null
           razao_social_emitente: string
           serie?: string | null
           status_entrega?: string
@@ -2803,6 +2805,7 @@ export type Database = {
           pernoite_em?: string | null
           peso_bruto?: number | null
           peso_liquido?: number | null
+          qtd_volumes?: number | null
           razao_social_emitente?: string
           serie?: string | null
           status_entrega?: string

@@ -28,7 +28,7 @@ import {
   printBlob,
 } from "@/lib/pdf-generator";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { itensConferencia } from "@/lib/cesta-natalina";
+import { itensNotaDeCarga } from "@/lib/cesta-natalina";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel, getAllMacroRegioes } from "@/lib/macro-regioes";
 import { generateResumoMRPDF } from "@/lib/resumo-mr-pdf";
@@ -81,6 +81,7 @@ interface NotaFiscalData {
   macroRegiao: number;
   pesoBruto: number;
   volumeM3: number;
+  qtdVolumes?: number | null;
   itens: {
     cProd: string;
     xProd: string;
@@ -193,6 +194,7 @@ export default function Romaneio() {
             data_emissao,
             peso_bruto,
             volume_m3,
+            qtd_volumes,
             itens_nf(
               c_prod,
               x_prod,
@@ -251,6 +253,7 @@ export default function Romaneio() {
         macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         pesoBruto: Number(nf.peso_bruto || 0),
         volumeM3: Number(nf.volume_m3 || 0),
+        qtdVolumes: nf.qtd_volumes ?? null,
         itens: (nf.itens_nf || []).map((item: any) => ({
           cProd: item.c_prod,
           xProd: item.x_prod,
@@ -331,10 +334,10 @@ export default function Romaneio() {
       macroRegiao: nf.macroRegiao,
       dataEmissao: nf.dataEmissao,
       enderecamentos: enderecMap.get(nf.id) || [],
-      itens: itensConferencia(nf.itens, (i) => i.xProd).map((item) => ({
+      itens: itensNotaDeCarga(nf.itens, (i) => i.xProd, (i) => calculateBoxes(i.qCom), nf.qtdVolumes).map(({ item, qtdCaixas }) => ({
         cProd: item.cProd,
         xProd: item.xProd,
-        qtdCaixas: calculateBoxes(item.qCom),
+        qtdCaixas,
       })),
     }));
   }

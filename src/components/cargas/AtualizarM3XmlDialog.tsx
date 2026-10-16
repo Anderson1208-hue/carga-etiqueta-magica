@@ -131,7 +131,7 @@ export function AtualizarM3XmlDialog({
 
         const { data: updatedRows, error: errUpd } = await supabase
           .from("notas_fiscais")
-          .update({ volume_m3: parsed.volumeM3 })
+          .update({ volume_m3: parsed.volumeM3, ...(parsed.qtdVolumes > 0 ? { qtd_volumes: parsed.qtdVolumes } : {}) })
           .eq("id", nfRef.id)
           .select("id");
 
