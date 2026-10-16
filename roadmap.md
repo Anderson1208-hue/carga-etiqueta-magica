@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] 16/10: sete contas externas e cadastro antigo do Gilson excluídos; conta @tlmlogistica.com.br preservada, ativa e com sessão mantida. Exclusão confirmada e ferramenta temporária removida.
+
 - [x] Organizar o menu em pastas e subpastas laterais, preservando funções e permissões; sem implementar faturamento. Verificado com acesso de Anderson, incluindo menu recolhido.
 
 - [x] Acesso dos operadores confirmado: 24 liberados e 5 bloqueados — Anderson confirmou que os bloqueios são intencionais e devem continuar.
