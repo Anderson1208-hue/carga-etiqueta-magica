@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] 16/10: restringir consulta de endereços/coordenadas aos operadores aprovados; verificar evidências e quantidade de acessos anteriores sem aprovação.
+
 - [x] 16/10: sete contas externas e cadastro antigo do Gilson excluídos; conta @tlmlogistica.com.br preservada, ativa e com sessão mantida. Exclusão confirmada e ferramenta temporária removida.
 
 - [x] Organizar o menu em pastas e subpastas laterais, preservando funções e permissões; sem implementar faturamento. Verificado com acesso de Anderson, incluindo menu recolhido.
