@@ -4,6 +4,7 @@ import { generateNotaDeCargaPDF, printBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao } from "@/lib/macro-regioes";
 import { calculateBoxes } from "@/lib/xml-parser";
+import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useAuth } from "@/hooks/useAuth";
@@ -331,7 +332,8 @@ export default function Cargas() {
         });
 
         const etiquetas: { c_prod: string; x_prod: string; seq: number; total: number; qr_payload: string }[] = [];
-        Object.entries(groupedItems).forEach(([cProd, { xProd, qCom }]) => {
+        // Etiquetas só para IBAC/IBAE (decisão Anderson 16/10/2026).
+        if (isEmitenteCacau(nf.cnpjEmitente)) Object.entries(groupedItems).forEach(([cProd, { xProd, qCom }]) => {
           const totalCaixas = calculateBoxes(qCom);
           for (let seq = 1; seq <= totalCaixas; seq++) {
             const qrPayload = `{CARGA_ID};${nf.numeroNf};${cProd};${seq};${totalCaixas};${nf.chaveAcesso}`;
