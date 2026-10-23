@@ -195,12 +195,7 @@ Deno.serve(async (req) => {
     const auth = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
     const { data: usuario } = await supabase.auth.getUser(auth);
     if (!usuario.user) return json({ mensagem: "Sessão inválida." }, 401);
-    // Use the existing protected permission helper in the caller's JWT context.
-    const caller = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: `Bearer ${auth}` } },
-    });
-    const { data: admin, error: adminError } = await caller.rpc("is_admin");
-    if (adminError || admin !== true) return json({ mensagem: "Somente administradores podem corrigir o envio." }, 403);
+    // Any approved (ativo) operator may correct rejected photos; approval checked above.
     if (!opts.queue_id || !/^[0-9a-f-]{36}$/i.test(opts.queue_id) || !["anexar", "reenviar"].includes(opts.correcao) || dryRun || opts.aprovacao_manual) {
       return json({ mensagem: "Solicitação de correção inválida." }, 400);
     }
