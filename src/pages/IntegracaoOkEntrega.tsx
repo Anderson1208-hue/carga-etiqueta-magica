@@ -1059,7 +1059,7 @@ export default function IntegracaoOkEntrega() {
                         <TableCell className="text-xs min-w-[180px] max-w-[320px] whitespace-normal break-words">
                           {i.fila?.motivo_recusa || i.fila?.erro_mensagem || "—"}
                         </TableCell>
-                        {isAdmin && <TableCell>
+                        {isAdmin && <TableCell className="sticky right-0 z-10 bg-card border-l">
                           {i.fila?.status === "recusado" && <div className="flex flex-col items-start gap-2 min-w-[180px]">
                             <Button size="sm" variant="outline" disabled={corrigirImagem.isPending} onClick={() => {
                               setNotaAnexo(i.fila); arquivoCorrecao.current?.click();
