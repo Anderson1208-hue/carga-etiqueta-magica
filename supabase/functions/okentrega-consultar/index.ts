@@ -65,6 +65,7 @@ Deno.serve(async req => {
     for (let i = 0; i < 4 && home.response.headers.has('location'); i++) home = await request(home.response.headers.get('location') ?? '/login.php8');
     home = await request('/assets/application/cons.documento2.php8');
     const api = async (fields: Record<string, string>) => JSON.parse((await request('/assets/system/sys.ajax.php8', fields)).text);
+    const inputValue = (id: string) => home.text.match(new RegExp(`<input[^>]*id=["']${id}["'][^>]*>`, 'i'))?.[0].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     const selected = (id: string) => {
       const block = home.text.match(new RegExp(`<select[^>]*id=["']${id}["'][^>]*>([\\s\\S]*?)<\\/select>`, 'i'))?.[1] ?? '';
       const options = [...block.matchAll(/<option\b([^>]*)>/gi)];
@@ -72,8 +73,7 @@ Deno.serve(async req => {
       return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     };
     const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
-    if (filtro?.resposta_status?.status !== 1) return json({ etapa: 'filtro_nf', nf: '767250', status: filtro?.resposta_status?.status, tipo: selected('campTipoDoc'), emissor_opcoes: [...home.text.matchAll(/<select[^>]*id=["']campEmissorDoc["'][^>]*>([\s\S]*?)<\/select>/gi)].flatMap(m => [...m[1].matchAll(/<option[^>]*value=["']([\w-]*)["'][^>]*>([^<]*)/gi)].map(o => ({ codigo: o[1], titulo: o[2].slice(0,100) }))), atualizado: false }, 502);
-    const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: '', statusHandler: '' });
+    const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: inputValue('GET'), statusHandler: '' });
     const rows = lista?.resposta_dados?.lista;
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
     if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf: '767250', lista_ok: lista?.resposta_status?.status === 1, atualizado: false }, 502);
