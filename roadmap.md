@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] 23/10 17h02: revisar as sete recusadas de 22/10 buscando novas imagens/ocorrências e validação atual no portal; não julgar canhotos por critérios próprios.
 
 - [x] 23/10: vídeo comparado e consulta automática individual verificada. Filtro indevido de série/emitente removido para espelhar busca do vídeo; lupa usa id sem aspas e RESULTADO_VALIDA é array. NF 767250: Registrado, validação 22/10 14:42, consulta 4,209 s; NF 767017: Recusado, Erro na data de entrega, validação 23/10 13:20, consulta 5,009 s. Nenhum status gravado e nenhuma imagem reenviada; consulta individual não equivale a atualização do lote.
 
