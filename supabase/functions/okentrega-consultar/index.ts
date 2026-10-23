@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { portalDocumentId, portalValidationText, portalQueueStatus } from '../_shared/okentrega-portal-parser.ts';
+import { portalDocumentId, portalValidationText, portalQueueStatus, latestPortalDelivery } from '../_shared/okentrega-portal-parser.ts';
 
 const BASE = 'https://www.okentrega.com.br';
 const schema = z.object({ data: z.literal('2026-10-22'), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar']).default('diagnosticar'), queue_id: z.string().uuid().optional() }).strict();
@@ -105,15 +105,15 @@ Deno.serve(async req => {
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
     if (queue) {
-      const matches = Object.entries(entries).filter(([id]) => id.replace(/^[A-Za-z]+/, '') === queue?.ocorrencia_entrega_id);
-      if (matches.length !== 1) return json({ nf, atualizado: false, motivo: 'Ocorrência enviada não identificada de forma única', duracao_ms: Date.now() - started });
-      const occurrence = matches[0][1] as { RESULTADO_VALIDA?: unknown; INFO_ORI?: Record<string, unknown> };
+      const latest = latestPortalDelivery(entries, queue.ocorrencia_entrega_id ?? '');
+      if (!latest) return json({ nf, atualizado: false, motivo: 'Ocorrência atual não identificada de forma segura', duracao_ms: Date.now() - started });
+      const occurrence = latest.value;
       const status = portalQueueStatus(occurrence.RESULTADO_VALIDA);
       if (!status) return json({ nf, atualizado: false, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), motivo: 'Sem resultado definitivo reconhecido', duracao_ms: Date.now() - started });
       const motivo = status.status === 'recusado' ? plain(occurrence.INFO_ORI?.MOTIVORECUSA ?? occurrence.INFO_ORI?.MOTIVOOCORRENCIA ?? occurrence.INFO_ORI?.MOTIVO) : null;
       const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
       if (error || !saved) return json({ nf, atualizado: false, erro: 'Não foi possível salvar validação' }, 502);
-      return json({ nf, atualizado: true, ...saved, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
+      return json({ nf, atualizado: true, ...saved, ocorrencia_atual_portal: latest.id.replace(/^[A-Za-z]+/, ''), status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
     }
     return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: portalValidationText(v.RESULTADO_VALIDA), resultado_validacao: portalValidationText(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
   } catch {
