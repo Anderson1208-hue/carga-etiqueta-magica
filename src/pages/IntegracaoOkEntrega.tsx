@@ -1070,6 +1070,7 @@ export default function IntegracaoOkEntrega() {
                               Reenviar nova imagem
                             </Button>
                             {i.fila?.payload?.nova_foto_path && <span className="text-xs text-muted-foreground">Nova foto anexada</span>}
+                            {i.fila?.erro_mensagem && <span className="text-xs text-destructive max-w-[220px] whitespace-normal break-words">{i.fila.erro_mensagem}</span>}
                           </div>}
                         </TableCell>}
                       </TableRow>
