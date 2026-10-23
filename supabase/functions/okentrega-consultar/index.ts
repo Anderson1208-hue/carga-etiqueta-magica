@@ -28,7 +28,7 @@ Deno.serve(async req => {
     if (target.origin !== BASE) throw new Error('destino_nao_permitido');
     const response = await fetch(target, {
       redirect: 'manual', signal: AbortSignal.timeout(20000),
-      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: `${BASE}/assets/application/cons.documento2.php8` } : {}) },
       method: fields ? 'POST' : 'GET', ...(fields ? { body: new URLSearchParams(fields) } : {}),
     });
     for (const cookie of response.headers.getSetCookie()) {
@@ -72,7 +72,7 @@ Deno.serve(async req => {
       const opt = options.find(o => /selected/i.test(o[1])) ?? options[0];
       return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     };
-    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
+    await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
     const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: inputValue('GET'), statusHandler: '' });
     const rows = lista?.resposta_dados?.lista;
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
