@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
+import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound, Paperclip } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { compararNfsCrescente } from "@/lib/okentrega-acompanhamento";
 import {
@@ -93,6 +94,44 @@ export default function IntegracaoOkEntrega() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroBusca, setFiltroBusca] = useState<string>("");
   const [dataConsulta, setDataConsulta] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }));
+  const arquivoCorrecao = useRef<HTMLInputElement>(null);
+  const [notaAnexo, setNotaAnexo] = useState<any>(null);
+  const [notaReenvio, setNotaReenvio] = useState<any>(null);
+
+  const atualizarCorrecao = () => {
+    qc.invalidateQueries({ queryKey: ["okentrega-fila"] });
+    qc.invalidateQueries({ queryKey: ["okentrega-roteirizadas-hoje"] });
+    qc.invalidateQueries({ queryKey: ["okentrega-stats"] });
+  };
+  const corrigirImagem = useMutation({
+    mutationFn: async ({ item, arquivo }: { item: any; arquivo?: File }) => {
+      let path: string | undefined;
+      if (arquivo) {
+        if (!["image/jpeg", "image/png"].includes(arquivo.type)) throw new Error("Selecione uma foto JPEG ou PNG.");
+        const bitmap = await createImageBitmap(arquivo);
+        bitmap.close();
+        path = `okentrega-correcoes/${item.id}/${crypto.randomUUID()}.${arquivo.type === "image/png" ? "png" : "jpg"}`;
+        const { error } = await supabase.storage.from("comprovantes").upload(path, arquivo, { contentType: arquivo.type, upsert: false });
+        if (error) throw error;
+      }
+      const { data, error } = await supabase.functions.invoke("okentrega-sync", {
+        body: { correcao: arquivo ? "anexar" : "reenviar", queue_id: item.id, ...(path ? { nova_foto_path: path } : {}) },
+      });
+      if (error) {
+        let mensagem = "Não foi possível concluir. Atualize a lista antes de tentar novamente.";
+        try { mensagem = (await error.context?.json())?.mensagem ?? mensagem; } catch { /* resposta indisponível */ }
+        throw new Error(mensagem);
+      }
+      if (arquivo && data?.status !== "foto_anexada") throw new Error(data?.mensagem ?? "Anexo não confirmado.");
+      if (!arquivo && data?.sucessos !== 1) throw new Error(data?.mensagem ?? "Reenvio não confirmado pela OK Entrega. Consulte o motivo na nota.");
+      return { anexado: !!arquivo };
+    },
+    onSuccess: ({ anexado }) => {
+      toast.success(anexado ? "Nova foto anexada; ainda não enviada." : "Nova imagem recebida pela OK Entrega. A aprovação depende do retorno do portal.");
+      atualizarCorrecao();
+    },
+    onError: (e: Error) => { toast.error(e.message); atualizarCorrecao(); },
+  });
 
   // form local da config
   const [ambiente, setAmbiente] = useState("homolog");
@@ -613,6 +652,25 @@ export default function IntegracaoOkEntrega() {
   return (
     <MainLayout>
       <div className="container mx-auto p-4 max-w-7xl space-y-4">
+        <input ref={arquivoCorrecao} type="file" accept="image/jpeg,image/png" className="hidden" aria-label="Nova foto do canhoto"
+          onChange={(e) => {
+            const arquivo = e.target.files?.[0];
+            if (arquivo && notaAnexo) corrigirImagem.mutate({ item: notaAnexo, arquivo });
+            e.target.value = "";
+            setNotaAnexo(null);
+          }} />
+        <AlertDialog open={!!notaReenvio} onOpenChange={(aberto) => { if (!aberto) setNotaReenvio(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reenviar canhoto da NF {notaReenvio?.numero_nf}?</AlertDialogTitle>
+              <AlertDialogDescription>A nova foto será enviada à OK Entrega. As imagens anteriores serão preservadas; o envio não significa aprovação para pagamento.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { if (notaReenvio) corrigirImagem.mutate({ item: notaReenvio }); }}>Reenviar nova imagem</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div>
           <Button variant="ghost" size="sm" className="mb-1 -ml-3 h-8" asChild>
             <Link to="/">
@@ -973,6 +1031,7 @@ export default function IntegracaoOkEntrega() {
                       <TableHead>Retorno OK Entrega</TableHead>
                       <TableHead>Comprovante</TableHead>
                       <TableHead>Motivo</TableHead>
+                      {isAdmin && <TableHead>Ações</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1000,11 +1059,24 @@ export default function IntegracaoOkEntrega() {
                         <TableCell className="text-xs min-w-[180px] max-w-[320px] whitespace-normal break-words">
                           {i.fila?.motivo_recusa || i.fila?.erro_mensagem || "—"}
                         </TableCell>
+                        {isAdmin && <TableCell>
+                          {i.fila?.status === "recusado" && <div className="flex flex-col items-start gap-2 min-w-[180px]">
+                            <Button size="sm" variant="outline" disabled={corrigirImagem.isPending} onClick={() => {
+                              setNotaAnexo(i.fila); arquivoCorrecao.current?.click();
+                            }}><Paperclip className="w-4 h-4 mr-2" />Anexar nova foto</Button>
+                            <Button size="sm" disabled={corrigirImagem.isPending || !i.fila?.payload?.nova_foto_path || !cfg?.envio_ativo}
+                              onClick={() => setNotaReenvio(i.fila)}>
+                              {corrigirImagem.isPending && corrigirImagem.variables?.item.id === i.fila.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                              Reenviar nova imagem
+                            </Button>
+                            {i.fila?.payload?.nova_foto_path && <span className="text-xs text-muted-foreground">Nova foto anexada</span>}
+                          </div>}
+                        </TableCell>}
                       </TableRow>
                     );})}
                     {acompanhamentoHoje.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                        <TableCell colSpan={isAdmin ? 9 : 8} className="text-center text-muted-foreground py-6">
                           Nenhuma NF Pandurata roteirizada na data selecionada para os filtros aplicados.
                         </TableCell>
                       </TableRow>
