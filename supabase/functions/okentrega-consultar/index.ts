@@ -29,7 +29,7 @@ Deno.serve(async req => {
   if (input.data.acao === 'lote') {
     const hoje = dataBrasilia();
     if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
-    let routes = db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje).order('nf_id').range(0, 499);
+    let routes = db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje).order('nf_id').range(0, 19);
     if (input.data.cursor) routes = routes.gt('nf_id', input.data.cursor);
     const { data: rows, error } = await routes;
     if (error) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
@@ -42,13 +42,19 @@ Deno.serve(async req => {
       work.push(...(items ?? []));
     }
     const run = async () => {
-      for (const item of work) {
-        const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
-        const result = await response.json().catch(() => ({}));
-        console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
+      for (let i = 0; i < work.length; i += 3) {
+        await Promise.all(work.slice(i, i + 3).map(async item => {
+          try {
+            const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
+            const result = await response.json().catch(() => ({}));
+            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
+          } catch {
+            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
+          }
+        }));
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      if (rows?.length === 500) {
+      if (rows?.length === 20) {
         await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: rows[rows.length - 1]?.nf_id }) });
       }
     };
