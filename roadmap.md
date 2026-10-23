@@ -28,3 +28,4 @@
 - [x] 16/10 queda do banco: corrigidas 169 regras de acesso que conferiam permissão linha a linha (consultas 5s→0,3s).
 - [x] Domingo 18/10/2026: servidor ampliado Tiny→Mini (17h55); etiquetas compactadas 479 MB→55 MB, banco 1.293 MB→868 MB, 83.517 etiquetas preservadas.
 - [x] 18/10: a mensagem em inglês era a janela de ampliação do próprio Lovable, não do sistema; não dá para traduzir. Traduzida para Anderson no chat.
+- [x] 23/10: coluna Ações da tela Integração OK Entrega fixada na borda direita (sticky). Anderson não via os botões porque a tabela é mais larga que a tela e a coluna ficava fora da área visível; confirmado com sessão de administrador em 22/10 (NF 766978) que os botões só aparecem depois de rolar a tabela para a direita.
