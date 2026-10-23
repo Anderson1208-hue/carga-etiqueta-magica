@@ -1,5 +1,5 @@
 # Architecture rules
-- OK Entrega scheduled validation uses a dedicated authenticated consultation endpoint, never the enqueue/transmission job; select routing dates through the current Brasília day and page deterministically, preserving original occurrence IDs.
+- OK Entrega scheduled validation uses a dedicated authenticated consultation endpoint, never the enqueue/transmission job; gate dispatch with the existing RJ business-day calendar to avoid holiday calls, select routing dates through the current Brasília day and page deterministically, preserving original occurrence IDs.
 - OK Entrega rejected-photo corrections stage a unique storage object without changing the operational POD, require server-validated approved-operator access and a conditional rejected-row reservation, and transmit only on explicit confirmation; preserve historical images and portal responses and never automatically retry a corrected submission.
 
 - OK Entrega portal consultation is isolated from image transmission; authenticate approved operators and return only allowlisted business data, never portal HTML or authentication responses, to prevent credential leakage and accidental retransmission.

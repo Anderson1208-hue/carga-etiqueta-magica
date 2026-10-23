@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { CONSULTA_CRON, AUTOMACAO_INICIO, dataConsultaPermitida, dataBrasilia } from '../../supabase/functions/_shared/okentrega-consulta-regras';
 
 describe('consulta programada OK Entrega', () => {
-  it('executa às 07h e 17h Brasília (10h e 20h UTC)', () => {
-    expect(CONSULTA_CRON).toBe('0 10,20 * * *');
+  it('executa às 07h e 17h Brasília (10h e 20h UTC) somente de segunda a sexta', () => {
+    expect(CONSULTA_CRON).toBe('0 10,20 * * 1-5');
   });
   it('inicia a automação na segunda 26/10/2026', () => {
     expect(AUTOMACAO_INICIO).toBe('2026-10-26');
