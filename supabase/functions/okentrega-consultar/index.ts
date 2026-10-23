@@ -68,7 +68,10 @@ Deno.serve(async req => {
     const paths = [...home.text.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/gi)]
       .map(m => { try { const u = new URL(m[1], new URL('/assets/application/cons.documento2.php8', BASE)); return u.origin === BASE ? u.pathname : ''; } catch { return ''; } })
       .filter(p => /^\/assets\/(application|js\/system)\/[\w./-]+\.(php8?|js)$/.test(p));
-    return json({ login_ok: paths.length > 0, autenticacao_aceita: true, pagina_http: home.response.status, pagina_login: /camp_identificacao|RedirecionarLogin/.test(home.text), etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
+    const campos = [...home.text.matchAll(/<(?:input|select)[^>]*>/gi)].map(m => ({ id: m[0].match(/\bid=["']([\w-]+)["']/i)?.[1], nome: m[0].match(/\bname=["']([\w-]+)["']/i)?.[1] })).filter(c => c.id || c.nome);
+    const scripts = [...home.text.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
+    const pagina = scripts.join('\n').match(/pagina_filtro\s*=\s*["']([\w.]+)["']/)?.[1];
+    return json({ login_ok: paths.length > 0, pagina, campos, etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
