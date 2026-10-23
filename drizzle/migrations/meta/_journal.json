@@ -162,6 +162,13 @@
       "when": 1792188655811,
       "tag": "0022_restrict_geocode_cache_approved_operators",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792793264717,
+      "tag": "0023_okentrega_consulta_cron_auth",
+      "breakpoints": true
     }
   ]
 }
