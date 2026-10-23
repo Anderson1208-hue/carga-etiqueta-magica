@@ -2,10 +2,10 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { portalDocumentId, portalValidationText } from '../_shared/okentrega-portal-parser.ts';
+import { portalDocumentId, portalValidationText, portalQueueStatus } from '../_shared/okentrega-portal-parser.ts';
 
 const BASE = 'https://www.okentrega.com.br';
-const schema = z.object({ data: z.literal('2026-10-22'), nf: z.enum(['767250', '767017']).default('767250'), acao: z.literal('diagnosticar').default('diagnosticar') }).strict();
+const schema = z.object({ data: z.literal('2026-10-22'), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar']).default('diagnosticar'), queue_id: z.string().uuid().optional() }).strict();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async req => {
@@ -21,6 +21,16 @@ Deno.serve(async req => {
   const input = schema.safeParse(await req.json().catch(() => null));
   if (!input.success) return json({ erro: 'Informe a data 2026-10-22 para o teste autorizado' }, 400);
   const nf = input.data.nf;
+  let queue: { id: string; nf_id: string; ocorrencia_entrega_id: string | null } | null = null;
+  if (input.data.acao === 'atualizar') {
+    if (!input.data.queue_id) return json({ erro: 'Informe o registro da fila' }, 400);
+    const { data: item, error } = await db.from('okentrega_queue').select('id,nf_id,numero_nf,ocorrencia_entrega_id,ambiente').eq('id', input.data.queue_id).maybeSingle();
+    if (error || !item || item.ambiente !== 'producao' || String(Number(item.numero_nf)) !== String(Number(nf)) || !item.ocorrencia_entrega_id) return json({ erro: 'Registro não elegível para consulta' }, 400);
+    const { data: vinculo } = await db.from('veiculo_nfs').select('veiculos!inner(data),notas_fiscais!inner(cnpj_emitente)').eq('nf_id', item.nf_id).eq('veiculos.data', input.data.data).maybeSingle();
+    const emitente = (vinculo?.notas_fiscais as unknown as { cnpj_emitente?: string })?.cnpj_emitente;
+    if (!vinculo || !emitente?.replace(/\D/g, '').startsWith('70940994')) return json({ erro: 'NF fora da roteirização autorizada' }, 400);
+    queue = item;
+  }
   const login = Deno.env.get('OKENTREGA_PORTAL_LOGIN');
   const password = Deno.env.get('OKENTREGA_PORTAL_PASSWORD');
   if (!login || !password) return json({ erro: 'Credenciais do portal ausentes' }, 400);
@@ -94,6 +104,17 @@ Deno.serve(async req => {
     if (!docId) return json({ etapa: 'identificar_nf', nf, encontrado: Boolean(row), atualizado: false });
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
+    if (queue) {
+      const matches = Object.entries(entries).filter(([id]) => id.replace(/^[A-Za-z]+/, '') === queue?.ocorrencia_entrega_id);
+      if (matches.length !== 1) return json({ nf, atualizado: false, motivo: 'Ocorrência enviada não identificada de forma única', duracao_ms: Date.now() - started });
+      const occurrence = matches[0][1] as { RESULTADO_VALIDA?: unknown; INFO_ORI?: Record<string, unknown> };
+      const status = portalQueueStatus(occurrence.RESULTADO_VALIDA);
+      if (!status) return json({ nf, atualizado: false, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), motivo: 'Sem resultado definitivo reconhecido', duracao_ms: Date.now() - started });
+      const motivo = status.status === 'recusado' ? plain(occurrence.INFO_ORI?.MOTIVORECUSA ?? occurrence.INFO_ORI?.MOTIVOOCORRENCIA ?? occurrence.INFO_ORI?.MOTIVO) : null;
+      const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
+      if (error || !saved) return json({ nf, atualizado: false, erro: 'Não foi possível salvar validação' }, 502);
+      return json({ nf, atualizado: true, ...saved, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
+    }
     return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: portalValidationText(v.RESULTADO_VALIDA), resultado_validacao: portalValidationText(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);

@@ -5,6 +5,7 @@
 - [x] Consulta individual de 767017 e 767250 confirmada diretamente no portal em 23/10; resultados registrados acima, sem alteração operacional.
 
 - [ ] OK Entrega: atualizar validação das 32 NFs da roteirização de 22/10/2026, medir lote completo e apresentar custo para autorizar recorrência 07h/17h Brasília. Consulta individual do portal agora funciona, sem reenviar imagens; faltam generalização, persistência segura dos resultados e medição do lote. Recorrência aguarda autorização do custo.
+- [ ] 23/10 16h49: executar atualização autorizada do dia 22/10, conferir resultados salvos e duração; sem ativar agendamento.
 
 - [ ] Analisar em 24/10/2026 o incidente relatado por Anderson em 23/10: motorista marcou reentrega indevidamente; Gilson desfez a baixa na prestação de contas, mas a NF apareceu na Preparação em vez de retornar ao motorista para inclusão do canhoto e baixa correta. Anderson autorizou investigação somente, sem mudanças operacionais. Confirmado no banco: registrar reentrega remove vínculo com veículo, limpa agenda e define CARGA NO DEPOSITO; excluir a baixa não tem gatilho inverso. Histórico recente: Gilson desfez três reentregas de KWN4F37 em 22/10 (NFs 4360543, 4377613, 4360546), hoje todas entregues; NF 4359314/LPY9J85 teve reentrega desfeita em 21/10 e outra reentrega registrada cinco minutos depois, hoje sem vínculo. Bloqueador: obter número da NF e placa do incidente para confirmar qual sequência corresponde ao relato; não presumir que seja LOW9508.
 
