@@ -2870,6 +2870,21 @@ export type Database = {
         }
         Relationships: []
       }
+      okentrega_cron_auth: {
+        Row: {
+          id: boolean
+          token: string
+        }
+        Insert: {
+          id?: boolean
+          token?: string
+        }
+        Update: {
+          id?: boolean
+          token?: string
+        }
+        Relationships: []
+      }
       okentrega_log_envios: {
         Row: {
           created_at: string
@@ -4494,6 +4509,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      okentrega_validar_cron: { Args: { p_token: string }; Returns: boolean }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: {
