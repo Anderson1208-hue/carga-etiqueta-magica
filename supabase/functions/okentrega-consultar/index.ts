@@ -28,7 +28,7 @@ Deno.serve(async req => {
     if (target.origin !== BASE) throw new Error('destino_nao_permitido');
     const response = await fetch(target, {
       redirect: 'manual', signal: AbortSignal.timeout(20000),
-      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: `${BASE}/assets/application/cons.documento2.php8` } : {}) },
       method: fields ? 'POST' : 'GET', ...(fields ? { body: new URLSearchParams(fields) } : {}),
     });
     for (const cookie of response.headers.getSetCookie()) {
@@ -63,11 +63,26 @@ Deno.serve(async req => {
     const destination = redirect.page_direciona || '/assets/application/hom.cockpit2.php8';
     let home = await request(destination, fields);
     for (let i = 0; i < 4 && home.response.headers.has('location'); i++) home = await request(home.response.headers.get('location') ?? '/login.php8');
-    // Return only static module paths, never HTML, user identifiers, cookies or authentication payloads.
-    const paths = [...home.text.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/gi)]
-      .map(m => { try { const u = new URL(m[1], new URL(destination, BASE)); return u.origin === BASE ? u.pathname : ''; } catch { return ''; } })
-      .filter(p => /^\/assets\/(application|js\/system)\/[\w./-]+\.(php8?|js)$/.test(p));
-    return json({ login_ok: paths.length > 0, autenticacao_aceita: true, pagina_http: home.response.status, pagina_login: /camp_identificacao|RedirecionarLogin/.test(home.text), etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
+    home = await request('/assets/application/cons.documento2.php8');
+    const api = async (fields: Record<string, string>) => JSON.parse((await request('/assets/system/sys.ajax.php8', fields)).text);
+    const inputValue = (id: string) => home.text.match(new RegExp(`<input[^>]*id=["']${id}["'][^>]*>`, 'i'))?.[0].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
+    const selected = (id: string) => {
+      const block = home.text.match(new RegExp(`<select[^>]*id=["']${id}["'][^>]*>([\\s\\S]*?)<\\/select>`, 'i'))?.[1] ?? '';
+      const options = [...block.matchAll(/<option\b([^>]*)>/gi)];
+      const opt = options.find(o => /selected/i.test(o[1])) ?? options[0];
+      return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
+    };
+    await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
+    const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: inputValue('GET'), statusHandler: '' });
+    const rows = lista?.resposta_dados?.lista;
+    const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
+    if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf: '767250', lista_ok: lista?.resposta_status?.status === 1, atualizado: false }, 502);
+    const row = rows.find(r => /\b767250\b/.test(plain(r.NF) ?? ''));
+    const docId = typeof row?.Function === 'string' ? row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] : undefined;
+    if (!docId) return json({ etapa: 'identificar_nf', nf: '767250', notas: rows.map(r => ({ nf: plain(r.NF), campos: Object.keys(r) })), atualizado: false });
+    const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
+    const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
+    return json({ nf: '767250', etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: plain(v.INFO_ORI?.STATUS), resultado_validacao: plain(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
