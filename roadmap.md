@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] OK Entrega: consultar validação no portal para roteirizações a partir de 22/10/2026; medir a duração da consulta do dia 22; atualização diária às 07h e 17h de Brasília. Ativação recorrente depende da estimativa de custo e autorização de Anderson; primeiro verificar acesso e método de consulta.
+
 - [ ] Analisar em 24/10/2026 o incidente relatado por Anderson em 23/10: motorista marcou reentrega indevidamente; Gilson desfez a baixa na prestação de contas, mas a NF apareceu na Preparação em vez de retornar ao motorista para inclusão do canhoto e baixa correta. Anderson autorizou investigação somente, sem mudanças operacionais. Confirmado no banco: registrar reentrega remove vínculo com veículo, limpa agenda e define CARGA NO DEPOSITO; excluir a baixa não tem gatilho inverso. Histórico recente: Gilson desfez três reentregas de KWN4F37 em 22/10 (NFs 4360543, 4377613, 4360546), hoje todas entregues; NF 4359314/LPY9J85 teve reentrega desfeita em 21/10 e outra reentrega registrada cinco minutos depois, hoje sem vínculo. Bloqueador: obter número da NF e placa do incidente para confirmar qual sequência corresponde ao relato; não presumir que seja LOW9508.
 
 - [x] 16/10: consulta de endereços/coordenadas restrita a perfis ativos na tabela e nas funções geocodificar-endereco/backfill-geocode. Cinco testes passaram; sessão aprovada consultou o cache e anônimo não recebeu dados. Histórico disponível não permite atribuir ou contar consultas anteriores das contas externas; não confundir ausência de registro com ausência de acesso.
