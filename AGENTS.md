@@ -1,6 +1,7 @@
 # Architecture rules
 
 - OK Entrega portal consultation is isolated from image transmission; authenticate approved operators and return only allowlisted business data, never portal HTML or authentication responses, to prevent credential leakage and accidental retransmission.
+- OK Entrega portal parsing uses a tested shared parser for document-link IDs and validation-result arrays; mirror the portal's actual fields rather than assuming HTML quoting or scalar statuses.
 
 - OK Entrega date consultation uses the vehicle routing date and fetches queue results for those invoices independently of the recent technical-history limit; historical statuses must not disappear because of that limit.
 
