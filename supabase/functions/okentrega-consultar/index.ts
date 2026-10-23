@@ -40,12 +40,15 @@ Deno.serve(async req => {
     return { response, text };
   }
   async function action(action: string, fields: Record<string, string>) {
-    const { text } = await request('/assets/system/sys.ajax.php8', { component: 'sys.sys.login2', action, ...fields });
+    const { text } = await request('/assets/system/sys.ajax.php', { component: 'sys.sys.login', action, ...fields });
     return JSON.parse(text);
   }
   try {
-    await request('/login.php8');
-    const types = await action('tipoacesso', { email: login });
+    await request('/login2.php');
+    const config = await request('/assets/system/sys.config.json.php?page=sys.login');
+    const typePath = JSON.parse(config.text)?.resposta_dados?.ajaxTipoAcesso;
+    if (typeof typePath !== 'string') throw new Error('config_invalida');
+    const types = JSON.parse((await request(typePath, { email: login })).text);
     const options = types?.resposta_dados?.dados;
     const option = Array.isArray(options) ? options[0] : null;
     const type = typeof option === 'string' ? option.match(/value\s*=\s*(?:["']([^"']+)["']|([^\s>]+))/i)?.slice(1).find(Boolean) : null;
