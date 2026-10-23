@@ -86,7 +86,8 @@ Orkestria Logística`;
 
 
 export default function IntegracaoOkEntrega() {
-  const { isAdmin, isLoading } = useAuth();
+  const { isAdmin, isLoading, profile } = useAuth();
+  const podeCorrigir = !!profile?.ativo;
   const { podeVerOkEntrega } = useAcessoOkEntrega();
   const qc = useQueryClient();
   const [tab, setTab] = useState("fila");
@@ -1031,7 +1032,7 @@ export default function IntegracaoOkEntrega() {
                       <TableHead>Retorno OK Entrega</TableHead>
                       <TableHead>Comprovante</TableHead>
                       <TableHead>Motivo</TableHead>
-                      {isAdmin && <TableHead className="sticky right-0 z-20 bg-card border-l">Ações</TableHead>}
+                      {podeCorrigir && <TableHead className="sticky right-0 z-20 bg-card border-l">Ações</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1059,7 +1060,7 @@ export default function IntegracaoOkEntrega() {
                         <TableCell className="text-xs min-w-[180px] max-w-[320px] whitespace-normal break-words">
                           {i.fila?.motivo_recusa || i.fila?.erro_mensagem || "—"}
                         </TableCell>
-                        {isAdmin && <TableCell className="sticky right-0 z-10 bg-card border-l">
+                        {podeCorrigir && <TableCell className="sticky right-0 z-10 bg-card border-l">
                           {i.fila?.status === "recusado" && <div className="flex flex-col items-start gap-2 min-w-[180px]">
                             <Button size="sm" variant="outline" disabled={corrigirImagem.isPending} onClick={() => {
                               setNotaAnexo(i.fila); arquivoCorrecao.current?.click();
@@ -1077,7 +1078,7 @@ export default function IntegracaoOkEntrega() {
                     );})}
                     {acompanhamentoHoje.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 9 : 8} className="text-center text-muted-foreground py-6">
+                        <TableCell colSpan={podeCorrigir ? 9 : 8} className="text-center text-muted-foreground py-6">
                           Nenhuma NF Pandurata roteirizada na data selecionada para os filtros aplicados.
                         </TableCell>
                       </TableRow>
