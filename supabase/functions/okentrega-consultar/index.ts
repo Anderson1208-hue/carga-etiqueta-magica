@@ -89,7 +89,7 @@ Deno.serve(async req => {
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
     if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf, estrutura_filtro: shape(filtro), estrutura_lista: shape(lista), filtro_ok: filtro?.resposta_status?.status === 1, lista_ok: lista?.resposta_status?.status === 1, codigo_pagina: portalCode(home.text), codigo_filtro: portalCode(filtro), codigo_lista: portalCode(lista), rejeicao_filtro: rejection(filtro), rejeicao_lista: rejection(lista), campo_nf_presente: /id=["']campDocumentosfiltro["']/.test(home.text), pagina_http: home.response.status, pagina_login: /camp_identificacao|camp_senha/.test(home.text), duracao_ms: Date.now() - started, atualizado: false }, 502);
     const row = rows.find(r => new RegExp(`\\b${nf}\\b`).test(plain(r.NF) ?? ''));
-    const docId = typeof row?.Function === 'string' ? (row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] ?? row.Function.match(/\bid=["'](\d+)["']/)?.[1]) : undefined;
+    const docId = typeof row?.Function === 'string' ? (row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] ?? row.Function.match(/\bid\s*=\s*["']?(\d+)/)?.[1]) : undefined;
     if (!docId) return json({ etapa: 'identificar_nf', nf, encontrado: Boolean(row), atualizado: false });
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
