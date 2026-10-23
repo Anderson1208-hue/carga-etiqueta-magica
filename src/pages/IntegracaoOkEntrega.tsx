@@ -998,7 +998,7 @@ export default function IntegracaoOkEntrega() {
                               : ["enviado", "aguardando_aprovacao"].includes(i.fila?.status) ? "Em análise" : "Aguardando envio"}
                         </TableCell>
                         <TableCell className="text-xs min-w-[180px] max-w-[320px] whitespace-normal break-words">
-                          {i.fila?.motivo_recusa || i.fila?.last_error || "—"}
+                          {i.fila?.motivo_recusa || i.fila?.erro_mensagem || "—"}
                         </TableCell>
                       </TableRow>
                     );})}
