@@ -2,7 +2,7 @@
 
 - OK Entrega portal consultation is isolated from image transmission; authenticate approved operators and return only allowlisted business data, never portal HTML or authentication responses, to prevent credential leakage and accidental retransmission.
 - OK Entrega portal parsing uses a tested shared parser for document-link IDs and validation-result arrays; mirror the portal's actual fields rather than assuming HTML quoting or scalar statuses.
-- OK Entrega validation updates must match the queue's transmitted occurrence ID and the authorized routing date before persisting; unknown or ambiguous portal results never approve an invoice.
+- OK Entrega validation updates verify the original transmitted occurrence belongs to the document and authorized routing date, then read the latest uniquely dated delivery occurrence including manual portal corrections; retain the original transmission ID and never infer approval from unknown or ambiguous results.
 
 - OK Entrega date consultation uses the vehicle routing date and fetches queue results for those invoices independently of the recent technical-history limit; historical statuses must not disappear because of that limit.
 
