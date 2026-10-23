@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Adicionar anexo de nova foto e reenvio explícito em notas recusadas na Integração OK Entrega, preservando originais e mostrando o retorno real do cliente.
 - [x] 23/10 17h02: revisão confirmou novas ocorrências no portal nas sete recusadas. Seis agora Registrado (764358, 764557, 764698, 766979, 766981, 767146), salvas como aprovadas sem motivo; 766978 tem nova recusa 23/10 14:18, motivo do portal Erro na data de entrega. Leitura agora considera ocorrência de entrega mais recente por DTREGISTRO, preserva ID da transmissão original e exige correspondência na mesma nota. Sem julgamento de imagem ou reenvio. 15 testes passaram; registros salvos e relidos.
 
 - [x] 23/10: vídeo comparado e consulta automática individual verificada. Filtro indevido de série/emitente removido para espelhar busca do vídeo; lupa usa id sem aspas e RESULTADO_VALIDA é array. NF 767250: Registrado, validação 22/10 14:42, consulta 4,209 s; NF 767017: Recusado, Erro na data de entrega, validação 23/10 13:20, consulta 5,009 s. Nenhum status gravado e nenhuma imagem reenviada; consulta individual não equivale a atualização do lote.
