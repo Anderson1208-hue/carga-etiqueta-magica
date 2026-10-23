@@ -83,14 +83,6 @@ Deno.serve(async req => {
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
     return json({ nf: '767250', etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: plain(v.INFO_ORI?.STATUS), resultado_validacao: plain(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
-    // Return only static module paths, never HTML, user identifiers, cookies or authentication payloads.
-    const paths = [...home.text.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/gi)]
-      .map(m => { try { const u = new URL(m[1], new URL('/assets/application/cons.documento2.php8', BASE)); return u.origin === BASE ? u.pathname : ''; } catch { return ''; } })
-      .filter(p => /^\/assets\/(application|js\/system)\/[\w./-]+\.(php8?|js)$/.test(p));
-    const campos = [...home.text.matchAll(/<(?:input|select)[^>]*>/gi)].map(m => ({ id: m[0].match(/\bid=["']([\w-]+)["']/i)?.[1], nome: m[0].match(/\bname=["']([\w-]+)["']/i)?.[1] })).filter(c => c.id || c.nome);
-    const scripts = [...home.text.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
-    const pagina = scripts.join('\n').match(/pagina_filtro\s*=\s*["']([\w.]+)["']/)?.[1];
-    return json({ login_ok: paths.length > 0, pagina, campos, etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
