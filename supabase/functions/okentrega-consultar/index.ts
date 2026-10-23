@@ -2,6 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
+import { portalDocumentId, portalValidationText } from '../_shared/okentrega-portal-parser.ts';
 
 const BASE = 'https://www.okentrega.com.br';
 const schema = z.object({ data: z.literal('2026-10-22'), nf: z.enum(['767250', '767017']).default('767250'), acao: z.literal('diagnosticar').default('diagnosticar') }).strict();
@@ -89,11 +90,11 @@ Deno.serve(async req => {
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
     if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf, estrutura_filtro: shape(filtro), estrutura_lista: shape(lista), filtro_ok: filtro?.resposta_status?.status === 1, lista_ok: lista?.resposta_status?.status === 1, codigo_pagina: portalCode(home.text), codigo_filtro: portalCode(filtro), codigo_lista: portalCode(lista), rejeicao_filtro: rejection(filtro), rejeicao_lista: rejection(lista), campo_nf_presente: /id=["']campDocumentosfiltro["']/.test(home.text), pagina_http: home.response.status, pagina_login: /camp_identificacao|camp_senha/.test(home.text), duracao_ms: Date.now() - started, atualizado: false }, 502);
     const row = rows.find(r => new RegExp(`\\b${nf}\\b`).test(plain(r.NF) ?? ''));
-    const docId = typeof row?.Function === 'string' ? (row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] ?? row.Function.match(/\bid\s*=\s*["']?(\d+)/)?.[1]) : undefined;
+    const docId = portalDocumentId(row?.Function);
     if (!docId) return json({ etapa: 'identificar_nf', nf, encontrado: Boolean(row), atualizado: false });
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
-    return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: plain(Array.isArray(v.RESULTADO_VALIDA) ? v.RESULTADO_VALIDA[0] : v.RESULTADO_VALIDA), resultado_validacao: plain(Array.isArray(v.RESULTADO_VALIDA) ? v.RESULTADO_VALIDA[0] : v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
+    return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: portalValidationText(v.RESULTADO_VALIDA), resultado_validacao: portalValidationText(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
