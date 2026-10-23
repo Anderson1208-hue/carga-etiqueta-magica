@@ -74,6 +74,7 @@ Deno.serve(async req => {
       if (/component/.test(text) && /inval|encontr/.test(text)) return 'componente_invalido';
       return 'nao_identificado';
     };
+    const shape = (value: unknown) => value && typeof value === 'object' ? Object.keys(value).filter(k => /^[a-zA-Z_]{1,40}$/.test(k)) : [typeof value];
     const api = async (fields: Record<string, string>) => JSON.parse((await request('/assets/system/sys.ajax.php8', fields)).text);
     const inputValue = (id: string) => home.text.match(new RegExp(`<input[^>]*id=["']${id}["'][^>]*>`, 'i'))?.[0].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     const selected = (id: string) => {
@@ -82,11 +83,11 @@ Deno.serve(async req => {
       const opt = options.find(o => /selected/i.test(o[1])) ?? options[0];
       return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     };
-    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: nf, campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
+    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: nf, campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '', campEmissorDoc: '', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
     const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: inputValue('GET'), statusHandler: '' });
     const rows = lista?.resposta_dados?.lista;
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
-    if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf, filtro_ok: filtro?.resposta_status?.status === 1, lista_ok: lista?.resposta_status?.status === 1, codigo_pagina: portalCode(home.text), codigo_filtro: portalCode(filtro), codigo_lista: portalCode(lista), rejeicao_filtro: rejection(filtro), rejeicao_lista: rejection(lista), campo_nf_presente: /id=["']campDocumentos["']/.test(home.text), pagina_http: home.response.status, pagina_login: /camp_identificacao|camp_senha/.test(home.text), scripts: [...home.text.matchAll(/<script[^>]*src=["']([^"']+)["']/gi)].map(m => new URL(m[1], `${BASE}/assets/application/cons.documento2.php8`)).filter(u => u.origin === BASE && /^\/assets\/js\/[\w./-]+\.js$/.test(u.pathname)).map(u => u.pathname), duracao_ms: Date.now() - started, atualizado: false }, 502);
+    if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf, estrutura_filtro: shape(filtro), estrutura_lista: shape(lista), filtro_ok: filtro?.resposta_status?.status === 1, lista_ok: lista?.resposta_status?.status === 1, codigo_pagina: portalCode(home.text), codigo_filtro: portalCode(filtro), codigo_lista: portalCode(lista), rejeicao_filtro: rejection(filtro), rejeicao_lista: rejection(lista), campo_nf_presente: /id=["']campDocumentosfiltro["']/.test(home.text), pagina_http: home.response.status, pagina_login: /camp_identificacao|camp_senha/.test(home.text), duracao_ms: Date.now() - started, atualizado: false }, 502);
     const row = rows.find(r => new RegExp(`\\b${nf}\\b`).test(plain(r.NF) ?? ''));
     const docId = typeof row?.Function === 'string' ? row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] : undefined;
     if (!docId) return json({ etapa: 'identificar_nf', nf, encontrado: Boolean(row), atualizado: false });
