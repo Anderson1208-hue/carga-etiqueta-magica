@@ -48,8 +48,8 @@ Deno.serve(async req => {
     const types = await action('tipoacesso', { email: login });
     const options = types?.resposta_dados?.dados;
     const option = Array.isArray(options) ? options[0] : null;
-    const type = typeof option === 'string' ? option.match(/value\s*=\s*["']([^"']+)["']/i)?.[1] : null;
-    if (!type) return json({ etapa: 'tipo_acesso', login_ok: false, duracao_ms: Date.now() - started }, 502);
+    const type = typeof option === 'string' ? option.match(/value\s*=\s*(?:["']([^"']+)["']|([^\s>]+))/i)?.slice(1).find(Boolean) : null;
+    if (!type) return json({ etapa: 'tipo_acesso', login_ok: false, resposta_aceita: types?.resposta_status?.status === 1, lista_disponivel: Array.isArray(options), duracao_ms: Date.now() - started }, 502);
     const result = await action('RedirecionarLogin', { email: login, password, pgredirect: '', cliente_id: '', elemento: '', tipoacesso: type });
     if (result?.resposta_status?.status !== 1 || !result?.resposta_dados?.dados?.id) return json({ etapa: 'login', login_ok: false, duracao_ms: Date.now() - started }, 502);
     const redirect = result.resposta_dados.redirect ?? {};
