@@ -1,5 +1,7 @@
 # Architecture rules
 
+- OK Entrega portal consultation is isolated from image transmission; authenticate approved operators and return only allowlisted business data, never portal HTML or authentication responses, to prevent credential leakage and accidental retransmission.
+
 - OK Entrega date consultation uses the vehicle routing date and fetches queue results for those invoices independently of the recent technical-history limit; historical statuses must not disappear because of that limit.
 
 - Keep operator navigation grouped in lateral flyouts within the existing desktop Sidebar, retaining existing route targets and access-hook filters; this reduces menu clutter without changing business workflows or the driver application.
