@@ -11,6 +11,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { prepararCanhoto, paraBase64, localizarCanhotoIA, type ModoImagem } from "../_shared/okentrega-image.ts";
 import { classificarRetornoOkEntrega } from "../_shared/okentrega-state.ts";
+import { operatorAccessStatus } from "../_shared/approved-operator.ts";
+import { prepararReenvio } from "../_shared/okentrega-reenvio.ts";
 import { Image as ImageLib } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 const corsHeaders = {
@@ -155,6 +157,8 @@ Deno.serve(async (req) => {
     // Mantido apenas para rejeitar clientes antigos: imagens externas não
     // passam pela validação obrigatória do servidor.
     imagem_base64?: string;
+    correcao?: "anexar" | "reenviar";
+    nova_foto_path?: string;
   } = {};
   try {
     opts = (await req.json()) ?? {};
@@ -181,6 +185,53 @@ Deno.serve(async (req) => {
   const whitelist: string[] = (cfg?.whitelist_nfs ?? []).map((v: string) => String(v).trim()).filter(Boolean);
 
   const dryRun = !!opts.dry_run;
+
+  // Correção explícita: anexar nunca coloca na fila automática nem altera a baixa.
+  let correcaoItem: any = null;
+  let correcaoPayload: Record<string, unknown> | null = null;
+  if (opts.correcao) {
+    const access = await operatorAccessStatus(req.headers.get("authorization"), supabase);
+    if (access) return json({ mensagem: "Acesso não autorizado." }, access);
+    const auth = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+    const { data: usuario } = await supabase.auth.getUser(auth);
+    if (!usuario.user) return json({ mensagem: "Sessão inválida." }, 401);
+    // Use the existing protected permission helper in the caller's JWT context.
+    const caller = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+      global: { headers: { Authorization: `Bearer ${auth}` } },
+    });
+    const { data: admin, error: adminError } = await caller.rpc("is_admin");
+    if (adminError || admin !== true) return json({ mensagem: "Somente administradores podem corrigir o envio." }, 403);
+    if (!opts.queue_id || !/^[0-9a-f-]{36}$/i.test(opts.queue_id) || !["anexar", "reenviar"].includes(opts.correcao) || dryRun || opts.aprovacao_manual) {
+      return json({ mensagem: "Solicitação de correção inválida." }, 400);
+    }
+    const { data: atual, error: atualError } = await supabase.from("okentrega_queue").select("*").eq("id", opts.queue_id).maybeSingle();
+    if (atualError || !atual || atual.status !== "recusado") return json({ mensagem: "A nota não está mais recusada. Atualize a lista." }, 409);
+    const payload = atual.payload ?? {};
+    if (opts.correcao === "anexar") {
+      const path = opts.nova_foto_path;
+      try { prepararReenvio({ status: atual.status, payload: { ...payload, nova_foto_path: path } }, atual.id); }
+      catch (e) { return json({ mensagem: e instanceof Error ? e.message : "Foto inválida." }, 400); }
+      const { data: foto, error: fotoError } = await supabase.storage.from("comprovantes").download(String(path));
+      if (fotoError || !foto || foto.size === 0) return json({ mensagem: "Nova foto não encontrada." }, 400);
+      const { data: salvo, error: salvarError } = await supabase.from("okentrega_queue").update({
+        payload: { ...payload, nova_foto_path: path, nova_foto_anexada_em: new Date().toISOString(), nova_foto_anexada_por: usuario.user.id },
+      }).eq("id", atual.id).eq("status", "recusado").eq("payload", JSON.stringify(payload)).select("id").maybeSingle();
+      if (salvarError || !salvo) return json({ mensagem: "A nota mudou durante o anexo. Atualize e tente novamente." }, 409);
+      return json({ status: "foto_anexada" });
+    }
+    try { correcaoPayload = prepararReenvio({ status: atual.status, payload }, atual.id); }
+    catch (e) { return json({ mensagem: e instanceof Error ? e.message : "Anexe uma nova foto." }, 400); }
+    const block = (cfg?.blocklist_nfs ?? []).map((v: string) => String(v).replace(/\D/g, ""));
+    if (!envioAtivo || !entregadorId || !cnpjTransportadora || block.includes(String(atual.numero_nf).replace(/\D/g, "")) || block.includes(String(atual.chave_acesso).replace(/\D/g, ""))) {
+      return json({ mensagem: "Envio desativado, bloqueado ou configuração incompleta." }, 400);
+    }
+    // Reserva condicional: só um administrador transmite; cron não seleciona recusadas.
+    const { data: reservado, error: reservaError } = await supabase.from("okentrega_queue")
+      .update({ status: "processando", processamento_iniciado_em: new Date().toISOString() })
+      .eq("id", atual.id).eq("status", "recusado").eq("payload", JSON.stringify(payload)).select("*").maybeSingle();
+    if (reservaError || !reservado) return json({ mensagem: "A nota mudou ou já está sendo reenviada." }, 409);
+    correcaoItem = reservado;
+  }
 
   // Teste isolado de credenciais: faz login e informa só se obteve token (nunca expõe o valor)
   if (opts.testar_login) {
@@ -290,7 +341,9 @@ Deno.serve(async (req) => {
 
   let pendentesRaw: any[] | null = null;
   let errSelect: any = null;
-  if (dryRun || aprovacaoManual) {
+  if (correcaoItem) {
+    pendentesRaw = [correcaoItem];
+  } else if (dryRun || aprovacaoManual) {
     const selecionados = await q;
     pendentesRaw = selecionados.data;
     errSelect = selecionados.error;
@@ -364,7 +417,7 @@ Deno.serve(async (req) => {
       if (pendentes.length > 0) {
         await supabase
           .from("okentrega_queue")
-          .update({ status: "pendente", processamento_iniciado_em: null })
+          .update({ status: correcaoItem ? "recusado" : "pendente", processamento_iniciado_em: null })
           .in("id", pendentes.map((item) => item.id));
       }
       return json({ status: "erro_login", mensagem: e instanceof Error ? e.message : String(e) }, 502);
@@ -376,7 +429,7 @@ Deno.serve(async (req) => {
   const amostras: unknown[] = [];
 
   for (const item of pendentes) {
-    const p = (item.payload ?? {}) as any;
+    const p = (correcaoPayload ?? item.payload ?? {}) as any;
     let erroPreparo: string | null = null;
     let imagemOrigem: string | null = null;
     let validacaoImagem: Record<string, unknown> | null = null;
@@ -420,7 +473,7 @@ Deno.serve(async (req) => {
         // exceção (conferência manual). Falha temporária (visão 429/indisponível,
         // download) volta para a fila e tenta de novo até 5 vezes.
         const temporario = /VALIDACAO_INDISPONIVEL|Falha ao baixar/.test(erroPreparo);
-        const statusPreparo = temporario && (item.tentativas ?? 0) + 1 < 5 ? "pendente" : "revisao";
+        const statusPreparo = correcaoItem ? "recusado" : temporario && (item.tentativas ?? 0) + 1 < 5 ? "pendente" : "revisao";
         await supabase
           .from("okentrega_queue")
           .update({
@@ -453,7 +506,7 @@ Deno.serve(async (req) => {
         .upload(imagemEnviadaPath, imagemBytes, { contentType: "image/jpeg", upsert: false });
       if (uploadErr) {
         const msg = `Falha ao arquivar a imagem exata do envio: ${uploadErr.message}`;
-        await supabase.from("okentrega_queue").update({ status: "revisao", erro_mensagem: msg, processamento_iniciado_em: null }).eq("id", item.id);
+        await supabase.from("okentrega_queue").update({ status: correcaoItem ? "recusado" : "revisao", erro_mensagem: msg, processamento_iniciado_em: null }).eq("id", item.id);
         resultados.push({ id: item.id, sucesso: false });
         continue;
       }
@@ -466,7 +519,7 @@ Deno.serve(async (req) => {
     }
 
     const dtEntregaLocal = toSaoPauloISO(p.dtentrega ?? p.registrado_em ?? item.created_at);
-    const dtRegistroLocal = toSaoPauloISO(p.registrado_em ?? item.created_at);
+    const dtRegistroLocal = toSaoPauloISO(correcaoItem ? new Date() : p.registrado_em ?? item.created_at);
 
     const body = {
       documento: String(item.chave_acesso ?? p.documento ?? "").replace(/\D/g, ""),
@@ -540,20 +593,35 @@ Deno.serve(async (req) => {
       tentativasAtuais: item.tentativas,
       maxTentativas,
     });
-    if (duplicado) erroMsg = "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
+    if (duplicado) erroMsg = correcaoItem
+      ? "OK Entrega não aceitou o reenvio: ocorrência já existe (HTTP 409). A nova imagem continua anexada; correção pelo portal pode ser necessária."
+      : "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
 
     await supabase
       .from("okentrega_queue")
       .update({
-        status: novoStatus,
+        status: correcaoItem && !sucesso ? "recusado" : novoStatus,
+        ...(correcaoItem && !sucesso ? {
+          imagem_enviada_path: item.imagem_enviada_path, imagem_origem: item.imagem_origem,
+          validacao_imagem: item.validacao_imagem, validado_em: item.validado_em,
+        } : {}),
+        ...(correcaoItem && sucesso ? { payload: {
+          ...p,
+          historico_correcoes: [...(Array.isArray(item.payload?.historico_correcoes) ? item.payload.historico_correcoes : []), {
+            foto_anterior: item.payload?.foto_path, imagem_enviada_anterior: item.imagem_enviada_path,
+            ocorrencia_anterior: item.ocorrencia_entrega_id, motivo_anterior: item.motivo_recusa,
+            nova_foto: p.foto_path, reenviado_em: new Date().toISOString(),
+            anexado_por: item.payload?.nova_foto_anexada_por,
+          }],
+        } } : {}),
         tentativas: item.tentativas + 1,
         ultima_tentativa_em: new Date().toISOString(),
         enviado_em: sucesso ? new Date().toISOString() : item.enviado_em,
         erro_mensagem: erroMsg,
-        ocorrencia_entrega_id: respBody?.ocorrenciaentregaId ?? null,
-        status_baixa: statusBaixa,
-        status_comprovante: statusComprovante,
-        motivo_recusa: respBody?.motivorecusa ?? null,
+        ocorrencia_entrega_id: correcaoItem && !sucesso ? item.ocorrencia_entrega_id : respBody?.ocorrenciaentregaId ?? null,
+        status_baixa: correcaoItem && !sucesso ? item.status_baixa : statusBaixa,
+        status_comprovante: correcaoItem && !sucesso ? item.status_comprovante : statusComprovante,
+        motivo_recusa: correcaoItem && !sucesso ? item.motivo_recusa : respBody?.motivorecusa ?? null,
         processamento_iniciado_em: null,
       })
       .eq("id", item.id);
