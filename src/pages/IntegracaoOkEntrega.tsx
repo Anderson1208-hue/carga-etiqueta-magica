@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { compararNfsCrescente } from "@/lib/okentrega-acompanhamento";
 import {
   previewCanhotoOkEntrega,
   AJUSTE_PADRAO,
@@ -91,6 +92,7 @@ export default function IntegracaoOkEntrega() {
   const [dryRunJson, setDryRunJson] = useState<string>("");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [filtroBusca, setFiltroBusca] = useState<string>("");
+  const [dataConsulta, setDataConsulta] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }));
 
   // form local da config
   const [ambiente, setAmbiente] = useState("homolog");
@@ -147,7 +149,6 @@ export default function IntegracaoOkEntrega() {
 
   });
 
-  const hojeOperacional = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const prefixosConfigurados = (cfg?.cnpjs_emitente ?? [])
     .map((cnpj: string) => String(cnpj).replace(/\D/g, ""))
     .filter(Boolean);
@@ -156,13 +157,13 @@ export default function IntegracaoOkEntrega() {
   // necessário mostrar também as NFs roteirizadas que ainda estão em rota,
   // sem baixa/foto ou aguardando o encerramento da prestação de contas.
   const { data: nfsRoteirizadasHoje = [], refetch: refetchRoteirizadas } = useQuery({
-    queryKey: ["okentrega-roteirizadas-hoje", hojeOperacional, prefixosConfigurados.join(",")],
+    queryKey: ["okentrega-roteirizadas-hoje", dataConsulta, prefixosConfigurados.join(",")],
     enabled: prefixosConfigurados.length > 0,
     queryFn: async () => {
       const { data: veiculos, error: veiculosError } = await supabase
         .from("veiculos")
         .select("id, placa, motorista, prestacao_contas_em")
-        .eq("data", hojeOperacional);
+        .eq("data", dataConsulta);
       if (veiculosError) throw veiculosError;
 
       const veiculoIds = (veiculos ?? []).map((v: any) => v.id);
@@ -198,6 +199,22 @@ export default function IntegracaoOkEntrega() {
       const idsPandurata = notasPandurata.map((nf: any) => nf.id);
       if (idsPandurata.length === 0) return [];
 
+      // Consultar toda a fila das NFs da data, sem depender dos 300 registros recentes.
+      const filaDaData = new Map<string, any>();
+      for (let i = 0; i < idsPandurata.length; i += 200) {
+        for (let offset = 0; ; offset += 500) {
+          const { data, error } = await supabase.from("okentrega_queue")
+            .select("*").in("nf_id", idsPandurata.slice(i, i + 200))
+            .order("created_at", { ascending: false }).order("id")
+            .range(offset, offset + 499);
+          if (error) throw error;
+          for (const item of data ?? []) {
+            if (item.nf_id && !filaDaData.has(item.nf_id)) filaDaData.set(item.nf_id, item);
+          }
+          if ((data ?? []).length < 500) break;
+        }
+      }
+
       const baixas: any[] = [];
       for (let i = 0; i < idsPandurata.length; i += 200) {
         const { data, error } = await supabase
@@ -219,7 +236,7 @@ export default function IntegracaoOkEntrega() {
       return notasPandurata.map((nf: any) => {
         const veiculoId = vinculoMap.get(nf.id);
         const veiculo: any = veiculoId ? veiculoMap.get(veiculoId) : null;
-        return { ...nf, veiculo, baixa: baixaMap.get(nf.id) ?? null };
+        return { ...nf, veiculo, baixa: baixaMap.get(nf.id) ?? null, fila: filaDaData.get(nf.id) ?? null };
       });
     },
     refetchInterval: 30_000,
@@ -311,7 +328,7 @@ export default function IntegracaoOkEntrega() {
   const acompanhamentoHoje = useMemo(() => {
     const termo = filtroBusca.trim().toLowerCase();
     return (nfsRoteirizadasHoje as any[])
-      .map((nf) => ({ ...nf, fila: filaPorNfId.get(nf.id) ?? null }))
+      .map((nf) => ({ ...nf, fila: filaPorNfId.get(nf.id) ?? nf.fila ?? null }))
       .filter((item) => {
         const statusFila = item.fila?.status ?? "fora_fila";
         if (filtroStatus !== "todos" && statusFila !== filtroStatus) return false;
@@ -322,7 +339,7 @@ export default function IntegracaoOkEntrega() {
           .toLowerCase()
           .includes(termo);
       })
-      .sort((a, b) => String(a.veiculo?.placa ?? "").localeCompare(String(b.veiculo?.placa ?? "")));
+      .sort(compararNfsCrescente);
   }, [nfsRoteirizadasHoje, filaPorNfId, filtroBusca, filtroStatus]);
 
   const statusAcompanhamento = (item: any) => {
@@ -900,7 +917,7 @@ export default function IntegracaoOkEntrega() {
             <Card className="mb-4">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>NFs Pandurata roteirizadas hoje</CardTitle>
+                  <CardTitle>NFs Pandurata por data de roteirização</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
                     Acompanhamento desde a roteirização até o retorno da OK Entrega.
                   </p>
@@ -911,6 +928,12 @@ export default function IntegracaoOkEntrega() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="okentrega-data">Data da roteirização</Label>
+                    <Input id="okentrega-data" type="date" value={dataConsulta}
+                      onChange={(e) => { if (e.target.value) setDataConsulta(e.target.value); }}
+                      className="w-[160px]" />
+                  </div>
                   <Select value={filtroStatus} onValueChange={setFiltroStatus}>
                     <SelectTrigger className="w-[180px]">
                       <SelectValue placeholder="Status" />
@@ -918,6 +941,8 @@ export default function IntegracaoOkEntrega() {
                     <SelectContent>
                       <SelectItem value="todos">Todos os status</SelectItem>
                       <SelectItem value="pendente">Pendente</SelectItem>
+                      <SelectItem value="processando">Validando</SelectItem>
+                      <SelectItem value="bloqueado">Bloqueado</SelectItem>
                       <SelectItem value="enviado">Enviado</SelectItem>
                       <SelectItem value="aguardando_aprovacao">Em análise</SelectItem>
                       <SelectItem value="aprovado">Aprovado</SelectItem>
@@ -947,6 +972,7 @@ export default function IntegracaoOkEntrega() {
                       <TableHead>Status da integração</TableHead>
                       <TableHead>Retorno OK Entrega</TableHead>
                       <TableHead>Comprovante</TableHead>
+                      <TableHead>Motivo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -968,15 +994,18 @@ export default function IntegracaoOkEntrega() {
                             : i.fila?.status_comprovante === "1"
                             ? "Aprovado"
                             : i.fila?.status_comprovante === "2"
-                              ? `Recusado${i.fila?.motivo_recusa ? ` — ${i.fila.motivo_recusa}` : ""}`
+                              ? "Recusado"
                               : ["enviado", "aguardando_aprovacao"].includes(i.fila?.status) ? "Em análise" : "Aguardando envio"}
+                        </TableCell>
+                        <TableCell className="text-xs min-w-[180px] max-w-[320px] whitespace-normal break-words">
+                          {i.fila?.motivo_recusa || i.fila?.erro_mensagem || "—"}
                         </TableCell>
                       </TableRow>
                     );})}
                     {acompanhamentoHoje.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
-                          Nenhuma NF Pandurata roteirizada hoje para os filtros aplicados.
+                        <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                          Nenhuma NF Pandurata roteirizada na data selecionada para os filtros aplicados.
                         </TableCell>
                       </TableRow>
                     )}
