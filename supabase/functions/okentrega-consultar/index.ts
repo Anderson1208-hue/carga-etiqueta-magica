@@ -71,7 +71,7 @@ Deno.serve(async req => {
       const opt = options.find(o => /selected/i.test(o[1])) ?? options[0];
       return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     };
-    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: selected('campEmissorDoc'), usuarioClientes: '0', pagina: 'cons.documento2.php8' });
+    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
     if (filtro?.resposta_status?.status !== 1) return json({ etapa: 'filtro_nf', nf: '767250', status: filtro?.resposta_status?.status, tipo: selected('campTipoDoc'), emissor_opcoes: [...home.text.matchAll(/<select[^>]*id=["']campEmissorDoc["'][^>]*>([\s\S]*?)<\/select>/gi)].flatMap(m => [...m[1].matchAll(/<option[^>]*value=["']([\w-]*)["'][^>]*>([^<]*)/gi)].map(o => ({ codigo: o[1], titulo: o[2].slice(0,100) }))), atualizado: false }, 502);
     const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: '', statusHandler: '' });
     const rows = lista?.resposta_dados?.lista;
