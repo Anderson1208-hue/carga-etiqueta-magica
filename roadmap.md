@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] 23/10: apurar falha da consulta automática da NF 767250 comparando com o vídeo enviado às 16h38; consulta manual demonstrada pelo usuário. Não reenviar imagens nem ativar recorrência nesta investigação.
+
 - [ ] Consulta individual solicitada em 23/10: NF 767017 testada após a 767250; portal recusou filtro e listagem (4,199 s). Resultado atual da ocorrência não confirmado; o vídeo anterior mostrava recusado por erro na data de entrega, mas não serve como consulta atual. Bloqueada pela mesma falha de contexto da consulta automática; nenhum registro alterado ou imagem reenviada.
 
 - [ ] OK Entrega: consultar validação para roteirizações desde 22/10/2026 (32 NFs nessa data); medir consulta e depois ativar 07h/17h Brasília após autorizar custo total. Anderson autorizou implementar/testar, não ativar recorrência. Endereço confirmado em 23/10: https://www.okentrega.com.br/login2.php. Login e página Consulta Documento funcionam. NF escolhida para teste: 767250, série 20, filial 70940994008277; no Orkestria ainda aguarda aprovação, envio em 22/10, sem status_comprovante ou conciliado_em. Identificados endpoints públicos de consulta listardocumentos e ocorrenciasEntrega; chamada autenticada não retorna lista válida, mesmo com filtro da NF/filial e cabeçalhos do navegador. Resultado atual da validação no portal ainda NÃO confirmado. Nenhum status atualizado ou imagem reenviada. Pendente: diagnosticar contexto de sessão/filtros da consulta; medir atualização completa e autorizar custo da recorrência.
