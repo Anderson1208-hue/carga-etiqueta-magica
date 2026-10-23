@@ -146,30 +146,50 @@ export default function DesfazerBaixa() {
       if (delErr) throw delErr;
       if (!count) throw new Error("Sem permissão para desfazer a baixa.");
 
-      const { data: outras } = await supabase
+      const { data: outras, error: outErr } = await supabase
         .from("baixas_entrega")
         .select("id")
         .eq("nf_id", r.nf_id)
         .limit(1);
+      if (outErr) throw outErr;
 
+      const avisos: string[] = [];
       if (!outras || outras.length === 0) {
-        await supabase
+        const { error: stErr } = await supabase
           .from("notas_fiscais")
           .update({ status_entrega: "NF EM ROTA" })
           .eq("id", r.nf_id);
+        if (stErr) avisos.push(`Status da NF não atualizado: ${stErr.message}`);
 
-        if (r.veiculo?.id && r.nf?.carga_id) {
-          await supabase
+        // Garante que a NF volte ao veículo do motorista (reentrega pode tê-la liberado para a Preparação)
+        if (r.veiculo?.id) {
+          const { data: vinc, error: vErr } = await supabase
             .from("veiculo_nfs")
-            .upsert(
-              [{ veiculo_id: r.veiculo.id, nf_id: r.nf_id, carga_origem_id: r.nf.carga_id }],
-              { onConflict: "nf_id", ignoreDuplicates: true }
-            );
+            .select("id, veiculo_id")
+            .eq("nf_id", r.nf_id)
+            .maybeSingle();
+          if (vErr) throw vErr;
+          if (!vinc) {
+            if (!r.nf?.carga_id) {
+              avisos.push("NF sem carga de origem: não foi possível devolvê-la ao veículo.");
+            } else {
+              const { error: insErr } = await supabase
+                .from("veiculo_nfs")
+                .insert({ veiculo_id: r.veiculo.id, nf_id: r.nf_id, carga_origem_id: r.nf.carga_id });
+              if (insErr) avisos.push(`NF não voltou ao veículo: ${insErr.message}`);
+            }
+          } else if (vinc.veiculo_id !== r.veiculo.id) {
+            const { error: upErr } = await supabase
+              .from("veiculo_nfs")
+              .update({ veiculo_id: r.veiculo.id })
+              .eq("id", vinc.id);
+            if (upErr) avisos.push(`NF está em outro veículo e não foi movida: ${upErr.message}`);
+          }
         }
       }
 
       if (encerrado && reabrir && r.veiculo?.id) {
-        await supabase
+        const { error: reErr } = await supabase
           .from("veiculos")
           .update({
             prestacao_contas_em: null,
@@ -177,12 +197,23 @@ export default function DesfazerBaixa() {
             prestacao_contas_obs: null,
           })
           .eq("id", r.veiculo.id);
+        if (reErr) avisos.push(`Prestação de contas não reaberta: ${reErr.message}`);
       }
 
-      toast({
-        title: "Baixa desfeita",
-        description: encerrado && reabrir ? "Prestação de contas reaberta." : "NF voltou para o motorista.",
-      });
+      if (avisos.length > 0) {
+        toast({
+          title: "Baixa desfeita, mas com pendências",
+          description: avisos.join(" | "),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Baixa desfeita",
+          description: encerrado && reabrir
+            ? "Prestação reaberta e NF de volta no app do motorista."
+            : "NF voltou para o app do motorista.",
+        });
+      }
       await buscar();
     } catch (err: any) {
       toast({ title: "Erro ao desfazer", description: err?.message, variant: "destructive" });
