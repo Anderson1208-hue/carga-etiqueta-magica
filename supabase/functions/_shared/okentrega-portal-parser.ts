@@ -16,6 +16,11 @@ export function portalQueueStatus(value: unknown) {
   return null;
 }
 
+export function portalConsultationStatus(value: unknown) {
+  return portalQueueStatus(value) ?? (portalValidationText(value)?.toLowerCase() === 'em análise'
+    ? { status: 'aguardando_aprovacao', status_comprovante: null } : null);
+}
+
 type PortalOccurrence = { RESULTADO_VALIDA?: unknown; INFO_ORI?: Record<string, unknown> };
 
 function portalDateOrder(value: unknown): number | null {

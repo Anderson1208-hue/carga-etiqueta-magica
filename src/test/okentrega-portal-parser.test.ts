@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { portalDocumentId, portalValidationText, portalQueueStatus, latestPortalDelivery } from '../../supabase/functions/_shared/okentrega-portal-parser';
+import { portalDocumentId, portalValidationText, portalQueueStatus, portalConsultationStatus, latestPortalDelivery } from '../../supabase/functions/_shared/okentrega-portal-parser';
 
 describe('consulta de ocorrência OK Entrega', () => {
+  it('registra em análise sem aprovar e mantém desconhecidos sem interpretação', () => {
+    expect(portalConsultationStatus(['em análise'])).toEqual({ status: 'aguardando_aprovacao', status_comprovante: null });
+    expect(portalConsultationStatus(['desconhecido'])).toBeNull();
+  });
   const entry = (date: string, status: string) => ({ INFO_ORI: { TIPOOCORRENCIA: 'Entrega', DTREGISTRO: date }, RESULTADO_VALIDA: [status] });
   it('considera correção posterior registrada no portal, não só o envio original', () => {
     const latest = latestPortalDelivery({ EE1: entry('22/10/2026 16:04', 'Recusado'), EE2: entry('23/10/2026 09:51', 'registrado') }, '1');

@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { portalDocumentId, portalValidationText, portalQueueStatus, latestPortalDelivery } from '../_shared/okentrega-portal-parser.ts';
+import { portalDocumentId, portalValidationText, portalConsultationStatus, latestPortalDelivery } from '../_shared/okentrega-portal-parser.ts';
 import { CONSULTA_INICIO, AUTOMACAO_INICIO, dataBrasilia, dataConsultaPermitida } from '../_shared/okentrega-consulta-regras.ts';
 
 const BASE = 'https://www.okentrega.com.br';
@@ -150,10 +150,10 @@ Deno.serve(async req => {
       const latest = latestPortalDelivery(entries, queue.ocorrencia_entrega_id ?? '');
       if (!latest) return json({ nf, atualizado: false, motivo: 'Ocorrência atual não identificada de forma segura', duracao_ms: Date.now() - started });
       const occurrence = latest.value;
-      const status = portalQueueStatus(occurrence.RESULTADO_VALIDA);
+      const status = portalConsultationStatus(occurrence.RESULTADO_VALIDA);
       if (!status) return json({ nf, atualizado: false, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), motivo: 'Sem resultado definitivo reconhecido', duracao_ms: Date.now() - started });
       const motivo = status.status === 'recusado' ? plain(occurrence.INFO_ORI?.MOTIVORECUSA ?? occurrence.INFO_ORI?.MOTIVOOCORRENCIA ?? occurrence.INFO_ORI?.MOTIVO) : null;
-      const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
+      const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).neq('status', 'processando').select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
       if (error || !saved) return json({ nf, atualizado: false, erro: 'Não foi possível salvar validação' }, 502);
       return json({ nf, atualizado: true, ...saved, ocorrencia_atual_portal: latest.id.replace(/^[A-Za-z]+/, ''), status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
     }
