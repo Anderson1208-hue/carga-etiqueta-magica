@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
       if (fotoError || !foto || foto.size === 0) return json({ mensagem: "Nova foto não encontrada." }, 400);
       const { data: salvo, error: salvarError } = await supabase.from("okentrega_queue").update({
         payload: { ...payload, nova_foto_path: path, nova_foto_anexada_em: new Date().toISOString(), nova_foto_anexada_por: usuario.user.id },
-      }).eq("id", atual.id).eq("status", "recusado").eq("updated_at", atual.updated_at).select("id").maybeSingle();
+      }).eq("id", atual.id).eq("status", "recusado").eq("payload", JSON.stringify(payload)).select("id").maybeSingle();
       if (salvarError || !salvo) return json({ mensagem: "A nota mudou durante o anexo. Atualize e tente novamente." }, 409);
       return json({ status: "foto_anexada" });
     }
@@ -225,7 +225,7 @@ Deno.serve(async (req) => {
     // Reserva condicional: só um administrador transmite; cron não seleciona recusadas.
     const { data: reservado, error: reservaError } = await supabase.from("okentrega_queue")
       .update({ status: "processando", processamento_iniciado_em: new Date().toISOString() })
-      .eq("id", atual.id).eq("status", "recusado").eq("updated_at", atual.updated_at).select("*").maybeSingle();
+      .eq("id", atual.id).eq("status", "recusado").eq("payload", JSON.stringify(payload)).select("*").maybeSingle();
     if (reservaError || !reservado) return json({ mensagem: "A nota mudou ou já está sendo reenviada." }, 409);
     correcaoItem = reservado;
   }
@@ -516,7 +516,7 @@ Deno.serve(async (req) => {
     }
 
     const dtEntregaLocal = toSaoPauloISO(p.dtentrega ?? p.registrado_em ?? item.created_at);
-    const dtRegistroLocal = toSaoPauloISO(p.registrado_em ?? item.created_at);
+    const dtRegistroLocal = toSaoPauloISO(correcaoItem ? new Date() : p.registrado_em ?? item.created_at);
 
     const body = {
       documento: String(item.chave_acesso ?? p.documento ?? "").replace(/\D/g, ""),
@@ -590,12 +590,18 @@ Deno.serve(async (req) => {
       tentativasAtuais: item.tentativas,
       maxTentativas,
     });
-    if (duplicado) erroMsg = "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
+    if (duplicado) erroMsg = correcaoItem
+      ? "OK Entrega não aceitou o reenvio: ocorrência já existe (HTTP 409). A nova imagem continua anexada; correção pelo portal pode ser necessária."
+      : "HTTP 409 — ocorrência já existe no portal; retransmissão automática bloqueada.";
 
     await supabase
       .from("okentrega_queue")
       .update({
         status: correcaoItem && !sucesso ? "recusado" : novoStatus,
+        ...(correcaoItem && !sucesso ? {
+          imagem_enviada_path: item.imagem_enviada_path, imagem_origem: item.imagem_origem,
+          validacao_imagem: item.validacao_imagem, validado_em: item.validado_em,
+        } : {}),
         ...(correcaoItem && sucesso ? { payload: {
           ...p,
           historico_correcoes: [...(Array.isArray(item.payload?.historico_correcoes) ? item.payload.historico_correcoes : []), {

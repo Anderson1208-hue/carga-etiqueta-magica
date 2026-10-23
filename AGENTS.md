@@ -1,4 +1,5 @@
 # Architecture rules
+- OK Entrega rejected-photo corrections stage a unique storage object without changing the operational POD, require server-validated admin access and a conditional rejected-row reservation, and transmit only on explicit confirmation; preserve historical images and portal responses and never automatically retry a corrected submission.
 
 - OK Entrega portal consultation is isolated from image transmission; authenticate approved operators and return only allowlisted business data, never portal HTML or authentication responses, to prevent credential leakage and accidental retransmission.
 - OK Entrega portal parsing uses a tested shared parser for document-link IDs and validation-result arrays; mirror the portal's actual fields rather than assuming HTML quoting or scalar statuses.
