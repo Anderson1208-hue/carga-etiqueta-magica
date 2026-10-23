@@ -4,7 +4,7 @@ import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
 
 const BASE = 'https://www.okentrega.com.br';
-const schema = z.object({ data: z.literal('2026-10-22'), acao: z.literal('diagnosticar').default('diagnosticar') }).strict();
+const schema = z.object({ data: z.literal('2026-10-22'), nf: z.enum(['767250', '767017']).default('767250'), acao: z.literal('diagnosticar').default('diagnosticar') }).strict();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async req => {
@@ -19,6 +19,7 @@ Deno.serve(async req => {
   if (access) return json({ erro: 'Acesso não autorizado' }, access);
   const input = schema.safeParse(await req.json().catch(() => null));
   if (!input.success) return json({ erro: 'Informe a data 2026-10-22 para o teste autorizado' }, 400);
+  const nf = input.data.nf;
   const login = Deno.env.get('OKENTREGA_PORTAL_LOGIN');
   const password = Deno.env.get('OKENTREGA_PORTAL_PASSWORD');
   if (!login || !password) return json({ erro: 'Credenciais do portal ausentes' }, 400);
@@ -72,17 +73,17 @@ Deno.serve(async req => {
       const opt = options.find(o => /selected/i.test(o[1])) ?? options[0];
       return opt?.[1].match(/value=["']([^"']*)["']/i)?.[1] ?? '';
     };
-    await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: '767250', campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
+    const filtro = await api({ component: 'sys.sys.busca2', action: 'reloadFieldFilters', acao: 'G', campDocumentos: nf, campTipoDoc: selected('campTipoDoc'), campSerieDocumentos: '20', campEmissorDoc: '70940994008277', usuarioClientes: '0', pagina: 'cons.documento2.php8' });
     const lista = await api({ component: 'sys.sys.listardocumento2', action: 'listardocumentos', usuarioClientes: '0', pagina: 'cons.documento2.php8', limitador: '10', get: inputValue('GET'), statusHandler: '' });
     const rows = lista?.resposta_dados?.lista;
     const plain = (v: unknown) => typeof v === 'string' ? v.replace(/<[^>]*>/g, '').trim().slice(0, 500) : null;
-    if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf: '767250', lista_ok: lista?.resposta_status?.status === 1, atualizado: false }, 502);
-    const row = rows.find(r => /\b767250\b/.test(plain(r.NF) ?? ''));
+    if (!Array.isArray(rows)) return json({ etapa: 'lista_nf', nf, filtro_ok: filtro?.resposta_status?.status === 1, lista_ok: lista?.resposta_status?.status === 1, duracao_ms: Date.now() - started, atualizado: false }, 502);
+    const row = rows.find(r => new RegExp(`\\b${nf}\\b`).test(plain(r.NF) ?? ''));
     const docId = typeof row?.Function === 'string' ? row.Function.match(/abrirDocumento\(\s*["']?(\d+)/)?.[1] : undefined;
-    if (!docId) return json({ etapa: 'identificar_nf', nf: '767250', notas: rows.map(r => ({ nf: plain(r.NF), campos: Object.keys(r) })), atualizado: false });
+    if (!docId) return json({ etapa: 'identificar_nf', nf, encontrado: Boolean(row), atualizado: false });
     const ocorr = await api({ component: 'app.cons.documento2', action: 'ocorrenciasEntrega', usuarioClientes: '0', pagina: 'cons.documento2.php8', doc_cli: docId });
     const entries = ocorr?.resposta_dados?.ocorrencias ?? {};
-    return json({ nf: '767250', etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: plain(v.INFO_ORI?.STATUS), resultado_validacao: plain(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
+    return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: plain(v.INFO_ORI?.STATUS), resultado_validacao: plain(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
