@@ -65,8 +65,9 @@ Deno.serve(async req => {
     for (let i = 0; i < 4 && home.response.headers.has('location'); i++) home = await request(home.response.headers.get('location') ?? '/login.php8');
     // Return only static module paths, never HTML, user identifiers, cookies or authentication payloads.
     const paths = [...home.text.matchAll(/(?:src|href)\s*=\s*["']([^"']+)["']/gi)]
-      .map(m => m[1].split('?')[0]).filter(p => /^\/?assets\/(application|js\/system)\/[\w./-]+\.(php8?|js)$/.test(p));
-    return json({ login_ok: paths.length > 0, etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
+      .map(m => { try { const u = new URL(m[1], new URL(destination, BASE)); return u.origin === BASE ? u.pathname : ''; } catch { return ''; } })
+      .filter(p => /^\/assets\/(application|js\/system)\/[\w./-]+\.(php8?|js)$/.test(p));
+    return json({ login_ok: paths.length > 0, autenticacao_aceita: true, pagina_http: home.response.status, pagina_login: /camp_identificacao|RedirecionarLogin/.test(home.text), etapa: 'descobrir_consulta', caminhos: [...new Set(paths)], duracao_ms: Date.now() - started, atualizado: false });
   } catch {
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
