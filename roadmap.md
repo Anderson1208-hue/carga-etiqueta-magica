@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Consultar as NFs de 23/10 agora, sem envio; a partir de segunda 26/10 consultar às 07h/17h Brasília incluindo as roteirizações do próprio dia e anteriores desde 22/10.
 - [x] Adicionados anexo e reenvio explícito nas recusadas (administradores), preservando originais, baixa e histórico; anexo não entra na fila automática. 15 testes passaram, função publicada, NF 766978 conferida com sessão de Anderson e reenvio sem anexo bloqueado pelo servidor (400). Não anexada foto fictícia nem realizado envio real: falta foto corretiva de Anderson para verificar aceitação pelo cliente; API pode retornar duplicidade 409, exibida sem presumir aprovação.
 - [x] 23/10 17h02: revisão confirmou novas ocorrências no portal nas sete recusadas. Seis agora Registrado (764358, 764557, 764698, 766979, 766981, 767146), salvas como aprovadas sem motivo; 766978 tem nova recusa 23/10 14:18, motivo do portal Erro na data de entrega. Leitura agora considera ocorrência de entrega mais recente por DTREGISTRO, preserva ID da transmissão original e exige correspondência na mesma nota. Sem julgamento de imagem ou reenvio. 15 testes passaram; registros salvos e relidos.
 
