@@ -1031,7 +1031,7 @@ export default function IntegracaoOkEntrega() {
                       <TableHead>Retorno OK Entrega</TableHead>
                       <TableHead>Comprovante</TableHead>
                       <TableHead>Motivo</TableHead>
-                      {isAdmin && <TableHead>Ações</TableHead>}
+                      {isAdmin && <TableHead className="sticky right-0 z-20 bg-card border-l">Ações</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
