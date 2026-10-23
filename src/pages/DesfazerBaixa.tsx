@@ -189,7 +189,7 @@ export default function DesfazerBaixa() {
       }
 
       if (encerrado && reabrir && r.veiculo?.id) {
-        await supabase
+        const { error: reErr } = await supabase
           .from("veiculos")
           .update({
             prestacao_contas_em: null,
@@ -197,12 +197,23 @@ export default function DesfazerBaixa() {
             prestacao_contas_obs: null,
           })
           .eq("id", r.veiculo.id);
+        if (reErr) avisos.push(`Prestação de contas não reaberta: ${reErr.message}`);
       }
 
-      toast({
-        title: "Baixa desfeita",
-        description: encerrado && reabrir ? "Prestação de contas reaberta." : "NF voltou para o motorista.",
-      });
+      if (avisos.length > 0) {
+        toast({
+          title: "Baixa desfeita, mas com pendências",
+          description: avisos.join(" | "),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Baixa desfeita",
+          description: encerrado && reabrir
+            ? "Prestação reaberta e NF de volta no app do motorista."
+            : "NF voltou para o app do motorista.",
+        });
+      }
       await buscar();
     } catch (err: any) {
       toast({ title: "Erro ao desfazer", description: err?.message, variant: "destructive" });
