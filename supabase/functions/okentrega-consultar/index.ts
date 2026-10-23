@@ -3,9 +3,10 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
 import { portalDocumentId, portalValidationText, portalQueueStatus, latestPortalDelivery } from '../_shared/okentrega-portal-parser.ts';
+import { CONSULTA_INICIO, AUTOMACAO_INICIO, dataBrasilia, dataConsultaPermitida } from '../_shared/okentrega-consulta-regras.ts';
 
 const BASE = 'https://www.okentrega.com.br';
-const schema = z.object({ data: z.literal('2026-10-22'), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar']).default('diagnosticar'), queue_id: z.string().uuid().optional() }).strict();
+const schema = z.object({ data: z.string().refine(v => dataConsultaPermitida(v)).optional(), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar', 'lote']).default('diagnosticar'), queue_id: z.string().uuid().optional(), cursor: z.string().uuid().optional() }).strict();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async req => {
@@ -16,10 +17,45 @@ Deno.serve(async req => {
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) return json({ erro: 'Configuração ausente' }, 500);
   const db = createClient(url, key);
-  const access = await operatorAccessStatus(req.headers.get('authorization'), db);
-  if (access) return json({ erro: 'Acesso não autorizado' }, access);
+  const internal = req.headers.get('authorization') === `Bearer ${key}`;
+  const cronToken = req.headers.get('x-okentrega-cron');
+  const cron = cronToken ? (await db.rpc('okentrega_validar_cron', { p_token: cronToken })).data === true : false;
+  if (!internal && !cron) {
+    const access = await operatorAccessStatus(req.headers.get('authorization'), db);
+    if (access) return json({ erro: 'Acesso não autorizado' }, access);
+  }
   const input = schema.safeParse(await req.json().catch(() => null));
-  if (!input.success) return json({ erro: 'Informe a data 2026-10-22 para o teste autorizado' }, 400);
+  if (!input.success) return json({ erro: 'Informe uma data válida desde 22/10/2026 até hoje' }, 400);
+  if (input.data.acao === 'lote') {
+    const hoje = dataBrasilia();
+    if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
+    let routes = db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje).order('nf_id').range(0, 499);
+    if (input.data.cursor) routes = routes.gt('nf_id', input.data.cursor);
+    const { data: rows, error } = await routes;
+    if (error) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
+    const dates = new Map((rows ?? []).map(r => [r.nf_id, (r.veiculos as unknown as { data: string }).data]));
+    const ids = [...dates.keys()];
+    const work: Array<{ id: string; numero_nf: string; nf_id: string }> = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data: items, error: itemError } = await db.from('okentrega_queue').select('id,numero_nf,nf_id').in('nf_id', ids.slice(i, i + 100)).eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).order('id');
+      if (itemError) return json({ erro: 'Falha ao selecionar fila' }, 502);
+      work.push(...(items ?? []));
+    }
+    const run = async () => {
+      for (const item of work) {
+        const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
+        const result = await response.json().catch(() => ({}));
+        console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      if (rows?.length === 500) {
+        await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: rows[rows.length - 1]?.nf_id }) });
+      }
+    };
+    EdgeRuntime.waitUntil(run());
+    return json({ status: 'consulta_iniciada', selecionadas: work.length, desde: input.data.data ?? CONSULTA_INICIO, ate: input.data.data ?? hoje });
+  }
+  if (!input.data.data) return json({ erro: 'Informe a data da roteirização' }, 400);
   const nf = input.data.nf;
   let queue: { id: string; nf_id: string; ocorrencia_entrega_id: string | null } | null = null;
   if (input.data.acao === 'atualizar') {
