@@ -176,6 +176,13 @@
       "when": 1793024081371,
       "tag": "0024_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793045416387,
+      "tag": "0025_ibac_portal_validacao",
+      "breakpoints": true
     }
   ]
 }
