@@ -526,6 +526,10 @@ export default function IntegracaoIbac() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Fila de eventos</CardTitle>
+                <input ref={fotoRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => {
+                  const f = e.target.files?.[0]; e.target.value = "";
+                  if (f && alvoFoto) anexarFoto(alvoFoto, f);
+                }} />
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={exportarPdf} disabled={fila.length === 0}>
                     <FileDown className="w-4 h-4 mr-2" />
@@ -614,7 +618,7 @@ export default function IntegracaoIbac() {
                       <TableHead>Tentativas</TableHead>
                       <TableHead>Criado em</TableHead>
                       <TableHead>Erro</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="sticky right-0 bg-background">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
