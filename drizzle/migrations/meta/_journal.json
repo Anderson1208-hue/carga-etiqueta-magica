@@ -169,6 +169,13 @@
       "when": 1792793264717,
       "tag": "0023_okentrega_consulta_cron_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793024081371,
+      "tag": "0024_migration",
+      "breakpoints": true
     }
   ]
 }

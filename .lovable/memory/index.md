@@ -141,3 +141,4 @@ type: reference
 - [Peso da caixa 1000137](mem://logica/peso-caixa-cod-1000137) — CX MONTEBELLO MARSH TRADICIONAL 90GX12UN (IBAC): 1,491 kg bruto / 1,080 kg líquido / 0,009 m³ por caixa; ainda sem cadastro em produtos.
 - [Consulta status canhoto OK Entrega](mem://arquitetura/integracao-erp/okentrega-consulta-status-canhao.md) — API não expõe leitura; sonda okentrega-probe; pendente endpoint oficial ou painel web.
 - [Faturamento por canhoto validado](mem://funcionalidades/faturamento-liberacao-canhotos.md) — Ideia guardada; cobrar só NF com canhoto validado; aguarda retorno dos portais.
+- [Último status prevalece](mem://logica/ultimo-status-prevalece) — Reagenda após recusa reabre NF na Preparação.
