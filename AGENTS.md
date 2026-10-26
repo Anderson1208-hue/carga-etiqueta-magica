@@ -10,4 +10,4 @@
 
 - Keep operator navigation grouped in lateral flyouts within the existing desktop Sidebar, retaining existing route targets and access-hook filters; this reduces menu clutter without changing business workflows or the driver application.
 - In RLS policies always wrap no-argument helper checks as `(SELECT public.is_admin())` / `(SELECT public.is_active_operator())`; bare calls run once per row and saturated the database (outages Oct/2026).
-- Geocode-cache reads require active profiles in RLS; geocoding endpoints using service credentials must validate the caller and protected profile approval through the shared operator guard, because service credentials bypass RLS.
+- Geocode-cache reads require active profiles in RLS; geocoding endpoints using service credentials must validate the caller and protected profile approval through the shared operator guard, because service credentials bypass RLS.- OK Entrega transmission has its own 15-minute queue-drain schedule calling the send job; never repurpose it for validation consultation, because stuck items are only released when the send job runs.
