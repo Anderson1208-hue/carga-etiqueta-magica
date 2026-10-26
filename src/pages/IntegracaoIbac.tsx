@@ -79,6 +79,31 @@ export default function IntegracaoIbac() {
     refetchInterval: 15_000,
   });
 
+  const chavesFila = Array.from(new Set((filaRaw as any[]).map((f) => String(f?.chave_acesso ?? "").replace(/\D/g, "")).filter((c) => c.length === 44)));
+  const { data: portalMap = {} } = useQuery({
+    queryKey: ["ibac-fila-portal", chavesFila.join(",")],
+    enabled: chavesFila.length > 0,
+    queryFn: async () => {
+      const m: Record<string, { status_portal: string | null; status_validacao: string | null }> = {};
+      for (let i = 0; i < chavesFila.length; i += 200) {
+        const { data, error } = await (supabase as any).from("ibac_portal_validacao")
+          .select("chave,status_portal,status_validacao").in("chave", chavesFila.slice(i, i + 200));
+        if (error) throw error;
+        for (const p of data ?? []) m[p.chave] = p;
+      }
+      return m;
+    },
+  });
+  const retornoPortal = (f: any) => {
+    const p = (portalMap as any)[String(f?.chave_acesso ?? "").replace(/\D/g, "")];
+    if (!p) return <Badge variant="outline">Sem retorno</Badge>;
+    const s = (p.status_portal ?? "").toUpperCase();
+    const inval = (p.status_validacao ?? "").toUpperCase().includes("INVALID");
+    if (s.includes("APROV")) return <Badge>Aprovado</Badge>;
+    if (inval || s.includes("REPROV")) return <Badge variant="destructive">Recusado</Badge>;
+    return <Badge variant="secondary">{p.status_portal ?? "Pendente"}</Badge>;
+  };
+
   // Raízes de CNPJ de emitente autorizadas no canal IBAC (1 canal = 1 grupo de CNPJ).
   const { data: raizesEscopo = [] } = useQuery({
     queryKey: ["ibac-escopo-emitentes"],
@@ -547,6 +572,7 @@ export default function IntegracaoIbac() {
 
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Retorno portal</TableHead>
                       <TableHead>Tentativas</TableHead>
                       <TableHead>Criado em</TableHead>
                       <TableHead>Erro</TableHead>
@@ -568,6 +594,7 @@ export default function IntegracaoIbac() {
                         </TableCell>
                         <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
                         <TableCell>{statusBadge(f.status)}</TableCell>
+                        <TableCell>{retornoPortal(f)}</TableCell>
                         <TableCell>{f.tentativas}</TableCell>
                         <TableCell className="text-xs">{new Date(f.created_at).toLocaleString("pt-BR")}</TableCell>
                         <TableCell className="text-xs text-destructive max-w-xs truncate">{f.erro_mensagem ?? "—"}</TableCell>
@@ -586,7 +613,7 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
 
                   </TableBody>
