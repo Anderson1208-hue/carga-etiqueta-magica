@@ -650,7 +650,7 @@ export default function IntegracaoIbac() {
                                 Reenviar
                               </Button>
                             )}
-                            {f.evento_interno === "envio_canhoto" && portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
+                            {portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
                               const p = portalDe(f);
                               const ch = p.chave as string;
                               return (
