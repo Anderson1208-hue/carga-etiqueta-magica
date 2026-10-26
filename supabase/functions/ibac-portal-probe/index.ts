@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
       ? lj.empresas.map((e: any) => ({ oid: e?.oid, nome: e?.nome ?? e?.razaoSocial ?? e?.descricao }))
       : null;
     out.login_keys = lj ? Object.keys(lj) : null;
+    out.mensagem = typeof lj?.mensagem === "string" ? lj.mensagem.slice(0, 200) : null;
     if (lj?.id) {
       const params = new URLSearchParams(body.params ?? { page: "1", limit: "3" });
       const cr = await fetch(BASE + "api/transportador/canhotos?" + params, {
