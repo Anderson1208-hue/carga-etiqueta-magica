@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X, FileDown } from "lucide-react";
+import { RefreshCw, Send, AlertCircle, CheckCircle2, Clock, RotateCcw, Trash2, X, FileDown, Paperclip } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,21 +87,59 @@ export default function IntegracaoIbac() {
       const m: Record<string, { status_portal: string | null; status_validacao: string | null }> = {};
       for (let i = 0; i < chavesFila.length; i += 200) {
         const { data, error } = await (supabase as any).from("ibac_portal_validacao")
-          .select("chave,status_portal,status_validacao").in("chave", chavesFila.slice(i, i + 200));
+          .select("chave,status_portal,status_validacao,nova_foto_path,nova_foto_enviada_em,nova_foto_resultado").in("chave", chavesFila.slice(i, i + 200));
         if (error) throw error;
         for (const p of data ?? []) m[p.chave] = p;
       }
       return m;
     },
   });
+  const portalDe = (f: any): any => (portalMap as any)[String(f?.chave_acesso ?? "").replace(/\D/g, "")];
+  const recusadoPortal = (p: any) => {
+    const s = (p?.status_portal ?? "").toUpperCase();
+    return !s.includes("APROV") && ((p?.status_validacao ?? "").toUpperCase().includes("INVALID") || s.includes("REPROV"));
+  };
   const retornoPortal = (f: any) => {
-    const p = (portalMap as any)[String(f?.chave_acesso ?? "").replace(/\D/g, "")];
+    const p = portalDe(f);
     if (!p) return <Badge variant="outline">Sem retorno</Badge>;
-    const s = (p.status_portal ?? "").toUpperCase();
-    const inval = (p.status_validacao ?? "").toUpperCase().includes("INVALID");
-    if (s.includes("APROV")) return <Badge>Aprovado</Badge>;
-    if (inval || s.includes("REPROV")) return <Badge variant="destructive">Recusado</Badge>;
+    if ((p.status_portal ?? "").toUpperCase().includes("APROV")) return <Badge>Aprovado</Badge>;
+    if (recusadoPortal(p)) return <Badge variant="destructive">Recusado</Badge>;
     return <Badge variant="secondary">{p.status_portal ?? "Pendente"}</Badge>;
+  };
+
+  const fotoRef = useRef<HTMLInputElement>(null);
+  const [alvoFoto, setAlvoFoto] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const chamarCorrecao = async (body: Record<string, unknown>) => {
+    const { data: r, error } = await supabase.functions.invoke("ibac-corrigir-foto", { body });
+    if (error) {
+      let m = "Não foi possível concluir.";
+      try { m = (await (error as any).context?.json())?.mensagem ?? m; } catch { /* sem corpo */ }
+      throw new Error(m);
+    }
+    return r;
+  };
+  const anexarFoto = async (chave: string, arquivo: File) => {
+    setOcupado(chave);
+    try {
+      if (!["image/jpeg", "image/png"].includes(arquivo.type)) throw new Error("Selecione uma foto JPEG ou PNG.");
+      const path = `ibac-correcoes/${chave}/${crypto.randomUUID()}.${arquivo.type === "image/png" ? "png" : "jpg"}`;
+      const { error } = await supabase.storage.from("comprovantes").upload(path, arquivo, { contentType: arquivo.type, upsert: false });
+      if (error) throw error;
+      await chamarCorrecao({ acao: "anexar", chave, nova_foto_path: path });
+      toast.success("Nova foto anexada; ainda não enviada.");
+      qc.invalidateQueries({ queryKey: ["ibac-fila-portal"] });
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao anexar"); } finally { setOcupado(null); }
+  };
+  const reenviarFoto = async (chave: string) => {
+    if (!confirm("Reenviar a nova imagem para a Cacau Show?")) return;
+    setOcupado(chave);
+    try {
+      const r = await chamarCorrecao({ acao: "reenviar", chave });
+      if (r?.status === "enviado") toast.success("Nova imagem enviada. A validação depende do portal.");
+      else toast.warning(`Reenvio: ${r?.mensagem ?? "pendente"}`);
+      qc.invalidateQueries({ queryKey: ["ibac-fila-portal"] });
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao reenviar"); } finally { setOcupado(null); }
   };
 
   // Raízes de CNPJ de emitente autorizadas no canal IBAC (1 canal = 1 grupo de CNPJ).
@@ -488,6 +526,10 @@ export default function IntegracaoIbac() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Fila de eventos</CardTitle>
+                <input ref={fotoRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => {
+                  const f = e.target.files?.[0]; e.target.value = "";
+                  if (f && alvoFoto) anexarFoto(alvoFoto, f);
+                }} />
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={exportarPdf} disabled={fila.length === 0}>
                     <FileDown className="w-4 h-4 mr-2" />
@@ -576,7 +618,7 @@ export default function IntegracaoIbac() {
                       <TableHead>Tentativas</TableHead>
                       <TableHead>Criado em</TableHead>
                       <TableHead>Erro</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="sticky right-0 bg-background">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -598,8 +640,8 @@ export default function IntegracaoIbac() {
                         <TableCell>{f.tentativas}</TableCell>
                         <TableCell className="text-xs">{new Date(f.created_at).toLocaleString("pt-BR")}</TableCell>
                         <TableCell className="text-xs text-destructive max-w-xs truncate">{f.erro_mensagem ?? "—"}</TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex gap-2">
+                        <TableCell onClick={(e) => e.stopPropagation()} className="sticky right-0 bg-background">
+                          <div className="flex gap-2 items-center">
                             <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
                               Detalhes
                             </Button>
@@ -608,6 +650,21 @@ export default function IntegracaoIbac() {
                                 Reenviar
                               </Button>
                             )}
+                            {f.evento_interno === "envio_canhoto" && portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
+                              const p = portalDe(f);
+                              const ch = p.chave as string;
+                              return (
+                                <div className="flex flex-col gap-1">
+                                  <Button size="sm" variant="outline" disabled={ocupado === ch} onClick={() => { setAlvoFoto(ch); fotoRef.current?.click(); }}>
+                                    <Paperclip className="w-4 h-4 mr-1" />Anexar nova foto
+                                  </Button>
+                                  <Button size="sm" disabled={ocupado === ch || !p.nova_foto_path || !!p.nova_foto_enviada_em} onClick={() => reenviarFoto(ch)}>
+                                    <Send className="w-4 h-4 mr-1" />Reenviar nova imagem
+                                  </Button>
+                                  {p.nova_foto_resultado && <span className="text-xs text-muted-foreground">{p.nova_foto_resultado}</span>}
+                                </div>
+                              );
+                            })()}
                           </div>
                         </TableCell>
                       </TableRow>
