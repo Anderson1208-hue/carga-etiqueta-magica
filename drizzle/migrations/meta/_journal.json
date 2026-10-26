@@ -183,6 +183,13 @@
       "when": 1793045416387,
       "tag": "0025_ibac_portal_validacao",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793045810295,
+      "tag": "0026_ibac_correcao_foto",
+      "breakpoints": true
     }
   ]
 }
