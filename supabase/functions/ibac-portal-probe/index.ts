@@ -25,11 +25,17 @@ Deno.serve(async (req) => {
       ? lj.empresas.map((e: any) => ({ oid: e?.oid, nome: e?.nome ?? e?.razaoSocial ?? e?.descricao }))
       : null;
     out.login_keys = lj ? Object.keys(lj) : null;
+    out.produto_tipo = typeof lj?.produto; out.produto_sigla = typeof lj?.produto === "object" ? lj?.produto?.sigla : lj?.produto;
     out.mensagem = typeof lj?.mensagem === "string" ? lj.mensagem.slice(0, 200) : null;
     if (lj?.id) {
       const params = new URLSearchParams(body.params ?? { page: "1", limit: "3" });
       const cr = await fetch(BASE + "api/transportador/canhotos?" + params, {
-        headers: { "auth-token": lj.id, "sigla-sistema": "APP" },
+        headers: {
+          "auth-token": lj.id,
+          "sigla-sistema": String(lj?.produto?.sigla ?? lj?.produto ?? "APP"),
+          Cookie: `auth-token=${lj.id}; timezone-offset=180`,
+          Accept: "application/json",
+        },
       });
       const txt = await cr.text();
       out.canhotos_status = cr.status;
