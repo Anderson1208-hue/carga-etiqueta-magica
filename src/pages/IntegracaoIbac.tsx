@@ -38,6 +38,7 @@ import { IbacRetryPanel } from "@/components/ibac/IbacRetryPanel";
 import { ImportarDeParaDialog } from "@/components/ibac/ImportarDeParaDialog";
 import { IbacCanhotosPanel } from "@/components/ibac/IbacCanhotosPanel";
 import { IbacEnvioPanel } from "@/components/ibac/IbacEnvioPanel";
+import { IbacValidacaoPortalPanel } from "@/components/ibac/IbacValidacaoPortalPanel";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
@@ -429,14 +430,20 @@ export default function IntegracaoIbac() {
             {isAdmin && <TabsTrigger value="retry">Retry</TabsTrigger>}
             {isAdmin && <TabsTrigger value="depara">De-Para de Eventos</TabsTrigger>}
             <TabsTrigger value="canhotos">Canhotos</TabsTrigger>
+            <TabsTrigger value="validacao">Validação portal</TabsTrigger>
             {isAdmin && <TabsTrigger value="envio">Envio</TabsTrigger>}
 
             <TabsTrigger value="logs">Logs ({logs.length})</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="validacao">
+            <IbacValidacaoPortalPanel />
+          </TabsContent>
+
           <TabsContent value="saude">
             <IbacSaudePanel />
           </TabsContent>
+
 
           <TabsContent value="alertas">
             <IbacAlertasPanel />

@@ -2192,6 +2192,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ibac_portal_validacao: {
+        Row: {
+          chave: string
+          consultado_em: string
+          data_criacao_portal: string | null
+          data_entrega: string | null
+          justificativa: string | null
+          numero_nf: string | null
+          possui_imagem: string | null
+          recebedor: string | null
+          status_portal: string | null
+          status_validacao: string | null
+        }
+        Insert: {
+          chave: string
+          consultado_em?: string
+          data_criacao_portal?: string | null
+          data_entrega?: string | null
+          justificativa?: string | null
+          numero_nf?: string | null
+          possui_imagem?: string | null
+          recebedor?: string | null
+          status_portal?: string | null
+          status_validacao?: string | null
+        }
+        Update: {
+          chave?: string
+          consultado_em?: string
+          data_criacao_portal?: string | null
+          data_entrega?: string | null
+          justificativa?: string | null
+          numero_nf?: string | null
+          possui_imagem?: string | null
+          recebedor?: string | null
+          status_portal?: string | null
+          status_validacao?: string | null
+        }
+        Relationships: []
+      }
       itens_nf: {
         Row: {
           c_prod: string
