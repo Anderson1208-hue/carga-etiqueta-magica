@@ -35,7 +35,8 @@ const BATCH_SIZE = 1;
 // Fotos acima deste tamanho estouram CPU/memória do worker no decode.
 // Baixamos uma cópia reduzida (máx. 2000 px) gerada pelo storage; o original
 // no bucket permanece intacto. Se a transformação falhar, usa o original.
-const LIMITE_FOTO_BYTES = 2.5 * 1024 * 1024;
+// 1,7–2,4 MB com alta resolução também derrubavam o worker (NF 767035/765883, 26/10).
+const LIMITE_FOTO_BYTES = 1 * 1024 * 1024;
 
 async function baixarFotoLeve(supabase: any, path: string): Promise<{ data: Blob | null; error: any }> {
   const orig = await supabase.storage.from("comprovantes").download(path);
