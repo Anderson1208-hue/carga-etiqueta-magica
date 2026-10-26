@@ -34,6 +34,7 @@ export function IbacValidacaoPortalPanel() {
   const qc = useQueryClient();
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState("todos");
+  const [dataFiltro, setDataFiltro] = useState("");
   const [rodando, setRodando] = useState(false);
 
   const { data = [], isLoading } = useQuery({
@@ -56,11 +57,13 @@ export function IbacValidacaoPortalPanel() {
 
   const linhas = useMemo(() => {
     const b = busca.trim();
+    const diaBR = (v: string | null) => (v ? new Date(v).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }) : "");
     return data
-      .filter((l) => status === "todos" || l.status_portal === status)
+      .filter((l) => !dataFiltro || diaBR(l.data_entrega) === dataFiltro)
+      .filter((l) => status === "todos" || (status === "REPROVADO" ? reprovado(l) : l.status_portal === status))
       .filter((l) => !b || (l.numero_nf ?? "").includes(b) || (l.recebedor ?? "").toLowerCase().includes(b.toLowerCase()))
       .sort((a, b2) => Number(a.numero_nf ?? 0) - Number(b2.numero_nf ?? 0));
-  }, [data, busca, status]);
+  }, [data, busca, status, dataFiltro]);
 
   const ultima = data.reduce<string | null>((m, l) => (!m || l.consultado_em > m ? l.consultado_em : m), null);
   const cont = (s: string) => data.filter((l) => l.status_portal === s).length;
@@ -141,7 +144,10 @@ export function IbacValidacaoPortalPanel() {
           <Badge variant="secondary">Pendente: {cont("PENDENTE")}</Badge>
           <Badge variant="outline">Total: {data.length}</Badge>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <label className="text-xs text-muted-foreground">Data de entrega</label>
+          <Input type="date" value={dataFiltro} onChange={(e) => setDataFiltro(e.target.value)} className="w-40" />
+          {dataFiltro && <Button size="sm" variant="ghost" onClick={() => setDataFiltro("")}>Todas as datas</Button>}
           <Input placeholder="NF ou recebedor" value={busca} onChange={(e) => setBusca(e.target.value)} className="max-w-xs" />
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
@@ -149,6 +155,7 @@ export function IbacValidacaoPortalPanel() {
               <SelectItem value="todos">Todos os status</SelectItem>
               <SelectItem value="APROVADO">Aprovado</SelectItem>
               <SelectItem value="PENDENTE">Pendente</SelectItem>
+              <SelectItem value="REPROVADO">Reprovado (inválido)</SelectItem>
             </SelectContent>
           </Select>
         </div>
