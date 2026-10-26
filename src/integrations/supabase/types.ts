@@ -2199,6 +2199,11 @@ export type Database = {
           data_criacao_portal: string | null
           data_entrega: string | null
           justificativa: string | null
+          nova_foto_anexada_em: string | null
+          nova_foto_enviada_em: string | null
+          nova_foto_path: string | null
+          nova_foto_queue_id: string | null
+          nova_foto_resultado: string | null
           numero_nf: string | null
           possui_imagem: string | null
           recebedor: string | null
@@ -2211,6 +2216,11 @@ export type Database = {
           data_criacao_portal?: string | null
           data_entrega?: string | null
           justificativa?: string | null
+          nova_foto_anexada_em?: string | null
+          nova_foto_enviada_em?: string | null
+          nova_foto_path?: string | null
+          nova_foto_queue_id?: string | null
+          nova_foto_resultado?: string | null
           numero_nf?: string | null
           possui_imagem?: string | null
           recebedor?: string | null
@@ -2223,6 +2233,11 @@ export type Database = {
           data_criacao_portal?: string | null
           data_entrega?: string | null
           justificativa?: string | null
+          nova_foto_anexada_em?: string | null
+          nova_foto_enviada_em?: string | null
+          nova_foto_path?: string | null
+          nova_foto_queue_id?: string | null
+          nova_foto_resultado?: string | null
           numero_nf?: string | null
           possui_imagem?: string | null
           recebedor?: string | null
