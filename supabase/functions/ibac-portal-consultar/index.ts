@@ -74,10 +74,14 @@ Deno.serve(async (req) => {
         data_criacao_portal: ts(x.dataCriacao),
         consultado_em: new Date().toISOString(),
       }));
-    if (up.length) {
-      const { error } = await admin.from("ibac_portal_validacao").upsert(up, { onConflict: "chave" });
+    const chaves = up.map((u: any) => u.chave);
+    const validas = await chavesJaValidas(admin, chaves);
+    const { aGravar, puladas: puladasPagina } = filtrarPendentes(up, validas);
+    puladas += puladasPagina;
+    if (aGravar.length) {
+      const { error } = await admin.from("ibac_portal_validacao").upsert(aGravar, { onConflict: "chave" });
       if (error) return json({ error: error.message, gravadas }, 500);
-      gravadas += up.length;
+      gravadas += aGravar.length;
     }
     paginas++;
     offset += LIMIT;
