@@ -642,7 +642,7 @@ export default function IntegracaoIbac() {
 
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-8 gap-3 p-3 rounded-md border bg-muted/30">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
                   <div className="space-y-1">
                     <Label className="text-xs">Status</Label>
                     <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -709,7 +709,7 @@ export default function IntegracaoIbac() {
                     <Label className="text-xs">Até</Label>
                     <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
                   </div>
-                  <div className="md:col-span-8 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="md:col-span-6 flex items-center justify-between text-xs text-muted-foreground">
                     <span>{grupos.length} nota(s) · {fila.length} aviso(s) carregado(s){filtroDataIni || filtroDataFim ? "" : " (últimos 500 avisos)"}</span>
                     {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroPortal !== "todos" || filtroValidacao !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
                       <Button
