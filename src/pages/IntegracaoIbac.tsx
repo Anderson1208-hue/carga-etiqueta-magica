@@ -758,7 +758,7 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
 
                   </TableBody>
