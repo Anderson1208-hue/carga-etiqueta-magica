@@ -209,6 +209,23 @@ export default function IntegracaoIbac() {
         });
   const fila = filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal);
 
+  // Uma linha por nota: agrupa os avisos (entrega_realizada, envio_canhoto) da mesma NF.
+  const grupos = (() => {
+    const map = new Map<string, any[]>();
+    for (const f of fila as any[]) {
+      const chave = String(f?.chave_acesso ?? "").replace(/\D/g, "");
+      const k = chave.length === 44 ? chave : f.nf_id ? `nf:${f.nf_id}` : `id:${f.id}`;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
+    }
+    return Array.from(map.entries()).map(([key, eventos]) => {
+      const ord = [...eventos].sort((a, b) => String(a.evento_interno).localeCompare(String(b.evento_interno)));
+      const principal = ord.find((e) => e.evento_interno === "envio_canhoto") ?? ord[0];
+      const ultimo = [...eventos].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      return { key, eventos: ord, principal, ultimo };
+    });
+  })();
+
 
   // Números de CT-e vinculados às NFs da fila.
   const { data: cteMap = {} } = useQuery({
@@ -248,18 +265,17 @@ export default function IntegracaoIbac() {
   const exportarExcel = async () => {
     try {
       const XLSX = await import("xlsx");
-      const linhas = fila.map((f: any) => ({
+      const linhas = grupos.map(({ eventos, principal: f, ultimo }) => ({
         NF: nfDoEvento(f) ?? "",
         "CT-e": cteDoEvento(f) ?? "",
         Destinatário: (f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "",
-        Evento: f.evento_interno,
-        Status: f.status,
+        Avisos: eventos.map((e: any) => `${e.evento_interno}: ${e.status}`).join(" | "),
         "Retorno portal": retornoPortalTexto(f),
         "Status portal": portalDe(f)?.status_portal ?? "",
         "Status validação": portalDe(f)?.status_validacao ?? "",
-        Tentativas: f.tentativas,
-        "Criado em": new Date(f.created_at).toLocaleString("pt-BR"),
-        Erro: f.erro_mensagem ?? "",
+        Tentativas: eventos.map((e: any) => `${e.evento_interno}: ${e.tentativas}`).join(" | "),
+        "Criado em": new Date(ultimo.created_at).toLocaleString("pt-BR"),
+        Erro: eventos.filter((e: any) => e.erro_mensagem).map((e: any) => `${e.evento_interno}: ${e.erro_mensagem}`).join(" | "),
       }));
       const ws = XLSX.utils.json_to_sheet(linhas);
       const wb = XLSX.utils.book_new();
@@ -665,8 +681,7 @@ export default function IntegracaoIbac() {
                       <TableHead>CT-e</TableHead>
                       <TableHead>Destinatário</TableHead>
 
-                      <TableHead>Evento</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Avisos enviados</TableHead>
                       <TableHead>Retorno portal</TableHead>
                       <TableHead>Status validação</TableHead>
                       <TableHead>Tentativas</TableHead>
@@ -676,9 +691,9 @@ export default function IntegracaoIbac() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fila.map((f) => (
+                    {grupos.map(({ key, eventos, principal: f, ultimo }) => (
                       <TableRow
-                        key={f.id}
+                        key={key}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setDetalheId(f.id)}
                       >
@@ -688,23 +703,41 @@ export default function IntegracaoIbac() {
                         <TableCell className="text-xs max-w-[200px] truncate">
                           {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
-                        <TableCell>{statusBadge(f.status)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {eventos.map((e: any) => (
+                              <div key={e.id} className="flex items-center gap-2">
+                                <span className="font-mono text-xs">{e.evento_interno}</span>
+                                {statusBadge(e.status)}
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
                         <TableCell>{retornoPortal(f)}</TableCell>
                         <TableCell className="text-xs">{validacaoPortal(f)}</TableCell>
-                        <TableCell>{f.tentativas}</TableCell>
-                        <TableCell className="text-xs">{new Date(f.created_at).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-xs text-destructive max-w-xs truncate">{f.erro_mensagem ?? "—"}</TableCell>
+                        <TableCell className="text-xs">
+                          {eventos.length === 1 ? f.tentativas : eventos.map((e: any) => <div key={e.id}>{e.tentativas}</div>)}
+                        </TableCell>
+                        <TableCell className="text-xs">{new Date(ultimo.created_at).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-xs text-destructive max-w-xs truncate">
+                          {eventos.some((e: any) => e.erro_mensagem)
+                            ? eventos.filter((e: any) => e.erro_mensagem).map((e: any) => <div key={e.id} className="truncate">{e.evento_interno}: {e.erro_mensagem}</div>)
+                            : "—"}
+                        </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()} className="sticky right-0 bg-background">
                           <div className="flex gap-2 items-center">
-                            <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
-                              Detalhes
-                            </Button>
-                            {isAdmin && f.status === "erro" && (
-                              <Button size="sm" variant="outline" onClick={() => reenviar.mutate(f.id)}>
-                                Reenviar
+                            <div className="flex flex-col gap-1">
+                              {eventos.map((e: any) => (
+                                <Button key={e.id} size="sm" variant="ghost" onClick={() => setDetalheId(e.id)}>
+                                  Detalhes{eventos.length > 1 ? ` (${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"})` : ""}
+                                </Button>
+                              ))}
+                            </div>
+                            {isAdmin && eventos.filter((e: any) => e.status === "erro").map((e: any) => (
+                              <Button key={e.id} size="sm" variant="outline" onClick={() => reenviar.mutate(e.id)}>
+                                Reenviar{eventos.length > 1 ? ` (${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"})` : ""}
                               </Button>
-                            )}
+                            ))}
                             {portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
                               const p = portalDe(f);
                               const ch = p.chave as string;
@@ -725,7 +758,7 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
 
                   </TableBody>
