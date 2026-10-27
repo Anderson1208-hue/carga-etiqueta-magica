@@ -56,6 +56,7 @@ export default function IntegracaoIbac() {
   const [filtroDataIni, setFiltroDataIni] = useState<string>("");
   const [filtroDataFim, setFiltroDataFim] = useState<string>("");
   const [filtroPortal, setFiltroPortal] = useState<string>("todos");
+  const [filtroValidacao, setFiltroValidacao] = useState<string>("todos");
 
   const { data: filaRaw = [], refetch: refetchFila } = useQuery({
     queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
@@ -116,6 +117,14 @@ export default function IntegracaoIbac() {
     return <Badge variant="secondary">{portalDe(f)?.status_portal ?? "Pendente"}</Badge>;
   };
   const validacaoPortal = (f: any): string => portalDe(f)?.status_validacao ?? "—";
+  // Texto do Status validação usado pelo filtro: Válido, Inválido ou Sem retorno.
+  const validacaoTexto = (f: any): string => {
+    const v = (portalDe(f)?.status_validacao ?? "").toUpperCase();
+    if (!v) return "Sem retorno";
+    if (v.includes("INVALID")) return "Inválido";
+    if (v.includes("VALID")) return "Válido";
+    return "Sem retorno";
+  };
 
   const fotoRef = useRef<HTMLInputElement>(null);
   const [alvoFoto, setAlvoFoto] = useState<string | null>(null);
@@ -208,7 +217,9 @@ export default function IntegracaoIbac() {
           const raiz = raizEmitente(f);
           return raiz ? raizesEscopo.includes(raiz) : true;
         });
-  const fila = filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal);
+  const fila = (
+    filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal)
+  ).filter((f: any) => filtroValidacao === "todos" || validacaoTexto(f) === filtroValidacao);
 
   // Uma linha por nota: agrupa os avisos (entrega_realizada, envio_canhoto) da mesma NF.
   const grupos = (() => {
@@ -306,6 +317,7 @@ export default function IntegracaoIbac() {
           busca: filtroBusca,
           dataIni: filtroDataIni,
           dataFim: filtroDataFim,
+          validacao: filtroValidacao,
         },
       );
     } catch (e: any) {
@@ -630,7 +642,7 @@ export default function IntegracaoIbac() {
 
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-7 gap-3 p-3 rounded-md border bg-muted/30">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border bg-muted/30">
                   <div className="space-y-1">
                     <Label className="text-xs">Status</Label>
                     <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -669,6 +681,18 @@ export default function IntegracaoIbac() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Status validação</Label>
+                    <Select value={filtroValidacao} onValueChange={setFiltroValidacao}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="Válido">Válido</SelectItem>
+                        <SelectItem value="Inválido">Inválido</SelectItem>
+                        <SelectItem value="Sem retorno">Sem retorno</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1 md:col-span-2">
                     <Label className="text-xs">NF / Chave de acesso</Label>
                     <Input
@@ -685,9 +709,9 @@ export default function IntegracaoIbac() {
                     <Label className="text-xs">Até</Label>
                     <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
                   </div>
-                  <div className="md:col-span-7 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="md:col-span-4 flex items-center justify-between text-xs text-muted-foreground">
                     <span>{grupos.length} nota(s) · {fila.length} aviso(s) carregado(s){filtroDataIni || filtroDataFim ? "" : " (últimos 500 avisos)"}</span>
-                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroPortal !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
+                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroPortal !== "todos" || filtroValidacao !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -695,6 +719,7 @@ export default function IntegracaoIbac() {
                           setFiltroStatus("todos");
                           setFiltroEvento("todos");
                           setFiltroPortal("todos");
+                          setFiltroValidacao("todos");
                           setFiltroBusca("");
                           setFiltroDataIni("");
                           setFiltroDataFim("");
