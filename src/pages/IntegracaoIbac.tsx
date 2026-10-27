@@ -63,7 +63,7 @@ export default function IntegracaoIbac() {
         .from("ibac_eventos_queue")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(filtroDataIni || filtroDataFim ? 3000 : 500);
       if (filtroStatus !== "todos") q = q.eq("status", filtroStatus as any);
       if (filtroEvento !== "todos") q = q.eq("evento_interno", filtroEvento);
       const busca = filtroBusca.trim();
@@ -537,7 +537,7 @@ export default function IntegracaoIbac() {
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="fila">Fila ({fila.length})</TabsTrigger>
+            <TabsTrigger value="fila">Fila ({grupos.length})</TabsTrigger>
             <TabsTrigger value="saude">Saúde</TabsTrigger>
             <TabsTrigger value="alertas">Alertas</TabsTrigger>
             {isAdmin && <TabsTrigger value="backfill">Backfill</TabsTrigger>}
@@ -653,7 +653,7 @@ export default function IntegracaoIbac() {
                     <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
                   </div>
                   <div className="md:col-span-7 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{fila.length} evento(s) carregado(s) (máx. 500)</span>
+                    <span>{grupos.length} nota(s) · {fila.length} aviso(s) carregado(s){filtroDataIni || filtroDataFim ? "" : " (últimos 500 avisos)"}</span>
                     {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroPortal !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
                       <Button
                         variant="ghost"
