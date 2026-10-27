@@ -4,6 +4,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { operatorAccessStatus } from "../_shared/approved-operator.ts";
+import { chavesJaValidas, filtrarPendentes } from "../_shared/ibac-consulta-regras.ts";
 
 const BASE = "https://cacaushow.mosistemas.com/app/";
 const LIMIT = 200;
@@ -53,7 +54,7 @@ Deno.serve(async (req) => {
     Accept: "application/json",
   };
 
-  let offset = 0, total = 0, gravadas = 0, paginas = 0;
+  let offset = 0, total = 0, gravadas = 0, puladas = 0, paginas = 0;
   while (paginas < MAX_PAGINAS) {
     const r = await fetch(`${BASE}api/transportador/canhotos?limit=${LIMIT}&offset=${offset}`, { headers });
     if (!r.ok) return json({ error: `Portal respondeu ${r.status}`, gravadas }, 502);
@@ -74,14 +75,18 @@ Deno.serve(async (req) => {
         data_criacao_portal: ts(x.dataCriacao),
         consultado_em: new Date().toISOString(),
       }));
-    if (up.length) {
-      const { error } = await admin.from("ibac_portal_validacao").upsert(up, { onConflict: "chave" });
+    const chaves = up.map((u: any) => u.chave);
+    const validas = await chavesJaValidas(admin, chaves);
+    const { aGravar, puladas: puladasPagina } = filtrarPendentes(up, validas);
+    puladas += puladasPagina;
+    if (aGravar.length) {
+      const { error } = await admin.from("ibac_portal_validacao").upsert(aGravar, { onConflict: "chave" });
       if (error) return json({ error: error.message, gravadas }, 500);
-      gravadas += up.length;
+      gravadas += aGravar.length;
     }
     paginas++;
     offset += LIMIT;
     if (rows.length < LIMIT || offset >= total) break;
   }
-  return json({ ok: true, total_portal: total, gravadas, paginas, duracao_ms: Date.now() - t0 });
+  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, duracao_ms: Date.now() - t0 });
 });
