@@ -409,10 +409,13 @@ export default function IntegracaoIbac() {
 
   const reenviarTodosErros = useMutation({
     mutationFn: async () => {
+      const ids = fila.filter((f: any) => statusAtual(f) === "erro").map((f: any) => f.id);
+      if (ids.length === 0) return 0;
       const { data, error } = await supabase
         .from("ibac_eventos_queue")
         .update({ status: "pendente", tentativas: 0, erro_mensagem: null })
         .eq("status", "erro")
+        .in("id", ids)
         .select("id");
       if (error) throw error;
       return data?.length ?? 0;
