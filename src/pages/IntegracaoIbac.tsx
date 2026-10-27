@@ -39,6 +39,7 @@ import { ImportarDeParaDialog } from "@/components/ibac/ImportarDeParaDialog";
 import { IbacCanhotosPanel } from "@/components/ibac/IbacCanhotosPanel";
 import { IbacEnvioPanel } from "@/components/ibac/IbacEnvioPanel";
 import { IbacValidacaoPortalPanel } from "@/components/ibac/IbacValidacaoPortalPanel";
+import { correcaoPendente, confirmacaoSubstituicao } from "@/lib/ibac-correcao-ui";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
@@ -88,7 +89,7 @@ export default function IntegracaoIbac() {
       const m: Record<string, { status_portal: string | null; status_validacao: string | null }> = {};
       for (let i = 0; i < chavesFila.length; i += 200) {
         const { data, error } = await (supabase as any).from("ibac_portal_validacao")
-          .select("chave,status_portal,status_validacao,nova_foto_path,nova_foto_enviada_em,nova_foto_resultado").in("chave", chavesFila.slice(i, i + 200));
+          .select("chave,status_portal,status_validacao,nova_foto_path,nova_foto_enviada_em,nova_foto_resultado,correcao_estado").in("chave", chavesFila.slice(i, i + 200));
         if (error) throw error;
         for (const p of data ?? []) m[p.chave] = p;
       }
@@ -141,14 +142,14 @@ export default function IntegracaoIbac() {
     } catch (e: any) { toast.error(e?.message ?? "Falha ao anexar"); } finally { setOcupado(null); }
   };
   const reenviarFoto = async (chave: string) => {
-    if (!confirm("Reenviar a nova imagem para a Cacau Show?")) return;
+    if (!confirm(confirmacaoSubstituicao((portalMap as any)[chave]?.correcao_estado))) return;
     setOcupado(chave);
     try {
       const r = await chamarCorrecao({ acao: "reenviar", chave });
       if (r?.status === "enviado") toast.success("Nova imagem enviada. A validação depende do portal.");
-      else toast.warning(`Reenvio: ${r?.mensagem ?? "pendente"}`);
+      else toast.warning(r?.mensagem ?? "Substituição não concluída.");
       qc.invalidateQueries({ queryKey: ["ibac-fila-portal"] });
-    } catch (e: any) { toast.error(e?.message ?? "Falha ao reenviar"); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao reenviar"); } finally { setOcupado(null); qc.invalidateQueries({ queryKey: ["ibac-fila-portal"] }); }
   };
 
   // Raízes de CNPJ de emitente autorizadas no canal IBAC (1 canal = 1 grupo de CNPJ).
@@ -764,16 +765,16 @@ export default function IntegracaoIbac() {
                                 Reenviar{eventos.length > 1 ? ` ${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"}` : ""}
                               </Button>
                             ))}
-                            {portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
+                            {portalDe(f) && (recusadoPortal(portalDe(f)) || correcaoPendente(portalDe(f).correcao_estado)) && (() => {
                               const p = portalDe(f);
                               const ch = p.chave as string;
                               return (
                                 <div className="flex flex-col gap-1">
-                                  <Button size="sm" variant="outline" disabled={ocupado === ch} onClick={() => { setAlvoFoto(ch); fotoRef.current?.click(); }}>
+                                  <Button size="sm" variant="outline" disabled={ocupado === ch || correcaoPendente(p.correcao_estado)} onClick={() => { setAlvoFoto(ch); fotoRef.current?.click(); }}>
                                     <Paperclip className="w-4 h-4 mr-1" />Anexar nova foto
                                   </Button>
                                   <Button size="sm" disabled={ocupado === ch || !p.nova_foto_path || !!p.nova_foto_enviada_em} onClick={() => reenviarFoto(ch)}>
-                                    <Send className="w-4 h-4 mr-1" />Reenviar nova imagem
+                                    <Send className="w-4 h-4 mr-1" />{correcaoPendente(p.correcao_estado) ? 'Retomar envio' : 'Reenviar nova imagem'}
                                   </Button>
                                   {p.nova_foto_resultado && <span className="text-xs text-muted-foreground">{p.nova_foto_resultado}</span>}
                                 </div>
