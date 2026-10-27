@@ -34,6 +34,7 @@ import { calculateBoxes } from "@/lib/xml-parser";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel } from "@/lib/macro-regioes";
+import { CanhotoConsulta } from "@/components/consulta/CanhotoConsulta";
 
 interface NfResult {
   id: string;
@@ -122,23 +123,7 @@ export default function ConsultaNF() {
   const [selectedNf, setSelectedNf] = useState<NfResult | null>(null);
   const [searched, setSearched] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [canhotoUrl, setCanhotoUrl] = useState<string | null>(null);
-  const [loadingCanhoto, setLoadingCanhoto] = useState(false);
   const [historicoNf, setHistoricoNf] = useState<{ id: string; numero: string } | null>(null);
-
-  async function carregarCanhoto(path: string) {
-    setLoadingCanhoto(true);
-    setCanhotoUrl(null);
-    try {
-      const url = await (await import("@/lib/foto-leve")).urlFotoLeve(path, 3600);
-      if (!url) throw new Error("Foto não encontrada");
-      setCanhotoUrl(url);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Erro ao carregar canhoto", description: err.message });
-    } finally {
-      setLoadingCanhoto(false);
-    }
-  }
 
   async function handleGerarPdf(nf: NfResult) {
     if (!nf.carga) return;
@@ -191,7 +176,6 @@ export default function ConsultaNF() {
     setLoading(true);
     setSearched(true);
     setSelectedNf(null);
-    setCanhotoUrl(null);
 
     try {
       // Search by numero_nf (partial match)
@@ -450,34 +434,7 @@ export default function ConsultaNF() {
 
                   <div className="mt-3 pt-3 border-t border-success/20">
                     <p className="text-xs text-muted-foreground mb-2">Canhoto / Comprovante</p>
-                    {selectedNf.baixa.foto_path ? (
-                      canhotoUrl ? (
-                        <a href={canhotoUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
-                          <img
-                            src={canhotoUrl}
-                            alt="Canhoto da entrega"
-                            className="max-h-64 rounded border hover:opacity-90 transition-opacity"
-                          />
-                          <p className="text-xs text-primary mt-1">Clique para abrir em tamanho real</p>
-                        </a>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => carregarCanhoto(selectedNf.baixa!.foto_path!)}
-                          disabled={loadingCanhoto}
-                        >
-                          {loadingCanhoto ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <FileText className="w-4 h-4 mr-2" />
-                          )}
-                          Ver canhoto
-                        </Button>
-                      )
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">Sem foto registrada</p>
-                    )}
+                    <CanhotoConsulta key={selectedNf.id} chave={selectedNf.chave_acesso} originalPath={selectedNf.baixa.foto_path} />
                   </div>
                 </div>
               )}
