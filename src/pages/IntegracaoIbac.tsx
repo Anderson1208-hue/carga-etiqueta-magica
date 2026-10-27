@@ -56,6 +56,7 @@ export default function IntegracaoIbac() {
   const [filtroDataIni, setFiltroDataIni] = useState<string>("");
   const [filtroDataFim, setFiltroDataFim] = useState<string>("");
   const [filtroPortal, setFiltroPortal] = useState<string>("todos");
+  const [filtroValidacao, setFiltroValidacao] = useState<string>("todos");
 
   const { data: filaRaw = [], refetch: refetchFila } = useQuery({
     queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
@@ -116,6 +117,14 @@ export default function IntegracaoIbac() {
     return <Badge variant="secondary">{portalDe(f)?.status_portal ?? "Pendente"}</Badge>;
   };
   const validacaoPortal = (f: any): string => portalDe(f)?.status_validacao ?? "—";
+  // Texto do Status validação usado pelo filtro: Válido, Inválido ou Sem retorno.
+  const validacaoTexto = (f: any): string => {
+    const v = (portalDe(f)?.status_validacao ?? "").toUpperCase();
+    if (!v) return "Sem retorno";
+    if (v.includes("INVALID")) return "Inválido";
+    if (v.includes("VALID")) return "Válido";
+    return "Sem retorno";
+  };
 
   const fotoRef = useRef<HTMLInputElement>(null);
   const [alvoFoto, setAlvoFoto] = useState<string | null>(null);
@@ -208,7 +217,9 @@ export default function IntegracaoIbac() {
           const raiz = raizEmitente(f);
           return raiz ? raizesEscopo.includes(raiz) : true;
         });
-  const fila = filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal);
+  const fila = (
+    filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal)
+  ).filter((f: any) => filtroValidacao === "todos" || validacaoTexto(f) === filtroValidacao);
 
   // Uma linha por nota: agrupa os avisos (entrega_realizada, envio_canhoto) da mesma NF.
   const grupos = (() => {
