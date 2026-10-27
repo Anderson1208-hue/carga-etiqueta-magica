@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     Accept: "application/json",
   };
 
-  let offset = 0, total = 0, gravadas = 0, paginas = 0;
+  let offset = 0, total = 0, gravadas = 0, puladas = 0, paginas = 0;
   while (paginas < MAX_PAGINAS) {
     const r = await fetch(`${BASE}api/transportador/canhotos?limit=${LIMIT}&offset=${offset}`, { headers });
     if (!r.ok) return json({ error: `Portal respondeu ${r.status}`, gravadas }, 502);
