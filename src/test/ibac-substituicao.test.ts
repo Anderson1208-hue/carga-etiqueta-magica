@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { fotoInvalida, proximaEtapa } from '../../supabase/functions/_shared/ibac-substituicao-regras';
-import { combinarCanhoto } from '../../supabase/functions/_shared/ibac-portal-parser';
+import { combinarCanhoto, payloadImagem } from '../../supabase/functions/_shared/ibac-portal-parser';
 
 describe('substituição explícita Cacau', () => {
   const chave = '35261061472205000407550010044001191227177955';
+  it('envia o documento completo como o portal, preservando vínculos e substituindo somente a foto', () => {
+    const original = { oid: 'imagem', documentoIndustria: { chaveDoc: chave }, conhecimentos: [{ oid: 'cte' }], status: 'PENDENTE', base64: null };
+    const payload = payloadImagem(original, 'imagem', 'nova', 'canhoto.jpg');
+    expect(payload.documentoIndustria.chaveDoc).toBe(chave);
+    expect(payload.conhecimentos).toEqual([{ oid: 'cte' }]);
+    expect(payload.base64).toBe('nova');
+    expect(original.base64).toBeNull();
+    expect(() => payloadImagem(original, 'outra', 'nova', 'canhoto.jpg')).toThrow();
+  });
   it('identifica a NF pelo documentoIndustria e mantém a validação da lista MO', () => {
     const p = combinarCanhoto({ oid: 'imagem', chave, statusValidacaoIA: 'INVALIDO' }, { oid: 'imagem', documentoIndustria: { chaveDoc: chave }, status: 'PENDENTE', base64: 'foto' }, chave);
     expect(p.chave).toBe(chave);

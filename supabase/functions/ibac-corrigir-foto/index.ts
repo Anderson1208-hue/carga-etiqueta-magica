@@ -102,11 +102,12 @@ Deno.serve(async req => {
       atual = await portal.localizar(chave, oid);
       if (possuiImagem(atual) || String(atual.status).toUpperCase().includes('APROV')) throw new Error('Portal mudou antes do envio; operação interrompida sem nova exclusão.');
       await registrar('envio_iniciado');
-      await portal.enviar(oid, base64, jpeg ? 'canhoto.jpg' : 'canhoto.png');
+      await portal.enviar(oid, base64, jpeg ? 'canhoto.jpg' : 'canhoto.png', atual.detalhePortal);
       atual = await portal.localizar(chave, oid);
       if (!possuiImagem(atual) || normalizarImagem(atual.base64) !== base64) throw new Error('Envio sem confirmação inequívoca da nova foto. Consulte o portal antes de retomar.');
       await espelhar(atual);
     }
+    await espelhar(atual);
     const enviada = new Date().toISOString();
     await registrar('enviado', { enviada_em: enviada, resultado: 'Nova imagem confirmada no portal; validação depende da Cacau Show.' });
     await patchPortal({ nova_foto_enviada_em: enviada, nova_foto_resultado: 'Nova imagem confirmada no portal; aguardando validação do cliente.' });
