@@ -438,6 +438,19 @@ export default function IntegracaoIbac() {
     erro: fila.filter((f) => f.status === "erro").length,
   };
 
+  // Contagem por NOTA (agrupada): nota com erro se algum aviso está em erro;
+  // pendente se nenhum em erro mas algum pendente; enviada caso contrário.
+  const countsNotas = (() => {
+    let pendente = 0, enviado = 0, erro = 0;
+    for (const g of grupos) {
+      const sts = g.eventos.map((e: any) => e.status);
+      if (sts.includes("erro")) erro += 1;
+      else if (sts.includes("pendente")) pendente += 1;
+      else enviado += 1;
+    }
+    return { pendente, enviado, erro, total: grupos.length };
+  })();
+
   const statusBadge = (status: string) => {
     const variants: Record<string, { v: any; icon: any; cls: string }> = {
       pendente: { v: "secondary", icon: Clock, cls: "" },
