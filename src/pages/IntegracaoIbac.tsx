@@ -548,6 +548,25 @@ export default function IntegracaoIbac() {
           </Card>
         </div>
 
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas na fila</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold">{countsNotas.total}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas pendentes</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold">{countsNotas.pendente}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas enviadas</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold text-green-600">{countsNotas.enviado}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas com erro</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold text-destructive">{countsNotas.erro}</div></CardContent>
+          </Card>
+        </div>
+
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="fila">Fila ({grupos.length})</TabsTrigger>
