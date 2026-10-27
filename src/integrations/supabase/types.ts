@@ -2156,6 +2156,56 @@ export type Database = {
         }
         Relationships: []
       }
+      ibac_foto_substituicoes: {
+        Row: {
+          backup_path: string | null
+          chave: string
+          created_at: string
+          enviada_em: string | null
+          estado: string
+          id: string
+          imagem_removida_em: string | null
+          nova_foto_path: string
+          portal_oid: string | null
+          resultado: string | null
+          updated_at: string
+        }
+        Insert: {
+          backup_path?: string | null
+          chave: string
+          created_at?: string
+          enviada_em?: string | null
+          estado?: string
+          id?: string
+          imagem_removida_em?: string | null
+          nova_foto_path: string
+          portal_oid?: string | null
+          resultado?: string | null
+          updated_at?: string
+        }
+        Update: {
+          backup_path?: string | null
+          chave?: string
+          created_at?: string
+          enviada_em?: string | null
+          estado?: string
+          id?: string
+          imagem_removida_em?: string | null
+          nova_foto_path?: string
+          portal_oid?: string | null
+          resultado?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ibac_foto_substituicoes_chave_fkey"
+            columns: ["chave"]
+            isOneToOne: false
+            referencedRelation: "ibac_portal_validacao"
+            referencedColumns: ["chave"]
+          },
+        ]
+      }
       ibac_log_envios: {
         Row: {
           created_at: string | null
@@ -2196,6 +2246,9 @@ export type Database = {
         Row: {
           chave: string
           consultado_em: string
+          correcao_estado: string | null
+          correcao_lock: string | null
+          correcao_lock_em: string | null
           data_criacao_portal: string | null
           data_entrega: string | null
           justificativa: string | null
@@ -2213,6 +2266,9 @@ export type Database = {
         Insert: {
           chave: string
           consultado_em?: string
+          correcao_estado?: string | null
+          correcao_lock?: string | null
+          correcao_lock_em?: string | null
           data_criacao_portal?: string | null
           data_entrega?: string | null
           justificativa?: string | null
@@ -2230,6 +2286,9 @@ export type Database = {
         Update: {
           chave?: string
           consultado_em?: string
+          correcao_estado?: string | null
+          correcao_lock?: string | null
+          correcao_lock_em?: string | null
           data_criacao_portal?: string | null
           data_entrega?: string | null
           justificativa?: string | null
@@ -4458,6 +4517,10 @@ export type Database = {
       haversine_metros: {
         Args: { lat1: number; lat2: number; lon1: number; lon2: number }
         Returns: number
+      }
+      ibac_reservar_correcao: {
+        Args: { p_chave: string; p_token: string }
+        Returns: boolean
       }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       importar_produtos_lote: { Args: { payload: Json }; Returns: Json }
