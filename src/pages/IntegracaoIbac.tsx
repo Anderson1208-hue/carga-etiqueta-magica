@@ -438,6 +438,19 @@ export default function IntegracaoIbac() {
     erro: fila.filter((f) => f.status === "erro").length,
   };
 
+  // Contagem por NOTA (agrupada): nota com erro se algum aviso está em erro;
+  // pendente se nenhum em erro mas algum pendente; enviada caso contrário.
+  const countsNotas = (() => {
+    let pendente = 0, enviado = 0, erro = 0;
+    for (const g of grupos) {
+      const sts = g.eventos.map((e: any) => e.status);
+      if (sts.includes("erro")) erro += 1;
+      else if (sts.includes("pendente")) pendente += 1;
+      else enviado += 1;
+    }
+    return { pendente, enviado, erro, total: grupos.length };
+  })();
+
   const statusBadge = (status: string) => {
     const variants: Record<string, { v: any; icon: any; cls: string }> = {
       pendente: { v: "secondary", icon: Clock, cls: "" },
@@ -532,6 +545,25 @@ export default function IntegracaoIbac() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Erros</CardTitle></CardHeader>
             <CardContent><div className="text-3xl font-bold text-destructive">{counts.erro}</div></CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas na fila</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold">{countsNotas.total}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas pendentes</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold">{countsNotas.pendente}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas enviadas</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold text-green-600">{countsNotas.enviado}</div></CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Notas com erro</CardTitle></CardHeader>
+            <CardContent><div className="text-3xl font-bold text-destructive">{countsNotas.erro}</div></CardContent>
           </Card>
         </div>
 
