@@ -209,6 +209,23 @@ export default function IntegracaoIbac() {
         });
   const fila = filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal);
 
+  // Uma linha por nota: agrupa os avisos (entrega_realizada, envio_canhoto) da mesma NF.
+  const grupos = (() => {
+    const map = new Map<string, any[]>();
+    for (const f of fila as any[]) {
+      const chave = String(f?.chave_acesso ?? "").replace(/\D/g, "");
+      const k = chave.length === 44 ? chave : f.nf_id ? `nf:${f.nf_id}` : `id:${f.id}`;
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
+    }
+    return Array.from(map.entries()).map(([key, eventos]) => {
+      const ord = [...eventos].sort((a, b) => String(a.evento_interno).localeCompare(String(b.evento_interno)));
+      const principal = ord.find((e) => e.evento_interno === "envio_canhoto") ?? ord[0];
+      const ultimo = [...eventos].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+      return { key, eventos: ord, principal, ultimo };
+    });
+  })();
+
 
   // Números de CT-e vinculados às NFs da fila.
   const { data: cteMap = {} } = useQuery({
@@ -248,18 +265,17 @@ export default function IntegracaoIbac() {
   const exportarExcel = async () => {
     try {
       const XLSX = await import("xlsx");
-      const linhas = fila.map((f: any) => ({
+      const linhas = grupos.map(({ eventos, principal: f, ultimo }) => ({
         NF: nfDoEvento(f) ?? "",
         "CT-e": cteDoEvento(f) ?? "",
         Destinatário: (f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "",
-        Evento: f.evento_interno,
-        Status: f.status,
+        Avisos: eventos.map((e: any) => `${e.evento_interno}: ${e.status}`).join(" | "),
         "Retorno portal": retornoPortalTexto(f),
         "Status portal": portalDe(f)?.status_portal ?? "",
         "Status validação": portalDe(f)?.status_validacao ?? "",
-        Tentativas: f.tentativas,
-        "Criado em": new Date(f.created_at).toLocaleString("pt-BR"),
-        Erro: f.erro_mensagem ?? "",
+        Tentativas: eventos.map((e: any) => `${e.evento_interno}: ${e.tentativas}`).join(" | "),
+        "Criado em": new Date(ultimo.created_at).toLocaleString("pt-BR"),
+        Erro: eventos.filter((e: any) => e.erro_mensagem).map((e: any) => `${e.evento_interno}: ${e.erro_mensagem}`).join(" | "),
       }));
       const ws = XLSX.utils.json_to_sheet(linhas);
       const wb = XLSX.utils.book_new();
