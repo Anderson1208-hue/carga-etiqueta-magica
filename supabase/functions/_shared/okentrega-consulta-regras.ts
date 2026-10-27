@@ -1,6 +1,6 @@
 export const CONSULTA_INICIO = '2026-10-22';
 export const AUTOMACAO_INICIO = '2026-10-26';
-export const CONSULTA_CRON = '0 10,20 * * 1-5';
+export const CONSULTA_CRON = '0 10,15,20 * * 1-5';
 
 export function dataBrasilia(now = new Date()): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(now);
