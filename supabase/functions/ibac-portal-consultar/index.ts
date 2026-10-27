@@ -4,6 +4,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { operatorAccessStatus } from "../_shared/approved-operator.ts";
+import { chavesJaValidas, filtrarPendentes } from "../_shared/ibac-consulta-regras.ts";
 
 const BASE = "https://cacaushow.mosistemas.com/app/";
 const LIMIT = 200;
