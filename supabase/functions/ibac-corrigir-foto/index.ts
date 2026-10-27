@@ -81,7 +81,9 @@ Deno.serve(async req => {
       const snapshot = JSON.stringify({ chave, oid, base64: atual.base64, nomeImagem: atual.nomeImagem ?? null, status: atual.status, statusValidacaoIA: atual.statusValidacaoIA, preservada_em: new Date().toISOString() });
       if (!operacao.backup_path) {
         const { error: be } = await admin.storage.from('comprovantes').upload(backup, new Blob([snapshot], { type: 'application/json' }), { upsert: false });
-        if (be) throw new Error('Falha ao preservar a foto anterior. Nenhuma exclusão realizada.');
+        // A previous interrupted request may already have saved this immutable object.
+        // Never overwrite it; the read-back comparison below decides whether it is safe.
+        if (be && !['409', 'Duplicate'].includes(String((be as any).statusCode ?? be.name))) throw new Error('Falha ao preservar a foto anterior. Nenhuma exclusão realizada.');
       }
       const { data: copia, error: de } = await admin.storage.from('comprovantes').download(operacao.backup_path ?? backup);
       if (de || !copia || normalizarImagem(JSON.parse(await copia.text()).base64) !== anterior) throw new Error('Cópia histórica não confirmada. Nenhuma exclusão realizada.');
