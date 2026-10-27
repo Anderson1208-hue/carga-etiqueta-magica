@@ -1,3 +1,4 @@
+import { combinarCanhoto } from './ibac-portal-parser.ts';
 const BASE = 'https://cacaushow.mosistemas.com/app/api/transportador/canhotos';
 export const normalizarImagem = (s: unknown) => typeof s === 'string' ? s.replace(/^data:[^,]*,/, '').replace(/\s/g, '') : '';
 export const possuiImagem = (p: any) => Boolean(normalizarImagem(p?.base64)) || p?.possuiImagem === 'Sim' || p?.possuiImagem === true;
@@ -18,11 +19,6 @@ export async function abrirPortal() {
   };
   return {
     async localizar(chave: string, oid?: string | null) {
-      if (oid) {
-        const p = await request('/' + encodeURIComponent(oid));
-        if (p?.chave !== chave) throw new Error('A imagem do portal não corresponde à nota.');
-        return p;
-      }
       const inicio = Date.now();
       let encontrado: any = null;
       for (let pagina = 0; pagina < 30; pagina++) {
@@ -34,9 +30,9 @@ export async function abrirPortal() {
         if (matches.length) encontrado = matches[0];
         if (p.data.length < 200 || (Number.isFinite(Number(p.total)) && (pagina + 1) * 200 >= Number(p.total))) {
           if (!encontrado?.oid) throw new Error('Nota não identificada inequivocamente no portal.');
+          if (oid && String(encontrado.oid) !== oid) throw new Error('A identificação da imagem mudou no portal; substituição bloqueada.');
           const detalhe = await request('/' + encodeURIComponent(String(encontrado.oid)));
-          if (detalhe?.chave !== chave) throw new Error('A imagem do portal não corresponde à nota.');
-          return detalhe;
+          return combinarCanhoto(encontrado, detalhe, chave);
         }
       }
       throw new Error('Consulta incompleta; nenhuma imagem foi excluída.');
