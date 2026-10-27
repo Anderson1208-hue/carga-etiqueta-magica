@@ -6,8 +6,9 @@ export type LinhaConsulta = {
   [k: string]: unknown;
 };
 
-const ehValido = (v: string | null | undefined) =>
-  (v ?? '').trim().toUpperCase() === 'VALIDO';
+const normalizar = (v: string | null | undefined) =>
+  (v ?? '').trim().toUpperCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+const ehValido = (v: string | null | undefined) => normalizar(v) === 'VALIDO';
 
 export function filtrarPendentes(
   linhas: LinhaConsulta[],
