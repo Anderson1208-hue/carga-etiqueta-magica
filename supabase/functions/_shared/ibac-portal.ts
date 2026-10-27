@@ -1,4 +1,4 @@
-import { combinarCanhoto } from './ibac-portal-parser.ts';
+import { combinarCanhoto, payloadImagem } from './ibac-portal-parser.ts';
 const BASE = 'https://cacaushow.mosistemas.com/app/api/transportador/canhotos';
 export const normalizarImagem = (s: unknown) => typeof s === 'string' ? s.replace(/^data:[^,]*,/, '').replace(/\s/g, '') : '';
 export const possuiImagem = (p: any) => Boolean(normalizarImagem(p?.base64)) || p?.possuiImagem === 'Sim' || p?.possuiImagem === true;
@@ -12,7 +12,11 @@ export async function abrirPortal() {
   const l = await login.json().catch(() => null);
   if (!login.ok || !l?.id) throw new Error('Não foi possível acessar o portal Cacau Show.');
   const headers = { 'auth-token': String(l.id), 'sigla-sistema': String(l.produto ?? 'APP'), Cookie: `auth-token=${l.id}; timezone-offset=180`, 'Content-Type': 'application/json', Accept: 'application/json' };
+  let ultimaChamada = 0;
   const request = async (path: string, body?: unknown) => {
+    const pausa = Math.max(0, 1000 - (Date.now() - ultimaChamada));
+    if (pausa) await new Promise(r => setTimeout(r, pausa));
+    ultimaChamada = Date.now();
     const r = await fetch(BASE + path, { method: body === undefined ? 'GET' : 'POST', headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error(`Portal Cacau Show respondeu ${r.status}.`);
     return r.json().catch(() => null);
@@ -38,6 +42,6 @@ export async function abrirPortal() {
       throw new Error('Consulta incompleta; nenhuma imagem foi excluída.');
     },
     excluir: (oid: string) => request('/excluir-imagem/' + encodeURIComponent(oid)),
-    enviar: (oid: string, base64: string, nomeImagem: string) => request('/salvar-imagem', { oid, base64, nomeImagem }),
+    enviar: (oid: string, base64: string, nomeImagem: string, detalhe: any) => request('/salvar-imagem', payloadImagem(detalhe, oid, base64, nomeImagem)),
   };
 }
