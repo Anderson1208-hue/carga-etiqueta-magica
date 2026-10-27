@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RefreshCw, Loader2, Paperclip, Send } from "lucide-react";
 import { toast } from "sonner";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
+import { correcaoPendente, confirmacaoSubstituicao } from "@/lib/ibac-correcao-ui";
 
 type Portal = {
   chave: string;
@@ -21,6 +22,7 @@ type Portal = {
   nova_foto_path: string | null;
   nova_foto_enviada_em: string | null;
   nova_foto_resultado: string | null;
+  correcao_estado: string | null;
 };
 
 type Linha = {
@@ -94,7 +96,7 @@ export function IbacValidacaoPortalPanel() {
       const portal = new Map<string, Portal>();
       for (let i = 0; i < chaves.length; i += 200) {
         const { data, error } = await (supabase as any).from("ibac_portal_validacao")
-          .select("chave,status_portal,status_validacao,possui_imagem,justificativa,consultado_em,nova_foto_path,nova_foto_enviada_em,nova_foto_resultado")
+          .select("chave,status_portal,status_validacao,possui_imagem,justificativa,consultado_em,nova_foto_path,nova_foto_enviada_em,nova_foto_resultado,correcao_estado")
           .in("chave", chaves.slice(i, i + 200));
         if (error) throw error;
         for (const p of data ?? []) portal.set(p.chave, p);
@@ -152,14 +154,14 @@ export function IbacValidacaoPortalPanel() {
   };
 
   const reenviar = async (chave: string) => {
-    if (!confirm("Reenviar a nova imagem para a Cacau Show?")) return;
+    if (!confirm(confirmacaoSubstituicao(data.find(l => l.chave === chave)?.portal?.correcao_estado))) return;
     setOcupado(chave);
     try {
       const r = await chamar({ acao: "reenviar", chave });
       if (r?.status === "enviado") toast.success("Nova imagem enviada. A validação depende do portal.");
-      else toast.warning(`Reenvio na fila: ${r?.mensagem ?? "pendente"}`);
+      else toast.warning(r?.mensagem ?? "Substituição não concluída.");
       qc.invalidateQueries({ queryKey: ["ibac-portal-validacao"] });
-    } catch (e: any) { toast.error(e?.message ?? "Falha ao reenviar"); } finally { setOcupado(null); }
+    } catch (e: any) { toast.error(e?.message ?? "Falha ao reenviar"); } finally { setOcupado(null); qc.invalidateQueries({ queryKey: ["ibac-portal-validacao"] }); }
   };
 
   const atualizar = async () => {
@@ -241,13 +243,13 @@ export function IbacValidacaoPortalPanel() {
                     </TableCell>
                     <TableCell>{p?.possui_imagem ?? "—"}</TableCell>
                     <TableCell className="sticky right-0 bg-background whitespace-nowrap">
-                      {s === "recusado" && l.chave ? (
+                      {(s === "recusado" || correcaoPendente(p?.correcao_estado)) && l.chave ? (
                         <div className="flex flex-col gap-1">
-                          <Button size="sm" variant="outline" disabled={ocupado === l.chave} onClick={() => { setAlvo(l.chave); inputRef.current?.click(); }}>
+                          <Button size="sm" variant="outline" disabled={ocupado === l.chave || correcaoPendente(p?.correcao_estado)} onClick={() => { setAlvo(l.chave); inputRef.current?.click(); }}>
                             <Paperclip className="w-4 h-4 mr-1" />Anexar nova foto
                           </Button>
-                          <Button size="sm" disabled={ocupado === l.chave || !p?.nova_foto_path || !!p?.nova_foto_enviada_em} onClick={() => reenviar(l.chave!)}>
-                            {ocupado === l.chave ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}Reenviar nova imagem
+                          <Button size="sm" disabled={ocupado === l.chave || !p?.nova_foto_path || !!p?.nova_foto_enviada_em} onClick={() => { if (l.chave) reenviar(l.chave); }}>
+                            {ocupado === l.chave ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}{correcaoPendente(p?.correcao_estado) ? 'Retomar envio' : 'Reenviar nova imagem'}
                           </Button>
                           {p?.nova_foto_resultado && <span className="text-muted-foreground">{p.nova_foto_resultado}</span>}
                         </div>
