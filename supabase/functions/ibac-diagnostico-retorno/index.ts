@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
+import { combinarCanhoto } from '../_shared/ibac-portal-parser.ts';
 Deno.serve(async req => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const access = await operatorAccessStatus(req.headers.get('Authorization'), admin as any);
@@ -16,7 +17,7 @@ Deno.serve(async req => {
     for (const row of p.data ?? []) if (wanted.includes(String(row.numero))) {
       const d = await (await fetch(base+'transportador/canhotos/'+encodeURIComponent(row.oid),{headers})).json();
       const safe = (v:any) => ({oid:v?.oid,chave:v?.chave ?? v?.chaveDoc,numero:v?.numero ?? v?.numeroDoc,status:v?.status,statusValidacaoIA:v?.statusValidacaoIA,possuiImagem:v?.possuiImagem,hasBase64:typeof v?.base64==='string' && v.base64.length>0});
-      found.push({list:safe(row),detail:safe(d),documento:safe(d?.documentoIndustria),documentoKeys:Object.keys(d?.documentoIndustria ?? {}),keys:Object.keys(d ?? {})});
+      found.push(safe(combinarCanhoto(row,d,row.chave)));
     }
     if ((p.data?.length ?? 0)<200 || offset+200>=p.total) break;
   }
