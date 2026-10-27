@@ -40,6 +40,7 @@ import { IbacCanhotosPanel } from "@/components/ibac/IbacCanhotosPanel";
 import { IbacEnvioPanel } from "@/components/ibac/IbacEnvioPanel";
 import { IbacValidacaoPortalPanel } from "@/components/ibac/IbacValidacaoPortalPanel";
 import { correcaoPendente, confirmacaoSubstituicao } from "@/lib/ibac-correcao-ui";
+import { statusVisualIbac } from "@/lib/ibac-status-visual";
 
 export default function IntegracaoIbac() {
   const { isAdmin, isLoading, profile } = useAuth();
@@ -66,7 +67,7 @@ export default function IntegracaoIbac() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(filtroDataIni || filtroDataFim ? 3000 : 500);
-      if (filtroStatus !== "todos") q = q.eq("status", filtroStatus as any);
+      if (filtroStatus !== "todos" && filtroStatus !== "erro") q = q.eq("status", filtroStatus as any);
       if (filtroEvento !== "todos") q = q.eq("evento_interno", filtroEvento);
       const busca = filtroBusca.trim();
       if (busca) {
@@ -83,7 +84,7 @@ export default function IntegracaoIbac() {
   });
 
   const chavesFila = Array.from(new Set((filaRaw as any[]).map((f) => String(f?.chave_acesso ?? "").replace(/\D/g, "")).filter((c) => c.length === 44)));
-  const { data: portalMap = {} } = useQuery({
+  const { data: portalMap = {}, refetch: refetchPortal } = useQuery({
     queryKey: ["ibac-fila-portal", chavesFila.join(",")],
     enabled: chavesFila.length > 0,
     queryFn: async () => {
@@ -98,6 +99,7 @@ export default function IntegracaoIbac() {
     },
   });
   const portalDe = (f: any): any => (portalMap as any)[String(f?.chave_acesso ?? "").replace(/\D/g, "")];
+  const statusAtual = (f: any) => statusVisualIbac(f.status, portalDe(f));
   const recusadoPortal = (p: any) => {
     const s = (p?.status_portal ?? "").toUpperCase();
     return !s.includes("APROV") && ((p?.status_validacao ?? "").toUpperCase().includes("INVALID") || s.includes("REPROV"));
@@ -219,7 +221,8 @@ export default function IntegracaoIbac() {
         });
   const fila = (
     filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal)
-  ).filter((f: any) => filtroValidacao === "todos" || validacaoTexto(f) === filtroValidacao);
+  ).filter((f: any) => filtroValidacao === "todos" || validacaoTexto(f) === filtroValidacao)
+    .filter((f: any) => filtroStatus !== "erro" || statusAtual(f) === "erro");
 
   // Uma linha por nota: agrupa os avisos (entrega_realizada, envio_canhoto) da mesma NF.
   const grupos = (() => {
@@ -406,10 +409,13 @@ export default function IntegracaoIbac() {
 
   const reenviarTodosErros = useMutation({
     mutationFn: async () => {
+      const ids = fila.filter((f: any) => statusAtual(f) === "erro").map((f: any) => f.id);
+      if (ids.length === 0) return 0;
       const { data, error } = await supabase
         .from("ibac_eventos_queue")
         .update({ status: "pendente", tentativas: 0, erro_mensagem: null })
         .eq("status", "erro")
+        .in("id", ids)
         .select("id");
       if (error) throw error;
       return data?.length ?? 0;
@@ -446,9 +452,9 @@ export default function IntegracaoIbac() {
 
 
   const counts = {
-    pendente: fila.filter((f) => f.status === "pendente").length,
-    enviado: fila.filter((f) => f.status === "enviado").length,
-    erro: fila.filter((f) => f.status === "erro").length,
+    pendente: fila.filter((f) => statusAtual(f) === "pendente").length,
+    enviado: fila.filter((f) => ["enviado", "validado"].includes(statusAtual(f))).length,
+    erro: fila.filter((f) => statusAtual(f) === "erro").length,
   };
 
   // Contagem por NOTA (agrupada): nota com erro se algum aviso está em erro;
@@ -456,7 +462,7 @@ export default function IntegracaoIbac() {
   const countsNotas = (() => {
     let pendente = 0, enviado = 0, erro = 0;
     for (const g of grupos) {
-      const sts = g.eventos.map((e: any) => e.status);
+      const sts = g.eventos.map((e: any) => statusAtual(e));
       if (sts.includes("erro")) erro += 1;
       else if (sts.includes("pendente")) pendente += 1;
       else enviado += 1;
@@ -468,6 +474,7 @@ export default function IntegracaoIbac() {
     const variants: Record<string, { v: any; icon: any; cls: string }> = {
       pendente: { v: "secondary", icon: Clock, cls: "" },
       enviado: { v: "default", icon: CheckCircle2, cls: "bg-green-600" },
+      validado: { v: "outline", icon: CheckCircle2, cls: "text-success border-success" },
       erro: { v: "destructive", icon: AlertCircle, cls: "" },
       cancelado: { v: "outline", icon: AlertCircle, cls: "" },
     };
@@ -635,7 +642,7 @@ export default function IntegracaoIbac() {
                     <FileDown className="w-4 h-4 mr-2" />
                     Gerar Excel
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
+                  <Button variant="ghost" size="sm" onClick={() => { refetchFila(); refetchPortal(); }}>
                     <RefreshCw className="w-4 h-4" />
                   </Button>
                 </div>
@@ -766,7 +773,7 @@ export default function IntegracaoIbac() {
                             {eventos.map((e: any) => (
                               <div key={e.id} className="flex items-center justify-between gap-2 text-xs">
                                 <span className="text-muted-foreground w-14">{e.evento_interno === "envio_canhoto" ? "Canhoto" : e.evento_interno === "entrega_realizada" ? "Entrega" : e.evento_interno}</span>
-                                {statusBadge(e.status)}
+                                {statusBadge(statusAtual(e))}
                               </div>
                             ))}
                           </div>
@@ -777,15 +784,15 @@ export default function IntegracaoIbac() {
                           {eventos.reduce((s: number, e: any) => s + (Number(e.tentativas) || 0), 0)}
                         </TableCell>
                         <TableCell className="text-xs whitespace-nowrap">{new Date(ultimo.created_at).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-xs text-destructive max-w-[220px] truncate" title={eventos.filter((e: any) => e.erro_mensagem).map((e: any) => e.erro_mensagem).join(" | ")}>
-                          {eventos.find((e: any) => e.erro_mensagem)?.erro_mensagem ?? "—"}
+                        <TableCell className="text-xs text-destructive max-w-[220px] truncate" title={eventos.filter((e: any) => statusAtual(e) === "erro" && e.erro_mensagem).map((e: any) => e.erro_mensagem).join(" | ")}>
+                          {eventos.find((e: any) => statusAtual(e) === "erro" && e.erro_mensagem)?.erro_mensagem ?? "—"}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()} className="sticky right-0 bg-background">
                           <div className="flex gap-2 items-center">
                             <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
                               Detalhes
                             </Button>
-                            {isAdmin && eventos.filter((e: any) => e.status === "erro").map((e: any) => (
+                            {isAdmin && eventos.filter((e: any) => statusAtual(e) === "erro").map((e: any) => (
                               <Button key={e.id} size="sm" variant="outline" onClick={() => reenviar.mutate(e.id)}>
                                 Reenviar{eventos.length > 1 ? ` ${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"}` : ""}
                               </Button>
