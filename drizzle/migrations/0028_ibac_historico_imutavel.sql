@@ -1,0 +1,3 @@
+CREATE POLICY ibac_historico_sem_alteracao ON storage.objects AS RESTRICTIVE FOR UPDATE TO authenticated USING (NOT (bucket_id='comprovantes' AND name ~ '^ibac-correcoes/[0-9]{44}/historico/')) WITH CHECK (NOT (bucket_id='comprovantes' AND name ~ '^ibac-correcoes/[0-9]{44}/historico/'));
+CREATE POLICY ibac_historico_sem_exclusao ON storage.objects AS RESTRICTIVE FOR DELETE TO authenticated USING (NOT (bucket_id='comprovantes' AND name ~ '^ibac-correcoes/[0-9]{44}/historico/'));
+CREATE POLICY ibac_historico_somente_servidor ON storage.objects AS RESTRICTIVE FOR INSERT TO authenticated WITH CHECK (NOT (bucket_id='comprovantes' AND name ~ '^ibac-correcoes/[0-9]{44}/historico/'));
