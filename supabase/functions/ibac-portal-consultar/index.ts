@@ -88,5 +88,5 @@ Deno.serve(async (req) => {
     offset += LIMIT;
     if (rows.length < LIMIT || offset >= total) break;
   }
-  return json({ ok: true, total_portal: total, gravadas, paginas, duracao_ms: Date.now() - t0 });
+  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, duracao_ms: Date.now() - t0 });
 });
