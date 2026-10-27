@@ -12,6 +12,7 @@ export interface IbacFilaPdfLinha {
 export interface IbacFilaPdfFiltros {
   status: string;
   evento: string;
+  validacao: string;
   busca: string;
   dataIni: string;
   dataFim: string;
@@ -35,6 +36,7 @@ export async function gerarPdfFilaIbac(
   const filtrosTxt = [
     `Status: ${filtros.status}`,
     `Evento: ${filtros.evento}`,
+    `Status validação: ${filtros.validacao}`,
     filtros.busca ? `Busca: ${filtros.busca}` : null,
     filtros.dataIni ? `De: ${filtros.dataIni.split("-").reverse().join("/")}` : null,
     filtros.dataFim ? `Até: ${filtros.dataFim.split("-").reverse().join("/")}` : null,

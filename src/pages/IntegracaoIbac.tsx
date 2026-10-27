@@ -317,6 +317,7 @@ export default function IntegracaoIbac() {
           busca: filtroBusca,
           dataIni: filtroDataIni,
           dataFim: filtroDataFim,
+          validacao: filtroValidacao,
         },
       );
     } catch (e: any) {
