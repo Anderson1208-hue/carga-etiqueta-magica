@@ -703,39 +703,33 @@ export default function IntegracaoIbac() {
                         <TableCell className="text-xs max-w-[200px] truncate">
                           {(f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "—"}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             {eventos.map((e: any) => (
-                              <div key={e.id} className="flex items-center gap-2">
-                                <span className="font-mono text-xs">{e.evento_interno}</span>
+                              <div key={e.id} className="flex items-center justify-between gap-2 text-xs">
+                                <span className="text-muted-foreground w-14">{e.evento_interno === "envio_canhoto" ? "Canhoto" : e.evento_interno === "entrega_realizada" ? "Entrega" : e.evento_interno}</span>
                                 {statusBadge(e.status)}
                               </div>
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell>{retornoPortal(f)}</TableCell>
-                        <TableCell className="text-xs">{validacaoPortal(f)}</TableCell>
-                        <TableCell className="text-xs">
-                          {eventos.length === 1 ? f.tentativas : eventos.map((e: any) => <div key={e.id}>{e.tentativas}</div>)}
+                        <TableCell className="whitespace-nowrap">{retornoPortal(f)}</TableCell>
+                        <TableCell className="text-xs whitespace-nowrap">{validacaoPortal(f)}</TableCell>
+                        <TableCell className="text-xs text-center">
+                          {eventos.reduce((s: number, e: any) => s + (Number(e.tentativas) || 0), 0)}
                         </TableCell>
-                        <TableCell className="text-xs">{new Date(ultimo.created_at).toLocaleString("pt-BR")}</TableCell>
-                        <TableCell className="text-xs text-destructive max-w-xs truncate">
-                          {eventos.some((e: any) => e.erro_mensagem)
-                            ? eventos.filter((e: any) => e.erro_mensagem).map((e: any) => <div key={e.id} className="truncate">{e.evento_interno}: {e.erro_mensagem}</div>)
-                            : "—"}
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(ultimo.created_at).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-xs text-destructive max-w-[220px] truncate" title={eventos.filter((e: any) => e.erro_mensagem).map((e: any) => e.erro_mensagem).join(" | ")}>
+                          {eventos.find((e: any) => e.erro_mensagem)?.erro_mensagem ?? "—"}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()} className="sticky right-0 bg-background">
                           <div className="flex gap-2 items-center">
-                            <div className="flex flex-col gap-1">
-                              {eventos.map((e: any) => (
-                                <Button key={e.id} size="sm" variant="ghost" onClick={() => setDetalheId(e.id)}>
-                                  Detalhes{eventos.length > 1 ? ` (${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"})` : ""}
-                                </Button>
-                              ))}
-                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => setDetalheId(f.id)}>
+                              Detalhes
+                            </Button>
                             {isAdmin && eventos.filter((e: any) => e.status === "erro").map((e: any) => (
                               <Button key={e.id} size="sm" variant="outline" onClick={() => reenviar.mutate(e.id)}>
-                                Reenviar{eventos.length > 1 ? ` (${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"})` : ""}
+                                Reenviar{eventos.length > 1 ? ` ${e.evento_interno === "envio_canhoto" ? "canhoto" : "entrega"}` : ""}
                               </Button>
                             ))}
                             {portalDe(f) && recusadoPortal(portalDe(f)) && (() => {
