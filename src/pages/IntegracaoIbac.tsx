@@ -54,6 +54,7 @@ export default function IntegracaoIbac() {
   const [filtroBusca, setFiltroBusca] = useState<string>("");
   const [filtroDataIni, setFiltroDataIni] = useState<string>("");
   const [filtroDataFim, setFiltroDataFim] = useState<string>("");
+  const [filtroPortal, setFiltroPortal] = useState<string>("todos");
 
   const { data: filaRaw = [], refetch: refetchFila } = useQuery({
     queryKey: ["ibac-fila", filtroStatus, filtroEvento, filtroBusca, filtroDataIni, filtroDataFim],
@@ -70,8 +71,8 @@ export default function IntegracaoIbac() {
         // Busca por chave de acesso ou número de NF dentro do payload
         q = q.or(`chave_acesso.ilike.%${busca}%,payload->>numero_nf.ilike.%${busca}%`);
       }
-      if (filtroDataIni) q = q.gte("created_at", `${filtroDataIni}T00:00:00`);
-      if (filtroDataFim) q = q.lte("created_at", `${filtroDataFim}T23:59:59`);
+      if (filtroDataIni) q = q.gte("created_at", `${filtroDataIni}T00:00:00-03:00`);
+      if (filtroDataFim) q = q.lte("created_at", `${filtroDataFim}T23:59:59.999-03:00`);
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -99,13 +100,21 @@ export default function IntegracaoIbac() {
     const s = (p?.status_portal ?? "").toUpperCase();
     return !s.includes("APROV") && ((p?.status_validacao ?? "").toUpperCase().includes("INVALID") || s.includes("REPROV"));
   };
-  const retornoPortal = (f: any) => {
+  const retornoPortalTexto = (f: any): string => {
     const p = portalDe(f);
-    if (!p) return <Badge variant="outline">Sem retorno</Badge>;
-    if ((p.status_portal ?? "").toUpperCase().includes("APROV")) return <Badge>Aprovado</Badge>;
-    if (recusadoPortal(p)) return <Badge variant="destructive">Recusado</Badge>;
-    return <Badge variant="secondary">{p.status_portal ?? "Pendente"}</Badge>;
+    if (!p) return "Sem retorno";
+    if ((p.status_portal ?? "").toUpperCase().includes("APROV")) return "Aprovado";
+    if (recusadoPortal(p)) return "Recusado";
+    return "Pendente";
   };
+  const retornoPortal = (f: any) => {
+    const t = retornoPortalTexto(f);
+    if (t === "Sem retorno") return <Badge variant="outline">Sem retorno</Badge>;
+    if (t === "Aprovado") return <Badge>Aprovado</Badge>;
+    if (t === "Recusado") return <Badge variant="destructive">Recusado</Badge>;
+    return <Badge variant="secondary">{portalDe(f)?.status_portal ?? "Pendente"}</Badge>;
+  };
+  const validacaoPortal = (f: any): string => portalDe(f)?.status_validacao ?? "—";
 
   const fotoRef = useRef<HTMLInputElement>(null);
   const [alvoFoto, setAlvoFoto] = useState<string | null>(null);
@@ -191,13 +200,14 @@ export default function IntegracaoIbac() {
     return null;
   };
 
-  const fila =
+  const filaEscopo =
     raizesEscopo.length === 0
       ? filaRaw
       : filaRaw.filter((f: any) => {
           const raiz = raizEmitente(f);
           return raiz ? raizesEscopo.includes(raiz) : true;
         });
+  const fila = filtroPortal === "todos" ? filaEscopo : filaEscopo.filter((f: any) => retornoPortalTexto(f) === filtroPortal);
 
 
   // Números de CT-e vinculados às NFs da fila.
@@ -234,6 +244,31 @@ export default function IntegracaoIbac() {
 
   const cteDoEvento = (f: any) =>
     (f?.nf_id ? (cteMap as any)[f.nf_id] : null) ?? f?.payload?.numero_cte ?? null;
+
+  const exportarExcel = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const linhas = fila.map((f: any) => ({
+        NF: nfDoEvento(f) ?? "",
+        "CT-e": cteDoEvento(f) ?? "",
+        Destinatário: (f.nf_id && (nfMap as any)[f.nf_id]?.dest) || "",
+        Evento: f.evento_interno,
+        Status: f.status,
+        "Retorno portal": retornoPortalTexto(f),
+        "Status portal": portalDe(f)?.status_portal ?? "",
+        "Status validação": portalDe(f)?.status_validacao ?? "",
+        Tentativas: f.tentativas,
+        "Criado em": new Date(f.created_at).toLocaleString("pt-BR"),
+        Erro: f.erro_mensagem ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(linhas);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Fila IBAC");
+      XLSX.writeFile(wb, `fila_ibac_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (e: any) {
+      toast.error(`Falha ao gerar Excel: ${e.message}`);
+    }
+  };
 
   const exportarPdf = async () => {
     try {
@@ -535,6 +570,10 @@ export default function IntegracaoIbac() {
                     <FileDown className="w-4 h-4 mr-2" />
                     Gerar PDF
                   </Button>
+                  <Button variant="outline" size="sm" onClick={exportarExcel} disabled={fila.length === 0}>
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Gerar Excel
+                  </Button>
                   <Button variant="ghost" size="sm" onClick={() => refetchFila()}>
                     <RefreshCw className="w-4 h-4" />
                   </Button>
@@ -542,7 +581,7 @@ export default function IntegracaoIbac() {
 
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 rounded-md border bg-muted/30">
+                <div className="grid grid-cols-1 md:grid-cols-7 gap-3 p-3 rounded-md border bg-muted/30">
                   <div className="space-y-1">
                     <Label className="text-xs">Status</Label>
                     <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -568,6 +607,19 @@ export default function IntegracaoIbac() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Status do portal</Label>
+                    <Select value={filtroPortal} onValueChange={setFiltroPortal}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="Aprovado">Aprovado</SelectItem>
+                        <SelectItem value="Recusado">Recusado</SelectItem>
+                        <SelectItem value="Pendente">Pendente</SelectItem>
+                        <SelectItem value="Sem retorno">Sem retorno</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1 md:col-span-2">
                     <Label className="text-xs">NF / Chave de acesso</Label>
                     <Input
@@ -584,15 +636,16 @@ export default function IntegracaoIbac() {
                     <Label className="text-xs">Até</Label>
                     <Input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
                   </div>
-                  <div className="md:col-span-6 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="md:col-span-7 flex items-center justify-between text-xs text-muted-foreground">
                     <span>{fila.length} evento(s) carregado(s) (máx. 500)</span>
-                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
+                    {(filtroStatus !== "todos" || filtroEvento !== "todos" || filtroPortal !== "todos" || filtroBusca || filtroDataIni || filtroDataFim) && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
                           setFiltroStatus("todos");
                           setFiltroEvento("todos");
+                          setFiltroPortal("todos");
                           setFiltroBusca("");
                           setFiltroDataIni("");
                           setFiltroDataFim("");
@@ -615,6 +668,7 @@ export default function IntegracaoIbac() {
                       <TableHead>Evento</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Retorno portal</TableHead>
+                      <TableHead>Status validação</TableHead>
                       <TableHead>Tentativas</TableHead>
                       <TableHead>Criado em</TableHead>
                       <TableHead>Erro</TableHead>
@@ -637,6 +691,7 @@ export default function IntegracaoIbac() {
                         <TableCell className="font-mono text-xs">{f.evento_interno}</TableCell>
                         <TableCell>{statusBadge(f.status)}</TableCell>
                         <TableCell>{retornoPortal(f)}</TableCell>
+                        <TableCell className="text-xs">{validacaoPortal(f)}</TableCell>
                         <TableCell>{f.tentativas}</TableCell>
                         <TableCell className="text-xs">{new Date(f.created_at).toLocaleString("pt-BR")}</TableCell>
                         <TableCell className="text-xs text-destructive max-w-xs truncate">{f.erro_mensagem ?? "—"}</TableCell>
@@ -670,7 +725,7 @@ export default function IntegracaoIbac() {
                       </TableRow>
                     ))}
                     {fila.length === 0 && (
-                      <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-8">Fila vazia</TableCell></TableRow>
                     )}
 
                   </TableBody>
