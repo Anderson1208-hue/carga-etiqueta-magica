@@ -14,7 +14,8 @@ export function filtrarPendentes(
   linhas: LinhaConsulta[],
   chavesValidas: Set<string>,
 ): { aGravar: LinhaConsulta[]; puladas: number } {
-  const aGravar = linhas.filter((l) => !ehValido(l.status_validacao) && !chavesValidas.has(l.chave));
+  // Pula só o que já está VÁLIDO no nosso banco; se o portal virou VÁLIDO, grava.
+  const aGravar = linhas.filter((l) => !chavesValidas.has(l.chave));
   return { aGravar, puladas: linhas.length - aGravar.length };
 }
 
