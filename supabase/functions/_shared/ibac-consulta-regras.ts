@@ -25,8 +25,8 @@ export async function chavesJaValidas(
   chaves: string[],
 ): Promise<Set<string>> {
   const validas = new Set<string>();
-  for (let i = 0; i < chaves.length; i += 500) {
-    const parte = chaves.slice(i, i + 500);
+  for (let i = 0; i < chaves.length; i += 100) {
+    const parte = chaves.slice(i, i + 100);
     if (!parte.length) continue;
     const { data, error } = await admin
       .from('ibac_portal_validacao')

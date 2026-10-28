@@ -20,6 +20,10 @@ const ts = (v: unknown) => {
 };
 
 Deno.serve(async (req) => {
+  try { return await handler(req); } catch (e) { return json({ error: String((e as Error)?.message ?? e) }, 500); }
+});
+
+async function handler(req: Request) {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -116,4 +120,4 @@ Deno.serve(async (req) => {
   }
   gravadas += individuaisGravadas;
   return json({ ok: true, total_portal: total, gravadas, puladas, paginas, individuais: individuais.length, individuais_gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, duracao_ms: Date.now() - t0 });
-});
+}
