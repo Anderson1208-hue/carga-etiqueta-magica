@@ -55,6 +55,19 @@ Deno.serve(async (req) => {
   };
 
   let offset = 0, total = 0, gravadas = 0, puladas = 0, paginas = 0;
+  const vistas = new Set<string>();
+  const mapear = (x: any) => ({
+    chave: x.chave,
+    numero_nf: x.numero != null ? String(x.numero) : null,
+    status_portal: x.status ?? null,
+    status_validacao: x.statusValidacaoIA ?? null,
+    possui_imagem: x.possuiImagem ?? null,
+    justificativa: x.justificativa ?? null,
+    recebedor: x.recebedor ?? null,
+    data_entrega: ts(x.dataEntregaNfe),
+    data_criacao_portal: ts(x.dataCriacao),
+    consultado_em: new Date().toISOString(),
+  });
   while (paginas < MAX_PAGINAS) {
     const r = await fetch(`${BASE}api/transportador/canhotos?limit=${LIMIT}&offset=${offset}`, { headers });
     if (!r.ok) return json({ error: `Portal respondeu ${r.status}`, gravadas }, 502);
@@ -63,18 +76,8 @@ Deno.serve(async (req) => {
     total = Number(p?.total ?? 0);
     const up = rows
       .filter((x: any) => typeof x?.chave === "string" && x.chave.length === 44)
-      .map((x: any) => ({
-        chave: x.chave,
-        numero_nf: x.numero != null ? String(x.numero) : null,
-        status_portal: x.status ?? null,
-        status_validacao: x.statusValidacaoIA ?? null,
-        possui_imagem: x.possuiImagem ?? null,
-        justificativa: x.justificativa ?? null,
-        recebedor: x.recebedor ?? null,
-        data_entrega: ts(x.dataEntregaNfe),
-        data_criacao_portal: ts(x.dataCriacao),
-        consultado_em: new Date().toISOString(),
-      }));
+      .map(mapear);
+    up.forEach((u: any) => vistas.add(u.chave));
     const chaves = up.map((u: any) => u.chave);
     const validas = await chavesJaValidas(admin, chaves);
     const { aGravar, puladas: puladasPagina } = filtrarPendentes(up, validas);
@@ -88,5 +91,29 @@ Deno.serve(async (req) => {
     offset += LIMIT;
     if (rows.length < LIMIT || offset >= total) break;
   }
-  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, duracao_ms: Date.now() - t0 });
+  // A lista sem filtro só traz notas cadastradas recentemente no portal.
+  // Canhotos enviados nos últimos 30 dias que não vieram na lista e ainda não
+  // estão VÁLIDO aqui são consultados individualmente pela chave (somente leitura).
+  const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: enviados } = await admin.from("ibac_eventos_queue")
+    .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
+    .gte("enviado_em", desde).not("chave_acesso", "is", null).order("enviado_em", { ascending: false }).limit(2000);
+  const candidatas = [...new Set((enviados ?? []).map((e: any) => e.chave_acesso as string))]
+    .filter((c) => c.length === 44 && !vistas.has(c));
+  const jaValidas = await chavesJaValidas(admin, candidatas);
+  const individuais = candidatas.filter((c) => !jaValidas.has(c)).slice(0, 150);
+  let individuaisGravadas = 0, naoEncontradas = 0;
+  for (const chave of individuais) {
+    if (Date.now() - t0 > 120000) break;
+    await new Promise((r) => setTimeout(r, 400));
+    const r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+    if (!r.ok) continue;
+    const p: any = await r.json().catch(() => null);
+    const hit = (Array.isArray(p?.data) ? p.data : []).filter((x: any) => x?.chave === chave);
+    if (hit.length !== 1) { naoEncontradas++; continue; }
+    const { error } = await admin.from("ibac_portal_validacao").upsert([mapear(hit[0])], { onConflict: "chave" });
+    if (!error) individuaisGravadas++;
+  }
+  gravadas += individuaisGravadas;
+  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, individuais: individuais.length, individuais_gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, duracao_ms: Date.now() - t0 });
 });
