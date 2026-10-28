@@ -551,11 +551,19 @@ Deno.serve(async (req) => {
     let erroMsg: string | null = null;
 
     try {
-      const resp = await fetch(`${endpoint}?access_token=${encodeURIComponent(token)}`, {
+      const enviar = () => fetch(`${endpoint}?access_token=${encodeURIComponent(token)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      let resp = await enviar();
+      if (resp.status === 401) {
+        // Token revogado pelo portal antes do vencimento: invalida cache, renova e tenta 1x
+        await resp.text().catch(() => "");
+        await supabase.from("okentrega_token").update({ expira_em: new Date(0).toISOString() }).eq("ambiente", ambiente);
+        token = (await obterToken(supabase, ambiente)).token;
+        resp = await enviar();
+      }
       respStatus = resp.status;
       const texto = await resp.text();
       try {
