@@ -105,12 +105,13 @@ async function handler(req: Request) {
   const candidatas = [...new Set((enviados ?? []).map((e: any) => e.chave_acesso as string))]
     .filter((c) => c.length === 44 && !vistas.has(c));
   const jaValidas = await chavesJaValidas(admin, candidatas);
-  const individuais = candidatas.filter((c) => !jaValidas.has(c)).slice(0, 150);
+  const individuais = candidatas.filter((c) => !jaValidas.has(c)).slice(0, 80);
   let individuaisGravadas = 0, naoEncontradas = 0;
   for (const chave of individuais) {
     if (Date.now() - t0 > 120000) break;
-    await new Promise((r) => setTimeout(r, 400));
+    await new Promise((r) => setTimeout(r, 1100));
     const r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+    if (r.status === 429) break;
     if (!r.ok) continue;
     const p: any = await r.json().catch(() => null);
     const hit = (Array.isArray(p?.data) ? p.data : []).filter((x: any) => x?.chave === chave);
