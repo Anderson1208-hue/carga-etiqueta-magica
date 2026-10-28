@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound, Paperclip } from "lucide-react";
+import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyRound, Paperclip, FileText, FileSpreadsheet } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { compararNfsCrescente } from "@/lib/okentrega-acompanhamento";
@@ -398,6 +398,54 @@ export default function IntegracaoOkEntrega() {
       return { label: "Aguardando prestação", variant: "secondary" as const };
     }
     return { label: "Aguardando fila", variant: "secondary" as const };
+  };
+
+  const comprovanteTexto = (i: any) => !i.baixa?.foto_path ? "Sem imagem"
+    : i.fila?.status_comprovante === "1" ? "Aprovado"
+    : i.fila?.status_comprovante === "2" ? "Recusado"
+    : ["enviado", "aguardando_aprovacao"].includes(i.fila?.status) ? "Em análise" : "Aguardando envio";
+
+  const linhasExport = () => acompanhamentoHoje.map((i: any) => ({
+    NF: String(i.numero_nf ?? "").replace(/^0+/, ""),
+    Destinatário: i.dest_razao_social ?? "",
+    Placa: i.veiculo?.placa ?? "",
+    "Status da entrega": i.status_entrega ?? "Pendente",
+    "Status da integração": statusAcompanhamento(i).label,
+    "Retorno OK Entrega": rotuloStatusBaixa(i.fila?.status_baixa) ?? "",
+    Comprovante: comprovanteTexto(i),
+    Motivo: i.fila?.motivo_recusa || i.fila?.erro_mensagem || "",
+  }));
+
+  const exportarExcel = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const ws = XLSX.utils.json_to_sheet(linhasExport());
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "OK Entrega");
+      XLSX.writeFile(wb, `okentrega_${dataConsulta}.xlsx`);
+    } catch (e: any) { toast.error(`Falha ao gerar Excel: ${e.message}`); }
+  };
+
+  const exportarPdf = async () => {
+    try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+      const linhas = linhasExport();
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const [a, m, d] = dataConsulta.split("-");
+      doc.setFontSize(13);
+      doc.text(`Integração OK Entrega — roteirização ${d}/${m}/${a}`, 10, 12);
+      doc.setFontSize(9);
+      const filtros = [filtroStatus !== "todos" ? `Status: ${filtroStatus}` : null, filtroBusca ? `Busca: ${filtroBusca}` : null].filter(Boolean).join(" · ");
+      doc.text(`${linhas.length} NF(s)${filtros ? " · " + filtros : ""} · Gerado em ${new Date().toLocaleString("pt-BR")}`, 10, 18);
+      const cols = Object.keys(linhas[0] ?? { NF: "" });
+      autoTable(doc, {
+        startY: 22, head: [cols], body: linhas.map((l: any) => cols.map((c) => String(l[c] ?? ""))),
+        styles: { fontSize: 7, cellPadding: 1.5 }, headStyles: { fillColor: [40, 40, 40] },
+        columnStyles: { 1: { cellWidth: 60 }, 7: { cellWidth: 70 } },
+      });
+      doc.save(`okentrega_${dataConsulta}.pdf`);
+    } catch (e: any) { toast.error(`Falha ao gerar PDF: ${e.message}`); }
   };
 
   const fila = useMemo(() => {
@@ -1017,6 +1065,12 @@ export default function IntegracaoOkEntrega() {
                     onChange={(e) => setFiltroBusca(e.target.value)}
                     className="w-[320px]"
                   />
+                  <Button variant="outline" size="sm" onClick={exportarPdf} disabled={acompanhamentoHoje.length === 0}>
+                    <FileText className="w-4 h-4 mr-2" /> Gerar PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={exportarExcel} disabled={acompanhamentoHoje.length === 0}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" /> Gerar Excel
+                  </Button>
                   <span className="text-sm text-muted-foreground">
                     {acompanhamentoHoje.length} de {nfsRoteirizadasHoje.length} NF(s) · {new Set((nfsRoteirizadasHoje as any[]).map((n) => n.veiculo?.placa).filter(Boolean)).size} veículo(s)
                   </span>
