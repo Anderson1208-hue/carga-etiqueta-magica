@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] 28/10: corrigir paginação Sirius e atualizar excepcionalmente as 107 NFs abertas da lista de 191; não alterar 69 fechadas nem 15 ausentes. Conferir resultado remoto e fila.
 - [x] 27/10: consultas IBAC e OK Entrega alteradas nos agendamentos existentes para 07h, 12h e 17h Brasília, somente dias úteis, preservando condição de feriados RJ e destinos de consulta; custo parcial apresentado e autorizado. Envios não alterados.
 - [x] IBAC: notas validadas deixaram quadros, filtro e reenvio em lote de erro; histórico preservado. Conferido em 26/10: Notas com erro 0 e NF 4400071 mostrada como validada sem HTTP 409; testes passaram.
 - [x] Consulta NF: corrigido acesso à foto reenviada à MO sem substituir o POD original. Conferido com sessão de Anderson na NF 4400103: nova foto carregada do caminho corretivo exato, original acessível em aba separada, sem erros de execução; 11 testes passaram e compilação OK. Não alterados motorista, prestação de contas ou histórico de entrega.

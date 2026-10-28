@@ -1,6 +1,7 @@
 // Sincronizacao de status/datas no portal Sirius Log (Bauducco) para varias notas.
 // Por padrao dry_run = true (NAO grava nada). Gravacao exige { dry_run: false, confirmar: "SIM" }.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { carregarPaginasSirius } from '../_shared/siriuslog-pagination.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -149,10 +150,15 @@ Deno.serve(async (req) => {
   )
 
   // Plano por nota, a partir dos nossos dados
-  const { data: plano, error } = await sb.rpc('siriuslog_plano', { p_de: de, p_ate: ate })
-  if (error) { out.erro = error.message; return json() }
-  let linhas = (plano ?? []) as Record<string, string | null>[]
-  if (nfsFiltro) linhas = linhas.filter((l) => nfsFiltro.includes(String(l.numero_nf)))
+  let linhas: Record<string, string | null>[]
+  try {
+    linhas = await carregarPaginasSirius<Record<string, string | null>>((inicio, fim) => {
+      let consulta = sb.rpc('siriuslog_plano', { p_de: de, p_ate: ate })
+        .order('numero_nf').order('carga_updated').order('data_rot').order('baixa_entregue')
+      if (nfsFiltro) consulta = consulta.in('numero_nf', nfsFiltro)
+      return consulta.range(inicio, fim)
+    })
+  } catch (error) { out.erro = String(error); return json(500) }
   out.total_notas = linhas.length
   linhas = linhas.slice(offset, offset + limite)
 
