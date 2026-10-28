@@ -7,6 +7,7 @@
 //  - roda apenas em dia util (RJ) quando chamada pelo agendador;
 //  - execucao unica por vez (trava no banco) e limite de notas por rodada.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { carregarPaginasSirius } from '../_shared/siriuslog-pagination.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -89,19 +90,22 @@ Deno.serve(async (req) => {
 
   try {
     // 1) Plano de notas a partir da data inicial.
-    const { data: plano, error: ePlano } = await sb.rpc('siriuslog_plano', {
-      p_de: cfg.data_inicial, p_ate: hoje,
+    const plano = await carregarPaginasSirius<Record<string, string | null>>((inicioPagina, fimPagina) => {
+      let consulta = sb.rpc('siriuslog_plano', { p_de: cfg.data_inicial, p_ate: hoje })
+        .order('numero_nf').order('carga_updated').order('data_rot').order('baixa_entregue')
+      if (nfsAlvo) consulta = consulta.in('numero_nf', nfsAlvo)
+      return consulta.range(inicioPagina, fimPagina)
     })
-    if (ePlano) throw new Error(`plano: ${ePlano.message}`)
-    let todas = ((plano ?? []) as Record<string, string | null>[]).map((l) => String(l.numero_nf))
-    if (nfsAlvo) todas = todas.filter((nf) => nfsAlvo.includes(nf))
+    const todas = plano.map((l) => String(l.numero_nf))
 
     // 2) Remove notas ja concluidas e as que estouraram o limite de FALHAS DO DIA.
     // "tentativas" = falhas seguidas no dia; zera no dia seguinte e a cada envio aceito.
     // Assim nenhuma nota fica presa na fila para sempre.
-    const { data: fila } = await sb
-      .from('fila_tracking_pandurata')
+    const fila = await carregarPaginasSirius<{
+      numero_nf: string; concluido_em: string | null; tentativas: number | null; ultima_tentativa_em: string | null
+    }>((inicioPagina, fimPagina) => sb.from('fila_tracking_pandurata')
       .select('numero_nf, concluido_em, tentativas, ultima_tentativa_em')
+      .order('numero_nf').order('id').range(inicioPagina, fimPagina))
     const filaMap = new Map((fila ?? []).map((f) => [String(f.numero_nf), f]))
     const diaBR = (ts: string | null | undefined) =>
       ts ? new Date(new Date(ts).getTime() - 3 * 3600 * 1000).toISOString().slice(0, 10) : ''
