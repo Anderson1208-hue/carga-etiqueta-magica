@@ -37,3 +37,18 @@ export function extrairQtdVolumes(xmlDoc: Document): number {
   });
   return total;
 }
+
+/** Itens normalizados para contagem de caixas: NF de cesta vira 1 item com o total de caixas da NF. */
+export function itensCaixasNf(
+  itens: { q_com: number | string; x_prod?: string | null }[] | null | undefined,
+  qtdVolumes: number | null | undefined,
+): { q_com: number }[] {
+  const lista = itens || [];
+  if (qtdVolumes && qtdVolumes > 0 && isNfCesta(lista.map((i) => i.x_prod))) return [{ q_com: qtdVolumes }];
+  return lista.map((i) => ({ q_com: Number(i.q_com) }));
+}
+
+/** Total de caixas da NF respeitando a regra da cesta (1 un = 1 caixa nas demais). */
+export function caixasNf(nf: { itens_nf?: any[] | null; qtd_volumes?: number | null } | null | undefined): number {
+  return itensCaixasNf(nf?.itens_nf, nf?.qtd_volumes).reduce((s, i) => s + Math.ceil(i.q_com), 0);
+}

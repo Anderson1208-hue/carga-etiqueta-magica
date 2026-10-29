@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateBoxes } from "@/lib/xml-parser";
-import { itensNotaDeCarga } from "@/lib/cesta-natalina";
+import { itensNotaDeCarga, itensCaixasNf, caixasNf } from "@/lib/cesta-natalina";
 import { format } from "date-fns";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
@@ -301,7 +301,7 @@ export default function Roteirizacao() {
               peso_bruto,
               peso_liquido,
               volume_m3,
-              itens_nf(q_com)
+              qtd_volumes, itens_nf(q_com, x_prod)
             `)
             .in("carga_id", chunk)
             .order("numero_nf", { ascending: true })
@@ -379,10 +379,7 @@ export default function Roteirizacao() {
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
         entrega.volumeTotalM3 += Number(nf.volume_m3) || 0;
 
-        const nfItems = (nf.itens_nf || []) as { q_com: number }[];
-        nfItems.forEach((item) => {
-          entrega.totalCaixas += calculateBoxes(Number(item.q_com));
-        });
+        entrega.totalCaixas += caixasNf(nf as any);
       });
 
       // Ordenação: macroRegião crescente → bairro A-Z → razão social A-Z
@@ -415,7 +412,7 @@ export default function Roteirizacao() {
             id, numero_nf, carga_id, cnpj_destinatario,
             dest_razao_social, dest_logradouro, dest_numero,
             dest_bairro, dest_cidade, dest_uf, dest_cep,
-            peso_bruto, peso_liquido, volume_m3, itens_nf(q_com)
+            peso_bruto, peso_liquido, volume_m3, qtd_volumes, itens_nf(q_com, x_prod)
           `)
           .in("id", batch);
         if (data) allNfs.push(...data);
@@ -446,8 +443,7 @@ export default function Roteirizacao() {
         entrega.cargaIds.push(nf.carga_id);
         entrega.pesoTotalKg += Number(nf.peso_bruto) || 0;
         entrega.volumeTotalM3 += Number(nf.volume_m3) || 0;
-        const nfItems = (nf.itens_nf || []) as { q_com: number }[];
-        nfItems.forEach((item) => { entrega.totalCaixas += calculateBoxes(Number(item.q_com)); });
+        entrega.totalCaixas += caixasNf(nf as any);
       });
 
       const entregasList = sortByMacroRegiao(Array.from(entregasMap.values()));
@@ -1316,7 +1312,7 @@ export default function Roteirizacao() {
         .from("veiculo_nfs")
         .select(`
           id, nf_id, carga_origem_id,
-          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, itens_nf(q_com))
+          notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, qtd_volumes, itens_nf(q_com, x_prod))
         `)
         .eq("veiculo_id", veiculoId)
         .limit(2000);
@@ -1406,7 +1402,7 @@ export default function Roteirizacao() {
           .from("veiculo_nfs")
           .select(`
             nf_id, carga_origem_id,
-            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, data_emissao, itens_nf(q_com))
+            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, data_emissao, qtd_volumes, itens_nf(q_com, x_prod))
           `)
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
@@ -1450,7 +1446,7 @@ export default function Roteirizacao() {
             razao_social_emitente: nf.razao_social_emitente || "",
             data_emissao: nf.data_emissao || null,
             peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
-            itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
+            itens_nf: itensCaixasNf(nf.itens_nf, nf.qtd_volumes),
             ctes: (ctesMap[vnf.nf_id] || []).map((c: any) => ({ numero_cte: c.numero_cte })),
             ordem_entrega: ordemPorCnpjDia.get(cnpjKey),
             reentrega: reentregaMap.has(vnf.nf_id),
@@ -1507,7 +1503,7 @@ export default function Roteirizacao() {
           .from("veiculo_nfs")
           .select(`
             id, nf_id, carga_origem_id,
-            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, itens_nf(q_com))
+            notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, qtd_volumes, itens_nf(q_com, x_prod))
           `)
           .eq("veiculo_id", veiculo.id)
           .limit(2000);
@@ -1562,7 +1558,7 @@ export default function Roteirizacao() {
           cnpj_destinatario: nf.cnpj_destinatario || "",
           razao_social_emitente: nf.razao_social_emitente || "",
           peso_bruto: Number(nf.peso_bruto || 0), volume_m3: Number(nf.volume_m3 || 0),
-          itens_nf: (nf.itens_nf || []).map((it: any) => ({ q_com: Number(it.q_com) })),
+          itens_nf: itensCaixasNf(nf.itens_nf, nf.qtd_volumes),
           ctes: (vnf.ctes || []).map((c: any) => ({ numero_cte: c.numero_cte })),
           ordem_entrega: ordemPorCnpjResumo.get(cnpjKey),
           reentrega: reentregaMapResumo.has(vnf.nf_id),
@@ -2833,8 +2829,7 @@ export default function Roteirizacao() {
                                       const totalPeso = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.peso_bruto || 0), 0);
                                       const totalVolume = group.nfs.reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.volume_m3 || 0), 0);
                                       const totalCaixas = group.nfs.reduce((s: number, vnf: any) => {
-                                        const items = vnf.notas_fiscais.itens_nf || [];
-                                        return s + items.reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
+                                        return s + caixasNf(vnf.notas_fiscais);
                                       }, 0);
 
                                       return (
@@ -2862,7 +2857,7 @@ export default function Roteirizacao() {
                                           <div className="p-2 space-y-1">
                                             {group.nfs.map((vnf: any) => {
                                               const nf = vnf.notas_fiscais;
-                                              const nfCaixas = (nf.itens_nf || []).reduce((s: number, it: any) => s + calculateBoxes(Number(it.q_com)), 0);
+                                              const nfCaixas = caixasNf(nf);
                                               const nfCtes = vnf.ctes || [];
                                               return (
                                                 <div key={vnf.id} className="flex items-center justify-between text-sm py-1.5 px-3 rounded bg-muted/40">
@@ -2895,7 +2890,7 @@ export default function Roteirizacao() {
                                       const gtPeso = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.peso_bruto || 0), 0);
                                       const gtVolume = veiculoNfs[v.id].reduce((s: number, vnf: any) => s + Number(vnf.notas_fiscais.volume_m3 || 0), 0);
                                       const gtCaixas = veiculoNfs[v.id].reduce((s: number, vnf: any) => {
-                                        return s + (vnf.notas_fiscais.itens_nf || []).reduce((si: number, it: any) => si + calculateBoxes(Number(it.q_com)), 0);
+                                        return s + caixasNf(vnf.notas_fiscais);
                                       }, 0);
                                       return (
                                         <div className="rounded-lg bg-primary/10 p-3 flex items-center justify-between">
