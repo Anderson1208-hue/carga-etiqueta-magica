@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { caixasNf } from "@/lib/cesta-natalina";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -279,7 +280,7 @@ export function ReroteirizarVeiculoDialog({
             id, numero_nf, cnpj_destinatario, dest_razao_social,
             dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf, dest_cep,
             peso_bruto, volume_m3,
-            itens_nf(q_com)
+            qtd_volumes, itens_nf(q_com, x_prod)
           )
         `)
         .eq("veiculo_id", veiculoId);
@@ -310,10 +311,7 @@ export function ReroteirizarVeiculoDialog({
         const endereco = [nf.dest_logradouro, nf.dest_numero, nf.dest_bairro, nf.dest_cidade, nf.dest_uf, nf.dest_cep]
           .filter(Boolean)
           .join(", ");
-        const caixas = (nf.itens_nf || []).reduce(
-          (s: number, it: any) => s + calculateBoxes(Number(it.q_com)),
-          0
-        );
+        const caixas = caixasNf(nf);
 
         if (!entregaMap.has(cnpj)) {
           entregaMap.set(cnpj, {

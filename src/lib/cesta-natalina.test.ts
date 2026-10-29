@@ -23,3 +23,11 @@ describe("cesta natalina", () => {
     expect(r.map((i) => i.qtdCaixas)).toEqual([10, 5]);
   });
 });
+
+import { caixasNf as _caixasNf } from "./cesta-natalina";
+import { it as _it, expect as _expect } from "vitest";
+_it("NF de cesta conta o total de caixas da nota no resumo (NF 767027 = 18)", () => {
+  const itens = [{ q_com: 108, x_prod: "EMB. CESTA BAUDUCCO 15 ITENS" }, ...Array.from({ length: 7 }, () => ({ q_com: 108, x_prod: "PANETTONE" }))];
+  _expect(_caixasNf({ itens_nf: itens, qtd_volumes: 18 })).toBe(18);
+  _expect(_caixasNf({ itens_nf: [{ q_com: 5, x_prod: "WAFER" }], qtd_volumes: 2 })).toBe(5);
+});
