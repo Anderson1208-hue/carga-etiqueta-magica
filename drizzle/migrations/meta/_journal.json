@@ -204,6 +204,13 @@
       "when": 1793118527942,
       "tag": "0028_ibac_historico_imutavel",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793540619160,
+      "tag": "0029_audit_log_partitions_cron",
+      "breakpoints": true
     }
   ]
 }
