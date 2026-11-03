@@ -30,9 +30,8 @@ export function summarize(rows: BusinessRow[]) {
   for (const field of Object.keys(totals)) totals[field] = Math.round(totals[field] * 1e6) / 1e6;
   return { totals, missing, groups };
 }
-export const JULIO_USER_ID = 'e847b0ab-5e6f-417e-8115-6d2c67a3697f';
-export function eligibleIdentity(active: boolean, serverAdmin: boolean, userId: string, granted: boolean) {
-  return active && (serverAdmin || (userId === JULIO_USER_ID && granted));
+export function eligibleIdentity(active: boolean, serverAdmin: boolean, granted: boolean) {
+  return active && (serverAdmin || granted);
 }
 export function safeCell(value: string | number | boolean | null): string | number | boolean {
   if (value === null) return '';
