@@ -1,4 +1,5 @@
 # Architecture rules
+- The managerial agent uses only authenticated allowlisted read-only report RPCs, never operator-wide data tools or arbitrary SQL; per-user database threads have route-derived IDs and server-only message writes, with deterministic bounded reports and explicit partial-result warnings to preserve security and operational totals.
 - Sirius tracking loads the plan and queue in deterministic bounded pages and applies targeted NF filters server-side before pagination, because the Data API cap otherwise silently excludes newer invoices.
 - Operator NF consultation displays the confirmed MO corrective photo separately from the original delivery POD, keyed by NF access key; never overwrite operational photo paths when displaying corrections.
 - OK Entrega scheduled validation uses a dedicated authenticated consultation endpoint, never the enqueue/transmission job; gate dispatch with the existing RJ business-day calendar to avoid holiday calls, select routing dates through the current Brasília day and page deterministically, preserving original occurrence IDs.

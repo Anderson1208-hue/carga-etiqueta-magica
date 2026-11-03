@@ -15,6 +15,7 @@ const IS_NATIVE_APK = Capacitor.isNativePlatform();
 import Login from "./pages/Login";
 import Unsubscribe from "./pages/Unsubscribe";
 import Dashboard from "./pages/Dashboard";
+import AgenteGerencial from "./pages/AgenteGerencial";
 import Cargas from "./pages/Cargas";
 import Romaneio from "./pages/Romaneio";
 import Etiquetas from "./pages/Etiquetas";
@@ -396,6 +397,8 @@ function AppRoutes() {
       <Route path="/romaneio-por-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
+      <Route path="/agente-gerencial" element={<ProtectedRoute><AgenteGerencial /></ProtectedRoute>} />
+      <Route path="/agente-gerencial/:threadId" element={<ProtectedRoute><AgenteGerencial /></ProtectedRoute>} />
       <Route path="/macro-regioes" element={<ProtectedRoute><MacroRegioes /></ProtectedRoute>} />
       <Route path="/destinatarios" element={<ProtectedRoute><Destinatarios /></ProtectedRoute>} />
       <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />

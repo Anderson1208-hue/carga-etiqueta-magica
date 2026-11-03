@@ -1,0 +1,1 @@
+import '../../../supabase/functions/agente-gerencial/report.test';

@@ -6,6 +6,7 @@ import { useAcessoIbac } from "@/hooks/useAcessoIbac";
 import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
 import { useAcessoEnvioCanhoto } from "@/hooks/useAcessoEnvioCanhoto";
+import { useAgenteGerencial } from "@/hooks/useAgenteGerencial";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -283,6 +284,7 @@ export function Sidebar() {
   const { podeVerOkEntrega } = useAcessoOkEntrega();
   const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
   const { podeEnviarCanhoto } = useAcessoEnvioCanhoto();
+  const { allowed: podeAgenteGerencial } = useAgenteGerencial();
   const [collapsed, setCollapsed] = useState(false);
 
   const integracaoItems = integracaoItemsBase.filter((i) =>
@@ -340,6 +342,7 @@ export function Sidebar() {
         {topNav.map((item) => (
           <NavItem key={item.href} item={item} isActive={location.pathname === item.href} compact={collapsed} />
         ))}
+        {podeAgenteGerencial && <NavItem item={{name:"Agente Gerencial",href:"/agente-gerencial",icon:BarChart3}} isActive={location.pathname.startsWith('/agente-gerencial')} compact={collapsed}/>}
 
         <div className="pt-2 space-y-1">
           <NavGroupFlyout
