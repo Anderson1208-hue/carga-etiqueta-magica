@@ -6,9 +6,9 @@
 //   - peso bruto: posições 101-107 do layout = slice(100, 107), 2 decimais
 //   - peso densidade/cubagem: posições 108-112 do layout = slice(107, 112), 2 decimais
 //   - NÃO usar posições 198-212: no layout oficial isso é valor total do frete, não cubagem
-//   - fator de cubagem IBAC = 300 kg/m³  =>  volume_m3 = peso_cubado / 300
+//   - fator de cubagem IBAC/IBAE = 250 kg/m³  =>  volume_m3 = peso_cubado / 250
 
-export const FATOR_CUBAGEM_IBAC = 300;
+export const FATOR_CUBAGEM_IBAC = 250;
 
 export interface NotfisCubagemRow {
   numeroNf: string;
@@ -44,7 +44,7 @@ export function isNotfisCacauContent(content: string): boolean {
 }
 
 /**
- * Extrai peso cubado por NF dos registros 313 e converte em m³ (cubado / 300).
+ * Extrai peso cubado por NF dos registros 313 e converte em m³ (cubado / 250).
  * Última ocorrência da NF prevalece.
  */
 export function parseNotfisCubagem(content: string): NotfisCubagemRow[] {
