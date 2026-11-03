@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { summarize, eligibleIdentity, JULIO_USER_ID, safeCell } from './report';
+import { summarize, eligibleIdentity, JULIO_USER_ID, safeCell, validDate } from './report';
 describe('Agente Gerencial — autorizações e dados', () => {
+  it('rejeita datas impossíveis e aceita data local válida',()=>{expect(validDate('2026-02-30')).toBe(false);expect(validDate('2026-11-02')).toBe(true);});
   it('permite o administrador aprovado', () => expect(eligibleIdentity(true, true, 'admin', false)).toBe(true));
   it('permite somente a conta autorizada do Júlio', () => {
     expect(eligibleIdentity(true, false, JULIO_USER_ID, true)).toBe(true);

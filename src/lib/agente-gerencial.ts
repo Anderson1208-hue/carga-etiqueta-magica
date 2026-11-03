@@ -17,7 +17,9 @@ export async function exportReport(report: Report, format: 'pdf' | 'excel') {
       ['Relatório', report.title], ['Período inicial', report.period.inicio], ['Período final', report.period.fim],
       ['Consulta em', report.generatedAt], ['Completo', report.complete ? 'Sim' : 'Não — refine os filtros'],
       ['Filtros', JSON.stringify(report.filters)], ...Object.entries(report.totals),
+      ['Escopo',report.catalog?'Catálogo atual — sem filtro de período':'Período informado'],
       ...Object.entries(report.missing).map(([k,v]) => [`Sem ${k}`,v]),
+      ...Object.entries(report.groups).map(([k,v]) => [`Status ${k}`,v]),
     ];
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summary), 'Resumo');
     const sheet = XLSX.utils.aoa_to_sheet([columns, ...report.rows.map(row => columns.map(c => safeCell(row[c] ?? null)))]);
@@ -31,9 +33,9 @@ export async function exportReport(report: Report, format: 'pdf' | 'excel') {
     doc.setFontSize(15);
     doc.text(report.title.slice(0,120), 12, 14);
     doc.setFontSize(9);
-    doc.text(`${report.period.inicio} a ${report.period.fim} | ${report.rows.length} registros | ${report.complete ? 'Completo' : 'PARCIAL — refine os filtros'}`, 12, 21);
+    doc.text(`${report.catalog?'Catálogo atual — sem filtro de período':`${report.period.inicio} a ${report.period.fim}`} | ${report.rows.length} registros | ${report.complete ? 'Completo' : 'PARCIAL — refine os filtros'}`, 12, 21);
     doc.text(`Consulta: ${report.generatedAt} | Filtros: ${JSON.stringify(report.filters).slice(0,180)}`,12,27);
-    autoTable(doc, {startY: 32, head: [['Total','Valor']], body: Object.entries(report.totals).map(([k,v]) => [k,v.toLocaleString('pt-BR',{maximumFractionDigits:6})]), styles:{fontSize:8}, margin:{left:12,right:12}});
+    autoTable(doc, {startY: 32, head: [['Resumo','Valor']], body: [...Object.entries(report.totals),...Object.entries(report.missing).map(([k,v])=>[`Sem ${k}`,v] as [string,number]),...Object.entries(report.groups).map(([k,v])=>[`Status ${k}`,v] as [string,number])].map(([k,v]) => [k,v.toLocaleString('pt-BR',{maximumFractionDigits:6})]), styles:{fontSize:8}, margin:{left:12,right:12}});
     autoTable(doc, {head: [columns], body: report.rows.map(row => columns.map(c => String(row[c] ?? '—'))), styles:{fontSize:6,overflow:'linebreak'}, margin:{left:12,right:12}, horizontalPageBreak:true});
     doc.save(`${name}.pdf`);
   }

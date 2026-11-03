@@ -30,7 +30,7 @@ function ReportView({ report }: {report: Report}) {
       <Button variant="outline" size="sm" disabled={exporting} onClick={()=>download('pdf')}><FileText/>PDF</Button>
       <Button variant="outline" size="sm" disabled={exporting} onClick={()=>download('excel')}><FileSpreadsheet/>Excel</Button>
     </div>
-    <p className="text-xs text-muted-foreground">{report.period.inicio} a {report.period.fim} · {report.rows.length} registros · {report.complete ? 'Completo' : 'Parcial — refine os filtros'} · {new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</p>
+    <p className="text-xs text-muted-foreground">{report.catalog?'Catálogo atual — sem filtro de período':`${report.period.inicio} a ${report.period.fim}`} · {report.rows.length} registros · {report.complete ? 'Completo' : 'Parcial — refine os filtros'} · {new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</p>
     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">{Object.entries(report.totals).map(([k,v])=><div key={k}><span className="text-muted-foreground">{k.replace(/_/g,' ')}: </span><strong>{v.toLocaleString('pt-BR',{maximumFractionDigits:3})}</strong></div>)}</div>
     {Object.keys(report.missing).length>0 && <p className="text-sm text-destructive">Dados ausentes: {Object.entries(report.missing).map(([k,v])=>`${k}: ${v}`).join(' · ')}</p>}
     <Button variant="ghost" size="sm" onClick={()=>setExpanded(!expanded)}>{expanded?'Recolher dados':'Ver dados'}</Button>
@@ -110,7 +110,7 @@ function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>
       </Message>)}
     </ConversationContent><ConversationScrollButton/></Conversation>
     {error&&<p role="alert" className="mx-4 mb-2 text-sm text-destructive">{error}</p>}
-    <div className="border-t p-4 lg:px-8"><PromptInput onSubmit={send} maxFiles={0} className="w-full">
+    <div className="border-t p-4 pb-20 lg:px-8"><PromptInput onSubmit={send} maxFiles={0} className="w-full">
       <PromptInputTextarea autoFocus aria-label="Pedido ao Agente Gerencial" placeholder="Solicite um relatório, informando período e critérios…" value={text} onChange={e=>setText(e.target.value)} maxLength={4000} disabled={loading} className="min-h-20 max-h-40"/>
       <PromptInputFooter className="justify-end"><PromptInputSubmit status={status} disabled={loading || (status!=='submitted'&&status!=='streaming'&&!text.trim())} onStop={()=>abort.current?.abort()} aria-label={status==='submitted'||status==='streaming'?'Interromper pedido':'Enviar pedido'}/></PromptInputFooter>
     </PromptInput></div>

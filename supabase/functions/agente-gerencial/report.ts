@@ -1,10 +1,15 @@
-export const DATASETS = ['notas','cargas','veiculos','agendas','entregas','ibac','okentrega','produtos','destinatarios','embarcadores','roteirizacoes','prefaturas','prefatura_itens','ctes'] as const;
+export const DATASETS = ['notas','cargas','veiculos','agendas','entregas','ibac','okentrega','produtos','destinatarios','embarcadores','roteirizacoes','prefaturas','prefatura_itens','ctes','sla','tarifas'] as const;
 export type Dataset = typeof DATASETS[number];
 export type BusinessRow = Record<string, string | number | boolean | null>;
 export interface Report {
   title: string; dataset: Dataset; period: { inicio: string; fim: string }; filters: Record<string, string>;
   rows: BusinessRow[]; totals: Record<string, number>; missing: Record<string, number>; groups: Record<string, number>;
-  complete: boolean; generatedAt: string;
+  complete: boolean; generatedAt: string; catalog?: boolean;
+}
+export function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(date.getTime()) && date.getFullYear() === Number(value.slice(0,4)) && date.getMonth()+1 === Number(value.slice(5,7)) && date.getDate() === Number(value.slice(8,10));
 }
 const numericFields = ['peso_kg','volume_m3','valor_mercadoria','valor_frete','caixas','distancia_total_km'];
 export function summarize(rows: BusinessRow[]) {
