@@ -29,33 +29,40 @@ Deno.serve(async req => {
   if (input.data.acao === 'lote') {
     const hoje = dataBrasilia();
     if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
-    let routes = db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje).order('nf_id').range(0, 19);
-    if (input.data.cursor) routes = routes.gt('nf_id', input.data.cursor);
-    const { data: rows, error } = await routes;
-    if (error) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
-    const dates = new Map((rows ?? []).map(r => [r.nf_id, (r.veiculos as unknown as { data: string }).data]));
-    const ids = [...dates.keys()];
-    const work: Array<{ id: string; numero_nf: string; nf_id: string }> = [];
-    for (let i = 0; i < ids.length; i += 100) {
-      const { data: items, error: itemError } = await db.from('okentrega_queue').select('id,numero_nf,nf_id').in('nf_id', ids.slice(i, i + 100)).eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).order('id');
-      if (itemError) return json({ erro: 'Falha ao selecionar fila' }, 502);
-      work.push(...(items ?? []));
-    }
-    const run = async () => {
-      for (let i = 0; i < work.length; i += 3) {
-        await Promise.all(work.slice(i, i + 3).map(async item => {
-          try {
-            const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
-            const result = await response.json().catch(() => ({}));
-            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
-          } catch {
-            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
-          }
-        }));
-        await new Promise(resolve => setTimeout(resolve, 200));
+    // Seleciona direto as notas OK Entrega enviadas e ainda sem resultado final (blocos de 15, cursor por id).
+    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).order('id').limit(15);
+    if (input.data.cursor) pending = pending.gt('id', input.data.cursor);
+    const { data: items, error } = await pending;
+    if (error) return json({ erro: 'Falha ao selecionar fila' }, 502);
+    const dates = new Map<string, string>();
+    const nfIds = [...new Set((items ?? []).map(i => i.nf_id))];
+    if (nfIds.length) {
+      const { data: links, error: linkError } = await db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').in('nf_id', nfIds).gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje);
+      if (linkError) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
+      for (const l of links ?? []) {
+        const d = (l.veiculos as unknown as { data: string }).data;
+        if (!dates.has(l.nf_id) || d > dates.get(l.nf_id)!) dates.set(l.nf_id, d);
       }
-      if (rows?.length === 20) {
-        await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: rows[rows.length - 1]?.nf_id }) });
+    }
+    const work = (items ?? []).filter(i => dates.has(i.nf_id));
+    const run = async () => {
+      try {
+        for (let i = 0; i < work.length; i += 3) {
+          await Promise.all(work.slice(i, i + 3).map(async item => {
+            try {
+              const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
+              const result = await response.json().catch(() => ({}));
+              console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
+            } catch {
+              console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
+            }
+          }));
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } finally {
+        if (items?.length === 15) {
+          await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: items[items.length - 1].id }) }).catch(() => console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor: items[items.length - 1].id })));
+        }
       }
     };
     EdgeRuntime.waitUntil(run());
@@ -77,12 +84,12 @@ Deno.serve(async req => {
   const password = Deno.env.get('OKENTREGA_PORTAL_PASSWORD');
   if (!login || !password) return json({ erro: 'Credenciais do portal ausentes' }, 400);
   const jar = new Map<string, string>();
-  async function request(path: string, fields?: Record<string, string>) {
+  async function request(path: string, fields?: Record<string, string>, referer = `${BASE}/assets/application/cons.documento2.php8`) {
     const target = new URL(path, BASE);
     if (target.origin !== BASE) throw new Error('destino_nao_permitido');
     const response = await fetch(target, {
       redirect: 'manual', signal: AbortSignal.timeout(20000),
-      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: `${BASE}/assets/application/cons.documento2.php8` } : {}) },
+      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: referer, Origin: BASE, Accept: 'application/json, text/javascript, */*; q=0.01', 'User-Agent': 'Mozilla/5.0' } : {}) },
       method: fields ? 'POST' : 'GET', ...(fields ? { body: new URLSearchParams(fields) } : {}),
     });
     for (const cookie of response.headers.getSetCookie()) {
@@ -94,15 +101,13 @@ Deno.serve(async req => {
     return { response, text };
   }
   async function action(action: string, fields: Record<string, string>) {
-    const { text } = await request('/assets/system/sys.ajax.php', { component: 'sys.sys.login', action, ...fields });
+    const { text } = await request('/assets/system/sys.ajax.php8', { component: 'sys.sys.login2', action, ...fields }, `${BASE}/login.php8`);
     return JSON.parse(text);
   }
   try {
-    await request('/login2.php');
-    const config = await request('/assets/system/sys.config.json.php?page=sys.login');
-    const typePath = JSON.parse(config.text)?.resposta_dados?.ajaxTipoAcesso;
-    if (typeof typePath !== 'string') throw new Error('config_invalida');
-    const types = JSON.parse((await request(typePath, { email: login })).text);
+    // Portal migrou para login.php8 / sys.sys.login2 (nov/2026).
+    await request('/login.php8');
+    const types = await action('tipoacesso', { email: login });
     const options = types?.resposta_dados?.dados;
     const option = Array.isArray(options) ? options[0] : null;
     const type = typeof option === 'string' ? option.match(/value\s*=\s*(?:["']([^"']+)["']|([^\s>]+))/i)?.slice(1).find(Boolean) : null;
@@ -110,7 +115,7 @@ Deno.serve(async req => {
     const result = await action('RedirecionarLogin', { email: login, password, pgredirect: '', cliente_id: '', elemento: '', tipoacesso: type });
     if (result?.resposta_status?.status !== 1 || !result?.resposta_dados?.dados?.id) return json({ etapa: 'login', login_ok: false, duracao_ms: Date.now() - started }, 502);
     const redirect = result.resposta_dados.redirect ?? {};
-    const fields: Record<string, string> = { id: String(result.resposta_dados.dados.id), camp_acesso_tipo: type };
+    const fields: Record<string, string> = { id: String(result.resposta_dados.dados.id), camp_acesso_tipo: type, email: login, senha: password };
     for (const [from, to] of [['cliente_id', 'cliente_id'], ['id_elemento', 'elemento_id'], ['user_id', 'user_id']]) {
       if (redirect[from]) fields[to] = String(redirect[from]);
     }
@@ -158,7 +163,8 @@ Deno.serve(async req => {
       return json({ nf, atualizado: true, ...saved, ocorrencia_atual_portal: latest.id.replace(/^[A-Za-z]+/, ''), status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
     }
     return json({ nf, etapa: 'ocorrencias', ocorrencias: Object.values(entries).map((v: any) => ({ tipo: plain(v.INFO_ORI?.TIPOOCORRENCIA), status: portalValidationText(v.RESULTADO_VALIDA), resultado_validacao: portalValidationText(v.RESULTADO_VALIDA), data_validacao: plain(v.INFO_ORI?.DTVALIDACAO), data_registro: plain(v.INFO_ORI?.DTREGISTRO), data_entrega: plain(v.INFO_ORI?.DTENTREGA), motivo: plain(v.INFO_ORI?.MOTIVORECUSA ?? v.INFO_ORI?.MOTIVOOCORRENCIA ?? v.INFO_ORI?.MOTIVO) })), duracao_ms: Date.now() - started, atualizado: false });
-  } catch {
+  } catch (e) {
+    console.warn('[okentrega-consultar] falha', String((e as Error)?.message ?? e).slice(0, 200));
     return json({ erro: 'Não foi possível concluir a consulta segura do portal', duracao_ms: Date.now() - started, atualizado: false }, 502);
   }
 });
