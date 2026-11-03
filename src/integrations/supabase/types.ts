@@ -81,6 +81,7 @@ export type Database = {
       agente_gerencial_conversas: {
         Row: {
           created_at: string
+          execucao_token: string | null
           executando_em: string | null
           id: string
           titulo: string
@@ -89,6 +90,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          execucao_token?: string | null
           executando_em?: string | null
           id?: string
           titulo?: string
@@ -97,6 +99,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          execucao_token?: string | null
           executando_em?: string | null
           id?: string
           titulo?: string
@@ -4527,6 +4530,14 @@ export type Database = {
       }
     }
     Views: {
+      agente_gerencial_catalogos: {
+        Row: {
+          dados: Json | null
+          dataset: string | null
+          row_id: string | null
+        }
+        Relationships: []
+      }
       agente_gerencial_dados: {
         Row: {
           dados: Json | null
@@ -4589,9 +4600,24 @@ export type Database = {
           row_id: string
         }[]
       }
+      agente_gerencial_relatorio: {
+        Args: {
+          p_conversa: string
+          p_dataset: string
+          p_filtros?: Json
+          p_fim: string
+          p_inicio: string
+          p_token: string
+        }
+        Returns: Json
+      }
       agente_gerencial_reservar: {
         Args: { p_conversa: string }
         Returns: boolean
+      }
+      agente_gerencial_reservar_execucao: {
+        Args: { p_conversa: string }
+        Returns: string
       }
       aplicar_baixa_retroativa: {
         Args: { p_dry_run?: boolean; p_origem?: string; p_rows: Json }
