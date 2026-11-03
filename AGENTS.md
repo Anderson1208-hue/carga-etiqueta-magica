@@ -10,7 +10,7 @@
 - OK Entrega portal parsing uses a tested shared parser for document-link IDs and validation-result arrays; mirror the portal's actual fields rather than assuming HTML quoting or scalar statuses.
 - OK Entrega validation updates verify the original transmitted occurrence belongs to the document and authorized routing date, then read the latest uniquely dated delivery occurrence including manual portal corrections; retain the original transmission ID and never infer approval from unknown or ambiguous results.
 
-- OK Entrega date consultation uses the vehicle routing date and fetches queue results for those invoices independently of the recent technical-history limit; historical statuses must not disappear because of that limit.
+- OK Entrega scheduled validation selects only production queue rows still awaiting a final result (cursor by id, small chained blocks), then resolves their routing date; never scan all routed NFs, because that chain broke silently as volume grew. Manual date consultation still uses the vehicle routing date.
 
 - Keep operator navigation grouped in lateral flyouts within the existing desktop Sidebar, retaining existing route targets and access-hook filters; this reduces menu clutter without changing business workflows or the driver application.
 - In RLS policies always wrap no-argument helper checks as `(SELECT public.is_admin())` / `(SELECT public.is_active_operator())`; bare calls run once per row and saturated the database (outages Oct/2026).

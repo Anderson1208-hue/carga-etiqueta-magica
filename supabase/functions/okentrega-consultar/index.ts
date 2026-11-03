@@ -29,33 +29,40 @@ Deno.serve(async req => {
   if (input.data.acao === 'lote') {
     const hoje = dataBrasilia();
     if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
-    let routes = db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje).order('nf_id').range(0, 19);
-    if (input.data.cursor) routes = routes.gt('nf_id', input.data.cursor);
-    const { data: rows, error } = await routes;
-    if (error) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
-    const dates = new Map((rows ?? []).map(r => [r.nf_id, (r.veiculos as unknown as { data: string }).data]));
-    const ids = [...dates.keys()];
-    const work: Array<{ id: string; numero_nf: string; nf_id: string }> = [];
-    for (let i = 0; i < ids.length; i += 100) {
-      const { data: items, error: itemError } = await db.from('okentrega_queue').select('id,numero_nf,nf_id').in('nf_id', ids.slice(i, i + 100)).eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).order('id');
-      if (itemError) return json({ erro: 'Falha ao selecionar fila' }, 502);
-      work.push(...(items ?? []));
-    }
-    const run = async () => {
-      for (let i = 0; i < work.length; i += 3) {
-        await Promise.all(work.slice(i, i + 3).map(async item => {
-          try {
-            const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
-            const result = await response.json().catch(() => ({}));
-            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
-          } catch {
-            console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
-          }
-        }));
-        await new Promise(resolve => setTimeout(resolve, 200));
+    // Seleciona direto as notas OK Entrega enviadas e ainda sem resultado final (blocos de 15, cursor por id).
+    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).order('id').limit(15);
+    if (input.data.cursor) pending = pending.gt('id', input.data.cursor);
+    const { data: items, error } = await pending;
+    if (error) return json({ erro: 'Falha ao selecionar fila' }, 502);
+    const dates = new Map<string, string>();
+    const nfIds = [...new Set((items ?? []).map(i => i.nf_id))];
+    if (nfIds.length) {
+      const { data: links, error: linkError } = await db.from('veiculo_nfs').select('nf_id,veiculos!inner(data)').in('nf_id', nfIds).gte('veiculos.data', input.data.data ?? CONSULTA_INICIO).lte('veiculos.data', input.data.data ?? hoje);
+      if (linkError) return json({ erro: 'Falha ao selecionar roteirizações' }, 502);
+      for (const l of links ?? []) {
+        const d = (l.veiculos as unknown as { data: string }).data;
+        if (!dates.has(l.nf_id) || d > dates.get(l.nf_id)!) dates.set(l.nf_id, d);
       }
-      if (rows?.length === 20) {
-        await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: rows[rows.length - 1]?.nf_id }) });
+    }
+    const work = (items ?? []).filter(i => dates.has(i.nf_id));
+    const run = async () => {
+      try {
+        for (let i = 0; i < work.length; i += 3) {
+          await Promise.all(work.slice(i, i + 3).map(async item => {
+            try {
+              const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
+              const result = await response.json().catch(() => ({}));
+              console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
+            } catch {
+              console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
+            }
+          }));
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } finally {
+        if (items?.length === 15) {
+          await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: items[items.length - 1].id }) }).catch(() => console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor: items[items.length - 1].id })));
+        }
       }
     };
     EdgeRuntime.waitUntil(run());
