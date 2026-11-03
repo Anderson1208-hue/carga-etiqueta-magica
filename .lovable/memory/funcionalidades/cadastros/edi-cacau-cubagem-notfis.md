@@ -21,13 +21,13 @@ Registro **313** do NOTFIS = 1 NF. Posições (0-index):
 **m³ = peso cubado ÷ 250** (fator IBAC 250 kg/m³).
 
 Validação: arquivos de 24/08/2026 (MQX5615, cargas 249727/249728) = 532 registros 313.
-- Lote `220814570`: peso cubagem 2.289,60 kg ÷ 250 = **7,6320 m³**.
-- Lote `220814460`: peso cubagem 14.149,50 kg ÷ 250 = **47,1650 m³**.
-- Total: peso cubagem 16.439,10 kg ÷ 250 = **54,7970 m³**.
+- Lote `220814570`: peso cubagem 2.289,60 kg ÷ 250 = **9,1584 m³**.
+- Lote `220814460`: peso cubagem 14.149,50 kg ÷ 250 = **56,5980 m³**.
+- Total: peso cubagem 16.439,10 kg ÷ 250 = **65,7564 m³**.
 
 O campo `197-212`/posições oficiais `198-212` é **valor total do frete**, não peso cubado.
 Não usar último campo numérico da linha como fallback de cubagem; isso superestima a carga
-(ex.: 48.551,91 ÷ 250 = 161,84 m³, cálculo incorreto).
+(ex.: 48.551,91 ÷ 250 = 194,21 m³, cálculo incorreto).
 
 ## Regras
 - Só atualiza `volume_m3` de NFs **já existentes** na carga; nunca cria/duplica NF.
