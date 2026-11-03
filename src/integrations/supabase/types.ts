@@ -58,6 +58,106 @@ export type Database = {
           },
         ]
       }
+      agente_gerencial_acessos: {
+        Row: {
+          user_id: string
+        }
+        Insert: {
+          user_id: string
+        }
+        Update: {
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_gerencial_acessos_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agente_gerencial_conversas: {
+        Row: {
+          created_at: string
+          execucao_token: string | null
+          executando_em: string | null
+          id: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          execucao_token?: string | null
+          executando_em?: string | null
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          execucao_token?: string | null
+          executando_em?: string | null
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_gerencial_conversas_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agente_gerencial_mensagens: {
+        Row: {
+          conversa_id: string
+          created_at: string
+          id: string
+          parts: Json
+          role: string
+          user_id: string
+        }
+        Insert: {
+          conversa_id: string
+          created_at?: string
+          id?: string
+          parts: Json
+          role: string
+          user_id: string
+        }
+        Update: {
+          conversa_id?: string
+          created_at?: string
+          id?: string
+          parts?: Json
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_gerencial_mensagens_conversa_id_fkey"
+            columns: ["conversa_id"]
+            isOneToOne: false
+            referencedRelation: "agente_gerencial_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agente_gerencial_mensagens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_monitoramento: {
         Row: {
           created_at: string
@@ -4430,6 +4530,23 @@ export type Database = {
       }
     }
     Views: {
+      agente_gerencial_catalogos: {
+        Row: {
+          dados: Json | null
+          dataset: string | null
+          row_id: string | null
+        }
+        Relationships: []
+      }
+      agente_gerencial_dados: {
+        Row: {
+          dados: Json | null
+          data_ref: string | null
+          dataset: string | null
+          row_id: string | null
+        }
+        Relationships: []
+      }
       vw_apk_heartbeat_atual: {
         Row: {
           app_version: string | null
@@ -4470,6 +4587,38 @@ export type Database = {
         Returns: string
       }
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
+      agente_gerencial_consultar: {
+        Args: {
+          p_dataset: string
+          p_filtros?: Json
+          p_fim: string
+          p_inicio: string
+          p_offset?: number
+        }
+        Returns: {
+          dados: Json
+          row_id: string
+        }[]
+      }
+      agente_gerencial_relatorio: {
+        Args: {
+          p_conversa: string
+          p_dataset: string
+          p_filtros?: Json
+          p_fim: string
+          p_inicio: string
+          p_token: string
+        }
+        Returns: Json
+      }
+      agente_gerencial_reservar: {
+        Args: { p_conversa: string }
+        Returns: boolean
+      }
+      agente_gerencial_reservar_execucao: {
+        Args: { p_conversa: string }
+        Returns: string
+      }
       aplicar_baixa_retroativa: {
         Args: { p_dry_run?: boolean; p_origem?: string; p_rows: Json }
         Returns: Json
@@ -4744,6 +4893,7 @@ export type Database = {
           registrado_em: string
         }[]
       }
+      pode_agente_gerencial: { Args: never; Returns: boolean }
       pode_gestao_comercial: { Args: never; Returns: boolean }
       pode_limpar_conferencia: { Args: never; Returns: boolean }
       pode_sobrescrever_coordenada: {
