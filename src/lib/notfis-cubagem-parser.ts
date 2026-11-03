@@ -40,7 +40,7 @@ export async function readNotfisFile(file: File): Promise<string> {
 
 export function isNotfisCacauContent(content: string): boolean {
   const head = content.slice(0, 400);
-  return /^000/.test(head) && (/^313/m.test(content) || /\n313/.test(content));
+  return /^000/.test(head) && (/^(313|505)/m.test(content));
 }
 
 /**
@@ -67,6 +67,23 @@ export function parseNotfisCubagem(content: string): NotfisCubagemRow[] {
     const volumeM3 = pesoCubado > 0 ? +(pesoCubado / FATOR_CUBAGEM_IBAC).toFixed(4) : 0;
 
     rows.set(numeroNf, { numeroNf, caixas, valorNf, pesoBruto, pesoCubado, volumeM3 });
+  }
+
+  // NOTFIS 5.0 (usado pela IBAE): 505 = NF (posições 007-015), 506 = valores
+  // da NF: peso bruto 012-020 (3 decimais), peso cubado 040-049 (4 decimais).
+  let nf505: string | null = null;
+  for (const rawLine of content.split(/\r\n|\n|\r/)) {
+    if (rawLine.startsWith("505")) {
+      nf505 = normalizeNfNumber(rawLine.slice(6, 15));
+      if (nf505 === "0") nf505 = null;
+      continue;
+    }
+    if (!rawLine.startsWith("506") || !nf505) continue;
+    const pesoBruto = num(rawLine.slice(11, 20), 3);
+    const pesoCubado = num(rawLine.slice(39, 49), 4);
+    const volumeM3 = pesoCubado > 0 ? +(pesoCubado / FATOR_CUBAGEM_IBAC).toFixed(4) : 0;
+    rows.set(nf505, { numeroNf: nf505, caixas: 0, valorNf: 0, pesoBruto, pesoCubado, volumeM3 });
+    nf505 = null;
   }
 
   return Array.from(rows.values());
