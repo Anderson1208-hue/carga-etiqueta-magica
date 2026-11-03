@@ -31,10 +31,10 @@ function ReportView({ report }: {report: Report}) {
       <Button variant="outline" size="sm" disabled={exporting} onClick={()=>download('excel')}><FileSpreadsheet/>Excel</Button>
     </div>
     <p className="text-xs text-muted-foreground">{report.period.inicio} a {report.period.fim} · {report.rows.length} registros · {report.complete ? 'Completo' : 'Parcial — refine os filtros'} · {new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</p>
-    <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">{Object.entries(report.totals).map(([k,v])=><div key={k}><span className="text-muted-foreground">{k.replaceAll('_',' ')}: </span><strong>{v.toLocaleString('pt-BR',{maximumFractionDigits:3})}</strong></div>)}</div>
+    <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">{Object.entries(report.totals).map(([k,v])=><div key={k}><span className="text-muted-foreground">{k.replace(/_/g,' ')}: </span><strong>{v.toLocaleString('pt-BR',{maximumFractionDigits:3})}</strong></div>)}</div>
     {Object.keys(report.missing).length>0 && <p className="text-sm text-destructive">Dados ausentes: {Object.entries(report.missing).map(([k,v])=>`${k}: ${v}`).join(' · ')}</p>}
     <Button variant="ghost" size="sm" onClick={()=>setExpanded(!expanded)}>{expanded?'Recolher dados':'Ver dados'}</Button>
-    {expanded && <div className="max-h-96 overflow-auto border rounded-md"><table className="w-full text-xs"><thead className="sticky top-0 bg-muted"><tr>{columns.map(c=><th key={c} className="px-3 py-2 text-left whitespace-nowrap">{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{report.rows.slice(0,200).map((r,i)=><tr key={i} className="border-t">{columns.map(c=><td key={c} className="px-3 py-2 whitespace-nowrap">{String(r[c]??'—')}</td>)}</tr>)}</tbody></table>{report.rows.length>200&&<p className="p-3 text-muted-foreground">Exibindo 200 registros. O arquivo contém todos os registros consultados.</p>}</div>}
+    {expanded && <div className="max-h-96 overflow-auto border rounded-md"><table className="w-full text-xs"><thead className="sticky top-0 bg-muted"><tr>{columns.map(c=><th key={c} className="px-3 py-2 text-left whitespace-nowrap">{c.replace(/_/g,' ')}</th>)}</tr></thead><tbody>{report.rows.slice(0,200).map((r,i)=><tr key={i} className="border-t">{columns.map(c=><td key={c} className="px-3 py-2 whitespace-nowrap">{String(r[c]??'—')}</td>)}</tr>)}</tbody></table>{report.rows.length>200&&<p className="p-3 text-muted-foreground">Exibindo 200 registros. O arquivo contém todos os registros consultados.</p>}</div>}
   </section>;
 }
 
@@ -87,7 +87,7 @@ function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>
           if(event.type==='error')throw new Error(event.message);
           if(event.type==='text-delta') {setStatus('streaming');update(msg=>{const parts=[...msg.parts];const index=parts.findIndex(p=>p.type==='text');if(index>=0){const p=parts[index];if(p.type==='text')parts[index]={...p,text:p.text+event.delta};}else parts.push({type:'text',text:event.delta});return {...msg,parts};});}
           if(event.type==='tool-start')update(msg=>({...msg,parts:[...msg.parts,{type:'dynamic-tool',toolName:'consultar_relatorio',toolCallId:event.id,state:'input-available',input:event.input}]}));
-          if(event.type==='report')update(msg=>({...msg,parts:[...msg.parts.map(p=>p.type==='dynamic-tool'&&p.toolCallId===event.id?{...p,state:'output-available' as const,output:{registros:event.report.rows.length,completo:event.report.complete}}:p),{type:'data-report',data:event.report}]}));
+          if(event.type==='report')update(msg=>({...msg,parts:[...msg.parts.map(p=>p.type==='dynamic-tool'&&p.toolCallId===event.id?{type:'dynamic-tool' as const,toolName:p.toolName,toolCallId:p.toolCallId,input:p.input??{},state:'output-available' as const,output:{registros:event.report.rows.length,completo:event.report.complete}}:p),{type:'data-report',data:event.report}]}));
           if(event.type==='done'){done=true;onUpdate();}
         }
       }
@@ -96,7 +96,7 @@ function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>
     }catch(e){
       const message=e instanceof Error ? (e.name==='AbortError'?'Pedido interrompido; nenhuma alteração operacional foi feita.':e.message) : 'Erro ao consultar';
       setError(message);setText(requestText);setStatus('error');
-      setMessages(m=>m.map(msg=>msg.id===assistantId?{...msg,parts:msg.parts.map(p=>p.type==='dynamic-tool'&&p.state==='input-available'?{...p,state:'output-error' as const,errorText:message}:p)}:msg));
+      setMessages(m=>m.map(msg=>msg.id===assistantId?{...msg,parts:msg.parts.map(p=>p.type==='dynamic-tool'&&p.state==='input-available'?{type:'dynamic-tool' as const,toolName:p.toolName,toolCallId:p.toolCallId,input:p.input,state:'output-error' as const,errorText:message}:p)}:msg));
     }finally{focus();}
   }
   return <div ref={root} className="flex flex-col h-full min-h-0 min-w-0">

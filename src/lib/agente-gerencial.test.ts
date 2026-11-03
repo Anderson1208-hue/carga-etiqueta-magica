@@ -1,1 +1,1 @@
-import '../../../supabase/functions/agente-gerencial/report.test';
+import '../../supabase/functions/agente-gerencial/report.test';
