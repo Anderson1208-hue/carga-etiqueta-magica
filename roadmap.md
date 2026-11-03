@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Agente Gerencial: acesso exclusivo administrador/Júlio; consultas de negócio somente leitura, conversas separadas salvas por conta, PDF/Excel e verificação autenticada. Consumo variável autorizado sem recarga automática.
 - [x] 28/10: paginação Sirius corrigida no plano/fila e filtro por NF antes do corte; três testes e compilação OK. Atualização excepcional das 107 abertas concluída: 88 envios Na filial e 6 Entrega realizada aguardando canhoto aceitos (204), sem regredir entregues; fila relida e oito notas Na filial reconfirmadas diretamente no portal. Preservadas 69 fechadas e 15 ausentes.
 - [ ] 28/10: 13 NFs abertas da lista não atualizáveis no Sirius: 768743 sem viagem; 768964–768973 e 769112/769113 não encontradas pela consulta do portal. Bloqueador: identificação/vínculo no Sirius; não forçar envio nem mudar status local para mascarar ausência.
 - [x] 27/10: consultas IBAC e OK Entrega alteradas nos agendamentos existentes para 07h, 12h e 17h Brasília, somente dias úteis, preservando condição de feriados RJ e destinos de consulta; custo parcial apresentado e autorizado. Envios não alterados.
