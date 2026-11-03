@@ -2,6 +2,8 @@ import { useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { parseCTeXML, CTeParsed } from "@/lib/cte-parser";
+import { importCteLinks } from "@/lib/cte-import";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Loader2, Upload, FileCode, CheckCircle2, AlertCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -176,11 +178,11 @@ export function ImportarCteDialog({
 
     setSaving(true);
     try {
-      const inserts: any[] = [];
-      let totalLinhas = 0;
+      const inserts: Array<TablesInsert<"ctes"> & { nf_id: string }> = [];
       let totalCtesAgrupadores = 0;
       for (const file of successFiles) {
-        const cte = file.data!;
+        const cte = file.data;
+        if (!cte) continue;
         const matches = file.nfMatches || [];
         if (matches.length > 1) totalCtesAgrupadores++;
 
@@ -221,26 +223,35 @@ export function ImportarCteDialog({
             identificador_interno: null,
             data_emissao: cte.dataEmissao,
           });
-          totalLinhas++;
         }
       }
 
-      const { error } = await supabase.from("ctes" as any).insert(inserts as any);
-
-      if (error) {
-        if (error.message?.includes("duplicate key")) {
-          toast({ variant: "destructive", title: "CT-e duplicado", description: "Um ou mais vínculos CT-e+NF já foram importados anteriormente." });
-        } else {
-          throw error;
+      const result = await importCteLinks(inserts, async (nfIds) => {
+        const links: Array<{ chave_cte: string; nf_id: string }> = [];
+        for (let offset = 0; ; offset += 500) {
+          const { data, error } = await supabase.from("ctes")
+            .select("chave_cte, nf_id").in("nf_id", nfIds)
+            .order("id").range(offset, offset + 499);
+          if (error) throw error;
+          for (const row of data || []) {
+            if (row.nf_id) links.push({ chave_cte: row.chave_cte, nf_id: row.nf_id });
+          }
+          if ((data || []).length < 500) break;
         }
-      } else {
+        return links;
+      }, async (batch) => {
+        const { error } = await supabase.from("ctes").insert(batch);
+        return { error };
+      });
+      const importedKeys = new Set(result.imported.map(row => `${row.chave_cte}:${row.nf_id}`));
         // Sobrescrever volume_m3 da NF para fornecedores Pandurata e Docile
         const FORNECEDORES_VOLUME_CTE = ["PANDURATA", "DOCILE"];
         let volumesAtualizados = 0;
         for (const file of successFiles) {
-          const cte = file.data!;
-          if (!cte.volumeM3 || cte.volumeM3 <= 0) continue;
+          const cte = file.data;
+          if (!cte?.volumeM3 || cte.volumeM3 <= 0) continue;
           for (const m of file.nfMatches || []) {
+            if (!importedKeys.has(`${cte.chaveCte}:${m.id}`)) continue;
             const razao = (m.razao || "").toUpperCase();
             const isAlvo = FORNECEDORES_VOLUME_CTE.some((f) => razao.includes(f));
             if (!isAlvo) continue;
@@ -253,15 +264,14 @@ export function ImportarCteDialog({
         }
 
         toast({
-          title: "CT-es importados!",
+          title: result.imported.length ? "CT-es importados!" : "CT-es já vinculados",
           description:
-            `${successFiles.length} CT-e(s) → ${totalLinhas} vínculo(s) NF na carga ${cargaPlaca}.` +
+            `${result.imported.length} novo(s) vínculo(s) NF na carga ${cargaPlaca}. ${result.skipped} já existente(s), preservado(s).` +
             (totalCtesAgrupadores > 0 ? ` ${totalCtesAgrupadores} CT-e(s) agrupador(es) com frete rateado.` : "") +
             (volumesAtualizados > 0 ? ` ${volumesAtualizados} NF(s) com m³ atualizado (Pandurata/Docile).` : ""),
         });
         handleClose(false);
         onSuccess();
-      }
     } catch (error: any) {
       console.error("Error importing CTes:", error);
       toast({ variant: "destructive", title: "Erro ao importar CT-es", description: error.message || "Tente novamente." });
@@ -321,7 +331,7 @@ export function ImportarCteDialog({
           {parsedFiles.length > 0 && (
             <div className="space-y-2">
               <h4 className="font-medium text-sm">
-                Processados ({successFiles.length} sucesso
+                XMLs lidos ({successFiles.length} apto(s) para vincular
                 {errorFiles.length > 0 && `, ${errorFiles.length} erro(s)`})
               </h4>
 
@@ -355,7 +365,7 @@ export function ImportarCteDialog({
                           <p>{file.data?.razaoSocialEmitente} • Frete total R$ {file.data?.valorFrete.toFixed(2)}</p>
                           {(file.nfsNaoEncontradas?.length || 0) > 0 && (
                             <p className="text-warning">
-                              ⚠ {file.nfsNaoEncontradas!.length} NF(s) do CT-e não está(ão) nesta carga (ignorada(s))
+                              ⚠ {file.nfsNaoEncontradas?.length} NF(s) do CT-e não está(ão) nesta carga (ignorada(s))
                             </p>
                           )}
                         </div>
