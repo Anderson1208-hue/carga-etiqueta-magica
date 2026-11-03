@@ -84,12 +84,12 @@ Deno.serve(async req => {
   const password = Deno.env.get('OKENTREGA_PORTAL_PASSWORD');
   if (!login || !password) return json({ erro: 'Credenciais do portal ausentes' }, 400);
   const jar = new Map<string, string>();
-  async function request(path: string, fields?: Record<string, string>) {
+  async function request(path: string, fields?: Record<string, string>, referer = `${BASE}/assets/application/cons.documento2.php8`) {
     const target = new URL(path, BASE);
     if (target.origin !== BASE) throw new Error('destino_nao_permitido');
     const response = await fetch(target, {
       redirect: 'manual', signal: AbortSignal.timeout(20000),
-      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: `${BASE}/assets/application/cons.documento2.php8` } : {}) },
+      headers: { Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join('; '), ...(fields ? { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest', Referer: referer, Origin: BASE, Accept: 'application/json, text/javascript, */*; q=0.01', 'User-Agent': 'Mozilla/5.0' } : {}) },
       method: fields ? 'POST' : 'GET', ...(fields ? { body: new URLSearchParams(fields) } : {}),
     });
     for (const cookie of response.headers.getSetCookie()) {
@@ -101,7 +101,7 @@ Deno.serve(async req => {
     return { response, text };
   }
   async function action(action: string, fields: Record<string, string>) {
-    const { text } = await request('/assets/system/sys.ajax.php8', { component: 'sys.sys.login2', action, ...fields });
+    const { text } = await request('/assets/system/sys.ajax.php8', { component: 'sys.sys.login2', action, ...fields }, `${BASE}/login.php8`);
     return JSON.parse(text);
   }
   try {
