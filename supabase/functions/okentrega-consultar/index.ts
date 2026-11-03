@@ -101,15 +101,13 @@ Deno.serve(async req => {
     return { response, text };
   }
   async function action(action: string, fields: Record<string, string>) {
-    const { text } = await request('/assets/system/sys.ajax.php', { component: 'sys.sys.login', action, ...fields });
+    const { text } = await request('/assets/system/sys.ajax.php8', { component: 'sys.sys.login2', action, ...fields });
     return JSON.parse(text);
   }
   try {
-    await request('/login2.php');
-    const config = await request('/assets/system/sys.config.json.php?page=sys.login');
-    const typePath = JSON.parse(config.text)?.resposta_dados?.ajaxTipoAcesso;
-    if (typeof typePath !== 'string') throw new Error('config_invalida');
-    const types = JSON.parse((await request(typePath, { email: login })).text);
+    // Portal migrou para login.php8 / sys.sys.login2 (nov/2026).
+    await request('/login.php8');
+    const types = await action('tipoacesso', { email: login });
     const options = types?.resposta_dados?.dados;
     const option = Array.isArray(options) ? options[0] : null;
     const type = typeof option === 'string' ? option.match(/value\s*=\s*(?:["']([^"']+)["']|([^\s>]+))/i)?.slice(1).find(Boolean) : null;
@@ -117,7 +115,7 @@ Deno.serve(async req => {
     const result = await action('RedirecionarLogin', { email: login, password, pgredirect: '', cliente_id: '', elemento: '', tipoacesso: type });
     if (result?.resposta_status?.status !== 1 || !result?.resposta_dados?.dados?.id) return json({ etapa: 'login', login_ok: false, duracao_ms: Date.now() - started }, 502);
     const redirect = result.resposta_dados.redirect ?? {};
-    const fields: Record<string, string> = { id: String(result.resposta_dados.dados.id), camp_acesso_tipo: type };
+    const fields: Record<string, string> = { id: String(result.resposta_dados.dados.id), camp_acesso_tipo: type, email: login, senha: password };
     for (const [from, to] of [['cliente_id', 'cliente_id'], ['id_elemento', 'elemento_id'], ['user_id', 'user_id']]) {
       if (redirect[from]) fields[to] = String(redirect[from]);
     }
