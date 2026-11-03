@@ -25,7 +25,7 @@ type: reference
 - [ICMS e CIOT Ebenezer](mem://fiscal/icms-tomador-ciot) — Ebenezer recolhe ICMS e repassa; só Bauducco regime especial; CIOT frota via ANTT grátis.
 - [Hershey / Confirma Fácil](mem://arquitetura/integracao-erp/hershey-confirma-facil) — Endpoints, contrato do login sondado e pendências (docs, credenciais de API, liberação de IP).
 - [Docile SFTP + canhoto email](mem://arquitetura/integracao-erp/docile-sftp) — Ocorrência via SFTP no IP 177.153.228.228 (DNS bloqueado desde 28/08); canhotos por email.
-- [EDI Cacau m³](mem://funcionalidades/cadastros/edi-cacau-cubagem-notfis) — IBAC: importar NOTFIS na linha da carga; m³ = peso cubado ÷ 300.
+- [EDI Cacau m³](mem://funcionalidades/cadastros/edi-cacau-cubagem-notfis) — IBAC: importar NOTFIS na linha da carga; m³ = peso cubado ÷ 250 (IBAC/IBAE).
 - [UPDATE Conferência Race-safe](mem://arquitetura/conferencia-update-condicional) — UPDATE de etiquetas.status sempre filtra pelo status anterior.
 - [Match cProd zeros](mem://logica/match-cprod-zeros-a-esquerda) — c_prod da NF vem zero-padded; join com produtos.codigo sempre com ltrim(...,'0').
 - [Produtos Arcor/Bagley](mem://funcionalidades/cadastros/produtos-arcor-bagley) — Planilha Siebel: código = Part Num, m³/peso da planilha, Arcor+Bagley no mesmo arquivo.
