@@ -53,7 +53,7 @@ export default function MonitorFiscal() {
   };
 
   const nomeFonte = (id: string) => fontes.find((f) => f.id === id);
-  const corRel = (r: string) => (r === "alta" ? "destructive" : r === "media" ? "default" : "secondary") as const;
+  const corRel = (r: string): "destructive" | "default" | "secondary" => (r === "alta" ? "destructive" : r === "media" ? "default" : "secondary");
 
   return (
     <div className="space-y-6 p-6">
