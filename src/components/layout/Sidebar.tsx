@@ -312,6 +312,7 @@ export function Sidebar() {
     { name: "Motoristas (Fiscal)", href: "/fiscal/motoristas", icon: Receipt },
     { name: "Convênios Fiscais", href: "/fiscal/convenios", icon: Receipt },
     { name: "Tabelas de Frete", href: "/fiscal/tabelas-frete", icon: Receipt },
+    { name: "Monitor Fiscal", href: "/fiscal/monitor", icon: Receipt },
   ] : [];
   const administracaoItems = [
     { name: "Operadores", href: "/operadores", icon: Users },
