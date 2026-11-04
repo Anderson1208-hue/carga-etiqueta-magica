@@ -2100,6 +2100,119 @@ export type Database = {
         }
         Relationships: []
       }
+      fiscal_monitor_alertas: {
+        Row: {
+          decidido_em: string | null
+          decidido_por: string | null
+          detectado_em: string
+          fonte_id: string
+          id: string
+          impacto: string | null
+          observacao: string | null
+          regras_afetadas: string[]
+          relevancia: string
+          resumo: string
+          status: string
+          titulo: string
+          trecho: string | null
+        }
+        Insert: {
+          decidido_em?: string | null
+          decidido_por?: string | null
+          detectado_em?: string
+          fonte_id: string
+          id?: string
+          impacto?: string | null
+          observacao?: string | null
+          regras_afetadas?: string[]
+          relevancia?: string
+          resumo: string
+          status?: string
+          titulo: string
+          trecho?: string | null
+        }
+        Update: {
+          decidido_em?: string | null
+          decidido_por?: string | null
+          detectado_em?: string
+          fonte_id?: string
+          id?: string
+          impacto?: string | null
+          observacao?: string | null
+          regras_afetadas?: string[]
+          relevancia?: string
+          resumo?: string
+          status?: string
+          titulo?: string
+          trecho?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_monitor_alertas_fonte_id_fkey"
+            columns: ["fonte_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_monitor_fontes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_monitor_cron_auth: {
+        Row: {
+          id: boolean
+          token: string
+        }
+        Insert: {
+          id?: boolean
+          token?: string
+        }
+        Update: {
+          id?: boolean
+          token?: string
+        }
+        Relationships: []
+      }
+      fiscal_monitor_fontes: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          tema: string
+          ultima_mudanca: string | null
+          ultima_verificacao: string | null
+          ultimo_erro: string | null
+          ultimo_hash: string | null
+          ultimo_texto: string | null
+          url: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          tema: string
+          ultima_mudanca?: string | null
+          ultima_verificacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_hash?: string | null
+          ultimo_texto?: string | null
+          url: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          tema?: string
+          ultima_mudanca?: string | null
+          ultima_verificacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_hash?: string | null
+          ultimo_texto?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       geocode_cache: {
         Row: {
           address_input: string

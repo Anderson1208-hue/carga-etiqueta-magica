@@ -232,6 +232,13 @@
       "when": 1793717541800,
       "tag": "0032_agente_gerencial_acesso_por_lista",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793805684229,
+      "tag": "0033_fiscal_monitor",
+      "breakpoints": true
     }
   ]
 }
