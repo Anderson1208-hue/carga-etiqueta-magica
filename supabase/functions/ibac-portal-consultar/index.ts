@@ -9,6 +9,9 @@ import { chavesJaValidas, filtrarPendentes } from "../_shared/ibac-consulta-regr
 const BASE = "https://cacaushow.mosistemas.com/app/";
 const LIMIT = 200;
 const MAX_PAGINAS = 30;
+const MAX_RODADAS = 20; // 20 blocos encadeados ≈ 1.600 notas por consulta
+const ORCAMENTO_MS = 110000;
+const INICIO_ACOMPANHAMENTO = "2026-10-22T03:00:00.000Z";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -39,6 +42,11 @@ async function handler(req: Request) {
   }
 
   const t0 = Date.now();
+  // Continuação encadeada da consulta individual (sem teto fixo de notas por rodada).
+  const corpo: any = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const continuacao = corpo?.fase === "individual";
+  const apos = typeof corpo?.apos === "string" && /^\d{44}$/.test(corpo.apos) ? corpo.apos : "";
+  const rodada = Number.isInteger(corpo?.rodada) ? Math.min(Math.max(corpo.rodada, 1), MAX_RODADAS) : 1;
   const lr = await fetch(BASE + "api/login", {
     method: "POST",
     headers: { "Content-Type": "application/json", "sigla-sistema": "APP" },
@@ -72,7 +80,7 @@ async function handler(req: Request) {
     data_criacao_portal: ts(x.dataCriacao),
     consultado_em: new Date().toISOString(),
   });
-  while (paginas < MAX_PAGINAS) {
+  while (!continuacao && paginas < MAX_PAGINAS) {
     const r = await fetch(`${BASE}api/transportador/canhotos?limit=${LIMIT}&offset=${offset}`, { headers });
     if (!r.ok) return json({ error: `Portal respondeu ${r.status}`, gravadas }, 502);
     const p: any = await r.json();
@@ -95,30 +103,80 @@ async function handler(req: Request) {
     offset += LIMIT;
     if (rows.length < LIMIT || offset >= total) break;
   }
-  // A lista sem filtro só traz notas cadastradas recentemente no portal.
-  // Canhotos enviados nos últimos 30 dias que não vieram na lista e ainda não
-  // estão VÁLIDO aqui são consultados individualmente pela chave (somente leitura).
-  const desde = new Date(Date.now() - 30 * 86400000).toISOString();
-  const { data: enviados } = await admin.from("ibac_eventos_queue")
-    .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
-    .gte("enviado_em", desde).not("chave_acesso", "is", null).order("enviado_em", { ascending: false }).limit(2000);
-  const candidatas = [...new Set((enviados ?? []).map((e: any) => e.chave_acesso as string))]
-    .filter((c) => c.length === 44 && !vistas.has(c));
-  const jaValidas = await chavesJaValidas(admin, candidatas);
-  const individuais = candidatas.filter((c) => !jaValidas.has(c)).slice(0, 80);
-  let individuaisGravadas = 0, naoEncontradas = 0;
-  for (const chave of individuais) {
-    if (Date.now() - t0 > 120000) break;
-    await new Promise((r) => setTimeout(r, 1100));
-    const r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
-    if (r.status === 429) break;
-    if (!r.ok) continue;
-    const p: any = await r.json().catch(() => null);
-    const hit = (Array.isArray(p?.data) ? p.data : []).filter((x: any) => x?.chave === chave);
-    if (hit.length !== 1) { naoEncontradas++; continue; }
-    const { error } = await admin.from("ibac_portal_validacao").upsert([mapear(hit[0])], { onConflict: "chave" });
-    if (!error) individuaisGravadas++;
-  }
+  const faseIndividual = async () => {
+    // A lista sem filtro só traz notas cadastradas recentemente no portal.
+    // Canhotos enviados nos últimos 30 dias que não vieram na lista e ainda não
+    // estão VÁLIDO aqui são consultados individualmente pela chave (somente leitura).
+    // Janela: últimos 30 dias, nunca antes do início do acompanhamento (22/10/2026).
+    const trintaDias = new Date(Date.now() - 30 * 86400000).toISOString();
+    const desde = trintaDias > INICIO_ACOMPANHAMENTO ? trintaDias : INICIO_ACOMPANHAMENTO;
+    // Paginado em blocos de 1000 (teto da API) com ordem determinística por id.
+    const enviados: { chave_acesso: string }[] = [];
+    for (let de = 0; de < 20000; de += 1000) {
+      const { data: pg, error: eq } = await admin.from("ibac_eventos_queue")
+        .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
+        .gte("enviado_em", desde).not("chave_acesso", "is", null).order("id").range(de, de + 999);
+      if (eq) throw new Error(eq.message);
+      enviados.push(...(pg ?? []));
+      if (!pg || pg.length < 1000) break;
+    }
+    // Ordem estável por chave + cursor: cada bloco continua de onde o anterior parou.
+    const candidatas = [...new Set(enviados.map((e) => e.chave_acesso))]
+      .filter((c) => c.length === 44 && !vistas.has(c) && c > apos)
+      .sort();
+    const jaValidas = await chavesJaValidas(admin, candidatas);
+    const individuais = candidatas.filter((c) => !jaValidas.has(c));
+    let individuaisGravadas = 0, naoEncontradas = 0, processadas = 0, bloqueioPortal = false;
+    for (const chave of individuais) {
+      if (Date.now() - t0 > ORCAMENTO_MS) break;
+      await new Promise((r) => setTimeout(r, 1500));
+      let r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+      // Portal limita consultas por minuto: espera e tenta de novo, sem desistir na primeira recusa.
+      for (let espera = 0; r.status === 429 && espera < 3 && Date.now() - t0 < ORCAMENTO_MS - 30000; espera++) {
+        await r.body?.cancel();
+        await new Promise((res) => setTimeout(res, 25000));
+        r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+      }
+      if (r.status === 429) {
+        await r.body?.cancel();
+        // Ainda limitado: encerra este bloco e deixa o próximo continuar após pausa.
+        bloqueioPortal = true;
+        break;
+      }
+      processadas++;
+      if (!r.ok) continue;
+      const p: any = await r.json().catch(() => null);
+      const hit = (Array.isArray(p?.data) ? p.data : []).filter((x: any) => x?.chave === chave);
+      if (hit.length !== 1) { naoEncontradas++; continue; }
+      const { error } = await admin.from("ibac_portal_validacao").upsert([mapear(hit[0])], { onConflict: "chave" });
+      if (!error) individuaisGravadas++;
+    }
+    const restantes = individuais.length - processadas;
+    let encadeado = false;
+    if (restantes > 0 && processadas > 0 && rodada < MAX_RODADAS) {
+      if (bloqueioPortal) await new Promise((res) => setTimeout(res, 20000));
+      const fwd: Record<string, string> = { "Content-Type": "application/json" };
+      const cron = req.headers.get("x-okentrega-cron");
+      const auth = req.headers.get("Authorization");
+      const apikey = req.headers.get("apikey");
+      if (cron) fwd["x-okentrega-cron"] = cron;
+      if (auth) fwd["Authorization"] = auth;
+      if (apikey) fwd["apikey"] = apikey;
+      const proxima = fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ibac-portal-consultar`, {
+        method: "POST", headers: fwd,
+        body: JSON.stringify({ fase: "individual", apos: individuais[processadas - 1], rodada: rodada + 1 }),
+        // Só garante a entrega do pedido; o próximo bloco segue sozinho mesmo após este encerrar.
+        signal: AbortSignal.timeout(4000),
+      }).then((r) => r.body?.cancel()).catch((e) => {
+        if ((e as Error)?.name !== "TimeoutError") console.log(JSON.stringify({ erro: "encadeamento_falhou", rodada }));
+      });
+      await proxima;
+      encadeado = true;
+    }
+    console.log(JSON.stringify({ rodada, candidatas: individuais.length, processadas, gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, restantes, encadeado, bloqueioPortal }));
+  return { individuais: individuais.length, processadas, restantes, encadeado, individuaisGravadas, naoEncontradas };
+  };
+  const { individuais, processadas, restantes, encadeado, individuaisGravadas, naoEncontradas } = await faseIndividual();
   gravadas += individuaisGravadas;
-  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, individuais: individuais.length, individuais_gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, duracao_ms: Date.now() - t0 });
+  return json({ ok: true, total_portal: total, gravadas, puladas, paginas, rodada, individuais: individuais.length, processadas, restantes, encadeado, individuais_gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, duracao_ms: Date.now() - t0 });
 }
