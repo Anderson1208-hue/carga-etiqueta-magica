@@ -2794,7 +2794,7 @@ export default function Roteirizacao() {
                                 }}
                               >
                                 <Ban className="w-3.5 h-3.5 mr-1" />
-                                Cancelar
+                                Cancelar roteirização
                               </Button>
                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
                             </div>
