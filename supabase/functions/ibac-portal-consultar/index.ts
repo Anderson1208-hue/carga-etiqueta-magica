@@ -165,19 +165,17 @@ async function handler(req: Request) {
       const proxima = fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ibac-portal-consultar`, {
         method: "POST", headers: fwd,
         body: JSON.stringify({ fase: "individual", apos: individuais[processadas - 1], rodada: rodada + 1 }),
-      }).then((r) => r.body?.cancel()).catch(() => console.log(JSON.stringify({ erro: "encadeamento_falhou", rodada })));
+        // Só garante a entrega do pedido; o próximo bloco segue sozinho mesmo após este encerrar.
+        signal: AbortSignal.timeout(4000),
+      }).then((r) => r.body?.cancel()).catch((e) => {
+        if ((e as Error)?.name !== "TimeoutError") console.log(JSON.stringify({ erro: "encadeamento_falhou", rodada }));
+      });
       await proxima;
       encadeado = true;
     }
     console.log(JSON.stringify({ rodada, candidatas: individuais.length, processadas, gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, restantes, encadeado, bloqueioPortal }));
   return { individuais: individuais.length, processadas, restantes, encadeado, individuaisGravadas, naoEncontradas };
   };
-  if (continuacao) {
-    // Bloco encadeado: responde na hora e trabalha em segundo plano.
-    // @ts-ignore EdgeRuntime existe no runtime das funções
-    EdgeRuntime.waitUntil(faseIndividual().catch((e) => console.log(JSON.stringify({ erro: String(e), rodada }))));
-    return json({ ok: true, aceito: true, rodada }, 202);
-  }
   const { individuais, processadas, restantes, encadeado, individuaisGravadas, naoEncontradas } = await faseIndividual();
   gravadas += individuaisGravadas;
   return json({ ok: true, total_portal: total, gravadas, puladas, paginas, rodada, individuais: individuais.length, processadas, restantes, encadeado, individuais_gravadas: individuaisGravadas, nao_encontradas: naoEncontradas, duracao_ms: Date.now() - t0 });
