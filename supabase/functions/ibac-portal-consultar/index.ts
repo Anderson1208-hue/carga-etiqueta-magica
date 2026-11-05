@@ -129,9 +129,20 @@ async function handler(req: Request) {
     let individuaisGravadas = 0, naoEncontradas = 0, processadas = 0, bloqueioPortal = false;
     for (const chave of individuais) {
       if (Date.now() - t0 > ORCAMENTO_MS) break;
-      await new Promise((r) => setTimeout(r, 1100));
-      const r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
-      if (r.status === 429) { bloqueioPortal = true; break; }
+      await new Promise((r) => setTimeout(r, 1500));
+      let r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+      // Portal limita consultas por minuto: espera e tenta de novo, sem desistir na primeira recusa.
+      for (let espera = 0; r.status === 429 && espera < 3 && Date.now() - t0 < ORCAMENTO_MS - 30000; espera++) {
+        await r.body?.cancel();
+        await new Promise((res) => setTimeout(res, 25000));
+        r = await fetch(`${BASE}api/transportador/canhotos?limit=5&offset=0&chave=${chave}`, { headers });
+      }
+      if (r.status === 429) {
+        await r.body?.cancel();
+        // Ainda limitado: encerra este bloco e deixa o próximo continuar após pausa.
+        bloqueioPortal = true;
+        break;
+      }
       processadas++;
       if (!r.ok) continue;
       const p: any = await r.json().catch(() => null);
@@ -142,7 +153,8 @@ async function handler(req: Request) {
     }
     const restantes = individuais.length - processadas;
     let encadeado = false;
-    if (restantes > 0 && processadas > 0 && !bloqueioPortal && rodada < MAX_RODADAS) {
+    if (restantes > 0 && processadas > 0 && rodada < MAX_RODADAS) {
+      if (bloqueioPortal) await new Promise((res) => setTimeout(res, 20000));
       const fwd: Record<string, string> = { "Content-Type": "application/json" };
       const cron = req.headers.get("x-okentrega-cron");
       const auth = req.headers.get("Authorization");
