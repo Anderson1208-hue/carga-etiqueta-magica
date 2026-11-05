@@ -11,6 +11,7 @@ const LIMIT = 200;
 const MAX_PAGINAS = 30;
 const MAX_RODADAS = 20; // 20 blocos encadeados ≈ 1.600 notas por consulta
 const ORCAMENTO_MS = 110000;
+const INICIO_ACOMPANHAMENTO = "2026-10-22T03:00:00.000Z";
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -106,10 +107,12 @@ async function handler(req: Request) {
     // A lista sem filtro só traz notas cadastradas recentemente no portal.
     // Canhotos enviados nos últimos 30 dias que não vieram na lista e ainda não
     // estão VÁLIDO aqui são consultados individualmente pela chave (somente leitura).
-    const desde = new Date(Date.now() - 30 * 86400000).toISOString();
+    // Janela: últimos 30 dias, nunca antes do início do acompanhamento (22/10/2026).
+    const trintaDias = new Date(Date.now() - 30 * 86400000).toISOString();
+    const desde = trintaDias > INICIO_ACOMPANHAMENTO ? trintaDias : INICIO_ACOMPANHAMENTO;
     const { data: enviados } = await admin.from("ibac_eventos_queue")
       .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
-      .gte("enviado_em", desde).not("chave_acesso", "is", null).order("enviado_em", { ascending: false }).limit(2000);
+      .gte("enviado_em", desde).not("chave_acesso", "is", null).order("enviado_em", { ascending: false }).limit(5000);
     // Ordem estável por chave + cursor: cada bloco continua de onde o anterior parou.
     const candidatas = [...new Set((enviados ?? []).map((e: any) => e.chave_acesso as string))]
       .filter((c) => c.length === 44 && !vistas.has(c) && c > apos)
