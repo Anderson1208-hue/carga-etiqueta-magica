@@ -91,10 +91,12 @@ Deno.serve(async (req) => {
   try {
     // 1) Plano de notas a partir da data inicial.
     const plano = await carregarPaginasSirius<Record<string, string | null>>((inicioPagina, fimPagina) => {
-      let consulta = sb.rpc('siriuslog_plano', { p_de: cfg.data_inicial, p_ate: hoje })
+      // Filtros aplicados dentro da consulta (notas concluidas nunca voltam a ser processadas).
+      return sb.rpc('siriuslog_plano', {
+        p_de: cfg.data_inicial, p_ate: hoje, p_nfs: nfsAlvo ?? undefined, p_excluir_concluidas: true,
+      })
         .order('numero_nf').order('carga_updated').order('data_rot').order('baixa_entregue')
-      if (nfsAlvo) consulta = consulta.in('numero_nf', nfsAlvo)
-      return consulta.range(inicioPagina, fimPagina)
+        .range(inicioPagina, fimPagina)
     })
     const todas = plano.map((l) => String(l.numero_nf))
 

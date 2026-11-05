@@ -5150,7 +5150,12 @@ export type Database = {
         Returns: Json
       }
       siriuslog_plano: {
-        Args: { p_ate: string; p_de: string }
+        Args: {
+          p_ate: string
+          p_de: string
+          p_excluir_concluidas?: boolean
+          p_nfs?: string[]
+        }
         Returns: {
           baixa_entregue: string
           carga_status: string

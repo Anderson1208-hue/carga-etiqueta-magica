@@ -239,6 +239,13 @@
       "when": 1793805684229,
       "tag": "0033_fiscal_monitor",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793888888380,
+      "tag": "0034_siriuslog_plano_filtrado",
+      "breakpoints": true
     }
   ]
 }

@@ -153,10 +153,9 @@ Deno.serve(async (req) => {
   let linhas: Record<string, string | null>[]
   try {
     linhas = await carregarPaginasSirius<Record<string, string | null>>((inicio, fim) => {
-      let consulta = sb.rpc('siriuslog_plano', { p_de: de, p_ate: ate })
+      return sb.rpc('siriuslog_plano', { p_de: de, p_ate: ate, p_nfs: nfsFiltro ?? undefined })
         .order('numero_nf').order('carga_updated').order('data_rot').order('baixa_entregue')
-      if (nfsFiltro) consulta = consulta.in('numero_nf', nfsFiltro)
-      return consulta.range(inicio, fim)
+        .range(inicio, fim)
     })
   } catch (error) { out.erro = String(error); return json(500) }
   out.total_notas = linhas.length
