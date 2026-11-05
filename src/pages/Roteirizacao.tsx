@@ -67,7 +67,7 @@ import {
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
 import { CancelarRoteirizacaoDialog } from "@/components/roteirizacao/CancelarRoteirizacaoDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2, FileSpreadsheet, Search } from "lucide-react";
+import { Settings2, FileSpreadsheet, Search, Ban } from "lucide-react";
 
 interface Carga {
   id: string;
