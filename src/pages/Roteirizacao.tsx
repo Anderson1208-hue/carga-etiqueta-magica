@@ -65,8 +65,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
+import { CancelarRoteirizacaoDialog } from "@/components/roteirizacao/CancelarRoteirizacaoDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2, FileSpreadsheet, Search } from "lucide-react";
+import { Settings2, FileSpreadsheet, Search, Ban } from "lucide-react";
 
 interface Carga {
   id: string;
@@ -157,6 +158,7 @@ export default function Roteirizacao() {
   const [expandedVeiculoId, setExpandedVeiculoId] = useState<string | null>(null);
   const [veiculoNfs, setVeiculoNfs] = useState<Record<string, any[]>>({});
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
+  const [cancelarVeiculo, setCancelarVeiculo] = useState<any | null>(null);
   const [reroteirizarVeiculo, setReroteirizarVeiculo] = useState<any | null>(null);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
@@ -1170,6 +1172,7 @@ export default function Roteirizacao() {
       let query = supabase
         .from("veiculos")
         .select("id, placa, motorista, data, status, access_code, created_at, pernoite, pernoite_origem_id")
+        .neq("status", "cancelada")
         .order("data", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -2781,6 +2784,18 @@ export default function Roteirizacao() {
                                 <Route className="w-3.5 h-3.5 mr-1" />
                                 Reroteirizar
                               </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-2 text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCancelarVeiculo(v);
+                                }}
+                              >
+                                <Ban className="w-3.5 h-3.5 mr-1" />
+                                Cancelar
+                              </Button>
                               <ChevronDown className={`w-4 h-4 transition-transform ${expandedVeiculoId === v.id ? "rotate-180" : ""}`} />
                             </div>
                           </button>
@@ -2925,6 +2940,16 @@ export default function Roteirizacao() {
           onOpenChange={(open) => { if (!open) setAlterarRotaVeiculo(null); }}
           veiculo={alterarRotaVeiculo}
           onUpdated={() => {
+            loadVeiculos();
+            setVeiculoNfs({});
+            setExpandedVeiculoId(null);
+          }}
+        />
+
+        <CancelarRoteirizacaoDialog
+          veiculo={cancelarVeiculo}
+          onOpenChange={(open) => { if (!open) setCancelarVeiculo(null); }}
+          onCancelled={() => {
             loadVeiculos();
             setVeiculoNfs({});
             setExpandedVeiculoId(null);

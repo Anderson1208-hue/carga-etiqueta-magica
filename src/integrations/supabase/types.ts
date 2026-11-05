@@ -4078,6 +4078,42 @@ export type Database = {
         }
         Relationships: []
       }
+      roteirizacao_cancelamentos: {
+        Row: {
+          cancelado_em: string
+          cancelado_por: string
+          data_rota: string
+          id: string
+          motivo: string
+          motorista: string | null
+          nfs: Json
+          placa: string
+          veiculo_id: string
+        }
+        Insert: {
+          cancelado_em?: string
+          cancelado_por: string
+          data_rota: string
+          id?: string
+          motivo: string
+          motorista?: string | null
+          nfs?: Json
+          placa: string
+          veiculo_id: string
+        }
+        Update: {
+          cancelado_em?: string
+          cancelado_por?: string
+          data_rota?: string
+          id?: string
+          motivo?: string
+          motorista?: string | null
+          nfs?: Json
+          placa?: string
+          veiculo_id?: string
+        }
+        Relationships: []
+      }
       roteirizacao_paradas: {
         Row: {
           cnpj_destinatario: string
@@ -4745,6 +4781,10 @@ export type Database = {
         Returns: Json
       }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      cancelar_roteirizacao: {
+        Args: { _motivo: string; _veiculo_id: string }
+        Returns: Json
+      }
       canhoto_prazo_vencido: {
         Args: { p_dias_uteis?: number; p_marcado_em: string }
         Returns: boolean
