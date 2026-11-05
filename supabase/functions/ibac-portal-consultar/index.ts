@@ -110,11 +110,18 @@ async function handler(req: Request) {
     // Janela: últimos 30 dias, nunca antes do início do acompanhamento (22/10/2026).
     const trintaDias = new Date(Date.now() - 30 * 86400000).toISOString();
     const desde = trintaDias > INICIO_ACOMPANHAMENTO ? trintaDias : INICIO_ACOMPANHAMENTO;
-    const { data: enviados } = await admin.from("ibac_eventos_queue")
-      .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
-      .gte("enviado_em", desde).not("chave_acesso", "is", null).order("enviado_em", { ascending: false }).limit(5000);
+    // Paginado em blocos de 1000 (teto da API) com ordem determinística por id.
+    const enviados: { chave_acesso: string }[] = [];
+    for (let de = 0; de < 20000; de += 1000) {
+      const { data: pg, error: eq } = await admin.from("ibac_eventos_queue")
+        .select("chave_acesso").eq("evento_interno", "envio_canhoto").eq("status", "enviado")
+        .gte("enviado_em", desde).not("chave_acesso", "is", null).order("id").range(de, de + 999);
+      if (eq) throw new Error(eq.message);
+      enviados.push(...(pg ?? []));
+      if (!pg || pg.length < 1000) break;
+    }
     // Ordem estável por chave + cursor: cada bloco continua de onde o anterior parou.
-    const candidatas = [...new Set((enviados ?? []).map((e: any) => e.chave_acesso as string))]
+    const candidatas = [...new Set(enviados.map((e) => e.chave_acesso))]
       .filter((c) => c.length === 44 && !vistas.has(c) && c > apos)
       .sort();
     const jaValidas = await chavesJaValidas(admin, candidatas);
