@@ -246,6 +246,13 @@
       "when": 1793888888380,
       "tag": "0034_siriuslog_plano_filtrado",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793900686982,
+      "tag": "0035_cancelar_roteirizacao",
+      "breakpoints": true
     }
   ]
 }
