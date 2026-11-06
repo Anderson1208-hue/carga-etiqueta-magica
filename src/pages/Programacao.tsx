@@ -122,7 +122,7 @@ export default function Programacao() {
 
       const pageSize = 1000;
       const nfSelect = `
-        id, numero_nf, chave_acesso, cnpj_destinatario,
+        id, numero_nf, chave_acesso, cnpj_destinatario, termo_sensivel,
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
         peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
