@@ -244,8 +244,13 @@ Deno.serve(async (req) => {
     const motoristas = JSON.stringify([{ motoId: m.id, motoNome: m.nome, motoPrecedencia: '1', motoRg: m.rg, motoCpf: String(m.cpf || '').replace(/\./g, ''), hpmoId: null, hpmoStatus: null }]);
     const mesmoMot = motoCopia?.motoId === m.id;
     const tel = (cadUnico?.telefone || '').replace(/\D/g, '');
-    const celular = mesmoMot ? (inputValor(copia.text, 'celular') ?? '') : tel.length >= 10 ? `(${tel.slice(0, 2)}) ${tel.slice(2, -4)}-${tel.slice(-4)}` : '';
-    const contatoId = mesmoMot ? (inputValor(copia.text, 'contatoId') ?? '') : '';
+    const celularCopia = inputValor(copia.text, 'celular') ?? '';
+    const contatoCopia = inputValor(copia.text, 'contatoId') ?? '';
+    // Celular é obrigatório no portal: usa o telefone do nosso cadastro; sem ele, reutiliza o contato da SM modelo.
+    const telFormatado = tel.length >= 10 ? `(${tel.slice(0, 2)}) ${tel.slice(2, -4)}-${tel.slice(-4)}` : '';
+    const celular = mesmoMot ? celularCopia : telFormatado || celularCopia;
+    const contatoId = mesmoMot ? contatoCopia : telFormatado ? '' : contatoCopia;
+    if (!celular) throw new Error(`Motorista "${nomeMot}" sem telefone no cadastro e SM modelo sem contato; informe o telefone no cadastro de motoristas`);
     detalhes.motorista = m.nome;
 
     // Customer references by CNPJ; missing ones are registered from our customer data.
@@ -335,7 +340,8 @@ Deno.serve(async (req) => {
       .filter((s: any) => normalizarPlaca(s.veiculoPlaca) === placa && Number(s.id) > maxAntes && String(s.dataPrevisaoInicio || '').startsWith(dBR));
     if (!depois.length) {
       const alerta = resp.text.match(/class="alert[^"]*"[^>]*>([\s\S]{0,400}?)<\/div>/)?.[1]?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      throw new Error(`Portal não confirmou a SM${alerta ? `: ${alerta}` : ''}`);
+      const validacao = resp.text.match(/input-error[\s\S]{0,300}?<ul><li>([^<]+)</)?.[1];
+      throw new Error(`Portal não confirmou a SM${alerta ? `: ${alerta}` : ''}${validacao ? ` (validação do portal: ${validacao})` : ''}`);
     }
     const sm = String(Math.max(...depois.map((s: any) => Number(s.id))));
     await finalizar({ status: 'gerada', sm_numero: sm, rota_portal_id: String(rotaId), erro: null });
