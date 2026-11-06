@@ -197,7 +197,9 @@ export default function CanhotosPendentes() {
 
       toast({
         title: "Canhoto recuperado",
-        description: `NF ${alvo.numero_nf ?? ""} conferida. ${Number(fila?.enfileirados ?? 0)} imagem(ns) enfileirada(s) para a IBAC.`,
+        description: Number(fila?.enfileirados ?? 0) > 0
+          ? `NF ${alvo.numero_nf ?? ""} conferida. ${Number(fila?.enfileirados)} imagem(ns) enviada(s) para a fila da IBAC.`
+          : `NF ${alvo.numero_nf ?? ""} conferida. Canhoto registrado; segue para a integração do cliente da nota.`,
       });
       if (preview) URL.revokeObjectURL(preview);
       setAlvo(null);
