@@ -43,7 +43,11 @@ Deno.test('LQG1H40: Maximiliano encontra MAXMILIANO abreviado sem mínimo de sim
   assertEquals(termosBuscaMotorista('Maximiliano'), ['MAX']);
   const r = melhorMotorista('Maximiliano', [{ nome: 'MAXMILIANO SOARES DE AZEVEDO' }, { nome: 'MAXWELL DOS SANTOS' }]);
   assertEquals(r.escolhido?.nome, 'MAXMILIANO SOARES DE AZEVEDO');
-  assert(r.similaridade < 0.8);
+  assert(similaridadeNome('Maximiliano', 'MAXMILIANO SOARES DE AZEVEDO') < 0.8);
+});
+
+Deno.test('nome mais próximo é escolhido mesmo abaixo de 80 por cento', () => {
+  assertEquals(melhorMotorista('Maximiliano', [{ nome: 'MAXWELL' }]).escolhido?.nome, 'MAXWELL');
 });
 
 Deno.test('melhorMotorista: empate não bloqueia revisão pelo operador', () => {
