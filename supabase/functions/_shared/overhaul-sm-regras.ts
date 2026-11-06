@@ -94,7 +94,11 @@ export function melhorMotorista<T extends { nome: string }>(
   let melhorSim = -1;
   const ambiguos: T[] = [];
   for (const c of [...candidatos].filter((c) => normNome(c.nome)).sort((a, b) => normNome(a.nome).localeCompare(normNome(b.nome)))) {
-    const sim = similaridadeNome(nomeBusca, c.nome);
+    // Do not penalize the portal's extra surnames when routing has only a first name.
+    const buscaTokens = tokens(nomeBusca);
+    const portalTokens = tokens(c.nome);
+    const porToken = buscaTokens.reduce((soma, t) => soma + Math.max(0, ...portalTokens.map((p) => similaridadeNome(t, p))), 0) / Math.max(1, buscaTokens.length);
+    const sim = Math.max(similaridadeNome(nomeBusca, c.nome), porToken);
     if (sim > melhorSim) {
       melhor = c;
       melhorSim = sim;
