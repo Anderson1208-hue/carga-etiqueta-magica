@@ -99,6 +99,23 @@ const b64Grande = (s: string) => {
 
 const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
+// Geocodes the customer address via Nominatim (OSM), Brazil-only. Used when there is no
+// trustworthy operational coordinate; the register address is considered reliable.
+async function geocodificarEndereco(partes: (string | null | undefined)[]): Promise<{ lat: number; lng: number } | null> {
+  const q = partes.filter((p) => p && String(p).trim()).join(', ');
+  if (!q) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q + ', Brasil')}`;
+    const resp = await fetch(url, { headers: { 'User-Agent': 'TLM-Logistica/1.0 (overhaul-sm)' }, signal: AbortSignal.timeout(20000) });
+    if (!resp.ok) return null;
+    const arr = await resp.json() as { lat: string; lon: string }[];
+    if (!Array.isArray(arr) || !arr.length) return null;
+    return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
 // Registers a missing customer in the portal using our customer register and operational coordinate.
 async function cadastrarReferencia(admin: any, portal: Portal, cnpj: string, nfs: any[]) {
   const nf = nfs.find((n) => String(n.cnpj_destinatario || '').replace(/\D/g, '') === cnpj);
