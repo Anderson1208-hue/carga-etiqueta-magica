@@ -66,8 +66,8 @@ class Portal {
     } });
     if (/\/login/.test(r.url)) throw new Error('Login do portal Overhaul recusado');
   }
-  async jsonData(path: string, termo: string, length = 50) {
-    const r = await this.req(path, { xhr: true, form: { 'search[value]': termo, start: '0', length: String(length), resumido: 'true' } });
+  async jsonData(path: string, termo: string, length = 50, coluna = 'descricao') {
+    const r = await this.req(path, { xhr: true, form: { 'search[value]': termo, start: '0', length: String(length), 'order[0][column]': coluna, 'order[0][dir]': 'asc', resumido: 'true' } });
     try { return JSON.parse(r.text); } catch { throw new Error(`Portal Overhaul respondeu fora do padrão em ${path}`); }
   }
 }
@@ -96,6 +96,42 @@ const b64Grande = (s: string) => {
   for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return btoa(bin);
 };
+
+
+const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+// Registers a missing customer in the portal using our customer register and operational coordinate.
+async function cadastrarReferencia(admin: any, portal: Portal, cnpj: string, nfs: any[]) {
+  const nf = nfs.find((n) => String(n.cnpj_destinatario || '').replace(/\D/g, '') === cnpj);
+  const { data: dests } = await admin.from('destinatarios').select('id, cnpj_cpf, razao_social').limit(20)
+    .or(`cnpj_cpf.eq.${cnpj},cnpj_cpf.eq.${String(nf?.cnpj_destinatario || cnpj)}`);
+  const dest = (dests ?? []).find((d: any) => String(d.cnpj_cpf || '').replace(/\D/g, '') === cnpj);
+  if (!dest) throw new Error(`Cliente CNPJ ${cnpj} sem cadastro no nosso sistema para criar na Overhaul`);
+  const { data: end } = await admin.rpc('resolver_endereco_operacional', { _destinatario_id: dest.id });
+  const e = Array.isArray(end) ? end[0] : end;
+  if (!e?.latitude || !e?.longitude || ['legado_desconhecido', 'amostra_insuficiente'].includes(e.origem)) {
+    throw new Error(`Cliente CNPJ ${cnpj} sem localização confiável no nosso cadastro; corrija a coordenada antes de gerar a SM`);
+  }
+  const cidadeNome = semAcento(nf?.dest_cidade || 'RIO DE JANEIRO');
+  const uf = semAcento(nf?.dest_uf || 'RJ');
+  const cidades = (await portal.jsonData('cidade/getjsondata', cidadeNome, 20, 'cidade')).data ?? [];
+  const cidade = cidades.find((c: any) => semAcento(c.cidade) === `${cidadeNome} - ${uf}`);
+  if (!cidade) throw new Error(`Cidade "${cidadeNome}/${uf}" não encontrada no portal Overhaul`);
+  const razao = semAcento(dest.razao_social || nf?.dest_razao_social || '').replace(/["']/g, '');
+  const bairro = semAcento(nf?.dest_bairro || '');
+  const descricao = `${cnpj} ${razao}${bairro ? ` - ${bairro}` : ''}`.slice(0, 120);
+  const endereco = [nf?.dest_logradouro, nf?.dest_numero, nf?.dest_bairro, nf?.dest_cidade, nf?.dest_uf].filter(Boolean).join(', ');
+  await portal.req('referencia/cadastro', { xhr: true, form: [
+    ['descricao', descricao], ['temporaria', 'N'], ['codigoExterno', ''], ['cidadeReferencia', String(cidade.id)],
+    ['classeReferencia', '23'], ['area', ''], ['raio', '300'], ['km', ''], ['bandeira', ''], ['tlocRefe', 'N'],
+    ['tipoLocal', ''], ['raioLocal', ''], ['velocidadeMaxima', ''], ['endereco', endereco],
+    ['latitude', String(e.latitude)], ['longitude', String(e.longitude)], ['refe_pontos_area', ''],
+    ['texto', ''], ['telefone1', ''], ['celular', ''], ['radio', ''], ['email', ''], ['logradouro', ''], ['numero', ''],
+    ['complemento', ''], ['tipoLogradouro', ''], ['cep', ''], ['bairro', ''], ['abreviacaoBairro', ''], ['cidade', ''],
+    ['dadosClassificacaoGeral', ''], ['possuiSeguranca24h', 'N'], ['possuiPatioFechado', 'N'],
+    ['dadosServicosDisponiveis', 'null'], ['validarMaisInformacoes', 'false'], ['ferramentaMapaEndereco', 'gmaps'], ['dono', '4981162'],
+  ] });
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -128,7 +164,7 @@ Deno.serve(async (req) => {
   try {
     // NFs and order
     const { data: vnfs, error } = await admin.from('veiculo_nfs')
-      .select('notas_fiscais!inner(numero_nf, cnpj_destinatario, valor_nf)').eq('veiculo_id', veiculo_id).limit(2000);
+      .select('notas_fiscais!inner(numero_nf, cnpj_destinatario, valor_nf, dest_razao_social, dest_logradouro, dest_numero, dest_bairro, dest_cidade, dest_uf, dest_cep)').eq('veiculo_id', veiculo_id).limit(2000);
     if (error) throw new Error('Falha ao ler as notas do veículo');
     const nfs = (vnfs ?? []).map((v: any) => v.notas_fiscais);
     if (!nfs.length) throw new Error('Veículo sem notas roteirizadas');
@@ -152,27 +188,57 @@ Deno.serve(async (req) => {
     if (doDia.length && !forcar) {
       throw new Error(`Já existe SM ${doDia.map((s: any) => s.id).join(', ')} para ${placa} em ${dBR}`);
     }
-    const modelo = [...sms].sort((a: any, b: any) => b.id - a.id).find((s: any) => motoristaConfere(veic.motorista || '', s.nomeMotorista || ''));
-    if (!modelo) throw new Error(`Motorista "${veic.motorista}" não encontrado nas SMs anteriores desta placa no portal; gerar manualmente`);
-
+    // Vehicle/terminal data come from the vehicle's latest SM; the driver is resolved per trip.
+    const modelo = [...sms].sort((a: any, b: any) => b.id - a.id)[0];
+    if (!modelo) throw new Error(`Placa ${placa} sem SM anterior no portal para copiar veículo e rastreador; gerar manualmente a primeira`);
     const copia = await portal.req(`solicitacaomonitoramento/editar/${modelo.id}?copiar=1`);
-    const motoristas = inputValor(copia.text, 'dadosSolMonitoraMotoristas');
     const veiculos = inputValor(copia.text, 'dadosSolMonitoraVeiculos');
     const terminais = inputValor(copia.text, 'dadosSolMonitoraTerminais');
-    if (!motoristas || !veiculos || !terminais) throw new Error('Não foi possível ler a SM modelo no portal');
-    const mot = JSON.parse(motoristas)[0]; const vei = JSON.parse(veiculos)[0];
+    const motoCopia = JSON.parse(inputValor(copia.text, 'dadosSolMonitoraMotoristas') || '[]')[0];
+    if (!veiculos || !terminais) throw new Error('Não foi possível ler a SM modelo no portal');
+    const vei = JSON.parse(veiculos)[0];
     const planoGr = copia.text.match(/id="viag_pgpg_codigo"[^>]*>\s*<option value="(\d+)"/)?.[1] ?? '1538';
 
-    // Customer references by CNPJ
-    const refes: { id: number; descricao: string; lat: number; lng: number; raio: number }[] = [];
-    const semCadastro: string[] = [];
-    for (const c of cnpjs) {
-      const r = (await portal.jsonData('referencia/getjsondata', c)).data ?? [];
-      const ok = r.filter((x: any) => String(x.descricao || '').replace(/\D/g, '').startsWith(c));
-      const ref = ok[0] ?? (r.length === 1 ? r[0] : null);
-      if (!ref) semCadastro.push(c); else refes.push({ id: ref.id, descricao: ref.descricao, lat: ref.latitude, lng: ref.longitude, raio: ref.raio });
+    const nomeMot = (veic.motorista || '').trim();
+    if (!nomeMot) throw new Error('Veículo sem motorista na roteirização');
+    const { data: cad } = await admin.from('motoristas').select('nome, cpf, telefone').ilike('nome', `${nomeMot}%`).eq('ativo', true).limit(5);
+    const cadUnico = (cad ?? []).length === 1 ? cad![0] : null;
+    const cpf = (cadUnico?.cpf || '').replace(/\D/g, '');
+    let candidatos: any[] = [];
+    if (cpf.length === 11) candidatos = ((await portal.jsonData('motorista/getjsondata', cpf, 10, 'nome')).data ?? []).filter((m: any) => String(m.cpf || '').replace(/\D/g, '') === cpf);
+    if (!candidatos.length) candidatos = ((await portal.jsonData('motorista/getjsondata', nomeMot, 20, 'nome')).data ?? []).filter((m: any) => motoristaConfere(nomeMot, m.nome));
+    candidatos = candidatos.filter((m: any) => String(m.status || '').toUpperCase() === 'ATIVO');
+    if (candidatos.length !== 1) {
+      throw new Error(candidatos.length
+        ? `Motorista "${nomeMot}" corresponde a ${candidatos.length} cadastros no portal; informe o nome completo na roteirização`
+        : `Motorista "${nomeMot}" não encontrado ativo no portal Overhaul`);
     }
-    if (semCadastro.length) throw new Error(`Cliente sem cadastro na Overhaul: CNPJ ${semCadastro.join(', ')}`);
+    const m = candidatos[0];
+    const motoristas = JSON.stringify([{ motoId: m.id, motoNome: m.nome, motoPrecedencia: '1', motoRg: m.rg, motoCpf: String(m.cpf || '').replace(/\./g, ''), hpmoId: null, hpmoStatus: null }]);
+    const mesmoMot = motoCopia?.motoId === m.id;
+    const tel = (cadUnico?.telefone || '').replace(/\D/g, '');
+    const celular = mesmoMot ? (inputValor(copia.text, 'celular') ?? '') : tel.length >= 10 ? `(${tel.slice(0, 2)}) ${tel.slice(2, -4)}-${tel.slice(-4)}` : '';
+    const contatoId = mesmoMot ? (inputValor(copia.text, 'contatoId') ?? '') : '';
+    detalhes.motorista = m.nome;
+
+    // Customer references by CNPJ; missing ones are registered from our customer data.
+    const refes: { id: number; descricao: string; lat: number; lng: number; raio: number }[] = [];
+    const cadastrados: string[] = [];
+    const buscarRef = async (c: string) => {
+      const r = (await portal.jsonData('referencia/getjsondata', c)).data ?? [];
+      return r.filter((x: any) => String(x.descricao || '').replace(/\D/g, '').startsWith(c))[0] ?? null;
+    };
+    for (const c of cnpjs) {
+      let ref = await buscarRef(c);
+      if (!ref) {
+        await cadastrarReferencia(admin, portal, c, nfs);
+        ref = await buscarRef(c);
+        if (!ref) throw new Error(`Portal não confirmou o cadastro do cliente CNPJ ${c}`);
+        cadastrados.push(c);
+      }
+      refes.push({ id: ref.id, descricao: ref.descricao, lat: ref.latitude, lng: ref.longitude, raio: ref.raio });
+    }
+    detalhes.clientes_cadastrados = cadastrados;
     const destino = refes[refes.length - 1];
     const paradas = refes.slice(0, -1);
 
@@ -220,8 +286,7 @@ Deno.serve(async (req) => {
     // SM form
     const ov: Record<string, string> = {
       codigoSM: String(modelo.id), codigoSmOriginal: String(modelo.id), codigoOriginal: String(modelo.id),
-      planoGr, veiculoTransportador: String(vei.veicId), motoristaPrincipal: String(mot.motoId),
-      celular: inputValor(copia.text, 'celular') ?? '', contatoId: inputValor(copia.text, 'contatoId') ?? '',
+      planoGr, veiculoTransportador: String(vei.veicId), motoristaPrincipal: String(m.id), celular, contatoId,
       previsaoInicio: `${dBR} 06:00`, previsaoFim: `${dBR} 23:55`, viag_previsao_fim_alterada_manual: '0',
       roteirizarAutomatico: 'N', semRota: 'N', rota: String(rotaId),
       latOrigem: '', lngOrigem: '', latDestino: '', lngDestino: '', codigoOrigem: '', codigoDestino: '',
