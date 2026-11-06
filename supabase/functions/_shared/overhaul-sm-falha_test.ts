@@ -5,7 +5,7 @@ Deno.test('falha de SM permanece registrada e retorna ao operador sem enviar ema
   const start = source.lastIndexOf('} catch (e) {');
   const end = source.lastIndexOf('\n  }');
   if (start < 0 || end <= start) throw new Error('Tratamento de falha não encontrado');
-  const body = source.slice(start + '} catch (e) {'.length, end);
+  const body = source.slice(start + '} catch (e) {'.length, end).replaceAll(' as Error', '');
   const registros: unknown[] = [];
   let emails = 0;
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
