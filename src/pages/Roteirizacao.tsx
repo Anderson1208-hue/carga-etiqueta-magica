@@ -2992,6 +2992,13 @@ export default function Roteirizacao() {
           }}
         />
       </div>
+      <GerarSmDialog
+        open={!!gerarSm}
+        onOpenChange={(o) => !o && setGerarSm(null)}
+        dataLabel={gerarSm ? format(new Date(gerarSm.dateStr + "T12:00:00"), "dd/MM/yyyy") : ""}
+        veiculos={gerarSm?.veics || []}
+        obterCnpjsOrdenados={obterCnpjsOrdenados}
+      />
     </MainLayout>
   );
 }
