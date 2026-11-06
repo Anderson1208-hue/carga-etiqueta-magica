@@ -20,13 +20,11 @@ interface Props {
 export function GerarSmDialog({ open, onOpenChange, dataLabel, veiculos, obterCnpjsOrdenados }: Props) {
   const [marcados, setMarcados] = useState<string[]>([]);
   const [estados, setEstados] = useState<Record<string, Estado>>({});
-  const [forcar, setForcar] = useState(false);
   const [rodando, setRodando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setMarcados([]);
-    setForcar(false);
     const ids = veiculos.map((v) => v.id);
     supabase.from("overhaul_sm").select("veiculo_id, status, sm_numero, erro, created_at")
       .in("veiculo_id", ids).order("created_at", { ascending: false })
@@ -49,7 +47,7 @@ export function GerarSmDialog({ open, onOpenChange, dataLabel, veiculos, obterCn
       try {
         const cnpjs = await obterCnpjsOrdenados(id);
         const { data, error } = await supabase.functions.invoke("overhaul-gerar-sm", {
-          body: { veiculo_id: id, cnpjs_ordenados: cnpjs, forcar },
+          body: { veiculo_id: id, cnpjs_ordenados: cnpjs },
         });
         if (error) {
           let msg = error.message;
@@ -78,7 +76,7 @@ export function GerarSmDialog({ open, onOpenChange, dataLabel, veiculos, obterCn
       <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>Gerar SM Overhaul — {dataLabel}</DialogTitle></DialogHeader>
         <p className="text-xs text-muted-foreground">
-          Só placas rastreadas podem ser marcadas. A rota vai da origem até a última entrega, com as demais entregas como paradas, na ordem da roteirização.
+          Só placas rastreadas podem ser marcadas. A rota vai da origem até a última entrega, com as demais entregas como paradas, na ordem da roteirização. Se já existir SM da placa no dia, a geração é bloqueada — exclua no portal antes de gerar outra.
         </p>
         <div className="max-h-[50vh] overflow-y-auto space-y-1">
           {veiculos.map((v) => {
@@ -104,10 +102,6 @@ export function GerarSmDialog({ open, onOpenChange, dataLabel, veiculos, obterCn
             );
           })}
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={forcar} onCheckedChange={(c) => setForcar(!!c)} disabled={rodando} />
-          Gerar mesmo se já existir SM no portal para a placa neste dia
-        </label>
         <DialogFooter>
           <Button variant="outline" onClick={() => setMarcados(elegiveis.map((v) => v.id))} disabled={rodando}>Marcar todas</Button>
           <Button onClick={gerar} disabled={rodando || marcados.length === 0}>
