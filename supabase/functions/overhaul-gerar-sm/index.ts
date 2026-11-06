@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
     const sms = ((await portal.jsonData('solicitacaomonitoramento/getjsondata', placa, 100)).data ?? [])
       .filter((s: any) => normalizarPlaca(s.veiculoPlaca) === placa);
     const maxAntes = Math.max(0, ...sms.map((s: any) => Number(s.id)));
-    const doDia = sms.filter((s: any) => String(s.dataPrevisaoInicio || '').startsWith(dBR) && !/CANCEL|EXCLU/i.test(s.statusViagem || ''));
+    const doDia = sms.filter((s: any) => String(s.dataPrevisaoInicio || '').startsWith(dBR) && !/CANCEL|EXCLU|FINALIZ/i.test(s.statusViagem || ''));
     if (doDia.length) {
       throw new Error(`Já existe SM ${doDia.map((s: any) => s.id).join(', ')} para ${placa} em ${dBR}; exclua no portal antes de gerar outra`);
     }
