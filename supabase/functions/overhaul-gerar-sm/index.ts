@@ -6,7 +6,7 @@ import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
 import { SM_FORM_TEMPLATE } from '../_shared/overhaul-sm-template.ts';
 import {
-  conferirRota, dataBR, locaisDaRota, melhorMotorista, motoristaConfere, normalizarPlaca, placaRastreada, valorBR, type PontoRota,
+  conferirRota, dataBR, locaisDaRota, melhorMotorista, motoristaConfere, normalizarPlaca, placaRastreada, termosBuscaMotorista, valorBR, type PontoRota,
 } from '../_shared/overhaul-sm-regras.ts';
 
 const B = 'https://trafegus.over-haul.com/trafegusweb/public/';
@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
     const nomeMot = (veic.motorista || '').trim();
     if (!nomeMot) throw new Error('Veículo sem motorista na roteirização');
     const { data: cad } = await admin.from('motoristas').select('nome, cpf, telefone').ilike('nome', `${nomeMot}%`).eq('ativo', true).limit(5);
-    const cadUnico = (cad ?? []).length === 1 ? cad![0] : null;
+    const cadUnico = cad?.length === 1 ? cad[0] : null;
     const cpf = (cadUnico?.cpf || '').replace(/\D/g, '');
     let candidatos: any[] = [];
     if (cpf.length === 11) candidatos = ((await portal.jsonData('motorista/getjsondata', cpf, 10, 'nome')).data ?? []).filter((m: any) => String(m.cpf || '').replace(/\D/g, '') === cpf);
@@ -248,13 +248,28 @@ Deno.serve(async (req) => {
     candidatos = candidatos.filter((m: any) => String(m.status || '').toUpperCase() === 'ATIVO');
     if (candidatos.length !== 1) {
       // Grafia diferente: usa o cadastro ativo com o nome mais próximo (operador confere e edita se preciso).
-      const ativos = ((await portal.jsonData('motorista/getjsondata', nomeMot, 20, 'nome')).data ?? [])
+      const ativos = ((await portal.jsonData('motorista/getjsondata', nomeMot, 100, 'nome')).data ?? [])
         .filter((m: any) => String(m.status || '').toUpperCase() === 'ATIVO');
+      // The portal uses substring matching: "Maximiliano" misses "MAXMILIANO".
+      // Broaden by name-token prefixes, never reuse the model SM's driver.
+      if (!ativos.length) {
+        for (const termo of termosBuscaMotorista(nomeMot)) {
+          const rows = (await portal.jsonData('motorista/getjsondata', termo, 100, 'nome')).data ?? [];
+          if (rows.length >= 100) detalhes.motorista_consulta_parcial = true;
+          for (const row of rows) {
+            if (String(row.status || '').toUpperCase() === 'ATIVO' && !ativos.some((a: any) => a.id === row.id)) ativos.push(row);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+      }
+      ativos.sort((a: any, b: any) => Number(a.id) - Number(b.id));
       const prox = melhorMotorista(nomeMot, ativos);
-      if (prox.escolhido) candidatos = [prox.escolhido];
-      else throw new Error(ativos.length
-        ? `Motorista "${nomeMot}" sem correspondência clara no portal; informe o nome completo na roteirização`
-        : `Motorista "${nomeMot}" não encontrado ativo no portal Overhaul`);
+      if (prox.escolhido) {
+        candidatos = [prox.escolhido];
+        detalhes.motorista_nome_roteirizacao = nomeMot;
+        detalhes.motorista_similaridade = prox.similaridade;
+        detalhes.motorista_revisao_operador = true;
+      } else throw new Error(`Motorista "${nomeMot}" não encontrado ativo no portal Overhaul`);
     }
     const m = candidatos[0];
     const motoristas = JSON.stringify([{ motoId: m.id, motoNome: m.nome, motoPrecedencia: '1', motoRg: m.rg, motoCpf: String(m.cpf || '').replace(/\./g, ''), hpmoId: null, hpmoStatus: null }]);
