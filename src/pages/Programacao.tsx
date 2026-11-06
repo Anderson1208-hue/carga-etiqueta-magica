@@ -295,7 +295,7 @@ export default function Programacao() {
             carga_placa: carga?.placa || "",
             carga_motorista: carga?.motorista || "",
             carga_data: carga?.data || "",
-            carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
+            carga_tipo_carga: (nf as any).termo_sensivel ? "CHOCOLATE" : (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
             razao_social_emitente: (nf as any).razao_social_emitente || "",
             tem_agendamento: !antecipadas.has(nf.id) && ehAgendada(agendamentoMap.get(nf.id)),
