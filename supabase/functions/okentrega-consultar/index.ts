@@ -30,7 +30,7 @@ Deno.serve(async req => {
     const hoje = dataBrasilia();
     if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
     // Seleciona direto as notas OK Entrega enviadas e ainda sem resultado final (blocos de 15, cursor por id).
-    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).order('id').limit(15);
+    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).gte('enviado_em', `${CONSULTA_INICIO}T03:00:00Z`).order('id').limit(15);
     if (input.data.cursor) pending = pending.gt('id', input.data.cursor);
     const { data: items, error } = await pending;
     if (error) return json({ erro: 'Falha ao selecionar fila' }, 502);
