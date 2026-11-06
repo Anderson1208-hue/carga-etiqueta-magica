@@ -3460,6 +3460,51 @@ export type Database = {
         }
         Relationships: []
       }
+      overhaul_sm: {
+        Row: {
+          created_at: string
+          criado_por: string | null
+          data_rota: string
+          detalhes: Json | null
+          erro: string | null
+          id: string
+          placa: string
+          rota_portal_id: string | null
+          sm_numero: string | null
+          status: string
+          updated_at: string
+          veiculo_id: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por?: string | null
+          data_rota: string
+          detalhes?: Json | null
+          erro?: string | null
+          id?: string
+          placa: string
+          rota_portal_id?: string | null
+          sm_numero?: string | null
+          status?: string
+          updated_at?: string
+          veiculo_id: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string | null
+          data_rota?: string
+          detalhes?: Json | null
+          erro?: string | null
+          id?: string
+          placa?: string
+          rota_portal_id?: string | null
+          sm_numero?: string | null
+          status?: string
+          updated_at?: string
+          veiculo_id?: string
+        }
+        Relationships: []
+      }
       posicoes_gps: {
         Row: {
           accuracy: number | null
