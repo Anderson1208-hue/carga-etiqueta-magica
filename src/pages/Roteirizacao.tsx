@@ -43,6 +43,7 @@ import { format } from "date-fns";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { MapaRoteirizacao } from "@/components/roteirizacao/MapaRoteirizacao";
 import { ListaParadas } from "@/components/roteirizacao/ListaParadas";
+import { GerarSmDialog } from "@/components/roteirizacao/GerarSmDialog";
 import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
@@ -160,6 +161,7 @@ export default function Roteirizacao() {
   const [alterarRotaVeiculo, setAlterarRotaVeiculo] = useState<any | null>(null);
   const [cancelarVeiculo, setCancelarVeiculo] = useState<any | null>(null);
   const [reroteirizarVeiculo, setReroteirizarVeiculo] = useState<any | null>(null);
+  const [gerarSm, setGerarSm] = useState<{ dateStr: string; veics: any[] } | null>(null);
 
   // CD coordinates (Rua da Regeneração, 235 - Rio de Janeiro)
   const [cdLat, setCdLat] = useState<string>("-22.8783");
@@ -1306,6 +1308,20 @@ export default function Roteirizacao() {
     }
     cnpjsOrdenados.forEach((cnpj, idx) => ordemPorCnpj.set(cnpj, idx + 1));
     return ordemPorCnpj;
+  }
+
+  // Ordered destination CNPJs of a vehicle, same order shown in the routing (for Overhaul SM).
+  async function obterCnpjsOrdenados(veiculoId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from("veiculo_nfs")
+      .select("carga_origem_id, notas_fiscais!inner(cnpj_destinatario)")
+      .eq("veiculo_id", veiculoId)
+      .limit(2000);
+    if (error) throw error;
+    const cnpjs = Array.from(new Set((data || []).map((v: any) => (v.notas_fiscais?.cnpj_destinatario || "").replace(/\D/g, "")).filter(Boolean)));
+    const cargaIds = Array.from(new Set((data || []).map((v: any) => v.carga_origem_id).filter(Boolean))) as string[];
+    const ordem = await buildOrdemPorCnpj(cargaIds, new Set(cnpjs));
+    return cnpjs.sort((a, b) => (ordem.get(a) ?? 9999) - (ordem.get(b) ?? 9999));
   }
 
   async function loadVeiculoNfs(veiculoId: string) {
@@ -2651,6 +2667,15 @@ export default function Roteirizacao() {
                       </span>
                       <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
                       <div className="ml-auto flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setGerarSm({ dateStr, veics })}
+                        >
+                          <Truck className="w-3.5 h-3.5 mr-1" />
+                          Gerar SM
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
