@@ -10,7 +10,7 @@ export const normalizarPlaca = (p: string) => (p || '').toUpperCase().replace(/[
 export const placaRastreada = (p: string) => PLACAS_RASTREADAS.includes(normalizarPlaca(p));
 
 const tokens = (s: string) =>
-  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/[^A-Z]+/).filter((t) => t.length > 1);
+  (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().split(/[^A-Z]+/).filter((t) => t.length > 1);
 
 // Our driver name is often shortened ("Antonio Benedito"); every token must appear in the portal name.
 export function motoristaConfere(nosso: string, portal: string): boolean {
@@ -53,4 +53,52 @@ export function conferirRota(pontos: PontoRota[], origemId: number, refesOrdenad
   const esperado = refesOrdenadas.slice(0, -1);
   if (meio.length !== esperado.length || meio.some((r, i) => r !== esperado[i])) return 'paradas da rota fora da ordem da roteirização';
   return null;
+}
+
+const normNome = (s: string) =>
+  (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+// Name similarity to match our driver register with the portal's (normalized Levenshtein: 1 = identical).
+export function similaridadeNome(a: string, b: string): number {
+  const s = normNome(a);
+  const t = normNome(b);
+  if (!s || !t) return 0;
+  if (s === t) return 1;
+  const m = s.length;
+  const n = t.length;
+  let prev: number[] = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur: number[] = [i];
+    for (let j = 1; j <= n; j++) {
+      const custo = s[i - 1] === t[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + custo);
+    }
+    prev = cur;
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+// Picks the portal driver whose name is closest to ours; requires similarity >= 0.8 and no tie.
+export function melhorMotorista<T extends { nome: string }>(
+  nomeBusca: string,
+  candidatos: T[],
+  minimo = 0.8,
+): { escolhido: T | null; similaridade: number; ambiguos: T[] } {
+  let melhor: T | null = null;
+  let melhorSim = 0;
+  const ambiguos: T[] = [];
+  for (const c of candidatos) {
+    const sim = similaridadeNome(nomeBusca, c.nome);
+    if (sim > melhorSim) {
+      melhor = c;
+      melhorSim = sim;
+      ambiguos.length = 0;
+    } else if (sim === melhorSim && melhor) {
+      ambiguos.push(c);
+    }
+  }
+  if (!melhor || melhorSim < minimo || ambiguos.length > 0) {
+    return { escolhido: null, similaridade: melhorSim, ambiguos: melhor ? [melhor, ...ambiguos] : [] };
+  }
+  return { escolhido: melhor, similaridade: melhorSim, ambiguos: [] };
 }

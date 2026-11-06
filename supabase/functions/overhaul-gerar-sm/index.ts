@@ -6,7 +6,7 @@ import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
 import { SM_FORM_TEMPLATE } from '../_shared/overhaul-sm-template.ts';
 import {
-  conferirRota, dataBR, locaisDaRota, motoristaConfere, normalizarPlaca, placaRastreada, valorBR, type PontoRota,
+  conferirRota, dataBR, locaisDaRota, melhorMotorista, motoristaConfere, normalizarPlaca, placaRastreada, valorBR, type PontoRota,
 } from '../_shared/overhaul-sm-regras.ts';
 
 const B = 'https://trafegus.over-haul.com/trafegusweb/public/';
@@ -18,7 +18,6 @@ const json = (b: unknown, status = 200) =>
 const Body = z.object({
   veiculo_id: z.string().uuid(),
   cnpjs_ordenados: z.array(z.string().min(11)).min(1).max(60),
-  forcar: z.boolean().optional(),
 });
 
 class Portal {
@@ -100,6 +99,23 @@ const b64Grande = (s: string) => {
 
 const semAcento = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
 
+// Geocodes the customer address via Nominatim (OSM), Brazil-only. Used when there is no
+// trustworthy operational coordinate; the register address is considered reliable.
+async function geocodificarEndereco(partes: (string | null | undefined)[]): Promise<{ lat: number; lng: number } | null> {
+  const q = partes.filter((p) => p && String(p).trim()).join(', ');
+  if (!q) return null;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q + ', Brasil')}`;
+    const resp = await fetch(url, { headers: { 'User-Agent': 'TLM-Logistica/1.0 (overhaul-sm)' }, signal: AbortSignal.timeout(20000) });
+    if (!resp.ok) return null;
+    const arr = await resp.json() as { lat: string; lon: string }[];
+    if (!Array.isArray(arr) || !arr.length) return null;
+    return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
 // Registers a missing customer in the portal using our customer register and operational coordinate.
 async function cadastrarReferencia(admin: any, portal: Portal, cnpj: string, nfs: any[]) {
   const nf = nfs.find((n) => String(n.cnpj_destinatario || '').replace(/\D/g, '') === cnpj);
@@ -109,8 +125,14 @@ async function cadastrarReferencia(admin: any, portal: Portal, cnpj: string, nfs
   if (!dest) throw new Error(`Cliente CNPJ ${cnpj} sem cadastro no nosso sistema para criar na Overhaul`);
   const { data: end } = await admin.rpc('resolver_endereco_operacional', { _destinatario_id: dest.id });
   const e = Array.isArray(end) ? end[0] : end;
-  if (!e?.latitude || !e?.longitude || ['legado_desconhecido', 'amostra_insuficiente'].includes(e.origem)) {
-    throw new Error(`Cliente CNPJ ${cnpj} sem localização confiável no nosso cadastro; corrija a coordenada antes de gerar a SM`);
+  let lat = e?.latitude;
+  let lng = e?.longitude;
+  if (!lat || !lng || ['legado_desconhecido', 'amostra_insuficiente'].includes(e?.origem)) {
+    // Sem coordenada operacional confiável: geocodifica o endereço do cadastro (considerado confiável).
+    const geo = await geocodificarEndereco([nf?.dest_logradouro, nf?.dest_numero, nf?.dest_bairro, nf?.dest_cidade, nf?.dest_uf]);
+    if (!geo) throw new Error(`Cliente CNPJ ${cnpj}: não foi possível localizar o endereço no mapa; confira o cadastro de clientes`);
+    lat = geo.lat;
+    lng = geo.lng;
   }
   const cidadeNome = semAcento(nf?.dest_cidade || 'RIO DE JANEIRO');
   const uf = semAcento(nf?.dest_uf || 'RJ');
@@ -125,7 +147,7 @@ async function cadastrarReferencia(admin: any, portal: Portal, cnpj: string, nfs
     ['descricao', descricao], ['temporaria', 'N'], ['codigoExterno', ''], ['cidadeReferencia', String(cidade.id)],
     ['classeReferencia', '23'], ['area', ''], ['raio', '300'], ['km', ''], ['bandeira', ''], ['tlocRefe', 'N'],
     ['tipoLocal', ''], ['raioLocal', ''], ['velocidadeMaxima', ''], ['endereco', endereco],
-    ['latitude', String(e.latitude)], ['longitude', String(e.longitude)], ['refe_pontos_area', ''],
+    ['latitude', String(lat)], ['longitude', String(lng)], ['refe_pontos_area', ''],
     ['texto', ''], ['telefone1', ''], ['celular', ''], ['radio', ''], ['email', ''], ['logradouro', ''], ['numero', ''],
     ['complemento', ''], ['tipoLogradouro', ''], ['cep', ''], ['bairro', ''], ['abreviacaoBairro', ''], ['cidade', ''],
     ['dadosClassificacaoGeral', ''], ['possuiSeguranca24h', 'N'], ['possuiPatioFechado', 'N'],
@@ -141,7 +163,7 @@ Deno.serve(async (req) => {
   if (access) return json({ mensagem: access === 401 ? 'Não autenticado' : 'Operador não aprovado' }, access);
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ mensagem: 'Dados inválidos' }, 400);
-  const { veiculo_id, forcar } = parsed.data;
+  const { veiculo_id } = parsed.data;
   const cnpjs = parsed.data.cnpjs_ordenados.map((c) => c.replace(/\D/g, ''));
   const { data: u } = await admin.auth.getUser(req.headers.get('Authorization')!.replace(/^Bearer\s+/i, ''));
 
@@ -185,8 +207,8 @@ Deno.serve(async (req) => {
       .filter((s: any) => normalizarPlaca(s.veiculoPlaca) === placa);
     const maxAntes = Math.max(0, ...sms.map((s: any) => Number(s.id)));
     const doDia = sms.filter((s: any) => String(s.dataPrevisaoInicio || '').startsWith(dBR) && !/CANCEL|EXCLU/i.test(s.statusViagem || ''));
-    if (doDia.length && !forcar) {
-      throw new Error(`Já existe SM ${doDia.map((s: any) => s.id).join(', ')} para ${placa} em ${dBR}`);
+    if (doDia.length) {
+      throw new Error(`Já existe SM ${doDia.map((s: any) => s.id).join(', ')} para ${placa} em ${dBR}; exclua no portal antes de gerar outra`);
     }
     // Vehicle/terminal data come from the vehicle's latest SM; the driver is resolved per trip.
     const modelo = [...sms].sort((a: any, b: any) => b.id - a.id)[0];
@@ -209,8 +231,13 @@ Deno.serve(async (req) => {
     if (!candidatos.length) candidatos = ((await portal.jsonData('motorista/getjsondata', nomeMot, 20, 'nome')).data ?? []).filter((m: any) => motoristaConfere(nomeMot, m.nome));
     candidatos = candidatos.filter((m: any) => String(m.status || '').toUpperCase() === 'ATIVO');
     if (candidatos.length !== 1) {
-      throw new Error(candidatos.length
-        ? `Motorista "${nomeMot}" corresponde a ${candidatos.length} cadastros no portal; informe o nome completo na roteirização`
+      // Grafia diferente: usa o cadastro ativo com o nome mais próximo (operador confere e edita se preciso).
+      const ativos = ((await portal.jsonData('motorista/getjsondata', nomeMot, 20, 'nome')).data ?? [])
+        .filter((m: any) => String(m.status || '').toUpperCase() === 'ATIVO');
+      const prox = melhorMotorista(nomeMot, ativos);
+      if (prox.escolhido) candidatos = [prox.escolhido];
+      else throw new Error(ativos.length
+        ? `Motorista "${nomeMot}" sem correspondência clara no portal; informe o nome completo na roteirização`
         : `Motorista "${nomeMot}" não encontrado ativo no portal Overhaul`);
     }
     const m = candidatos[0];

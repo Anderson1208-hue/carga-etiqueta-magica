@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { PLACAS_RASTREADAS, placaRastreada, motoristaConfere, conferirRota, locaisDaRota } from './overhaul-sm-regras.ts';
+import { PLACAS_RASTREADAS, placaRastreada, motoristaConfere, conferirRota, locaisDaRota, similaridadeNome, melhorMotorista } from './overhaul-sm-regras.ts';
 
 Deno.test('somente as 39 placas rastreadas, hífen ignorado e LKU2A09 corrigida', () => {
   assertEquals(PLACAS_RASTREADAS.length, 39);
@@ -21,4 +21,31 @@ Deno.test('rota: origem, paradas na ordem e última entrega como destino', () =>
   assertEquals(conferirRota(pontos, 10, [1, 2, 3]), null);
   assertEquals(conferirRota(pontos, 10, [2, 1, 3]), 'paradas da rota fora da ordem da roteirização');
   assertEquals(locaisDaRota(pontos).map((l) => l[1]), [1, 2]);
+});
+
+Deno.test('similaridadeNome: idêntico = 1, ignora acentos e caixa', () => {
+  assertEquals(similaridadeNome('João Silva', 'JOAO SILVA'), 1);
+  assertEquals(similaridadeNome('', 'X'), 0);
+});
+
+Deno.test('melhorMotorista: escolhe o mais próximo acima do mínimo', () => {
+  const candidatos = [
+    { nome: 'MOACIR FERREIRA DA SILVA' },
+    { nome: 'MOACIR F SILVA' },
+    { nome: 'PEDRO SANTOS' },
+  ];
+  const r = melhorMotorista('MOACIR FERREIRA SILVA', candidatos);
+  assertEquals(r.escolhido?.nome, 'MOACIR FERREIRA DA SILVA');
+  assertEquals(r.ambiguos, []);
+});
+
+Deno.test('melhorMotorista: rejeita quando nenhum alcança o mínimo', () => {
+  const r = melhorMotorista('CARLOS ALBERTO', [{ nome: 'PEDRO SANTOS' }]);
+  assertEquals(r.escolhido, null);
+});
+
+Deno.test('melhorMotorista: rejeita empate ambíguo', () => {
+  const r = melhorMotorista('JOSE SILVA', [{ nome: 'JOSE SILVA' }, { nome: 'JOSE SILVA' }]);
+  assertEquals(r.escolhido, null);
+  assertEquals(r.ambiguos.length, 2);
 });
