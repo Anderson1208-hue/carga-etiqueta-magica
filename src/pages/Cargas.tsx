@@ -538,14 +538,7 @@ export default function Cargas() {
           <div className="flex items-center gap-2">
             <Button onClick={() => openImportDialog("SECA")}>
               <Plus className="w-4 h-4 mr-2" />
-              Nova Carga (Seca)
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => openImportDialog("CHOCOLATE")}
-            >
-              <AlertTriangle className="w-4 h-4 mr-2" />
-              Nova Carga (Chocolate)
+              Nova Carga
             </Button>
           </div>
         </div>
@@ -576,7 +569,7 @@ export default function Cargas() {
                     <span>Nova Carga – CHOCOLATE (Termo Sensível)</span>
                   </>
                 ) : (
-                  <span>Nova Carga (Seca)</span>
+                  <span>Nova Carga</span>
                 )}
               </DialogTitle>
             </DialogHeader>
@@ -586,6 +579,8 @@ export default function Cargas() {
                 <strong>⚠ ATENÇÃO:</strong> Todos os XMLs importados por este fluxo serão marcados como <strong>CHOCOLATE – TERMO SENSÍVEL</strong> e destacados em vermelho em todas as telas do sistema.
               </div>
             )}
+
+            <p className="text-xs text-muted-foreground">Notas de chocolate são identificadas automaticamente pelo cliente e pelo cadastro de produtos e destacadas em vermelho.</p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">

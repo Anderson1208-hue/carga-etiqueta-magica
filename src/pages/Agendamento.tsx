@@ -200,7 +200,7 @@ export default function Agendamento() {
         const nfIds = data.map(a => a.nf_id);
         const { data: nfsData } = await supabase
           .from("notas_fiscais")
-          .select("id, numero_nf, dest_razao_social, dest_cidade, carga_id")
+          .select("id, numero_nf, dest_razao_social, dest_cidade, carga_id, termo_sensivel")
           .in("id", nfIds)
           .limit(2000);
 
@@ -232,7 +232,7 @@ export default function Agendamento() {
             numero_nf: nf?.numero_nf,
             dest_razao_social: nf?.dest_razao_social,
             dest_cidade: nf?.dest_cidade,
-            tipo_carga: nf ? cargaMap.get(nf.carga_id) || "SECA" : "SECA",
+            tipo_carga: (nf as any)?.termo_sensivel ? "CHOCOLATE" : nf ? cargaMap.get(nf.carga_id) || "SECA" : "SECA",
             numero_cte: cte?.numero_cte ?? null,
             cte_emitente: cte?.razao_social_emitente ?? null,
           };
@@ -273,7 +273,7 @@ export default function Agendamento() {
           const batch = multiTerms.slice(i, i + batchSize);
           const { data, error } = await supabase
             .from("notas_fiscais")
-            .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+            .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id, termo_sensivel")
             .in("numero_nf", batch);
           if (error) throw error;
           if (data) allData.push(...data);
@@ -282,7 +282,7 @@ export default function Agendamento() {
         // Single term - search across multiple fields
         const { data, error } = await supabase
           .from("notas_fiscais")
-          .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id")
+          .select("id, numero_nf, chave_acesso, dest_razao_social, dest_cidade, dest_uf, cnpj_destinatario, status_entrega, carga_id, termo_sensivel")
           .or(`numero_nf.ilike.%${term}%,chave_acesso.ilike.%${term}%,dest_razao_social.ilike.%${term}%,cnpj_destinatario.ilike.%${term}%`)
           .limit(100);
         if (error) throw error;
@@ -325,7 +325,7 @@ export default function Agendamento() {
 
         setNfResults(allData.map(n => ({
           ...n,
-          tipo_carga: cargaMap.get(n.carga_id) || "SECA",
+          tipo_carga: (n as any).termo_sensivel ? "CHOCOLATE" : cargaMap.get(n.carga_id) || "SECA",
           agendamento_status: agMap.get(n.id)?.status ?? null,
           agendamento_data: agMap.get(n.id)?.data_agendamento ?? null,
           numero_cte: cteMap.get(n.id)?.numero_cte ?? null,

@@ -122,7 +122,7 @@ export default function Programacao() {
 
       const pageSize = 1000;
       const nfSelect = `
-        id, numero_nf, chave_acesso, cnpj_destinatario,
+        id, numero_nf, chave_acesso, cnpj_destinatario, termo_sensivel,
         dest_razao_social, dest_bairro, dest_cep,
         dest_logradouro, dest_numero, dest_cidade, dest_uf,
         peso_bruto, volume_m3, valor_nf, carga_id, status_entrega,
@@ -295,7 +295,7 @@ export default function Programacao() {
             carga_placa: carga?.placa || "",
             carga_motorista: carga?.motorista || "",
             carga_data: carga?.data || "",
-            carga_tipo_carga: (carga as any)?.tipo_carga || "SECA",
+            carga_tipo_carga: (nf as any).termo_sensivel ? "CHOCOLATE" : (carga as any)?.tipo_carga || "SECA",
             numero_cte: cteMap.get(nf.id) || "",
             razao_social_emitente: (nf as any).razao_social_emitente || "",
             tem_agendamento: !antecipadas.has(nf.id) && ehAgendada(agendamentoMap.get(nf.id)),
