@@ -11,7 +11,6 @@ import {
 
 const B = 'https://trafegus.over-haul.com/trafegusweb/public/';
 const ORIGEM = { id: 4943370, lat: -22.8613074176, lng: -43.2492269325, descricao: 'EBENEZER MATRIZ (BONSUCESSO/RJ)' };
-const EMAIL_FALHA = 'arquivostlm@tlmlogistica.com.br';
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -380,12 +379,6 @@ Deno.serve(async (req) => {
   } catch (e) {
     const msg = String((e as Error)?.message ?? e).slice(0, 500);
     await finalizar({ status: 'falha', erro: msg, rota_portal_id: detalhes.rota_id ? String(detalhes.rota_id) : null });
-    await admin.functions.invoke('send-transactional-email', {
-      body: {
-        templateName: 'overhaul-sm-falha', recipientEmail: EMAIL_FALHA, idempotencyKey: `overhaul-sm-${reg.id}`,
-        templateData: { placa, data: dataBR(veic.data), motivo: msg },
-      },
-    }).catch(() => null);
     return json({ status: 'falha', erro: msg });
   }
 });
