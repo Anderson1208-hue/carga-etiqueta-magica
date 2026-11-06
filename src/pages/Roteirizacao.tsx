@@ -165,6 +165,7 @@ export default function Roteirizacao() {
   const [cdLat, setCdLat] = useState<string>("-22.8783");
   const [cdLng, setCdLng] = useState<string>("-43.3367");
   const [cdNome, setCdNome] = useState<string>("CD - Rua da Regeneração, 235");
+  const [mostrarPartida, setMostrarPartida] = useState(false);
 
   const selectedCargas = cargas.filter((c) => selectedCargaIds.includes(c.id));
 
@@ -2105,9 +2106,19 @@ export default function Roteirizacao() {
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Navigation className="w-4 h-4" />
-                  Ponto de Partida (CD)
+                  Origem: <span className="font-normal">{cdNome || "Centro de Distribuição"}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => setMostrarPartida((v) => !v)}
+                  >
+                    {mostrarPartida ? "Ocultar ponto de partida" : "Alterar ponto de partida"}
+                  </Button>
                 </CardTitle>
               </CardHeader>
+              {mostrarPartida && (
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-4">
                   <div>
@@ -2136,6 +2147,7 @@ export default function Roteirizacao() {
                   </div>
                 </div>
               </CardContent>
+              )}
             </Card>
 
             {/* Filtro por Macro Região */}
