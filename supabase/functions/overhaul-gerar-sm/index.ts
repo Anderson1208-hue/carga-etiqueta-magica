@@ -210,16 +210,32 @@ Deno.serve(async (req) => {
     if (doDia.length) {
       throw new Error(`Já existe SM ${doDia.map((s: any) => s.id).join(', ')} para ${placa} em ${dBR}; exclua no portal antes de gerar outra`);
     }
-    // Vehicle/terminal data come from the vehicle's latest SM; the driver is resolved per trip.
-    const modelo = [...sms].sort((a: any, b: any) => b.id - a.id)[0];
-    if (!modelo) throw new Error(`Placa ${placa} sem SM anterior no portal para copiar veículo e rastreador; gerar manualmente a primeira`);
-    const copia = await portal.req(`solicitacaomonitoramento/editar/${modelo.id}?copiar=1`);
-    const veiculos = inputValor(copia.text, 'dadosSolMonitoraVeiculos');
-    const terminais = inputValor(copia.text, 'dadosSolMonitoraTerminais');
-    const motoCopia = JSON.parse(inputValor(copia.text, 'dadosSolMonitoraMotoristas') || '[]')[0];
-    if (!veiculos || !terminais) throw new Error('Não foi possível ler a SM modelo no portal');
+    // Vehicle/terminal data come from the vehicle's latest READABLE SM; the driver is resolved per trip.
+    // Some SMs (e.g. created manually without route) make the portal's copy form fail — skip to the previous one.
+    const modelos = [...sms].sort((a: any, b: any) => b.id - a.id).slice(0, 5);
+    if (!modelos.length) throw new Error(`Placa ${placa} sem SM anterior no portal para copiar veículo e rastreador; gerar manualmente a primeira`);
+    let modelo: any = null;
+    let copia: { text: string } | null = null;
+    let veiculos: string | null = null;
+    let terminais: string | null = null;
+    let motoCopia: any = null;
+    let planoGr = '1538';
+    for (const cand of modelos) {
+      const c = await portal.req(`solicitacaomonitoramento/editar/${cand.id}?copiar=1`);
+      const v = inputValor(c.text, 'dadosSolMonitoraVeiculos');
+      const t = inputValor(c.text, 'dadosSolMonitoraTerminais');
+      if (v && t) {
+        modelo = cand;
+        copia = c;
+        veiculos = v;
+        terminais = t;
+        motoCopia = JSON.parse(inputValor(c.text, 'dadosSolMonitoraMotoristas') || '[]')[0];
+        planoGr = c.text.match(/id="viag_pgpg_codigo"[^>]*>\s*<option value="(\d+)"/)?.[1] ?? '1538';
+        break;
+      }
+    }
+    if (!modelo || !copia || !veiculos || !terminais) throw new Error('Não foi possível ler nenhuma SM anterior da placa no portal');
     const vei = JSON.parse(veiculos)[0];
-    const planoGr = copia.text.match(/id="viag_pgpg_codigo"[^>]*>\s*<option value="(\d+)"/)?.[1] ?? '1538';
 
     const nomeMot = (veic.motorista || '').trim();
     if (!nomeMot) throw new Error('Veículo sem motorista na roteirização');
