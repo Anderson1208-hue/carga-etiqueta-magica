@@ -1,5 +1,5 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1';
-import { PLACAS_RASTREADAS, placaRastreada, motoristaConfere, conferirRota, locaisDaRota, similaridadeNome, melhorMotorista } from './overhaul-sm-regras.ts';
+import { PLACAS_RASTREADAS, placaRastreada, motoristaConfere, conferirRota, locaisDaRota, similaridadeNome, melhorMotorista, termosBuscaMotorista } from './overhaul-sm-regras.ts';
 
 Deno.test('somente as 39 placas rastreadas, hífen ignorado e LKU2A09 corrigida', () => {
   assertEquals(PLACAS_RASTREADAS.length, 39);
@@ -28,7 +28,7 @@ Deno.test('similaridadeNome: idêntico = 1, ignora acentos e caixa', () => {
   assertEquals(similaridadeNome('', 'X'), 0);
 });
 
-Deno.test('melhorMotorista: escolhe o mais próximo acima do mínimo', () => {
+Deno.test('melhorMotorista: escolhe o mais próximo', () => {
   const candidatos = [
     { nome: 'MOACIR FERREIRA DA SILVA' },
     { nome: 'MOACIR F SILVA' },
@@ -39,13 +39,20 @@ Deno.test('melhorMotorista: escolhe o mais próximo acima do mínimo', () => {
   assertEquals(r.ambiguos, []);
 });
 
-Deno.test('melhorMotorista: rejeita quando nenhum alcança o mínimo', () => {
-  const r = melhorMotorista('CARLOS ALBERTO', [{ nome: 'PEDRO SANTOS' }]);
-  assertEquals(r.escolhido, null);
+Deno.test('LQG1H40: Maximiliano encontra MAXMILIANO abreviado sem mínimo de similaridade', () => {
+  assertEquals(termosBuscaMotorista('Maximiliano'), ['MAX']);
+  const r = melhorMotorista('Maximiliano', [{ nome: 'MAXMILIANO SOARES DE AZEVEDO' }, { nome: 'MAXWELL DOS SANTOS' }]);
+  assertEquals(r.escolhido?.nome, 'MAXMILIANO SOARES DE AZEVEDO');
+  assert(r.similaridade < 0.8);
 });
 
-Deno.test('melhorMotorista: rejeita empate ambíguo', () => {
+Deno.test('melhorMotorista: empate não bloqueia revisão pelo operador', () => {
   const r = melhorMotorista('JOSE SILVA', [{ nome: 'JOSE SILVA' }, { nome: 'JOSE SILVA' }]);
-  assertEquals(r.escolhido, null);
-  assertEquals(r.ambiguos.length, 2);
+  assertEquals(r.escolhido?.nome, 'JOSE SILVA');
+  assertEquals(r.ambiguos.length, 1);
+});
+
+Deno.test('motorista ausente não inventa cadastro', () => {
+  assertEquals(melhorMotorista('Maximiliano', []).escolhido, null);
+  assertEquals(melhorMotorista('', [{ nome: 'MAXMILIANO' }]).escolhido, null);
 });

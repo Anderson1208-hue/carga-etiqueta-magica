@@ -78,16 +78,22 @@ export function similaridadeNome(a: string, b: string): number {
   return 1 - prev[n] / Math.max(m, n);
 }
 
-// Picks the portal driver whose name is closest to ours; requires similarity >= 0.8 and no tie.
+// Broaden portal substring searches when a misspelling excludes the full name.
+export function termosBuscaMotorista(nome: string): string[] {
+  return [...new Set(tokens(nome).filter((t) => t.length >= 3).map((t) => t.slice(0, 3)))].slice(0, 4);
+}
+
+// Operator reviews the selected driver in the portal during the pilot; no minimum score.
+// Sort first so equally close names are selected deterministically.
 export function melhorMotorista<T extends { nome: string }>(
   nomeBusca: string,
   candidatos: T[],
-  minimo = 0.8,
 ): { escolhido: T | null; similaridade: number; ambiguos: T[] } {
+  if (!normNome(nomeBusca)) return { escolhido: null, similaridade: 0, ambiguos: [] };
   let melhor: T | null = null;
-  let melhorSim = 0;
+  let melhorSim = -1;
   const ambiguos: T[] = [];
-  for (const c of candidatos) {
+  for (const c of [...candidatos].filter((c) => normNome(c.nome)).sort((a, b) => normNome(a.nome).localeCompare(normNome(b.nome)))) {
     const sim = similaridadeNome(nomeBusca, c.nome);
     if (sim > melhorSim) {
       melhor = c;
@@ -97,8 +103,5 @@ export function melhorMotorista<T extends { nome: string }>(
       ambiguos.push(c);
     }
   }
-  if (!melhor || melhorSim < minimo || ambiguos.length > 0) {
-    return { escolhido: null, similaridade: melhorSim, ambiguos: melhor ? [melhor, ...ambiguos] : [] };
-  }
-  return { escolhido: melhor, similaridade: melhorSim, ambiguos: [] };
+  return { escolhido: melhor, similaridade: Math.max(0, melhorSim), ambiguos };
 }
