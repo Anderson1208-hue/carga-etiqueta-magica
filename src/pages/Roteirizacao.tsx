@@ -2577,6 +2577,19 @@ export default function Roteirizacao() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Dia</Label>
+                <Select value={filtroDia} onValueChange={setFiltroDia}>
+                  <SelectTrigger className="w-24"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {Array.from({ length: diasNoMes }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>{String(d).padStart(2, "0")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex-1 min-w-[220px]">
                 <Label className="text-xs">Buscar placa / motorista</Label>
                 <div className="relative">
@@ -2627,21 +2640,6 @@ export default function Roteirizacao() {
                       : `${nfSearchIds?.size ?? 0} veículo(s) com essa NF`}
                   </p>
                 )}
-              </div>
-            </div>
-
-
-              <div>
-                <Label className="text-xs">Dia</Label>
-                <Select value={filtroDia} onValueChange={setFiltroDia}>
-                  <SelectTrigger className="w-24"><SelectValue placeholder="Todos" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {Array.from({ length: diasNoMes }, (_, i) => i + 1).map((d) => (
-                      <SelectItem key={d} value={String(d)}>{String(d).padStart(2, "0")}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
