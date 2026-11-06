@@ -165,6 +165,7 @@ export default function Roteirizacao() {
   const [cdLat, setCdLat] = useState<string>("-22.8783");
   const [cdLng, setCdLng] = useState<string>("-43.3367");
   const [cdNome, setCdNome] = useState<string>("CD - Rua da Regeneração, 235");
+  const [mostrarPartida, setMostrarPartida] = useState(false);
 
   const selectedCargas = cargas.filter((c) => selectedCargaIds.includes(c.id));
 
