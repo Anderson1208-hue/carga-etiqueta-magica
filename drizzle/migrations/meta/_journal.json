@@ -274,6 +274,13 @@
       "when": 1793986100631,
       "tag": "0038_okentrega_baixa_apos_prestacao",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794227625022,
+      "tag": "0039_integracao_retry",
+      "breakpoints": true
     }
   ]
 }

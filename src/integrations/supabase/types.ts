@@ -2626,6 +2626,36 @@ export type Database = {
         }
         Relationships: []
       }
+      integracao_tentativas: {
+        Row: {
+          created_at: string
+          erro: string | null
+          http_status: number | null
+          id: string
+          integracao: string
+          sucesso: boolean
+          tentativa: number
+        }
+        Insert: {
+          created_at?: string
+          erro?: string | null
+          http_status?: number | null
+          id?: string
+          integracao: string
+          sucesso: boolean
+          tentativa: number
+        }
+        Update: {
+          created_at?: string
+          erro?: string | null
+          http_status?: number | null
+          id?: string
+          integracao?: string
+          sucesso?: boolean
+          tentativa?: number
+        }
+        Relationships: []
+      }
       itens_nf: {
         Row: {
           c_prod: string
@@ -4982,6 +5012,18 @@ export type Database = {
       }
       importar_carga_xml_lote: { Args: { payload: Json }; Returns: Json }
       importar_produtos_lote: { Args: { payload: Json }; Returns: Json }
+      integracao_disparar: {
+        Args: { p_integracao: string; p_tentativa: number }
+        Returns: number
+      }
+      integracao_retry_agendar: {
+        Args: { p_integracao: string; p_tentativa: number }
+        Returns: undefined
+      }
+      integracao_retry_cancelar: {
+        Args: { p_integracao: string }
+        Returns: undefined
+      }
       is_active_operator: { Args: never; Returns: boolean }
       is_admin:
         | { Args: never; Returns: boolean }
