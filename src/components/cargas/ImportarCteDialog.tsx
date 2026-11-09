@@ -263,6 +263,24 @@ export function ImportarCteDialog({
           }
         }
 
+        // Guarda componentes do frete + XML completo à parte, sem tocar nos vínculos.
+        // Reimportar um CT-e já existente só preenche o detalhe que faltava.
+        const detalhesRows = successFiles
+          .filter((f) => f.data)
+          .map((f) => ({
+            chave_cte: f.data!.chaveCte,
+            numero_cte: f.data!.numeroCte,
+            data_emissao: f.data!.dataEmissao,
+            ...f.data!.detalhes,
+            xml: f.data!.xmlOriginal,
+          }));
+        for (let i = 0; i < detalhesRows.length; i += 50) {
+          const { error: detErr } = await supabase
+            .from("cte_detalhes")
+            .upsert(detalhesRows.slice(i, i + 50) as any, { onConflict: "chave_cte", ignoreDuplicates: true });
+          if (detErr) console.error("Falha ao guardar detalhes do CT-e:", detErr);
+        }
+
         toast({
           title: result.imported.length ? "CT-es importados!" : "CT-es já vinculados",
           description:

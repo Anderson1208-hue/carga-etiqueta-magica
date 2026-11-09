@@ -1216,6 +1216,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cte_detalhes: {
+        Row: {
+          cfop: string | null
+          chave_cte: string
+          componentes: Json
+          created_at: string
+          created_by: string | null
+          data_emissao: string | null
+          icms: Json | null
+          municipio_fim: string | null
+          municipio_inicio: string | null
+          numero_cte: string | null
+          quantidades: Json
+          uf_fim: string | null
+          uf_inicio: string | null
+          valor_carga: number | null
+          valor_receber: number | null
+          valor_total_prestacao: number | null
+          xml: string | null
+        }
+        Insert: {
+          cfop?: string | null
+          chave_cte: string
+          componentes?: Json
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          icms?: Json | null
+          municipio_fim?: string | null
+          municipio_inicio?: string | null
+          numero_cte?: string | null
+          quantidades?: Json
+          uf_fim?: string | null
+          uf_inicio?: string | null
+          valor_carga?: number | null
+          valor_receber?: number | null
+          valor_total_prestacao?: number | null
+          xml?: string | null
+        }
+        Update: {
+          cfop?: string | null
+          chave_cte?: string
+          componentes?: Json
+          created_at?: string
+          created_by?: string | null
+          data_emissao?: string | null
+          icms?: Json | null
+          municipio_fim?: string | null
+          municipio_inicio?: string | null
+          numero_cte?: string | null
+          quantidades?: Json
+          uf_fim?: string | null
+          uf_inicio?: string | null
+          valor_carga?: number | null
+          valor_receber?: number | null
+          valor_total_prestacao?: number | null
+          xml?: string | null
+        }
+        Relationships: []
+      }
       ctes: {
         Row: {
           carga_id: string
