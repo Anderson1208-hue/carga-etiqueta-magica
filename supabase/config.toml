@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.alerta-saude-gps]
 verify_jwt = false
+
+[functions.integracao-guardiao]
+verify_jwt = false
