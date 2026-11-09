@@ -10,6 +10,21 @@ export interface CTeParsed {
   valorFrete: number;
   volumeM3: number;
   dataEmissao: string | null; // <ide><dhEmi> (YYYY-MM-DD)
+  /** Componentes do frete e dados fiscais, guardados à parte (cte_detalhes). */
+  detalhes: {
+    cfop: string | null;
+    municipio_inicio: string | null;
+    uf_inicio: string | null;
+    municipio_fim: string | null;
+    uf_fim: string | null;
+    valor_total_prestacao: number | null;
+    valor_receber: number | null;
+    componentes: Array<{ nome: string; valor: number }>;
+    quantidades: Array<{ unidade: string; tipo: string; quantidade: number }>;
+    icms: Record<string, string> | null;
+    valor_carga: number | null;
+  };
+  xmlOriginal: string;
 }
 
 export function parseCTeXML(xmlString: string): CTeParsed {
@@ -117,7 +132,39 @@ export function parseCTeXML(xmlString: string): CTeParsed {
     }
   }
 
+  const txt = (sel: string) => xmlDoc.querySelector(sel)?.textContent?.trim() || null;
+  const num = (v: string | null | undefined) => (v == null || v === "" ? null : parseFloat(v));
+  const componentes = Array.from(xmlDoc.querySelectorAll("vPrest Comp")).map((c) => ({
+    nome: c.querySelector("xNome")?.textContent?.trim() || "",
+    valor: num(c.querySelector("vComp")?.textContent) ?? 0,
+  }));
+  const quantidades = infQNodes.map((n) => ({
+    unidade: n.querySelector("cUnid")?.textContent?.trim() || "",
+    tipo: n.querySelector("tpMed")?.textContent?.trim() || "",
+    quantidade: num(n.querySelector("qCarga")?.textContent) ?? 0,
+  }));
+  const icmsNode = xmlDoc.querySelector("imp ICMS");
+  const icmsGrupo = icmsNode?.firstElementChild;
+  const icms = icmsGrupo
+    ? Object.fromEntries(Array.from(icmsGrupo.children).map((e) => [e.localName, e.textContent?.trim() || ""]).concat([["grupo", icmsGrupo.localName]]))
+    : null;
+  const detalhes = {
+    cfop: txt("ide CFOP"),
+    municipio_inicio: txt("ide xMunIni"),
+    uf_inicio: txt("ide UFIni"),
+    municipio_fim: txt("ide xMunFim"),
+    uf_fim: txt("ide UFFim"),
+    valor_total_prestacao: num(vTPrest?.textContent),
+    valor_receber: num(vRec?.textContent),
+    componentes,
+    quantidades,
+    icms,
+    valor_carga: num(txt("infCarga vCarga")),
+  };
+
   return {
+    detalhes,
+    xmlOriginal: xmlString,
     chaveCte,
     numeroCte,
     cnpjEmitente,
