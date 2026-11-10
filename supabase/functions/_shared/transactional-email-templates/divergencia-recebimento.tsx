@@ -29,7 +29,7 @@ const Email = ({ carga = '', placa = '', data = '', operador = '', itens = [], c
             <Text style={alert}><strong>NFs canceladas por falta total</strong> (motivo de devolução: Não veio produto — Falta oriunda da origem): {canceladas.join(', ')}</Text>
           </>
         ) : null}
-        <Text style={muted}>A planilha no modelo da Cacau e as fotos são baixadas na tela Divergência de Recebimento. TLM Logística.</Text>
+        <Text style={muted}>A planilha e as fotos são baixadas na tela de divergência do sistema. TLM Logística.</Text>
       </Container>
     </Body>
   </Html>

@@ -846,6 +846,7 @@ export type Database = {
           data: string
           id: string
           import_batch_id: string | null
+          lacre: string | null
           motorista: string
           numero_carga: string | null
           observacao: string | null
@@ -861,6 +862,7 @@ export type Database = {
           data?: string
           id?: string
           import_batch_id?: string | null
+          lacre?: string | null
           motorista: string
           numero_carga?: string | null
           observacao?: string | null
@@ -876,6 +878,7 @@ export type Database = {
           data?: string
           id?: string
           import_batch_id?: string | null
+          lacre?: string | null
           motorista?: string
           numero_carga?: string | null
           observacao?: string | null
@@ -1650,6 +1653,83 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "divergencias_recebimento_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      divergencias_recebimento_clientes: {
+        Row: {
+          c_prod: string
+          cancelado_em: string | null
+          cancelado_motivo: string | null
+          cancelado_por: string | null
+          carga_id: string
+          criado_em: string
+          criado_por: string
+          criado_por_nome: string | null
+          embarcador: string
+          fotos: string[]
+          id: string
+          nf_id: string | null
+          numero_nf: string
+          observacao: string | null
+          qtd_nf: number | null
+          qtd_recebida: number | null
+          quantidade: number
+          retorno_cd: string | null
+          status: string
+          x_prod: string
+        }
+        Insert: {
+          c_prod: string
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cancelado_por?: string | null
+          carga_id: string
+          criado_em?: string
+          criado_por: string
+          criado_por_nome?: string | null
+          embarcador: string
+          fotos?: string[]
+          id?: string
+          nf_id?: string | null
+          numero_nf?: string
+          observacao?: string | null
+          qtd_nf?: number | null
+          qtd_recebida?: number | null
+          quantidade: number
+          retorno_cd?: string | null
+          status: string
+          x_prod: string
+        }
+        Update: {
+          c_prod?: string
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cancelado_por?: string | null
+          carga_id?: string
+          criado_em?: string
+          criado_por?: string
+          criado_por_nome?: string | null
+          embarcador?: string
+          fotos?: string[]
+          id?: string
+          nf_id?: string | null
+          numero_nf?: string
+          observacao?: string | null
+          qtd_nf?: number | null
+          qtd_recebida?: number | null
+          quantidade?: number
+          retorno_cd?: string | null
+          status?: string
+          x_prod?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "divergencias_recebimento_clientes_nf_id_fkey"
             columns: ["nf_id"]
             isOneToOne: false
             referencedRelation: "notas_fiscais"
@@ -5204,6 +5284,10 @@ export type Database = {
         Returns: Json
       }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      cancelar_divergencia_cliente: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: undefined
+      }
       cancelar_divergencia_recebimento: {
         Args: { p_id: string; p_motivo: string }
         Returns: Json
@@ -5250,6 +5334,10 @@ export type Database = {
         Returns: number
       }
       contar_canhotos_pendentes: { Args: never; Returns: number }
+      definir_lacre_carga: {
+        Args: { p_carga_id: string; p_lacre: string }
+        Returns: undefined
+      }
       detectar_paradas_nao_programadas: { Args: never; Returns: Json }
       detectar_paradas_suspeitas: {
         Args: { p_rota_id: string }
@@ -5269,6 +5357,10 @@ export type Database = {
         }[]
       }
       e_dia_util_rj: { Args: { p_data: string }; Returns: boolean }
+      embarcador_divergencia_cliente: {
+        Args: { p_cnpj: string }
+        Returns: string
+      }
       enriquecer_cadastros_fiscais_lote: {
         Args: { payload: Json }
         Returns: Json
@@ -5560,6 +5652,22 @@ export type Database = {
       }
       registrar_chegada_cd_manual: {
         Args: { p_nf_id: string; p_observacao?: string }
+        Returns: Json
+      }
+      registrar_divergencia_cliente: {
+        Args: {
+          p_c_prod: string
+          p_carga_id: string
+          p_embarcador: string
+          p_fotos: string[]
+          p_nf_id: string
+          p_observacao: string
+          p_qtd_recebida: number
+          p_quantidade: number
+          p_retorno_cd: string
+          p_status: string
+          p_x_prod: string
+        }
         Returns: Json
       }
       registrar_divergencia_recebimento: {

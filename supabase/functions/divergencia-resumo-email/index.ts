@@ -19,9 +19,15 @@ Deno.serve(async (req) => {
   const cargaId = String(corpo?.carga_id ?? '')
   if (!/^[0-9a-f-]{36}$/i.test(cargaId)) return json({ error: 'carga inválida' }, 400)
 
-  const { data: itens, error } = await sb.from('divergencias_recebimento')
-    .select('id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos')
-    .eq('carga_id', cargaId).is('cancelado_em', null).order('numero_nf').order('c_prod').limit(1000)
+  const clientes = corpo?.origem === 'clientes'
+  const { data: itens, error } = clientes
+    ? await sb.from('divergencias_recebimento_clientes')
+      .select('id, numero_nf, c_prod, x_prod, status, embarcador, retorno_cd, quantidade, observacao, fotos')
+      .eq('carga_id', cargaId).is('cancelado_em', null).order('embarcador').order('numero_nf').order('c_prod').limit(1000)
+      .then((r: any) => ({ ...r, data: (r.data ?? []).map((i: any) => ({ ...i, tipo: `${i.embarcador} — ${i.status}${i.retorno_cd ? ` (${i.retorno_cd})` : ''}` })) }))
+    : await sb.from('divergencias_recebimento')
+      .select('id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos')
+      .eq('carga_id', cargaId).is('cancelado_em', null).order('numero_nf').order('c_prod').limit(1000)
   if (error) return json({ error: error.message }, 500)
   if (!itens?.length) return json({ error: 'Nenhuma divergência lançada nesta carga' }, 400)
   const { data: carga } = await sb.from('cargas').select('numero_carga, placa').eq('id', cargaId).maybeSingle()
@@ -32,7 +38,7 @@ Deno.serve(async (req) => {
   const { error: e2 } = await sb.functions.invoke('send-transactional-email', {
     body: {
       templateName: 'divergencia-recebimento',
-      idempotencyKey: `divergencia-recebimento-${cargaId}-${itens.length}-${h}`,
+      idempotencyKey: `divergencia-recebimento-${clientes ? 'clientes-' : ''}${cargaId}-${itens.length}-${h}`,
       templateData: {
         carga: carga?.numero_carga ?? '', placa: carga?.placa ?? '',
         data: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
@@ -44,6 +50,6 @@ Deno.serve(async (req) => {
     },
   })
   if (e2) { console.error('[divergencia-resumo-email]', e2); return json({ error: 'Falha no envio do e-mail' }, 502) }
-  await sb.from('divergencias_recebimento_envios').insert({ carga_id: cargaId, ocorrencias: itens.length, enviado_por: u.user!.id })
+  if (!clientes) await sb.from('divergencias_recebimento_envios').insert({ carga_id: cargaId, ocorrencias: itens.length, enviado_por: u.user!.id })
   return json({ ok: true, ocorrencias: itens.length })
 })
