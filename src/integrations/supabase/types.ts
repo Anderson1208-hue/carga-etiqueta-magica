@@ -1577,6 +1577,107 @@ export type Database = {
         }
         Relationships: []
       }
+      divergencias_recebimento: {
+        Row: {
+          c_prod: string | null
+          cancelado_em: string | null
+          cancelado_motivo: string | null
+          cancelado_por: string | null
+          carga_id: string | null
+          criado_em: string
+          criado_por: string
+          criado_por_nome: string | null
+          etiquetas_bloqueadas: string[]
+          etiquetas_ja_bipadas: Json
+          fotos: string[]
+          id: string
+          nf_id: string
+          numero_nf: string
+          observacao: string | null
+          qtd_nao_bloqueada: number
+          quantidade: number
+          status_nf_anterior: string | null
+          tipo: string
+          x_prod: string | null
+        }
+        Insert: {
+          c_prod?: string | null
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cancelado_por?: string | null
+          carga_id?: string | null
+          criado_em?: string
+          criado_por: string
+          criado_por_nome?: string | null
+          etiquetas_bloqueadas?: string[]
+          etiquetas_ja_bipadas?: Json
+          fotos?: string[]
+          id?: string
+          nf_id: string
+          numero_nf: string
+          observacao?: string | null
+          qtd_nao_bloqueada?: number
+          quantidade?: number
+          status_nf_anterior?: string | null
+          tipo: string
+          x_prod?: string | null
+        }
+        Update: {
+          c_prod?: string | null
+          cancelado_em?: string | null
+          cancelado_motivo?: string | null
+          cancelado_por?: string | null
+          carga_id?: string | null
+          criado_em?: string
+          criado_por?: string
+          criado_por_nome?: string | null
+          etiquetas_bloqueadas?: string[]
+          etiquetas_ja_bipadas?: Json
+          fotos?: string[]
+          id?: string
+          nf_id?: string
+          numero_nf?: string
+          observacao?: string | null
+          qtd_nao_bloqueada?: number
+          quantidade?: number
+          status_nf_anterior?: string | null
+          tipo?: string
+          x_prod?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "divergencias_recebimento_nf_id_fkey"
+            columns: ["nf_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      divergencias_recebimento_envios: {
+        Row: {
+          carga_id: string
+          enviado_em: string
+          enviado_por: string | null
+          id: string
+          ocorrencias: number
+        }
+        Insert: {
+          carga_id: string
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          ocorrencias: number
+        }
+        Update: {
+          carga_id?: string
+          enviado_em?: string
+          enviado_por?: string | null
+          id?: string
+          ocorrencias?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -5100,6 +5201,10 @@ export type Database = {
         Returns: Json
       }
       can_view_veiculo: { Args: { p_veiculo_id: string }; Returns: boolean }
+      cancelar_divergencia_recebimento: {
+        Args: { p_id: string; p_motivo: string }
+        Returns: Json
+      }
       cancelar_roteirizacao: {
         Args: { _motivo: string; _veiculo_id: string }
         Returns: Json
@@ -5452,6 +5557,17 @@ export type Database = {
       }
       registrar_chegada_cd_manual: {
         Args: { p_nf_id: string; p_observacao?: string }
+        Returns: Json
+      }
+      registrar_divergencia_recebimento: {
+        Args: {
+          p_c_prod: string
+          p_fotos: string[]
+          p_nf_id: string
+          p_observacao: string
+          p_quantidade: number
+          p_tipo: string
+        }
         Returns: Json
       }
       rejeitar_sugestao_coordenada: {

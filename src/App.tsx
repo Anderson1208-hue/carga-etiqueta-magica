@@ -17,6 +17,7 @@ import Unsubscribe from "./pages/Unsubscribe";
 import Dashboard from "./pages/Dashboard";
 import AgenteGerencial from "./pages/AgenteGerencial";
 import ComercialParalelo from "./pages/ComercialParalelo";
+import DivergenciaRecebimento from "./pages/DivergenciaRecebimento";
 import Cargas from "./pages/Cargas";
 import Romaneio from "./pages/Romaneio";
 import Etiquetas from "./pages/Etiquetas";
@@ -400,6 +401,7 @@ function AppRoutes() {
       <Route path="/totalizado-nf" element={<ProtectedRoute><RomaneioPorNf /></ProtectedRoute>} />
       <Route path="/embarcadores" element={<ProtectedRoute><Embarcadores /></ProtectedRoute>} />
       <Route path="/agente-gerencial" element={<ProtectedRoute><AgenteGerencial /></ProtectedRoute>} />
+      <Route path="/divergencia-recebimento" element={<ProtectedRoute><DivergenciaRecebimento /></ProtectedRoute>} />
       <Route path="/comercial-paralelo" element={<ProtectedRoute><ComercialParalelo /></ProtectedRoute>} />
       <Route path="/agente-gerencial/:threadId" element={<ProtectedRoute><AgenteGerencial /></ProtectedRoute>} />
       <Route path="/macro-regioes" element={<ProtectedRoute><MacroRegioes /></ProtectedRoute>} />

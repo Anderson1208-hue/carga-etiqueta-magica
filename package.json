@@ -78,6 +78,7 @@
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.8",
+    "jszip": "^3.10.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
     "motion": "^14.9.0",

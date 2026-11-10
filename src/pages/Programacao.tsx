@@ -141,6 +141,7 @@ export default function Programacao() {
             .eq("carga_id", cargaId)
             .neq("status_entrega", "ENTREGUE")
             .neq("status_entrega", "RECUSADO")
+            .neq("status_entrega", "NF CANCELADA")
             .order("numero_nf", { ascending: true })
             .range(from, from + pageSize - 1);
 

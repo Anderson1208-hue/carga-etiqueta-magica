@@ -22,6 +22,7 @@ import { template as alertaSaudeGps } from './alerta-saude-gps.tsx'
 import { template as siriuslogPendencias } from './siriuslog-pendencias.tsx'
 import { template as overhaulSmFalha } from './overhaul-sm-falha.tsx'
 import { template as integracaoFalha } from './integracao-falha.tsx'
+import { template as divergenciaRecebimento } from './divergencia-recebimento.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'teste-envio': testeEnvio,
@@ -32,4 +33,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'siriuslog-pendencias': siriuslogPendencias,
   'overhaul-sm-falha': overhaulSmFalha,
   'integracao-falha': integracaoFalha,
+  'divergencia-recebimento': divergenciaRecebimento,
 }
