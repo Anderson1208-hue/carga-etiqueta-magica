@@ -288,6 +288,27 @@
       "when": 1794260044983,
       "tag": "0040_cte_detalhes",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794327736863,
+      "tag": "0041_parallel_commercial_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794328247274,
+      "tag": "0042_parallel_registry_lock_defaults",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794328268338,
+      "tag": "0043_parallel_tariff_review_state",
+      "breakpoints": true
     }
   ]
 }

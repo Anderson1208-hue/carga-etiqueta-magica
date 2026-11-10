@@ -7,6 +7,7 @@ import { useAcessoOkEntrega } from "@/hooks/useAcessoOkEntrega";
 import { useAcessoTrackingPandurata } from "@/hooks/useAcessoTrackingPandurata";
 import { useAcessoEnvioCanhoto } from "@/hooks/useAcessoEnvioCanhoto";
 import { useAgenteGerencial } from "@/hooks/useAgenteGerencial";
+import { useComercialParalelo } from "@/hooks/useComercialParalelo";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -48,6 +49,7 @@ import {
   Map as MapIcon,
   PanelLeftClose,
   PanelLeftOpen,
+  LockKeyhole,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -285,6 +287,7 @@ export function Sidebar() {
   const { podeVerTrackingPandurata } = useAcessoTrackingPandurata();
   const { podeEnviarCanhoto } = useAcessoEnvioCanhoto();
   const { allowed: podeAgenteGerencial } = useAgenteGerencial();
+  const { allowed: podeComercialParalelo } = useComercialParalelo();
   const [collapsed, setCollapsed] = useState(false);
 
   const integracaoItems = integracaoItemsBase.filter((i) =>
@@ -344,6 +347,7 @@ export function Sidebar() {
           <NavItem key={item.href} item={item} isActive={location.pathname === item.href} compact={collapsed} />
         ))}
         {podeAgenteGerencial && <NavItem item={{name:"Agente Gerencial",href:"/agente-gerencial",icon:BarChart3}} isActive={location.pathname.startsWith('/agente-gerencial')} compact={collapsed}/>}
+        {podeComercialParalelo && <NavItem item={{name:"Cadastro Paralelo",href:"/comercial-paralelo",icon:LockKeyhole}} isActive={location.pathname === '/comercial-paralelo'} compact={collapsed}/>}
 
         <div className="pt-2 space-y-1">
           <NavGroupFlyout

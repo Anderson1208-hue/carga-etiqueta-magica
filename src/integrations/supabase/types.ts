@@ -3598,6 +3598,184 @@ export type Database = {
         }
         Relationships: []
       }
+      paralelo_acessos: {
+        Row: {
+          user_id: string
+        }
+        Insert: {
+          user_id: string
+        }
+        Update: {
+          user_id?: string
+        }
+        Relationships: []
+      }
+      paralelo_clientes: {
+        Row: {
+          ativo: boolean
+          cnpj: string
+          created_at: string
+          fiscal: Json
+          id: string
+          nome: string
+          observacao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cnpj: string
+          created_at?: string
+          fiscal?: Json
+          id?: string
+          nome: string
+          observacao?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cnpj?: string
+          created_at?: string
+          fiscal?: Json
+          id?: string
+          nome?: string
+          observacao?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      paralelo_historico: {
+        Row: {
+          acao: string
+          antes: Json | null
+          autor: string | null
+          created_at: string
+          depois: Json | null
+          id: number
+          registro_id: string
+          tabela: string
+        }
+        Insert: {
+          acao: string
+          antes?: Json | null
+          autor?: string | null
+          created_at?: string
+          depois?: Json | null
+          id?: never
+          registro_id: string
+          tabela: string
+        }
+        Update: {
+          acao?: string
+          antes?: Json | null
+          autor?: string | null
+          created_at?: string
+          depois?: Json | null
+          id?: never
+          registro_id?: string
+          tabela?: string
+        }
+        Relationships: []
+      }
+      paralelo_regioes: {
+        Row: {
+          ativo: boolean
+          calendario: string
+          cidades: Json
+          cliente_id: string
+          created_at: string
+          id: string
+          lead_time: number | null
+          nome: string
+          observacao: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          calendario?: string
+          cidades?: Json
+          cliente_id: string
+          created_at?: string
+          id?: string
+          lead_time?: number | null
+          nome: string
+          observacao?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          calendario?: string
+          cidades?: Json
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          lead_time?: number | null
+          nome?: string
+          observacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paralelo_regioes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "paralelo_clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      paralelo_tarifas: {
+        Row: {
+          componentes: Json
+          created_at: string
+          faixas: Json
+          fator_cubagem: number | null
+          fiscal: Json
+          id: string
+          observacao: string
+          regiao_id: string
+          status: string
+          updated_at: string
+          vigente_ate: string | null
+          vigente_de: string
+        }
+        Insert: {
+          componentes?: Json
+          created_at?: string
+          faixas?: Json
+          fator_cubagem?: number | null
+          fiscal?: Json
+          id?: string
+          observacao?: string
+          regiao_id: string
+          status?: string
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de: string
+        }
+        Update: {
+          componentes?: Json
+          created_at?: string
+          faixas?: Json
+          fator_cubagem?: number | null
+          fiscal?: Json
+          id?: string
+          observacao?: string
+          regiao_id?: string
+          status?: string
+          updated_at?: string
+          vigente_ate?: string | null
+          vigente_de?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "paralelo_tarifas_regiao_id_fkey"
+            columns: ["regiao_id"]
+            isOneToOne: false
+            referencedRelation: "paralelo_regioes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posicoes_gps: {
         Row: {
           accuracy: number | null
@@ -5189,6 +5367,11 @@ export type Database = {
         }
       }
       okentrega_validar_cron: { Args: { p_token: string }; Returns: boolean }
+      paralelo_clientes_fontes: { Args: { p_cursor?: string }; Returns: Json }
+      paralelo_fontes: {
+        Args: { p_cursor?: string; p_fim: string; p_inicio: string }
+        Returns: Json
+      }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }
         Returns: {
@@ -5199,6 +5382,7 @@ export type Database = {
         }[]
       }
       pode_agente_gerencial: { Args: never; Returns: boolean }
+      pode_comercial_paralelo: { Args: never; Returns: boolean }
       pode_gestao_comercial: { Args: never; Returns: boolean }
       pode_limpar_conferencia: { Args: never; Returns: boolean }
       pode_sobrescrever_coordenada: {

@@ -1,0 +1,7 @@
+REVOKE ALL ON public.paralelo_acessos,public.paralelo_clientes,public.paralelo_regioes,public.paralelo_tarifas,public.paralelo_historico FROM anon;
+REVOKE INSERT,UPDATE,DELETE ON public.paralelo_acessos FROM authenticated;
+REVOKE UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER ON public.paralelo_tarifas FROM authenticated;
+REVOKE INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER ON public.paralelo_historico FROM authenticated;
+CREATE FUNCTION public.paralelo_validar_tarifa() RETURNS trigger LANGUAGE plpgsql SET search_path=public AS $$ DECLARE c jsonb; BEGIN IF jsonb_array_length(NEW.componentes)=0 AND jsonb_array_length(NEW.faixas)=0 THEN RAISE EXCEPTION 'Cadastre componentes ou faixas'; END IF; FOR c IN SELECT * FROM jsonb_array_elements(NEW.componentes) LOOP IF coalesce(trim(c->>'nome'),'')='' OR (c->>'base') NOT IN ('ton_cubada','ton_real','100kg','percentual_nf','percentual_frete','fixo','entrega','minimo') OR c->>'valor' IS NULL OR (c->>'valor')::numeric<0 THEN RAISE EXCEPTION 'Componente inválido'; END IF; END LOOP; RETURN NEW; END; $$;
+REVOKE ALL ON FUNCTION public.paralelo_validar_tarifa() FROM PUBLIC,anon,authenticated;
+CREATE TRIGGER paralelo_tarifa_validacao BEFORE INSERT ON public.paralelo_tarifas FOR EACH ROW EXECUTE FUNCTION public.paralelo_validar_tarifa();
