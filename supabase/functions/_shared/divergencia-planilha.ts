@@ -74,17 +74,17 @@ export function linhasPlanilha(
   const linhas: (string | number)[][] = [];
   for (const d of itens) {
     const fotos = nomesFotos(d).join(", ");
-    const comum = (cod: string, desc: string, qtd: string, statusOc: string) => [
+    const comum = (cod: string, desc: string, qtd: string, statusOc: string, obs = "") => [
       dataBr(ctx.emissaoPorNf[d.numero_nf]), dataBr(d.criado_em), "SIM", d.criado_por_nome ?? "", ctx.placa,
-      cod, desc, qtd, ctx.numeroCarga, statusOc, "", "", turnoDe(d.criado_em), "", [statusOc, d.observacao].filter(Boolean).join(" — "),
+      cod, desc, qtd, ctx.numeroCarga, statusOc, "", "", turnoDe(d.criado_em), "", [obs, d.observacao].filter(Boolean).join(" — "),
       d.numero_nf, fotos,
     ];
     if (d.tipo === "falta_total") {
       const itensNf = ctx.itensPorNf[d.numero_nf] ?? [];
-      if (!itensNf.length) linhas.push(comum("", "", "falta total", `NF CANCELADA — ${MOTIVO_DEVOLUCAO_FALTA_TOTAL}`));
+      if (!itensNf.length) linhas.push(comum("", "", "falta total", "FALTA ORIGEM", `NF CANCELADA — ${MOTIVO_DEVOLUCAO_FALTA_TOTAL}`));
       for (const it of itensNf) {
         const n = Math.ceil(Number(it.q_com) || 0);
-        linhas.push(comum(semZeros(it.c_prod), it.x_prod, `${n} - falta total`, `NF CANCELADA — ${MOTIVO_DEVOLUCAO_FALTA_TOTAL}`));
+        linhas.push(comum(semZeros(it.c_prod), it.x_prod, `${n} - falta total`, "FALTA ORIGEM", `NF CANCELADA — ${MOTIVO_DEVOLUCAO_FALTA_TOTAL}`));
       }
     } else {
       linhas.push(comum(semZeros(d.c_prod), d.x_prod ?? "", `${d.quantidade} - ${d.tipo === "avaria" ? "avaria" : "falta"}`,
