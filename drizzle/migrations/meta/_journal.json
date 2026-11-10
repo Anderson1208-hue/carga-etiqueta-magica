@@ -309,6 +309,13 @@
       "when": 1794328268338,
       "tag": "0043_parallel_tariff_review_state",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794333845024,
+      "tag": "0044_cargas_numero_carga",
+      "breakpoints": true
     }
   ]
 }

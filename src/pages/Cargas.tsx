@@ -171,6 +171,7 @@ export default function Cargas() {
     placa: "",
     motorista: "",
     observacao: "",
+    numero_carga: "",
   });
   const [parsedFiles, setParsedFiles] = useState<ParsedFile[]>([]);
 
@@ -260,6 +261,7 @@ export default function Cargas() {
       placa: "",
       motorista: "",
       observacao: "",
+      numero_carga: "",
     });
     setParsedFiles([]);
     setDialogOpen(true);
@@ -384,6 +386,12 @@ export default function Cargas() {
       );
 
       if (rpcError) throw rpcError;
+      const numeroCarga = sanitizeText(formData.numero_carga || "", 50).trim();
+      const novoCargaId = (rpcResult as any)?.carga_id;
+      if (numeroCarga && novoCargaId && (rpcResult as any)?.status !== "already_processed") {
+        const { error: numErr } = await supabase.from("cargas").update({ numero_carga: numeroCarga }).eq("id", novoCargaId);
+        if (numErr) toast({ variant: "destructive", title: "Número da carga não salvo", description: numErr.message });
+      }
       await salvarQtdVolumesCesta(successFiles.map((f) => f.data)).catch(() => {});
 
       const result = rpcResult as {
@@ -441,7 +449,7 @@ export default function Cargas() {
         }
       }
 
-      setFormData({ data: format(new Date(), "yyyy-MM-dd"), placa: "", motorista: "", observacao: "" });
+      setFormData({ data: format(new Date(), "yyyy-MM-dd"), placa: "", motorista: "", observacao: "", numero_carga: "" });
       setParsedFiles([]);
       setDialogOpen(false);
       loadCargas();
@@ -604,6 +612,16 @@ export default function Cargas() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="numero_carga">Número da carga</Label>
+                <Input
+                  id="numero_carga"
+                  placeholder="Ex.: 12345"
+                  value={formData.numero_carga}
+                  onChange={(e) => setFormData({ ...formData, numero_carga: e.target.value })}
+                />
               </div>
 
               <div className="space-y-2">

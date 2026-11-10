@@ -847,6 +847,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           motorista: string
+          numero_carga: string | null
           observacao: string | null
           operador_responsavel: string | null
           placa: string
@@ -861,6 +862,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           motorista: string
+          numero_carga?: string | null
           observacao?: string | null
           operador_responsavel?: string | null
           placa: string
@@ -875,6 +877,7 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           motorista?: string
+          numero_carga?: string | null
           observacao?: string | null
           operador_responsavel?: string | null
           placa?: string

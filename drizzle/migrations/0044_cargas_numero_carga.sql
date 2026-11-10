@@ -1,0 +1,1 @@
+ALTER TABLE public.cargas ADD COLUMN IF NOT EXISTS numero_carga text;
