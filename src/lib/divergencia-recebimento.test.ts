@@ -21,7 +21,13 @@ describe("divergência de recebimento", () => {
     const linhas = linhasPlanilha([{ ...base, tipo: "falta_total", c_prod: null, quantidade: 0 }], ctx);
     expect(linhas).toHaveLength(2);
     expect(linhas[0][7]).toBe("10 - falta total");
-    expect(String(linhas[1][9])).toContain("Não veio produto — Falta oriunda da origem");
+    expect(linhas[1][9]).toBe("FALTA ORIGEM");
+    expect(String(linhas[1][14])).toContain("Não veio produto — Falta oriunda da origem");
+  });
+  it("sobra sai com STATUS SOBRA", () => {
+    const [l] = linhasPlanilha([{ ...base, tipo: "sobra", quantidade: 3 }], ctx);
+    expect(l[7]).toBe("3 - sobra");
+    expect(l[9]).toBe("SOBRA");
   });
   it("turno pelo horário de Brasília", () => {
     expect(turnoDe("2026-11-10T13:00:00Z")).toBe("1° TURNO"); // 10h
