@@ -58,6 +58,7 @@ async function handler(req: Request) {
     }),
   });
   const lj: any = await lr.json().catch(() => null);
+  if (!lj?.id) console.warn("[ibac] login recusado", { http: lr.status, chaves: lj ? Object.keys(lj) : null, msg: typeof lj?.message === "string" ? lj.message.slice(0, 120) : (typeof lj?.mensagem === "string" ? lj.mensagem.slice(0, 120) : null) });
   if (!lj?.id) return json({ error: "Falha no login do portal Cacau Show" }, 502);
   const headers = {
     "auth-token": String(lj.id),
