@@ -23,13 +23,13 @@ Deno.serve(async (req) => {
   const itens: any[] = []
   for (let de = 0; ; de += 1000) {
     const { data, error } = await sb.from('divergencias_recebimento')
-      .select('id, carga_id, nf_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome')
+      .select('id, carga_id, nf_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome, embarcador')
       .is('cancelado_em', null).order('criado_em').order('id').range(de, de + 999)
     if (error) return json({ error: error.message }, 500)
     itens.push(...(data ?? []))
     if (!data || data.length < 1000) break
   }
-  const nfIds = [...new Set(itens.map((i) => i.nf_id))]
+  const nfIds = [...new Set(itens.map((i) => i.nf_id).filter(Boolean))]
   const cargaIds = [...new Set(itens.map((i) => i.carga_id).filter(Boolean))]
   const nfs = new Map<string, any>(); const cargas = new Map<string, any>()
   for (let k = 0; k < nfIds.length; k += 200) {
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   const porEmb = new Map<string, (string | number)[][]>()
   for (const d of itens) {
     const n = nfs.get(d.nf_id); const c = cargas.get(d.carga_id) ?? {}
-    const emb = embarcadorDe(n?.cnpj_emitente, n?.razao_social_emitente)
+    const emb = d.embarcador ?? embarcadorDe(n?.cnpj_emitente, n?.razao_social_emitente)
     if (filtro && emb !== filtro) continue
     const linhas = linhasPlanilha([d as DivergenciaRow], {
       numeroCarga: c.numero_carga ?? '', placa: c.placa ?? '',

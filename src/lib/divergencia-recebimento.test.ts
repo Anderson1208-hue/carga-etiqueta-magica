@@ -29,6 +29,9 @@ describe("divergência de recebimento", () => {
     expect(l[7]).toBe("3 - sobra");
     expect(l[9]).toBe("SOBRA");
   });
+  it("sobra sem NF nomeia fotos como SEM-NF", () => {
+    expect(nomesFotos({ ...base, tipo: "sobra", numero_nf: "" })[0]).toBe("SEM-NF_cProd1003489_sobra_1.jpeg");
+  });
   it("turno pelo horário de Brasília", () => {
     expect(turnoDe("2026-11-10T13:00:00Z")).toBe("1° TURNO"); // 10h
     expect(turnoDe("2026-11-10T20:00:00Z")).toBe("2° TURNO"); // 17h

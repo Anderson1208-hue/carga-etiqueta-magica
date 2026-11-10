@@ -58,6 +58,49 @@ export default function DivergenciaRecebimento() {
   const [embFiltro, setEmbFiltro] = useState("TODOS");
   const [consolidado, setConsolidado] = useState<{ nome: string; blob: Blob } | null>(null);
   const [gerandoCons, setGerandoCons] = useState(false);
+  const [sCarga, setSCarga] = useState("");
+  const [sEmb, setSEmb] = useState<"IBAC" | "IBAE">("IBAC");
+  const [sCod, setSCod] = useState("");
+  const [sDesc, setSDesc] = useState("");
+  const [sQtd, setSQtd] = useState("");
+  const [sObs, setSObs] = useState("");
+  const [sFotos, setSFotos] = useState<File[]>([]);
+  const [sSalvando, setSSalvando] = useState(false);
+  const cargasRecentes = useQuery({
+    queryKey: ["divergencia-cargas-recentes"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("cargas").select("id, numero_carga, placa, data")
+        .order("data", { ascending: false }).order("id").limit(60);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function salvarSobra() {
+    if (!sCarga || !sCod.trim() || !sDesc.trim() || !(Number(sQtd) > 0)) { toast.error("Informe a carreta, o código, a descrição e a quantidade"); return; }
+    setSSalvando(true);
+    try {
+      const caminhos: string[] = [];
+      for (const f of sFotos) {
+        const ext = (/\.([a-z0-9]{2,5})$/i.exec(f.name)?.[1] ?? "jpg").toLowerCase();
+        const path = `${sCarga}/sobra/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from(BUCKET).upload(path, f, { contentType: f.type || undefined, upsert: false });
+        if (error) throw new Error(`Falha ao enviar foto ${f.name}: ${error.message}`);
+        caminhos.push(path);
+      }
+      const { error } = await supabase.rpc("registrar_sobra_recebimento", {
+        p_carga_id: sCarga, p_embarcador: sEmb, p_c_prod: sCod.trim(), p_x_prod: sDesc.trim(),
+        p_quantidade: Number(sQtd), p_observacao: sObs, p_fotos: caminhos,
+      });
+      if (error) throw error;
+      toast.success("Sobra lançada (só relatório, nada bloqueado).");
+      supabase.functions.invoke("divergencia-consolidado", { body: { acao: "enviar" } }).then(({ error: ec }) => {
+        if (ec) toast.error("Sobra salva, mas o consolidado não foi enviado para gessica.rodrigues. Tente pelo botão Consolidado.");
+      });
+      setCargaSel(sCarga); setSCod(""); setSDesc(""); setSQtd(""); setSObs(""); setSFotos([]); setPacotes([]);
+      qc.invalidateQueries({ queryKey: ["divergencias-recebimento"] });
+    } catch (e: any) { toast.error(e.message ?? "Falha ao lançar sobra"); } finally { setSSalvando(false); }
+  }
 
   async function gerarConsolidado(enviar = false) {
     setGerandoCons(true); setConsolidado(null);
@@ -228,7 +271,7 @@ export default function DivergenciaRecebimento() {
   }
 
   async function cancelar(d: Linha) {
-    const motivo = window.prompt(`Cancelar o lançamento da NF ${d.numero_nf}? As etiquetas bloqueadas por ele voltam a pendentes${d.tipo === "falta_total" ? " e a NF volta ao status anterior" : ""}. Informe o motivo:`);
+    const motivo = window.prompt(`Cancelar o lançamento ${d.numero_nf ? `da NF ${d.numero_nf}` : "de sobra"}? As etiquetas bloqueadas por ele voltam a pendentes${d.tipo === "falta_total" ? " e a NF volta ao status anterior" : ""}. Informe o motivo:`);
     if (!motivo?.trim()) return;
     const { data, error } = await supabase.rpc("cancelar_divergencia_recebimento", { p_id: d.id, p_motivo: motivo });
     if (error) { toast.error(error.message); return; }
@@ -281,7 +324,6 @@ export default function DivergenciaRecebimento() {
                         <SelectContent>
                           <SelectItem value="falta_parcial">Falta parcial (bloqueia as caixas do código)</SelectItem>
                           <SelectItem value="avaria">Avaria (só relatório)</SelectItem>
-                          <SelectItem value="sobra">Sobra (só relatório)</SelectItem>
                           <SelectItem value="falta_total">Falta total (cancela a NF)</SelectItem>
                         </SelectContent>
                       </Select>
@@ -324,6 +366,42 @@ export default function DivergenciaRecebimento() {
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Lançar sobra (sem NF)</CardTitle></CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            <p className="text-sm text-muted-foreground md:col-span-2">Produto que veio a mais na carreta, mesmo que não esteja em nenhuma nota. Só entra na planilha e nos e-mails; não bloqueia nada.</p>
+            <div className="space-y-1">
+              <Label>Carreta</Label>
+              <Select value={sCarga} onValueChange={setSCarga}>
+                <SelectTrigger><SelectValue placeholder="Escolha a carga" /></SelectTrigger>
+                <SelectContent>
+                  {(cargasRecentes.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — {c.placa ?? "sem placa"} — {new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Embarcador</Label>
+              <Select value={sEmb} onValueChange={(v) => setSEmb(v as "IBAC" | "IBAE")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="IBAC">IBAC</SelectItem><SelectItem value="IBAE">IBAE</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1"><Label>Código do produto</Label><Input value={sCod} onChange={(e) => setSCod(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Descrição</Label><Input value={sDesc} onChange={(e) => setSDesc(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Quantidade de caixas</Label><Input type="number" min={1} value={sQtd} onChange={(e) => setSQtd(e.target.value)} /></div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2"><Camera className="h-4 w-4" />Fotos (originais)</Label>
+              <Input type="file" accept="image/*" multiple onChange={(e) => setSFotos(Array.from(e.target.files ?? []))} />
+            </div>
+            <div className="space-y-1 md:col-span-2"><Label>Observação</Label><Textarea value={sObs} onChange={(e) => setSObs(e.target.value)} rows={2} /></div>
+            <div className="md:col-span-2">
+              <Button onClick={salvarSobra} disabled={sSalvando}>{sSalvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Lançar sobra</Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -377,7 +455,7 @@ export default function DivergenciaRecebimento() {
                   <TableBody>
                     {itensCarga.map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell>{d.numero_nf}</TableCell>
+                        <TableCell>{d.numero_nf || "sem NF"}</TableCell>
                         <TableCell><Badge variant={d.tipo === "avaria" || d.tipo === "sobra" ? "secondary" : "destructive"}>{TIPO_LABEL[d.tipo]}</Badge></TableCell>
                         <TableCell>{semZeros(d.c_prod) || "—"}</TableCell>
                         <TableCell className="max-w-xs truncate">{d.x_prod ?? (d.tipo === "falta_total" ? "NF inteira" : "")}</TableCell>

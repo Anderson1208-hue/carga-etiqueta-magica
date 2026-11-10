@@ -1587,11 +1587,12 @@ export type Database = {
           criado_em: string
           criado_por: string
           criado_por_nome: string | null
+          embarcador: string | null
           etiquetas_bloqueadas: string[]
           etiquetas_ja_bipadas: Json
           fotos: string[]
           id: string
-          nf_id: string
+          nf_id: string | null
           numero_nf: string
           observacao: string | null
           qtd_nao_bloqueada: number
@@ -1609,11 +1610,12 @@ export type Database = {
           criado_em?: string
           criado_por: string
           criado_por_nome?: string | null
+          embarcador?: string | null
           etiquetas_bloqueadas?: string[]
           etiquetas_ja_bipadas?: Json
           fotos?: string[]
           id?: string
-          nf_id: string
+          nf_id?: string | null
           numero_nf: string
           observacao?: string | null
           qtd_nao_bloqueada?: number
@@ -1631,11 +1633,12 @@ export type Database = {
           criado_em?: string
           criado_por?: string
           criado_por_nome?: string | null
+          embarcador?: string | null
           etiquetas_bloqueadas?: string[]
           etiquetas_ja_bipadas?: Json
           fotos?: string[]
           id?: string
-          nf_id?: string
+          nf_id?: string | null
           numero_nf?: string
           observacao?: string | null
           qtd_nao_bloqueada?: number
@@ -5567,6 +5570,18 @@ export type Database = {
           p_observacao: string
           p_quantidade: number
           p_tipo: string
+        }
+        Returns: Json
+      }
+      registrar_sobra_recebimento: {
+        Args: {
+          p_c_prod: string
+          p_carga_id: string
+          p_embarcador: string
+          p_fotos: string[]
+          p_observacao: string
+          p_quantidade: number
+          p_x_prod: string
         }
         Returns: Json
       }

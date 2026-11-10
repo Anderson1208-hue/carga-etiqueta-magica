@@ -22,6 +22,7 @@ export interface DivergenciaRow {
   fotos: string[];
   criado_em: string;
   criado_por_nome: string | null;
+  embarcador?: string | null;
 }
 
 export interface ItemNf { c_prod: string; x_prod: string; q_com: number }
@@ -43,7 +44,7 @@ const extensao = (path: string) => {
 
 /** Nome de cada foto no pacote: identifica NF, código, tipo e ordem. */
 export function nomesFotos(d: Pick<DivergenciaRow, "numero_nf" | "c_prod" | "tipo" | "fotos">): string[] {
-  const base = `NF${d.numero_nf}${d.c_prod ? `_cProd${semZeros(d.c_prod)}` : ""}_${d.tipo}`;
+  const base = `${d.numero_nf ? `NF${d.numero_nf}` : "SEM-NF"}${d.c_prod ? `_cProd${semZeros(d.c_prod)}` : ""}_${d.tipo}`;
   return d.fotos.map((p, i) => `${base}_${i + 1}.${extensao(p)}`);
 }
 
