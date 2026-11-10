@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.divergencia-resumo-email]
 verify_jwt = false
+
+[functions.divergencia-consolidado]
+verify_jwt = false

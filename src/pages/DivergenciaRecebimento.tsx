@@ -55,6 +55,22 @@ export default function DivergenciaRecebimento() {
   const [pacotes, setPacotes] = useState<{ nome: string; blob: Blob }[]>([]);
   const [preparando, setPreparando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [embFiltro, setEmbFiltro] = useState("TODOS");
+  const [consolidado, setConsolidado] = useState<{ nome: string; blob: Blob } | null>(null);
+  const [gerandoCons, setGerandoCons] = useState(false);
+
+  async function gerarConsolidado(enviar = false) {
+    setGerandoCons(true); setConsolidado(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("divergencia-consolidado", {
+        body: { acao: enviar ? "enviar" : "baixar", embarcador: enviar || embFiltro === "TODOS" ? undefined : embFiltro } });
+      if (error) throw new Error((await (error as any).context?.json?.().catch(() => null))?.error ?? error.message);
+      if (enviar) { toast.success("Consolidado enviado para gessica.rodrigues@tlmlogistica.com.br"); return; }
+      const r = await fetch((data as any).url);
+      if (!r.ok) throw new Error("Falha ao baixar o consolidado");
+      setConsolidado({ nome: (data as any).nome, blob: await r.blob() });
+    } catch (e: any) { toast.error(e.message ?? "Falha no consolidado"); } finally { setGerandoCons(false); }
+  }
 
   const lista = useQuery({
     queryKey: ["divergencias-recebimento"],
@@ -148,6 +164,10 @@ export default function DivergenciaRecebimento() {
         const partes = [`Lançado. ${r?.bloqueadas ?? 0} etiqueta(s) bloqueada(s).`];
         if (tipo === "falta_total") partes.push("NF marcada como cancelada.");
         toast.success(partes.join(" "));
+        supabase.functions.invoke("divergencia-consolidado", { body: { acao: "enviar" } }).then(({ error: ec }) => {
+          if (ec) toast.error("Lançamento salvo, mas o consolidado não foi enviado para gessica.rodrigues. Tente pelo botão Consolidado.");
+          else toast.success("Consolidado atualizado enviado para gessica.rodrigues@tlmlogistica.com.br");
+        });
       }
       const bip = (r?.ja_bipadas ?? []) as { c_prod: string; seq: number; total: number }[];
       if (bip.length) toast.warning(`Atenção: ${bip.length} etiqueta(s) já foram bipadas e não foram bloqueadas: ${bip.map((b) => `${semZeros(b.c_prod)} cx ${b.seq}/${b.total}`).join(", ")}`, { duration: 15000 });
@@ -303,6 +323,25 @@ export default function DivergenciaRecebimento() {
                 )}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Consolidado (todas as ocorrências desde o início)</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-2">
+            <Select value={embFiltro} onValueChange={(v) => { setEmbFiltro(v); setConsolidado(null); }}>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="TODOS">Todos os embarcadores</SelectItem>
+                <SelectItem value="IBAC">IBAC</SelectItem>
+                <SelectItem value="IBAE">IBAE</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => gerarConsolidado(false)} disabled={gerandoCons}>
+              {gerandoCons ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageOpen className="h-4 w-4" />}Gerar consolidado
+            </Button>
+            {consolidado && <Button onClick={() => baixar(consolidado.blob, consolidado.nome)}><Download className="h-4 w-4" />Baixar {consolidado.nome}</Button>}
+            <Button variant="secondary" onClick={() => gerarConsolidado(true)} disabled={gerandoCons}><Mail className="h-4 w-4" />Reenviar para gessica.rodrigues</Button>
           </CardContent>
         </Card>
 
