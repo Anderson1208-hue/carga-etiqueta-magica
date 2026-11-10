@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { operatorAccessStatus } from '../_shared/approved-operator.ts'
 
-const TIPOS: Record<string, string> = { falta_parcial: 'Falta parcial', avaria: 'Avaria', falta_total: 'Falta total (NF cancelada)' }
+const TIPOS: Record<string, string> = { falta_parcial: 'Falta parcial', avaria: 'Avaria', falta_total: 'Falta total (NF cancelada)', sobra: 'Sobra' }
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 

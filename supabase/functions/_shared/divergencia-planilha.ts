@@ -1,10 +1,11 @@
 // Divergência de recebimento IBAC/IBAE: montagem da planilha (modelo Cacau) e do pacote de fotos.
-export type TipoDivergencia = "falta_parcial" | "avaria" | "falta_total";
+export type TipoDivergencia = "falta_parcial" | "avaria" | "falta_total" | "sobra";
 
 export const TIPO_LABEL: Record<TipoDivergencia, string> = {
   falta_parcial: "Falta parcial",
   avaria: "Avaria",
   falta_total: "Falta total (NF cancelada)",
+  sobra: "Sobra",
 };
 
 export const MOTIVO_DEVOLUCAO_FALTA_TOTAL = "Não veio produto — Falta oriunda da origem";
@@ -87,8 +88,8 @@ export function linhasPlanilha(
         linhas.push(comum(semZeros(it.c_prod), it.x_prod, `${n} - falta total`, "FALTA ORIGEM", `NF CANCELADA — ${MOTIVO_DEVOLUCAO_FALTA_TOTAL}`));
       }
     } else {
-      linhas.push(comum(semZeros(d.c_prod), d.x_prod ?? "", `${d.quantidade} - ${d.tipo === "avaria" ? "avaria" : "falta"}`,
-        d.tipo === "avaria" ? "AVARIA" : "FALTA ORIGEM"));
+      linhas.push(comum(semZeros(d.c_prod), d.x_prod ?? "", `${d.quantidade} - ${d.tipo === "avaria" ? "avaria" : d.tipo === "sobra" ? "sobra" : "falta"}`,
+        d.tipo === "avaria" ? "AVARIA" : d.tipo === "sobra" ? "SOBRA" : "FALTA ORIGEM"));
     }
   }
   return linhas;

@@ -281,6 +281,7 @@ export default function DivergenciaRecebimento() {
                         <SelectContent>
                           <SelectItem value="falta_parcial">Falta parcial (bloqueia as caixas do código)</SelectItem>
                           <SelectItem value="avaria">Avaria (só relatório)</SelectItem>
+                          <SelectItem value="sobra">Sobra (só relatório)</SelectItem>
                           <SelectItem value="falta_total">Falta total (cancela a NF)</SelectItem>
                         </SelectContent>
                       </Select>
@@ -377,7 +378,7 @@ export default function DivergenciaRecebimento() {
                     {itensCarga.map((d) => (
                       <TableRow key={d.id}>
                         <TableCell>{d.numero_nf}</TableCell>
-                        <TableCell><Badge variant={d.tipo === "avaria" ? "secondary" : "destructive"}>{TIPO_LABEL[d.tipo]}</Badge></TableCell>
+                        <TableCell><Badge variant={d.tipo === "avaria" || d.tipo === "sobra" ? "secondary" : "destructive"}>{TIPO_LABEL[d.tipo]}</Badge></TableCell>
                         <TableCell>{semZeros(d.c_prod) || "—"}</TableCell>
                         <TableCell className="max-w-xs truncate">{d.x_prod ?? (d.tipo === "falta_total" ? "NF inteira" : "")}</TableCell>
                         <TableCell className="text-right">{d.tipo === "falta_total" ? "todas" : d.quantidade}</TableCell>
