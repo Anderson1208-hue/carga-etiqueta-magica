@@ -323,7 +323,7 @@ export function ReroteirizarVeiculoDialog({
             cidade: nf.dest_cidade || "Rio de Janeiro",
             uf: nf.dest_uf || "RJ",
             logradouro: nf.dest_logradouro || "",
-            macroRegiao: getMacroRegiao(nf.dest_bairro || ""),
+            macroRegiao: getMacroRegiao(nf.dest_bairro || "", nf.dest_cidade),
             latitude: null,
             longitude: null,
             totalNfs: 0,

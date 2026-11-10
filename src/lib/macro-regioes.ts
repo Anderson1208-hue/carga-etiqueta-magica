@@ -342,13 +342,8 @@ export function getMacroRegiao(
   // Para cidades fora do Rio, prioriza a cidade
   if (!isRio) {
     const porCidade = resolveTerm(cidade!);
-    if (porCidade !== null) return porCidade;
-    // Fallback: tenta o bairro mesmo assim
-    if (bairro) {
-      const porBairro = resolveTerm(bairro);
-      if (porBairro !== null) return porBairro;
-    }
-    return 99;
+    // Fora da capital, somente a cidade define a MR (bairro nunca é usado)
+    return porCidade !== null ? porCidade : 99;
   }
 
   // Rio de Janeiro: usa o bairro

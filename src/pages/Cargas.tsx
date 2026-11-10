@@ -136,7 +136,7 @@ export default function Cargas() {
         destCidade: nf.dest_cidade || undefined,
         destUf: nf.dest_uf || undefined,
         destCep: nf.dest_cep || undefined,
-        macroRegiao: getMacroRegiao(nf.dest_bairro),
+        macroRegiao: getMacroRegiao(nf.dest_bairro, nf.dest_cidade),
         dataEmissao: nf.data_emissao,
         enderecamentos: enderecMap.get(nf.id) || [],
         itens: (nf.itens_nf || []).map((item: any) => ({
