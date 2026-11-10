@@ -5,7 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import * as XLSX from 'npm:xlsx@0.18.5'
 import { operatorAccessStatus } from '../_shared/approved-operator.ts'
-import { CABECALHO, embarcadorDe, linhasPlanilha, type DivergenciaRow, type ItemNf } from '../_shared/divergencia-planilha.ts'
+import { CABECALHO, embarcadorDe, linhasPlanilha, turnoDe, type DivergenciaRow, type ItemNf } from '../_shared/divergencia-planilha.ts'
 
 const BUCKET = 'divergencias-recebimento'
 const json = (b: unknown, s = 200) =>
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   if (negado) return json({ error: 'não autorizado' }, negado)
   const corpo: any = await req.json().catch(() => ({}))
   const acao = corpo?.acao === 'enviar' ? 'enviar' : 'baixar'
-  const filtro = typeof corpo?.embarcador === 'string' && /^[A-Z0-9]{2,20}$/.test(corpo.embarcador) ? corpo.embarcador : null
+  const filtro = typeof corpo?.embarcador === 'string' && /^[A-Z0-9/]{2,20}$/.test(corpo.embarcador) ? corpo.embarcador : null
 
   const itens: any[] = []
   for (let de = 0; ; de += 1000) {
@@ -29,8 +29,17 @@ Deno.serve(async (req) => {
     itens.push(...(data ?? []))
     if (!data || data.length < 1000) break
   }
-  const nfIds = [...new Set(itens.map((i) => i.nf_id).filter(Boolean))]
-  const cargaIds = [...new Set(itens.map((i) => i.carga_id).filter(Boolean))]
+  const outros: any[] = []
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await sb.from('divergencias_recebimento_clientes')
+      .select('id, carga_id, nf_id, numero_nf, embarcador, c_prod, x_prod, status, retorno_cd, quantidade, observacao, fotos, criado_em, criado_por_nome')
+      .is('cancelado_em', null).order('criado_em').order('id').range(de, de + 999)
+    if (error) return json({ error: error.message }, 500)
+    outros.push(...(data ?? []))
+    if (!data || data.length < 1000) break
+  }
+  const nfIds = [...new Set([...itens, ...outros].map((i) => i.nf_id).filter(Boolean))]
+  const cargaIds = [...new Set([...itens, ...outros].map((i) => i.carga_id).filter(Boolean))]
   const nfs = new Map<string, any>(); const cargas = new Map<string, any>()
   for (let k = 0; k < nfIds.length; k += 200) {
     const { data, error } = await sb.from('notas_fiscais').select('id, cnpj_emitente, razao_social_emitente, data_emissao, itens_nf(c_prod, x_prod, q_com)').in('id', nfIds.slice(k, k + 200))
@@ -54,6 +63,17 @@ Deno.serve(async (req) => {
     }).map((l) => [emb, ...l])
     porEmb.set(emb, [...(porEmb.get(emb) ?? []), ...linhas])
   }
+  const dataBr = (iso?: string | null) => !iso ? '' : (iso.length === 10 ? new Date(`${iso}T00:00:00`) : new Date(iso)).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+  for (const d of outros) {
+    if (filtro && d.embarcador !== filtro) continue
+    const n = nfs.get(d.nf_id); const c = cargas.get(d.carga_id) ?? {}
+    const cod = String(d.c_prod ?? '').replace(/^0+(?=\d)/, '')
+    const fotos = (d.fotos ?? []).map((_: string, i: number) => `${d.numero_nf ? `NF${d.numero_nf}` : 'SEM-NF'}_cProd${cod}_${String(d.status).replace('/', '-')}_${i + 1}`).join(', ')
+    const linha = [d.embarcador, dataBr(n?.data_emissao), dataBr(d.criado_em), 'SIM', d.criado_por_nome ?? '', c.placa ?? '',
+      cod, d.x_prod ?? '', `${d.quantidade} - ${String(d.status).toLowerCase()}`, c.numero_carga ?? '', d.status, '', '', turnoDe(d.criado_em), d.retorno_cd ?? '',
+      d.observacao ?? '', d.numero_nf || 'SEM NF', fotos]
+    porEmb.set(d.embarcador, [...(porEmb.get(d.embarcador) ?? []), linha])
+  }
   const cab = ['Embarcador', ...CABECALHO]
   const wb = XLSX.utils.book_new()
   const todas: (string | number)[][] = [...porEmb.values()].flat()
@@ -64,11 +84,11 @@ Deno.serve(async (req) => {
     XLSX.utils.book_append_sheet(wb, ws, nome)
   }
   aba(todas, 'TODAS')
-  for (const emb of [...porEmb.keys()].sort()) aba(porEmb.get(emb)!, emb.slice(0, 31))
+  for (const emb of [...porEmb.keys()].sort()) aba(porEmb.get(emb)!, emb.replace(/[\\/?*\[\]:]/g, '-').slice(0, 31))
   const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
   const agora = new Date()
   const carimbo = agora.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).replace(/[: ]/g, '-')
-  const nome = `Consolidado_divergencias${filtro ? `_${filtro}` : ''}_${carimbo}.xlsx`
+  const nome = `Consolidado_divergencias${filtro ? `_${filtro.replace('/', '-')}` : ''}_${carimbo}.xlsx`
   const path = `consolidado/${nome}`
   const up = await sb.storage.from(BUCKET).upload(path, new Blob([bytes]), {
     contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', upsert: false })
@@ -80,12 +100,12 @@ Deno.serve(async (req) => {
   if (acao === 'enviar') {
     const { error: e4 } = await sb.functions.invoke('send-transactional-email', { body: {
       templateName: 'divergencia-consolidado',
-      idempotencyKey: `divergencia-consolidado-${itens.length}-${itens.at(-1)?.id ?? 'vazio'}`,
-      templateData: { link: s.signedUrl, total: todas.length, ocorrencias: itens.length,
+      idempotencyKey: `divergencia-consolidado-${itens.length}-${outros.length}-${itens.at(-1)?.id ?? 'vazio'}-${outros.at(-1)?.id ?? 'vazio'}`,
+      templateData: { link: s.signedUrl, total: todas.length, ocorrencias: itens.length + outros.length,
         quando: agora.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
         embarcadores: [...porEmb.entries()].map(([e, r]) => `${e}: ${r.length} linha(s)`).join(' · ') },
     } })
     if (e4) { console.error('[divergencia-consolidado]', e4); return json({ error: 'Falha no envio do e-mail' }, 502) }
   }
-  return json({ ok: true, url: s.signedUrl, nome, ocorrencias: itens.length })
+  return json({ ok: true, url: s.signedUrl, nome, ocorrencias: itens.length + outros.length })
 })

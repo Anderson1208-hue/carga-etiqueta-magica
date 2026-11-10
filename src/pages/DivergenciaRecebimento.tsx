@@ -414,6 +414,9 @@ export default function DivergenciaRecebimento() {
                 <SelectItem value="TODOS">Todos os embarcadores</SelectItem>
                 <SelectItem value="IBAC">IBAC</SelectItem>
                 <SelectItem value="IBAE">IBAE</SelectItem>
+                <SelectItem value="ARCOR/BAGLEY">ARCOR/BAGLEY</SelectItem>
+                <SelectItem value="MASTERFOODS">MASTERFOODS</SelectItem>
+                <SelectItem value="PANDURATA">PANDURATA</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={() => gerarConsolidado(false)} disabled={gerandoCons}>

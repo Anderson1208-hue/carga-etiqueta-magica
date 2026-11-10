@@ -126,6 +126,10 @@ export default function DivergenciaClientes() {
       } as any);
       if (error) throw error;
       toast.success("Divergência lançada (só relatório, nada bloqueado).");
+      supabase.functions.invoke("divergencia-consolidado", { body: { acao: "enviar" } }).then(({ error: ec }) => {
+        if (ec) toast.error("Lançamento salvo, mas o consolidado não foi enviado para gessica.rodrigues.");
+        else toast.success("Consolidado atualizado enviado para gessica.rodrigues@tlmlogistica.com.br");
+      });
       setCprod(""); setDesc(""); setRecebida(""); setQtd(""); setObs(""); setFotos([]); setPacotes([]);
       qc.invalidateQueries({ queryKey: ["div-clientes", cargaId] });
     } catch (e: any) { toast.error(e.message ?? "Falha ao lançar"); } finally { setSalvando(false); }
