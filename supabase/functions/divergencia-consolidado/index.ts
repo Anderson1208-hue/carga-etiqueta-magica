@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const cod = String(d.c_prod ?? '').replace(/^0+(?=\d)/, '')
     const fotos = (d.fotos ?? []).map((_: string, i: number) => `${d.numero_nf ? `NF${d.numero_nf}` : 'SEM-NF'}_cProd${cod}_${String(d.status).replace('/', '-')}_${i + 1}`).join(', ')
     const linha = [d.embarcador, dataBr(n?.data_emissao), dataBr(d.criado_em), 'SIM', d.criado_por_nome ?? '', c.placa ?? '',
-      cod, d.x_prod ?? '', `${d.quantidade} - ${String(d.status).toLowerCase()}`, c.numero_carga ?? '', d.status, '', '', turnoDe(d.criado_em), d.retorno_cd ?? '',
+      cod, d.x_prod ?? '', `${d.quantidade} - ${String(d.status).toLowerCase()}`, c.numero_carga ?? '', d.status, '', '', turnoDe(d.criado_em), '',
       d.observacao ?? '', d.numero_nf || 'SEM NF', fotos]
     porEmb.set(d.embarcador, [...(porEmb.get(d.embarcador) ?? []), linha])
   }

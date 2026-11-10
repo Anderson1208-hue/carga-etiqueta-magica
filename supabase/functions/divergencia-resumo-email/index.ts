@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     ? await sb.from('divergencias_recebimento_clientes')
       .select('id, numero_nf, c_prod, x_prod, status, embarcador, retorno_cd, quantidade, observacao, fotos')
       .eq('carga_id', cargaId).is('cancelado_em', null).order('embarcador').order('numero_nf').order('c_prod').limit(1000)
-      .then((r: any) => ({ ...r, data: (r.data ?? []).map((i: any) => ({ ...i, tipo: `${i.embarcador} — ${i.status}${i.retorno_cd ? ` (${i.retorno_cd})` : ''}` })) }))
+      .then((r: any) => ({ ...r, data: (r.data ?? []).map((i: any) => ({ ...i, tipo: `${i.embarcador} — ${i.status}` })) }))
     : await sb.from('divergencias_recebimento')
       .select('id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos')
       .eq('carga_id', cargaId).is('cancelado_em', null).order('numero_nf').order('c_prod').limit(1000)
