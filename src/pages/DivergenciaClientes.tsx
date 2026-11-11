@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import * as XLSX from "xlsx";
+import { gerarDocile, gerarHersheys, gerarProtocolo } from "@/lib/divergencia-modelos";
 import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Search, PackageOpen, Mail, Download, Ban, Camera, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
-  CABECALHO_DOCILE, CABECALHO_PROTOCOLO, EMBARCADORES_CLIENTES, linhasDocile, planilhaHersheys, statusDoCliente, RETORNO_CD, embarcadorCliente, linhasProtocolo, type EmbarcadorCliente,
+  EMBARCADORES_CLIENTES, statusDoCliente, RETORNO_CD, embarcadorCliente, type EmbarcadorCliente,
 } from "@/lib/divergencia-clientes";
 
 const BUCKET = "divergencias-recebimento";
@@ -145,30 +145,20 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
       const saida: { nome: string; blob: Blob }[] = [];
       for (const e of EMBARCADORES_CLIENTES) {
         const doEmb = itens.filter((d) => d.embarcador === e); if (!doEmb.length) continue;
-        const wb = XLSX.utils.book_new();
+        let planilha: Uint8Array;
         if (e === "HERSHEYS") {
           const prim = doEmb.reduce((m, d) => (d.criado_em < m ? d.criado_em : m), doEmb[0].criado_em);
-          const ws = XLSX.utils.aoa_to_sheet(planilhaHersheys(doEmb, { placa: carga.placa ?? "", motorista: carga.motorista ?? "", romaneio: carga.numero_carga ?? "", lacre: carga.lacre ?? "",
-            recebimento: new Date(prim).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) }));
-          ws["!cols"] = [{ wch: 32 }, { wch: 45 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
-          XLSX.utils.book_append_sheet(wb, ws, "OCORRENCIA");
+          planilha = await gerarHersheys(doEmb, { placa: carga.placa ?? "", motorista: carga.motorista ?? "", romaneio: carga.numero_carga ?? "", lacre: carga.lacre ?? "",
+            recebimento: new Date(prim).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) });
         } else if (e === "DOCILE") {
-          const rows = linhasDocile(doEmb.map((d) => ({ ...d, cliente: d.notas_fiscais?.dest_razao_social ?? "" })),
+          planilha = await gerarDocile(doEmb.map((d) => ({ ...d, cliente: d.notas_fiscais?.dest_razao_social ?? "" })),
             { dataColeta: new Date(`${carga.data}T00:00:00`).toLocaleDateString("pt-BR"), embarque: carga.numero_carga ?? "" });
-          const ws = XLSX.utils.aoa_to_sheet([["Formulário de Ocorrência"], CABECALHO_DOCILE, ...rows]);
-          ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: CABECALHO_DOCILE.length - 1 } }];
-          ws["!cols"] = CABECALHO_DOCILE.map((h, i) => ({ wch: i === 4 ? 40 : Math.max(12, h.length + 4) }));
-          XLSX.utils.book_append_sheet(wb, ws, "Planilha1");
         } else {
-          const rows = linhasProtocolo(doEmb, { dt: carga.numero_carga ?? "", lacre: carga.lacre ?? "", motorista: carga.motorista ?? "" });
-          const ws = XLSX.utils.aoa_to_sheet([[`PROTOCOLO DE DIVERGÊNCIAS - ${hoje}`], CABECALHO_PROTOCOLO, ...rows]);
-          ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: CABECALHO_PROTOCOLO.length - 1 } }];
-          ws["!cols"] = CABECALHO_PROTOCOLO.map((h, i) => ({ wch: i === 3 ? 45 : Math.max(12, h.length + 4) }));
-          XLSX.utils.book_append_sheet(wb, ws, "PROTOCOLO");
+          planilha = await gerarProtocolo(doEmb, { dt: carga.numero_carga ?? "", lacre: carga.lacre ?? "", motorista: carga.motorista ?? "", hoje });
         }
         const base = `DIVERGENCIA ${e.replace("/", "-")} - CARGA ${carga.numero_carga || carga.placa || carga.id.slice(0, 8)}`;
         const zip = new JSZip();
-        zip.file(`${base}.xlsx`, XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+        zip.file(`${base}.xlsx`, planilha);
         for (const d of doEmb) for (let i = 0; i < d.fotos.length; i++) {
           const { data: b, error } = await supabase.storage.from(BUCKET).download(d.fotos[i]);
           if (error || !b) throw new Error(`Falha ao baixar foto da NF ${d.numero_nf || "sem NF"}`);
