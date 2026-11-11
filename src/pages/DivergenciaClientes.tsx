@@ -31,7 +31,7 @@ function baixar(blob: Blob, nome: string) {
   a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
-const rotulo = (c?: Carga) => c ? `${c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — ${c.placa ?? "sem placa"} — ${new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}` : "";
+const rotulo = (c?: Carga) => c ? `${c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — ${c.placa ?? "sem placa"} — ${c.motorista ?? "sem motorista"} — ${new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}` : "";
 
 export default function DivergenciaClientes() {
   const { isAdmin } = useAuth();

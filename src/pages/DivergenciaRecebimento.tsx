@@ -69,7 +69,7 @@ export default function DivergenciaRecebimento() {
   const cargasRecentes = useQuery({
     queryKey: ["divergencia-cargas-recentes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("cargas").select("id, numero_carga, placa, data")
+      const { data, error } = await supabase.from("cargas").select("id, numero_carga, placa, data, motorista")
         .order("data", { ascending: false }).order("id").limit(60);
       if (error) throw error;
       return data ?? [];
@@ -131,7 +131,7 @@ export default function DivergenciaRecebimento() {
     queryKey: ["divergencias-cargas", cargaIds],
     enabled: cargaIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase.from("cargas").select("id, numero_carga, placa, data").in("id", cargaIds);
+      const { data, error } = await supabase.from("cargas").select("id, numero_carga, placa, data, motorista").in("id", cargaIds);
       if (error) throw error;
       return Object.fromEntries((data ?? []).map((c) => [c.id, c]));
     },
@@ -152,7 +152,7 @@ export default function DivergenciaRecebimento() {
   [lista.data, cargaSel]);
   const rotuloCarga = (id: string) => {
     const c = cargasInfo.data?.[id];
-    return c ? `${c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — ${c.placa ?? "sem placa"} — ${new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}` : id.slice(0, 8);
+    return c ? `${c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — ${c.placa ?? "sem placa"} — ${c.motorista ?? "sem motorista"} — ${new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}` : id.slice(0, 8);
   };
 
   async function buscar() {
@@ -379,7 +379,7 @@ export default function DivergenciaRecebimento() {
                 <SelectTrigger><SelectValue placeholder="Escolha a carga" /></SelectTrigger>
                 <SelectContent>
                   {(cargasRecentes.data ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — {c.placa ?? "sem placa"} — {new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — {c.placa ?? "sem placa"} — {c.motorista ?? "sem motorista"} — {new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
