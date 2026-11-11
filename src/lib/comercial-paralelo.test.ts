@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agruparFontes, cidadesDoTexto, validarTarifa, normalizarCnpjParalelo, sugerirComponentes, type FonteParalela } from './comercial-paralelo';
+import { agruparFontes, cidadesDoTexto, validarTarifa, normalizarCnpjParalelo, sugerirComponentes, fonteDeEntrada, type EntradaParalela, type FonteParalela } from './comercial-paralelo';
 describe('cadastros paralelos', () => {
   it('sugere apenas com peso cubado explícito e amostras consistentes', () => {
     const f = {quantidades:[{unidade:'01',tipo:'PESO_CUBADO',quantidade:1000}],componentes:[{nome:'FRETE PESO',valor:561.9},{nome:'CAT',valor:5}],valor_carga:10000} as FonteParalela;
@@ -28,5 +28,13 @@ describe('cadastros paralelos', () => {
     expect(validarTarifa(tarifa)).toBeNull();
     expect(validarTarifa({...tarifa, vigente_ate: '2026-11-09'})).not.toBeNull();
     expect(validarTarifa({...tarifa, faixas:[{de:0,ate:100,valor:20},{de:50,ate:200,valor:30}]})).toBe('Faixas de peso sobrepostas');
+  });
+  it('usa somente CT-es novos como evidência de tarifa, nunca NFs', () => {
+    const entrada = { id:'1', tipo:'NF', fonte_id:'nf-1', cnpj:'70940994008277', cliente:'Pandurata', cidade:'Campos dos Goytacazes', uf:'RJ', documento:'123', data_documento:'2026-11-11', dados:{}, created_at:'2026-11-11T20:00:00Z' } as EntradaParalela;
+    expect(fonteDeEntrada(entrada)).toBeNull();
+    const cte = fonteDeEntrada({...entrada, tipo:'CTE', fonte_id:'cte-1', dados:{componentes:[{nome:'CAT',valor:5}],quantidades:[],valor_carga:1000,valor_total_prestacao:100}});
+    expect(cte?.chave_cte).toBe('cte-1');
+    expect(cte?.notas?.[0].cnpj_emitente).toBe('70940994008277');
+    expect(cte?.componentes).toEqual([{nome:'CAT',valor:5}]);
   });
 });

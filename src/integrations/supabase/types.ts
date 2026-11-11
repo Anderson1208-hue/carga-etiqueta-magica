@@ -3830,6 +3830,48 @@ export type Database = {
         }
         Relationships: []
       }
+      paralelo_entradas: {
+        Row: {
+          cidade: string
+          cliente: string
+          cnpj: string
+          created_at: string
+          dados: Json
+          data_documento: string | null
+          documento: string | null
+          fonte_id: string
+          id: string
+          tipo: string
+          uf: string
+        }
+        Insert: {
+          cidade: string
+          cliente: string
+          cnpj: string
+          created_at?: string
+          dados?: Json
+          data_documento?: string | null
+          documento?: string | null
+          fonte_id: string
+          id?: string
+          tipo: string
+          uf: string
+        }
+        Update: {
+          cidade?: string
+          cliente?: string
+          cnpj?: string
+          created_at?: string
+          dados?: Json
+          data_documento?: string | null
+          documento?: string | null
+          fonte_id?: string
+          id?: string
+          tipo?: string
+          uf?: string
+        }
+        Relationships: []
+      }
       paralelo_historico: {
         Row: {
           acao: string
@@ -5575,6 +5617,10 @@ export type Database = {
       paralelo_fontes: {
         Args: { p_cursor?: string; p_fim: string; p_inicio: string }
         Returns: Json
+      }
+      paralelo_garantir_cliente: {
+        Args: { p_cnpj: string; p_nome: string }
+        Returns: undefined
       }
       pings_sugestao_coordenada: {
         Args: { p_sugestao_id: string }

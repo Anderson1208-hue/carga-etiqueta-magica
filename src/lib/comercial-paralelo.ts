@@ -5,6 +5,37 @@ export type ComponenteParalelo = { nome: string; base: string; valor: number; em
 export type FaixaParalela = { de: number; ate: number | null; valor: number };
 export type TarifaParalela = { id: string; regiao_id: string; vigente_de: string; vigente_ate: string | null; fator_cubagem: number | null; componentes: ComponenteParalelo[]; fiscal: Record<string, string>; faixas: FaixaParalela[]; observacao: string; status: 'sugerida' | 'aprovada' };
 export type FonteParalela = { chave_cte: string; numero_cte: string; data_emissao: string; municipio_fim: string; uf_fim: string; cfop: string; icms: Record<string, string> | null; componentes: { nome: string; valor: number }[]; quantidades: { unidade: string; tipo: string; quantidade: number }[]; valor_total_prestacao: number; valor_carga: number; notas: { cnpj_emitente: string; razao_social_emitente: string; dest_cidade: string; dest_uf: string }[] | null };
+export type EntradaParalela = {
+  id: string;
+  tipo: 'NF' | 'CTE';
+  fonte_id: string;
+  cnpj: string;
+  cliente: string;
+  cidade: string;
+  uf: string;
+  documento: string | null;
+  data_documento: string | null;
+  dados: Partial<Pick<FonteParalela, 'numero_cte' | 'cfop' | 'icms' | 'componentes' | 'quantidades' | 'valor_total_prestacao' | 'valor_carga'>>;
+  created_at: string;
+};
+/** Converte somente CT-es capturados depois da ativação; NFs nunca viram evidência tarifária. */
+export function fonteDeEntrada(e: EntradaParalela): FonteParalela | null {
+  if (e.tipo !== 'CTE') return null;
+  return {
+    chave_cte: e.fonte_id,
+    numero_cte: e.dados.numero_cte || e.documento || '',
+    data_emissao: e.data_documento || '',
+    municipio_fim: e.cidade,
+    uf_fim: e.uf,
+    cfop: e.dados.cfop || '',
+    icms: e.dados.icms || null,
+    componentes: e.dados.componentes || [],
+    quantidades: e.dados.quantidades || [],
+    valor_total_prestacao: e.dados.valor_total_prestacao || 0,
+    valor_carga: e.dados.valor_carga || 0,
+    notas: [{ cnpj_emitente: e.cnpj, razao_social_emitente: e.cliente, dest_cidade: e.cidade, dest_uf: e.uf }],
+  };
+}
 export const basesParalelas = [
   ['ton_cubada', 'R$/t cubada'], ['ton_real', 'R$/t real'], ['100kg', 'R$/100 kg'],
   ['percentual_nf', '% da NF'], ['percentual_frete', '% do frete'], ['fixo', 'R$/CT-e'],
