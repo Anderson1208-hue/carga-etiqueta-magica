@@ -372,6 +372,13 @@
       "when": 1794424463224,
       "tag": "0052_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1794428496234,
+      "tag": "0053_parallel_clients_all_shippers",
+      "breakpoints": true
     }
   ]
 }
