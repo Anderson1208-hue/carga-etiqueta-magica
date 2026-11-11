@@ -76,7 +76,7 @@ function numericSort(a: string, b: string): number {
 }
 
 export async function generateRomaneioPDF(
-  carregamentoInfo: { data: string; placa: string; motorista: string },
+  carregamentoInfo: { data: string; placa: string; motorista: string; numeroCarga?: string | null },
   itens: RomaneioItem[]
 ): Promise<Blob> {
   const doc = new jsPDF({
@@ -100,6 +100,13 @@ export async function generateRomaneioPDF(
   doc.text(`Placa: ${carregamentoInfo.placa}`, MARGIN + 80, y);
   doc.text(`Motorista: ${carregamentoInfo.motorista}`, MARGIN + 150, y);
   y += 10;
+
+  if (carregamentoInfo.numeroCarga?.trim()) {
+    doc.setFont("helvetica", "bold");
+    doc.text(`Número da carga: ${carregamentoInfo.numeroCarga.trim()}`, MARGIN, y);
+    doc.setFont("helvetica", "normal");
+    y += 7;
+  }
 
   doc.setLineWidth(0.5);
   doc.line(MARGIN, y, A4_LANDSCAPE_WIDTH - MARGIN, y);

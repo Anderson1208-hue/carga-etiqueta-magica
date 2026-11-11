@@ -66,6 +66,7 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+  numero_carga: string | null;
   observacao: string | null;
   status: "aberta" | "fechada" | "em_rota" | "entregue" | "expedida";
   operador_responsavel: string | null;
@@ -192,6 +193,7 @@ export default function Cargas() {
         data: c.data,
         placa: c.placa,
         motorista: c.motorista,
+        numero_carga: c.numero_carga,
         observacao: c.observacao,
         status: c.status,
         created_by: c.created_by,
@@ -678,6 +680,7 @@ export default function Cargas() {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
+                <TableHead>Número da carga</TableHead>
                 <TableHead>Placa</TableHead>
                 <TableHead>Motorista</TableHead>
                 <TableHead>Tipo</TableHead>
@@ -690,13 +693,13 @@ export default function Cargas() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filteredCargas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={9} className="text-center py-8">
                     <div className="flex flex-col items-center gap-2">
                       <Truck className="w-10 h-10 text-muted-foreground/50" />
                       <p className="text-muted-foreground">
@@ -711,6 +714,7 @@ export default function Cargas() {
                     <TableCell className="font-medium">
                       {formatCargaDate(carga.data)}
                     </TableCell>
+                    <TableCell className="font-medium">{carga.numero_carga || "—"}</TableCell>
                     <TableCell className="font-mono">{carga.placa}</TableCell>
                     <TableCell>{carga.motorista}</TableCell>
                     <TableCell>

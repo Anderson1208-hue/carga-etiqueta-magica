@@ -55,6 +55,7 @@ interface Carga {
   data: string;
   placa: string;
   motorista: string;
+  numero_carga: string | null;
   tipo_carga?: string;
 }
 
@@ -149,7 +150,7 @@ export default function Romaneio() {
   async function loadCargas() {
     const { data } = await supabase
       .from("cargas")
-      .select("id, data, placa, motorista, tipo_carga")
+      .select("id, data, placa, motorista, numero_carga, tipo_carga")
       .order("created_at", { ascending: false });
 
     setCargas(data || []);
@@ -296,6 +297,7 @@ export default function Romaneio() {
           data: selectedCarga.data,
           placa: selectedCarga.placa,
           motorista: selectedCarga.motorista,
+          numeroCarga: selectedCarga.numero_carga,
         },
         romaneioItems
       );
@@ -420,6 +422,7 @@ export default function Romaneio() {
           data: selectedCarga.data,
           placa: selectedCarga.placa,
           motorista: selectedCarga.motorista,
+          numeroCarga: selectedCarga.numero_carga,
         },
         romaneioItems
       );
@@ -510,6 +513,7 @@ export default function Romaneio() {
           data: selectedCarga.data,
           placa: selectedCarga.placa,
           motorista: selectedCarga.motorista,
+          numeroCarga: selectedCarga.numero_carga,
         },
         sortedItems
       );
@@ -620,7 +624,7 @@ export default function Romaneio() {
                     <SelectItem key={carga.id} value={carga.id}>
                       <span className="flex items-center gap-2">
                         {isChocolate(carga.tipo_carga) && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
-                        {carga.placa} - {format(new Date(carga.data + "T00:00:00"), "dd/MM/yyyy")}{" "}
+                        {carga.numero_carga ? `Nº ${carga.numero_carga} - ` : ""}{carga.placa} - {format(new Date(carga.data + "T00:00:00"), "dd/MM/yyyy")}{" "}
                         - {carga.motorista}
                       </span>
                     </SelectItem>
@@ -944,7 +948,7 @@ export default function Romaneio() {
               <div className="p-4 border-b">
                 <h3 className="font-semibold">Romaneio Totalizado</h3>
                 <p className="text-sm text-muted-foreground">
-                  {romaneioItems.length} produtos • {totalCaixas} caixas total
+                  {selectedCarga?.numero_carga ? `Carga nº ${selectedCarga.numero_carga} • ` : ""}{romaneioItems.length} produtos • {totalCaixas} caixas total
                 </p>
               </div>
               <Table>

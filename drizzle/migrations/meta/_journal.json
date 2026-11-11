@@ -351,6 +351,20 @@
       "when": 1794345655679,
       "tag": "0049_divergencia_demais_clientes",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794421011894,
+      "tag": "0050_cargas_numero_na_listagem",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1794421035031,
+      "tag": "0051_cargas_numero_permissao_listagem",
+      "breakpoints": true
     }
   ]
 }

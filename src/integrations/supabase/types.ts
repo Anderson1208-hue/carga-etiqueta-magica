@@ -5433,6 +5433,7 @@ export type Database = {
           itens_count: number
           motorista: string
           nfs_count: number
+          numero_carga: string
           observacao: string
           operador_responsavel: string
           placa: string
