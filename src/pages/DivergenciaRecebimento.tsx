@@ -417,6 +417,8 @@ export default function DivergenciaRecebimento() {
                 <SelectItem value="ARCOR/BAGLEY">ARCOR/BAGLEY</SelectItem>
                 <SelectItem value="MASTERFOODS">MASTERFOODS</SelectItem>
                 <SelectItem value="PANDURATA">PANDURATA</SelectItem>
+                <SelectItem value="DOCILE">DOCILE</SelectItem>
+                <SelectItem value="HERSHEYS">HERSHEYS</SelectItem>
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={() => gerarConsolidado(false)} disabled={gerandoCons}>

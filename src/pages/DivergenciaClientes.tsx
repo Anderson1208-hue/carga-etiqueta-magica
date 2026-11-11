@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Search, PackageOpen, Mail, Download, Ban, Camera, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
-  CABECALHO_PROTOCOLO, EMBARCADORES_CLIENTES, RETORNO_CD, STATUS_CLIENTE, embarcadorCliente, linhasProtocolo, type EmbarcadorCliente,
+  CABECALHO_DOCILE, CABECALHO_PROTOCOLO, EMBARCADORES_CLIENTES, linhasDocile, planilhaHersheys, statusDoCliente, RETORNO_CD, embarcadorCliente, linhasProtocolo, type EmbarcadorCliente,
 } from "@/lib/divergencia-clientes";
 
 const BUCKET = "divergencias-recebimento";
@@ -24,7 +24,7 @@ const semZeros = (c: string | null | undefined) => String(c ?? "").replace(/^0+(
 type Carga = { id: string; numero_carga: string | null; placa: string | null; data: string; motorista: string | null; lacre: string | null };
 interface NfBusca { id: string; numero_nf: string; carga_id: string | null; cnpj_emitente: string | null; razao_social_emitente: string | null; itens_nf: { c_prod: string; x_prod: string; q_com: number }[] }
 interface Linha { id: string; carga_id: string; numero_nf: string; embarcador: EmbarcadorCliente; c_prod: string; x_prod: string; status: string; retorno_cd: string | null;
-  qtd_nf: number | null; qtd_recebida: number | null; quantidade: number; observacao: string | null; fotos: string[]; criado_em: string; criado_por_nome: string | null }
+  qtd_nf: number | null; qtd_recebida: number | null; quantidade: number; observacao: string | null; fotos: string[]; criado_em: string; criado_por_nome: string | null; notas_fiscais?: { dest_razao_social: string | null } | null }
 
 function baixar(blob: Blob, nome: string) {
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
@@ -66,7 +66,7 @@ export default function DivergenciaClientes() {
     queryKey: ["div-clientes", cargaId], enabled: !!cargaId,
     queryFn: async () => {
       const { data, error } = await supabase.from("divergencias_recebimento_clientes")
-        .select("id, carga_id, numero_nf, embarcador, c_prod, x_prod, status, retorno_cd, qtd_nf, qtd_recebida, quantidade, observacao, fotos, criado_em, criado_por_nome")
+        .select("id, carga_id, numero_nf, embarcador, c_prod, x_prod, status, retorno_cd, qtd_nf, qtd_recebida, quantidade, observacao, fotos, criado_em, criado_por_nome, notas_fiscais(dest_razao_social)")
         .eq("carga_id", cargaId).is("cancelado_em", null).order("criado_em").order("id").limit(1000);
       if (error) throw error; return (data ?? []) as Linha[];
     },
@@ -92,9 +92,9 @@ export default function DivergenciaClientes() {
       if (error) throw error;
       const ok = ((data ?? []) as unknown as NfBusca[]).filter((x) => embarcadorCliente(x.cnpj_emitente));
       const daCarga = ok.find((x) => x.carga_id === cargaId) ?? ok[0];
-      if (!daCarga) { toast.error(data?.length ? "Esta NF não é de Arcor/Bagley, Masterfoods ou Pandurata" : "NF não encontrada"); return; }
+      if (!daCarga) { toast.error(data?.length ? "Esta NF não é de Arcor/Bagley, Masterfoods, Pandurata, Docile ou Hershey's" : "NF não encontrada"); return; }
       if (daCarga.carga_id && daCarga.carga_id !== cargaId) toast.warning("Esta NF está em outra carga; o lançamento irá para a carga da NF.");
-      setNf(daCarga); setCprod("");
+      setNf(daCarga); setCprod(""); setStatus("FALTA");
     } catch (e: any) { toast.error(e.message ?? "Falha na busca"); } finally { setBuscando(false); }
   }
   const itensNf = useMemo(() => {
@@ -143,11 +143,27 @@ export default function DivergenciaClientes() {
       const saida: { nome: string; blob: Blob }[] = [];
       for (const e of EMBARCADORES_CLIENTES) {
         const doEmb = itens.filter((d) => d.embarcador === e); if (!doEmb.length) continue;
-        const rows = linhasProtocolo(doEmb, { dt: carga.numero_carga ?? "", lacre: carga.lacre ?? "", motorista: carga.motorista ?? "" });
-        const ws = XLSX.utils.aoa_to_sheet([[`PROTOCOLO DE DIVERGÊNCIAS - ${hoje}`], CABECALHO_PROTOCOLO, ...rows]);
-        ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: CABECALHO_PROTOCOLO.length - 1 } }];
-        ws["!cols"] = CABECALHO_PROTOCOLO.map((h, i) => ({ wch: i === 3 ? 45 : Math.max(12, h.length + 4) }));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "PROTOCOLO");
+        const wb = XLSX.utils.book_new();
+        if (e === "HERSHEYS") {
+          const prim = doEmb.reduce((m, d) => (d.criado_em < m ? d.criado_em : m), doEmb[0].criado_em);
+          const ws = XLSX.utils.aoa_to_sheet(planilhaHersheys(doEmb, { placa: carga.placa ?? "", motorista: carga.motorista ?? "", romaneio: carga.numero_carga ?? "", lacre: carga.lacre ?? "",
+            recebimento: new Date(prim).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) }));
+          ws["!cols"] = [{ wch: 32 }, { wch: 45 }, { wch: 12 }, { wch: 12 }, { wch: 20 }];
+          XLSX.utils.book_append_sheet(wb, ws, "OCORRENCIA");
+        } else if (e === "DOCILE") {
+          const rows = linhasDocile(doEmb.map((d) => ({ ...d, cliente: d.notas_fiscais?.dest_razao_social ?? "" })),
+            { dataColeta: new Date(`${carga.data}T00:00:00`).toLocaleDateString("pt-BR"), embarque: carga.numero_carga ?? "" });
+          const ws = XLSX.utils.aoa_to_sheet([["Formulário de Ocorrência"], CABECALHO_DOCILE, ...rows]);
+          ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: CABECALHO_DOCILE.length - 1 } }];
+          ws["!cols"] = CABECALHO_DOCILE.map((h, i) => ({ wch: i === 4 ? 40 : Math.max(12, h.length + 4) }));
+          XLSX.utils.book_append_sheet(wb, ws, "Planilha1");
+        } else {
+          const rows = linhasProtocolo(doEmb, { dt: carga.numero_carga ?? "", lacre: carga.lacre ?? "", motorista: carga.motorista ?? "" });
+          const ws = XLSX.utils.aoa_to_sheet([[`PROTOCOLO DE DIVERGÊNCIAS - ${hoje}`], CABECALHO_PROTOCOLO, ...rows]);
+          ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: CABECALHO_PROTOCOLO.length - 1 } }];
+          ws["!cols"] = CABECALHO_PROTOCOLO.map((h, i) => ({ wch: i === 3 ? 45 : Math.max(12, h.length + 4) }));
+          XLSX.utils.book_append_sheet(wb, ws, "PROTOCOLO");
+        }
         const base = `DIVERGENCIA ${e.replace("/", "-")} - CARGA ${carga.numero_carga || carga.placa || carga.id.slice(0, 8)}`;
         const zip = new JSZip();
         zip.file(`${base}.xlsx`, XLSX.write(wb, { type: "array", bookType: "xlsx" }));
@@ -181,7 +197,7 @@ export default function DivergenciaClientes() {
     <MainLayout>
       <div className="space-y-6 p-4 md:p-6">
         <div>
-          <h1 className="text-2xl font-bold">Divergência — Arcor/Bagley, Masterfoods e Pandurata</h1>
+          <h1 className="text-2xl font-bold">Divergência — Arcor/Bagley, Masterfoods, Pandurata, Docile e Hershey's</h1>
           <p className="text-sm text-muted-foreground">Só relatório: nada é bloqueado. Gere o protocolo de cada cliente e envie pelo seu e-mail. Cacau continua na tela própria.</p>
         </div>
         <Card>
@@ -226,7 +242,7 @@ export default function DivergenciaClientes() {
                   {!semNf && (
                     <div className="space-y-1"><Label>Status</Label>
                       <Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{STATUS_CLIENTE.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
+                        <SelectContent>{statusDoCliente(embarcadorCliente(nf?.cnpj_emitente) ?? "PANDURATA").map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select>
                     </div>
                   )}
                   <div className="space-y-1"><Label>Retorno CD</Label>
