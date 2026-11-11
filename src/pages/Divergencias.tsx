@@ -9,8 +9,9 @@ import DivergenciaClientes from "./DivergenciaClientes";
 
 export default function Divergencias() {
   const [params] = useSearchParams();
-  const [embarcador, setEmbarcador] = useState(params.get("embarcador") ?? "");
-  const cacau = embarcador === "IBAC" || embarcador === "IBAE";
+  const inicial = params.get("embarcador") ?? "";
+  const [embarcador, setEmbarcador] = useState(inicial === "IBAC" || inicial === "IBAE" ? "IBAC/IBAE" : inicial);
+  const cacau = embarcador === "IBAC/IBAE";
   return (
     <MainLayout>
       <div className="space-y-4 p-4 md:p-6">
@@ -20,13 +21,13 @@ export default function Divergencias() {
           <Select value={embarcador} onValueChange={setEmbarcador}>
             <SelectTrigger id="divergencia-embarcador"><SelectValue placeholder="Selecione o embarcador" /></SelectTrigger>
             <SelectContent>
-              {["IBAC", "IBAE", ...EMBARCADORES_CLIENTES].map((e) => <SelectItem key={e} value={e}>{e === "HERSHEYS" ? "Hershey's" : e}</SelectItem>)}
+              {["IBAC/IBAE", ...EMBARCADORES_CLIENTES].map((e) => <SelectItem key={e} value={e}>{e === "HERSHEYS" ? "Hershey's" : e}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
       </div>
       {embarcador && (cacau
-        ? <DivergenciaRecebimento key={embarcador} embedded embarcador={embarcador as "IBAC" | "IBAE"} />
+        ? <DivergenciaRecebimento key={embarcador} embedded />
         : <DivergenciaClientes key={embarcador} embedded embarcador={embarcador as EmbarcadorCliente} />)}
     </MainLayout>
   );
