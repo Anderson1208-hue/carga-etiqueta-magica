@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { ProdutoSobraFields } from "@/components/ProdutoSobraFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -388,13 +389,12 @@ export default function DivergenciaRecebimento({ embedded = false, embarcador }:
             </div>
             {!embarcador && <div className="space-y-1">
               <Label>Embarcador</Label>
-              <Select value={sEmb} onValueChange={(v) => setSEmb(v as "IBAC" | "IBAE")}>
+              <Select value={sEmb} onValueChange={(v) => { setSEmb(v as "IBAC" | "IBAE"); setSDesc(""); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="IBAC">IBAC</SelectItem><SelectItem value="IBAE">IBAE</SelectItem></SelectContent>
               </Select>
             </div>}
-            <div className="space-y-1"><Label>Código do produto</Label><Input value={sCod} onChange={(e) => setSCod(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Descrição</Label><Input value={sDesc} onChange={(e) => setSDesc(e.target.value)} /></div>
+            <ProdutoSobraFields key={sEmb} codigo={sCod} descricao={sDesc} embarcador={sEmb} onChange={(c, d) => { setSCod(c); setSDesc(d); }} />
             <div className="space-y-1"><Label>Quantidade de caixas</Label><Input type="number" min={1} value={sQtd} onChange={(e) => setSQtd(e.target.value)} /></div>
             <div className="space-y-1">
               <Label className="flex items-center gap-2"><Camera className="h-4 w-4" />Fotos (originais)</Label>

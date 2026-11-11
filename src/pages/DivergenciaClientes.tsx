@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
+import { ProdutoSobraFields } from "@/components/ProdutoSobraFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -108,7 +109,7 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
     if (!cargaId) { toast.error("Escolha a carreta"); return; }
     if (!semNf && !nf) { toast.error("Busque a NF ou marque sobra sem NF"); return; }
     if (!cprod.trim()) { toast.error("Informe o código"); return; }
-    if (semNf && !desc.trim()) { toast.error("Informe a descrição"); return; }
+    if (semNf && !desc.trim()) { toast.error("Busque o produto no cadastro antes de lançar a sobra"); return; }
     if (recebida === "" && !(Number(qtd) > 0)) { toast.error("Informe a quantidade recebida ou a divergência"); return; }
     setSalvando(true);
     try {
@@ -252,8 +253,7 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
                   </div>
                   {semNf ? (
                     <>
-                      <div className="space-y-1"><Label>Código do produto</Label><Input value={cprod} onChange={(e) => setCprod(e.target.value)} /></div>
-                      <div className="space-y-1"><Label>Descrição</Label><Input value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
+                      <ProdutoSobraFields key={emb} codigo={cprod} descricao={desc} embarcador={emb} onChange={(c, d) => { setCprod(c); setDesc(d); }} />
                       <div className="space-y-1"><Label>Quantidade</Label><Input type="number" min={1} value={qtd} onChange={(e) => setQtd(e.target.value)} /></div>
                     </>
                   ) : (
