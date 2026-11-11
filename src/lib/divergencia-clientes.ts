@@ -55,6 +55,6 @@ export function planilhaHersheys(itens: DivergenciaCliente[], ctx: { placa: stri
 export const CABECALHO_DOCILE = ["Data da Coleta", "Nº do Embarque", "NF", "NFD", "Cliente", "Transportadora", "Codigo SKU", "Qtde falta", "Qtde sobra", "Qtde avaria"];
 /** Docile — "Formulário de Ocorrência": uma linha por código, quantidade na coluna do tipo. */
 export function linhasDocile(itens: DivergenciaCliente[], ctx: { dataColeta: string; embarque: string }): (string | number)[][] {
-  return itens.map((d) => [ctx.dataColeta, ctx.embarque, d.numero_nf || "SEM NF", "", d.cliente ?? "", "TLM", semZeros(d.c_prod),
+  return itens.map((d) => [ctx.dataColeta, ctx.embarque, d.numero_nf || "SEM NF", "", d.cliente ?? "", "Expresso Ebenezer", semZeros(d.c_prod),
     d.status === "FALTA" ? d.quantidade : "", d.status === "SOBRA" ? d.quantidade : "", d.status === "AVARIA" ? d.quantidade : ""]);
 }

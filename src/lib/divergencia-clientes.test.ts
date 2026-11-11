@@ -23,7 +23,7 @@ describe("divergência demais clientes", () => {
   it("Docile põe a quantidade na coluna do tipo", () => {
     const [l] = linhasDocile([{ numero_nf: "1", c_prod: "007", x_prod: "X", status: "SOBRA", qtd_nf: null, qtd_recebida: null, quantidade: 3, criado_em: "2026-11-10T15:00:00Z", cliente: "LOJA" }],
       { dataColeta: "10/11/2026", embarque: "55" });
-    expect(l).toEqual(["10/11/2026", "55", "1", "", "LOJA", "TLM", "7", "", 3, ""]);
+    expect(l).toEqual(["10/11/2026", "55", "1", "", "LOJA", "Expresso Ebenezer", "7", "", 3, ""]);
   });
   it("Hershey's usa os motivos do formulário", () => {
     const rows = planilhaHersheys([{ numero_nf: "9", c_prod: "40001", x_prod: "BAR", status: "CURTA VALIDADE", qtd_nf: 10, qtd_recebida: null, quantidade: 2, criado_em: "2026-11-10T15:00:00Z" }],
