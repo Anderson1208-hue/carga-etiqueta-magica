@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
@@ -29,7 +29,7 @@ interface NfBusca {
   cargas: { numero_carga: string | null; placa: string | null; data: string } | null;
   itens_nf: ItemNf[];
 }
-type Linha = DivergenciaRow & { carga_id: string | null };
+type Linha = DivergenciaRow & { carga_id: string | null; embarcador?: string | null; notas_fiscais?: { cnpj_emitente: string | null } | null };
 
 function baixar(blob: Blob, nome: string) {
   const url = URL.createObjectURL(blob);
@@ -38,7 +38,9 @@ function baixar(blob: Blob, nome: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-export default function DivergenciaRecebimento() {
+export default function DivergenciaRecebimento({ embedded = false, embarcador }: { embedded?: boolean; embarcador?: "IBAC" | "IBAE" } = {}) {
+  const Layout = embedded ? Fragment : MainLayout;
+  const pertence = (cnpj: string | null) => isEmitenteCacau(cnpj) && (!embarcador || String(cnpj ?? "").replace(/\D/g, "").startsWith(embarcador === "IBAC" ? "61472205" : "42431457"));
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [numero, setNumero] = useState("");
@@ -59,7 +61,7 @@ export default function DivergenciaRecebimento() {
   const [consolidado, setConsolidado] = useState<{ nome: string; blob: Blob } | null>(null);
   const [gerandoCons, setGerandoCons] = useState(false);
   const [sCarga, setSCarga] = useState("");
-  const [sEmb, setSEmb] = useState<"IBAC" | "IBAE">("IBAC");
+  const [sEmb, setSEmb] = useState<"IBAC" | "IBAE">(embarcador ?? "IBAC");
   const [sCod, setSCod] = useState("");
   const [sDesc, setSDesc] = useState("");
   const [sQtd, setSQtd] = useState("");
@@ -116,13 +118,13 @@ export default function DivergenciaRecebimento() {
   }
 
   const lista = useQuery({
-    queryKey: ["divergencias-recebimento"],
+    queryKey: ["divergencias-recebimento", embarcador],
     queryFn: async () => {
       const { data, error } = await supabase.from("divergencias_recebimento")
-        .select("id, carga_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome, cancelado_em")
+        .select("id, carga_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome, cancelado_em, embarcador, notas_fiscais(cnpj_emitente)")
         .is("cancelado_em", null).order("criado_em", { ascending: false }).order("id").limit(500);
       if (error) throw error;
-      return (data ?? []) as unknown as Linha[];
+      return ((data ?? []) as unknown as Linha[]).filter((d) => !embarcador || (d.embarcador ? d.embarcador === embarcador : pertence(d.notas_fiscais?.cnpj_emitente ?? null)));
     },
   });
 
@@ -164,8 +166,8 @@ export default function DivergenciaRecebimento() {
         .select("id, numero_nf, carga_id, cnpj_emitente, razao_social_emitente, status_entrega, data_emissao, dest_razao_social, cargas(numero_carga, placa, data), itens_nf(c_prod, x_prod, q_com)")
         .eq("numero_nf", n).order("created_at", { ascending: false }).limit(20);
       if (error) throw error;
-      const cacau = ((data ?? []) as unknown as NfBusca[]).filter((x) => isEmitenteCacau(x.cnpj_emitente));
-      if (!cacau.length) { toast.error(data?.length ? "Esta NF não é da IBAC/IBAE" : "NF não encontrada"); return; }
+      const cacau = ((data ?? []) as unknown as NfBusca[]).filter((x) => pertence(x.cnpj_emitente));
+      if (!cacau.length) { toast.error(data?.length ? "Esta NF não pertence ao embarcador selecionado" : "NF não encontrada"); return; }
       if (cacau.length === 1) escolher(cacau[0]); else setOpcoes(cacau);
     } catch (e: any) { toast.error(e.message ?? "Falha na busca"); } finally { setBuscando(false); }
   }
@@ -283,12 +285,12 @@ export default function DivergenciaRecebimento() {
   const cancelada = nf?.status_entrega === "NF CANCELADA";
 
   return (
-    <MainLayout>
+    <Layout>
       <div className="space-y-6 p-4 md:p-6">
-        <div>
+        {!embedded && <div>
           <h1 className="text-2xl font-bold">Divergência de Recebimento</h1>
           <p className="text-sm text-muted-foreground">Somente IBAC e IBAE. Nada é enviado à Cacau: baixe a planilha com as fotos e envie pelo seu e-mail.</p>
-        </div>
+        </div>}
 
         <Card>
           <CardHeader><CardTitle className="text-lg">Lançar ocorrência</CardTitle></CardHeader>
@@ -384,13 +386,13 @@ export default function DivergenciaRecebimento() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
+            {!embarcador && <div className="space-y-1">
               <Label>Embarcador</Label>
               <Select value={sEmb} onValueChange={(v) => setSEmb(v as "IBAC" | "IBAE")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="IBAC">IBAC</SelectItem><SelectItem value="IBAE">IBAE</SelectItem></SelectContent>
               </Select>
-            </div>
+            </div>}
             <div className="space-y-1"><Label>Código do produto</Label><Input value={sCod} onChange={(e) => setSCod(e.target.value)} /></div>
             <div className="space-y-1"><Label>Descrição</Label><Input value={sDesc} onChange={(e) => setSDesc(e.target.value)} /></div>
             <div className="space-y-1"><Label>Quantidade de caixas</Label><Input type="number" min={1} value={sQtd} onChange={(e) => setSQtd(e.target.value)} /></div>
@@ -477,6 +479,6 @@ export default function DivergenciaRecebimento() {
           </CardContent>
         </Card>
       </div>
-    </MainLayout>
+    </Layout>
   );
 }

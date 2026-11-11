@@ -68,8 +68,7 @@ const depositoItems = [
   { name: "Etiquetas", href: "/etiquetas", icon: Tags },
   { name: "Endereçamento", href: "/enderecamento", icon: MapPin },
   { name: "Conf. Interna", href: "/conferencia-interna", icon: Warehouse },
-  { name: "Divergência Receb.", href: "/divergencia-recebimento", icon: PackageX },
-  { name: "Diverg. Demais Clientes", href: "/divergencia-clientes", icon: PackageX },
+  { name: "Divergência", href: "/divergencia-recebimento", icon: PackageX },
 ];
 
 const transporteItems = [

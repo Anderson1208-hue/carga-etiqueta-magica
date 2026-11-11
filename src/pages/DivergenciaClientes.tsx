@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
@@ -33,7 +33,8 @@ function baixar(blob: Blob, nome: string) {
 }
 const rotulo = (c?: Carga) => c ? `${c.numero_carga ? `Carga ${c.numero_carga}` : "Carga sem número"} — ${c.placa ?? "sem placa"} — ${c.motorista ?? "sem motorista"} — ${new Date(`${c.data}T00:00:00`).toLocaleDateString("pt-BR")}` : "";
 
-export default function DivergenciaClientes() {
+export default function DivergenciaClientes({ embedded = false, embarcador }: { embedded?: boolean; embarcador?: EmbarcadorCliente } = {}) {
+  const Layout = embedded ? Fragment : MainLayout;
   const { isAdmin } = useAuth();
   const qc = useQueryClient();
   const [cargaId, setCargaId] = useState("");
@@ -42,7 +43,7 @@ export default function DivergenciaClientes() {
   const [buscando, setBuscando] = useState(false);
   const [nf, setNf] = useState<NfBusca | null>(null);
   const [semNf, setSemNf] = useState(false);
-  const [emb, setEmb] = useState<EmbarcadorCliente>("PANDURATA");
+  const [emb, setEmb] = useState<EmbarcadorCliente>(embarcador ?? "PANDURATA");
   const [status, setStatus] = useState<string>("FALTA");
   const [retorno, setRetorno] = useState<string>("");
   const [cprod, setCprod] = useState(""); const [desc, setDesc] = useState("");
@@ -71,8 +72,8 @@ export default function DivergenciaClientes() {
       if (error) throw error; return (data ?? []) as Linha[];
     },
   });
-  const itens = useMemo(() => [...(lista.data ?? [])].sort((a, b) => a.embarcador.localeCompare(b.embarcador)
-    || a.numero_nf.localeCompare(b.numero_nf, "pt-BR", { numeric: true }) || a.c_prod.localeCompare(b.c_prod, "pt-BR", { numeric: true })), [lista.data]);
+  const itens = useMemo(() => [...(lista.data ?? [])].filter((d) => !embarcador || d.embarcador === embarcador).sort((a, b) => a.embarcador.localeCompare(b.embarcador)
+    || a.numero_nf.localeCompare(b.numero_nf, "pt-BR", { numeric: true }) || a.c_prod.localeCompare(b.c_prod, "pt-BR", { numeric: true })), [lista.data, embarcador]);
 
   function escolherCarga(id: string) {
     setCargaId(id); setPacotes([]); setNf(null);
@@ -90,9 +91,9 @@ export default function DivergenciaClientes() {
       const { data, error } = await supabase.from("notas_fiscais").select("id, numero_nf, carga_id, cnpj_emitente, razao_social_emitente, itens_nf(c_prod, x_prod, q_com)")
         .eq("numero_nf", n).order("created_at", { ascending: false }).limit(20);
       if (error) throw error;
-      const ok = ((data ?? []) as unknown as NfBusca[]).filter((x) => embarcadorCliente(x.cnpj_emitente));
+      const ok = ((data ?? []) as unknown as NfBusca[]).filter((x) => embarcadorCliente(x.cnpj_emitente) && (!embarcador || embarcadorCliente(x.cnpj_emitente) === embarcador));
       const daCarga = ok.find((x) => x.carga_id === cargaId) ?? ok[0];
-      if (!daCarga) { toast.error(data?.length ? "Esta NF não é de Arcor/Bagley, Masterfoods, Pandurata, Docile ou Hershey's" : "NF não encontrada"); return; }
+      if (!daCarga) { toast.error(data?.length ? "Esta NF não pertence ao embarcador selecionado" : "NF não encontrada"); return; }
       if (daCarga.carga_id && daCarga.carga_id !== cargaId) toast.warning("Esta NF está em outra carga; o lançamento irá para a carga da NF.");
       setNf(daCarga); setCprod(""); setStatus("FALTA");
     } catch (e: any) { toast.error(e.message ?? "Falha na busca"); } finally { setBuscando(false); }
@@ -120,7 +121,7 @@ export default function DivergenciaClientes() {
         caminhos.push(path);
       }
       const { error } = await supabase.rpc("registrar_divergencia_cliente", {
-        p_carga_id: cargaId, p_nf_id: semNf ? null : nf!.id, p_embarcador: emb, p_status: semNf ? "SOBRA" : status,
+        p_carga_id: cargaId, p_nf_id: semNf ? null : nf?.id, p_embarcador: emb, p_status: semNf ? "SOBRA" : status,
         p_c_prod: cprod.trim(), p_x_prod: desc.trim(), p_qtd_recebida: (recebida === "" || semNf ? null : Number(recebida)) as any,
         p_quantidade: (Number(qtd) || null) as any, p_retorno_cd: retorno, p_observacao: obs, p_fotos: caminhos,
       } as any);
@@ -194,12 +195,12 @@ export default function DivergenciaClientes() {
   }
 
   return (
-    <MainLayout>
+    <Layout>
       <div className="space-y-6 p-4 md:p-6">
-        <div>
+        {!embedded && <div>
           <h1 className="text-2xl font-bold">Divergência — Arcor/Bagley, Masterfoods, Pandurata, Docile e Hershey's</h1>
           <p className="text-sm text-muted-foreground">Só relatório: nada é bloqueado. Gere o protocolo de cada cliente e envie pelo seu e-mail. Cacau continua na tela própria.</p>
-        </div>
+        </div>}
         <Card>
           <CardHeader><CardTitle className="text-lg">Carreta</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-[1fr_auto]">
@@ -222,7 +223,7 @@ export default function DivergenciaClientes() {
             <CardHeader><CardTitle className="text-lg">Lançar ocorrência</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={semNf} onChange={(e) => { setSemNf(e.target.checked); setNf(null); setCprod(""); }} />Sobra sem NF (produto que não está em nenhuma nota)</label>
-              {semNf ? (
+              {semNf ? (!embarcador && (
                 <div className="max-w-xs space-y-1">
                   <Label>Cliente</Label>
                   <Select value={emb} onValueChange={(v) => setEmb(v as EmbarcadorCliente)}>
@@ -230,7 +231,7 @@ export default function DivergenciaClientes() {
                     <SelectContent>{EMBARCADORES_CLIENTES.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-              ) : (
+              )) : (
                 <div className="flex gap-2 max-w-md">
                   <Input placeholder="Número da NF" value={numero} inputMode="numeric" onChange={(e) => setNumero(e.target.value)} onKeyDown={(e) => e.key === "Enter" && buscar()} />
                   <Button onClick={buscar} disabled={buscando}>{buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}Buscar</Button>
@@ -314,6 +315,6 @@ export default function DivergenciaClientes() {
           </Card>
         )}
       </div>
-    </MainLayout>
+    </Layout>
   );
 }
