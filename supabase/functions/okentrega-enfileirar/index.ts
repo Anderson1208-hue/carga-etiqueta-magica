@@ -113,6 +113,21 @@ Deno.serve(async (req) => {
     .in("status", ["pendente", "processando", "aguardando_aprovacao", "aprovado", "revisao", "enviado", "bloqueado"]);
   const naFila = new Set((jaNaFila ?? []).map((r) => r.baixa_id).filter(Boolean));
 
+  // Regra: NF já aprovada (Registrado) no portal não recebe nova baixa/foto,
+  // para não transformar uma aprovação em nova análise.
+  const nfIdsCand = [...new Set((baixas ?? []).map((b) => b.nf_id).filter(Boolean))];
+  const nfAprovadas = new Set<string>();
+  for (let i = 0; i < nfIdsCand.length; i += 200) {
+    const { data: aprov, error: aErr } = await supabase
+      .from("okentrega_queue")
+      .select("nf_id")
+      .eq("ambiente", ambiente)
+      .eq("status", "aprovado")
+      .in("nf_id", nfIdsCand.slice(i, i + 200));
+    if (aErr) return json({ error: aErr.message }, 500);
+    for (const r of aprov ?? []) nfAprovadas.add(r.nf_id);
+  }
+
   // Bloqueio manual: NFs digitadas direto no portal do cliente nunca podem
   // entrar na fila (evita duplicidade 1005 / HTTP 409 na OK Entrega).
   const blocklist = new Set(
@@ -122,6 +137,7 @@ Deno.serve(async (req) => {
   const elegiveis = (baixas ?? [])
     .filter((b) => {
       if (naFila.has(b.id)) return false;
+      if (nfAprovadas.has(b.nf_id)) return false;
       const nf = (b as any).notas_fiscais;
       if (!nf) return false;
       // chave da DANFE com 44 dígitos é obrigatória
