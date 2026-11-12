@@ -180,6 +180,7 @@ export default function IntegracaoOkEntrega() {
       const { data, error } = await supabase
         .from("okentrega_queue")
         .select("*")
+        .gte("created_at", "2026-10-22T03:00:00Z") // só a partir de 22/10/2026 (Brasília)
         .order("created_at", { ascending: false })
         .limit(300);
       if (error) throw error;
