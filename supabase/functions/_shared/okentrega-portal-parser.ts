@@ -11,7 +11,8 @@ export function portalValidationText(value: unknown): string | null {
 
 export function portalQueueStatus(value: unknown) {
   const text = portalValidationText(value)?.toLowerCase();
-  if (text === 'registrado') return { status: 'aprovado', status_comprovante: '1' };
+  // Portal passou a exibir "aprovado (validação cliente)" além de "registrado" (nov/2026).
+  if (text === 'registrado' || text === 'aprovado' || text === 'aprovado (validação cliente)') return { status: 'aprovado', status_comprovante: '1' };
   if (text === 'recusado') return { status: 'recusado', status_comprovante: '2' };
   return null;
 }
