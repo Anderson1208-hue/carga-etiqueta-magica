@@ -73,7 +73,7 @@ const CanhotosEnvioManual = ({
           <Text style={muted}>
             Os links ficam ativos por 90 dias. As imagens permanecem guardadas no sistema.
           </Text>
-          <Text style={muted}>TLM Logística — Carga Fácil</Text>
+          <Text style={muted}>Expresso Ebenezer — Orkestria</Text>
         </Section>
       </Container>
     </Body>

@@ -71,7 +71,7 @@ export default function Unsubscribe() {
           {estado === "valido" && (
             <>
               <p className="text-sm text-muted-foreground">
-                Deseja parar de receber e-mails automáticos do Carga Fácil
+                Deseja parar de receber e-mails automáticos do Orkestria
                 {email ? (
                   <>
                     {" "}no endereço <strong>{email}</strong>

@@ -824,7 +824,7 @@ export default function ConferenciaInterna() {
           const result: ScanResult = {
             type: "error",
             message: "Bipe o código do cliente, não a nossa etiqueta",
-            details: "O 1º bipe é o código de barras do cliente; o 2º é a etiqueta TLM",
+            details: "O 1º bipe é o código de barras do cliente; o 2º é a etiqueta Expresso Ebenezer",
           };
           addToHistory(reportResult(result)); playSound("error");
           setCodigoCliente("");

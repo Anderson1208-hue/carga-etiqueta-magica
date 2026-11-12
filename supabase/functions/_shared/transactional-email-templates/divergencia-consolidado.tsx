@@ -16,7 +16,7 @@ const Email = ({ link = '#', ocorrencias = 0, total = 0, quando = '', embarcador
         {embarcadores ? <Text style={text}>{embarcadores}</Text> : null}
         <Text style={text}>A planilha tem a aba TODAS e uma aba por embarcador, com filtro em todas as colunas.</Text>
         <Button href={link} style={btn}>Baixar planilha consolidada</Button>
-        <Text style={muted}>O link vale por 7 dias. Um consolidado mais recente pode ser baixado a qualquer momento na tela Divergência de Recebimento. TLM Logística.</Text>
+        <Text style={muted}>O link vale por 7 dias. Um consolidado mais recente pode ser baixado a qualquer momento na tela Divergência de Recebimento. Expresso Ebenezer.</Text>
       </Container>
     </Body>
   </Html>

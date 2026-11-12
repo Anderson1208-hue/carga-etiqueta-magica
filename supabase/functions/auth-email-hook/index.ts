@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "Carga Fácil"
+const SITE_NAME = "Orkestria"
 const SENDER_DOMAIN = "imagens.tlmlogistica.com.br"
 const ROOT_DOMAIN = "tlmlogistica.com.br"
 const FROM_DOMAIN = "imagens.tlmlogistica.com.br" // Domain shown in From address (may be root or sender subdomain)
@@ -274,7 +274,7 @@ async function handleWebhook(req: Request): Promise<Response> {
         run_id,
         to: payload.data.email,
         from: `${SITE_NAME} <canhotos@${FROM_DOMAIN}>`,
-        reply_to: `Carga Fácil <faturamento@tlmlogistica.com.br>`,
+        reply_to: `Orkestria <faturamento@tlmlogistica.com.br>`,
         sender_domain: SENDER_DOMAIN,
         subject: EMAIL_SUBJECTS[emailType] || 'Notification',
         html,

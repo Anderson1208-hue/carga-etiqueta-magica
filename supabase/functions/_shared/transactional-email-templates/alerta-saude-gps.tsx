@@ -18,7 +18,7 @@ const AlertaSaude = ({ verificadoEm = '', problemas = [], detalhes = [] }: Props
           {detalhes.length ? <Text style={text}>Detalhes:</Text> : null}
           {detalhes.map((d, i) => (<Text key={i} style={item}>{d}</Text>))}
           <Text style={text}>Nada foi alterado automaticamente. Avise no chat para investigar.</Text>
-          <Text style={muted}>TLM Logística — acompanhamento de 2 dias</Text>
+          <Text style={muted}>Expresso Ebenezer — acompanhamento de 2 dias</Text>
         </Section>
       </Container>
     </Body>

@@ -18,7 +18,7 @@ const IntegracaoFalha = ({ integracao = '', tentativas = 5, erro = '', quando = 
           <Text style={text}><strong>Último erro:</strong> {erro}</Text>
           <Text style={text}><strong>Última tentativa:</strong> {quando}</Text>
           <Text style={text}>O status das notas não foi atualizado nesta rodada. A próxima rodada no horário normal tentará de novo. Se o erro for de login, confira a senha do portal.</Text>
-          <Text style={muted}>TLM Logística — monitoramento das integrações</Text>
+          <Text style={muted}>Expresso Ebenezer — monitoramento das integrações</Text>
         </Section>
       </Container>
     </Body>

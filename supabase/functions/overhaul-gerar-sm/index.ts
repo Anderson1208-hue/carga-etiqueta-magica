@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
     const paradas = refes.slice(0, -1);
 
     // Route: reuse an identical one with the same name, else create
-    const descricao = `TLM SM ${placa} ${dBR}`;
+    const descricao = `Expresso Ebenezer SM ${placa} ${dBR}`;
     const refeIds = refes.map((r) => r.id);
     const lerPontos = async (rotaId: number) => {
       const r = await portal.req('solicitacaomonitoramento/getdadosrota', { xhr: true, query: { rotaId: String(rotaId), transportador: '4981162', embarcador: '' } });
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
         pontoDestino: String(destino.id), areaDestino: '', latitudeDestino: String(destino.lat), longitudeDestino: String(destino.lng),
         previsaoChegadaDestino: '', previsaoSaidaDestino: '', distancia: km.toFixed(2), ativo: 'A', identificador: '',
         velocidadeMediaViagem: '', tempoTotalParadoViagem: '', tempoToleranciaAtraso: '', codigoExterno: '', percentualExcedente: '1',
-        observacao: 'Gerada pelo sistema TLM', rotaInstrucoes: b64('[]'), dadosInstrucoes: '',
+        observacao: 'Gerada pelo sistema Expresso Ebenezer', rotaInstrucoes: b64('[]'), dadosInstrucoes: '',
         coordenadasLatitude: b64Grande(coords.map((c) => c[1]).join('|')), coordenadasLongitude: b64Grande(coords.map((c) => c[0]).join('|')),
         dadosPontoRota: b64Grande(JSON.stringify(linhas)), tipoVeiculo: '', tipoCarroceria: '', valorFreteFechado: '', valorFrete: '',
         valorPedagio: '', valorAjudante: '', valorMotoraAdicional: '', valorPostosFiscais: '', valorHorasAdicionais: '', valorKmAdicionais: '',

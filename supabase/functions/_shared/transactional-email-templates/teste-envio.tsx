@@ -19,10 +19,10 @@ interface TesteEnvioProps {
 const TesteEnvio = ({ nome = 'Anderson' }: TesteEnvioProps) => (
   <Html>
     <Head />
-    <Preview>E-mail de teste — Carga Fácil</Preview>
+    <Preview>E-mail de teste — Orkestria</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Carga Fácil</Heading>
+        <Heading style={h1}>Orkestria</Heading>
         <Hr style={hr} />
         <Section>
           <Text style={text}>Olá, {nome}!</Text>
@@ -35,7 +35,7 @@ const TesteEnvio = ({ nome = 'Anderson' }: TesteEnvioProps) => (
             sistema está funcionando corretamente.
           </Text>
           <Text style={muted}>
-            TLM Logística — Relatórios e notificações automáticas
+            Expresso Ebenezer — Relatórios e notificações automáticas
           </Text>
         </Section>
       </Container>
@@ -45,7 +45,7 @@ const TesteEnvio = ({ nome = 'Anderson' }: TesteEnvioProps) => (
 
 export const template = {
   component: TesteEnvio,
-  subject: 'Teste de envio — Carga Fácil',
+  subject: 'Teste de envio — Orkestria',
   displayName: 'E-mail de teste',
   previewData: { nome: 'Anderson' },
 } satisfies TemplateEntry

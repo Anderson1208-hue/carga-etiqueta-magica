@@ -17,7 +17,7 @@ const OverhaulSmFalha = ({ placa = '', data = '', motivo = '' }: Props) => (
           <Text style={text}><strong>Data da rota:</strong> {data}</Text>
           <Text style={text}><strong>Motivo:</strong> {motivo}</Text>
           <Text style={text}>Corrija o motivo e use o botão "Gerar SM" na Roteirização de novo, ou abra a SM manualmente no portal.</Text>
-          <Text style={muted}>TLM Logística — geração de SM Overhaul</Text>
+          <Text style={muted}>Expresso Ebenezer — geração de SM Overhaul</Text>
         </Section>
       </Container>
     </Body>

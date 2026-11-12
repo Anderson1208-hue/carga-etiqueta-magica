@@ -32,7 +32,7 @@ const CanhotoTeste = ({
     <Preview>{`Canhoto da NF ${numeroNf} — teste de envio`}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Carga Fácil — canhoto de entrega</Heading>
+        <Heading style={h1}>Orkestria — canhoto de entrega</Heading>
         <Hr style={hr} />
         <Section>
           <Text style={text}>
@@ -55,7 +55,7 @@ const CanhotoTeste = ({
           ) : (
             <Text style={text}>Imagem do canhoto indisponível neste envio.</Text>
           )}
-          <Text style={muted}>TLM Logística — envio automático de comprovantes</Text>
+          <Text style={muted}>Expresso Ebenezer — envio automático de comprovantes</Text>
         </Section>
       </Container>
     </Body>
@@ -65,7 +65,7 @@ const CanhotoTeste = ({
 export const template = {
   component: CanhotoTeste,
   subject: (data: Record<string, any>) =>
-    `Canhoto da NF ${data?.numeroNf ?? ''} — Carga Fácil`,
+    `Canhoto da NF ${data?.numeroNf ?? ''} — Orkestria`,
   displayName: 'Canhoto de entrega',
   previewData: { numeroNf: '759539', cliente: 'CASAS GUANABARA', dataEntrega: '11/09/2026' },
 } satisfies TemplateEntry

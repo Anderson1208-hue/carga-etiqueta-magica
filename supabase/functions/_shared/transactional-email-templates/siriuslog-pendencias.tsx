@@ -28,7 +28,7 @@ const SiriusPendencias = ({ quando = '', total = 0, notas = [] }: Props) => (
             Essas notas serão tentadas de novo na próxima rodada. Viagens não localizadas dependem da
             Bauducco cadastrar a viagem no portal.
           </Text>
-          <Text style={muted}>TLM Logística — rotina de tracking Pandurata (Sirius Log)</Text>
+          <Text style={muted}>Expresso Ebenezer — rotina de tracking Pandurata (Sirius Log)</Text>
         </Section>
       </Container>
     </Body>

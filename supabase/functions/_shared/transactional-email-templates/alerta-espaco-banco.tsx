@@ -24,7 +24,7 @@ const AlertaEspaco = ({ medidoEm = '', bancoTotal = '', itens = [] }: Props) => 
           ))}
           {bancoTotal ? <Text style={text}>Tamanho total do banco: <strong>{bancoTotal}</strong></Text> : null}
           <Text style={text}>Nada foi alterado ou apagado automaticamente. Verifique a causa antes de qualquer ação.</Text>
-          <Text style={muted}>TLM Logística — Carga Fácil</Text>
+          <Text style={muted}>Expresso Ebenezer — Orkestria</Text>
         </Section>
       </Container>
     </Body>
