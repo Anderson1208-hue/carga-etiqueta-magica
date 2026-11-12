@@ -33,18 +33,26 @@ Deno.serve(async (req) => {
   const { data: carga } = await sb.from('cargas').select('numero_carga, placa').eq('id', cargaId).maybeSingle()
   const { data: perfil } = await sb.from('profiles').select('full_name, email').eq('id', u.user!.id).maybeSingle()
 
+  // Fotos seguem no e-mail como imagem + link assinado (30 dias); originais intactas no armazenamento.
+  const urls = new Map<string, string>()
+  const caminhos = itens.flatMap((i: any) => i.fotos ?? [])
+  for (let k = 0; k < caminhos.length; k += 100) {
+    const { data: ass } = await sb.storage.from('divergencias-recebimento').createSignedUrls(caminhos.slice(k, k + 100), 60 * 60 * 24 * 30)
+    for (const a of ass ?? []) if (a.signedUrl && a.path) urls.set(a.path, a.signedUrl)
+  }
   const assinatura = itens.map((i) => i.id).sort().join(',')
   let h = 0; for (const c of assinatura) h = (h * 31 + c.charCodeAt(0)) >>> 0
   const { error: e2 } = await sb.functions.invoke('send-transactional-email', {
     body: {
       templateName: 'divergencia-recebimento',
-      idempotencyKey: `divergencia-recebimento-${clientes ? 'clientes-' : ''}${cargaId}-${itens.length}-${h}`,
+      idempotencyKey: `divergencia-recebimento-f-${clientes ? 'clientes-' : ''}${cargaId}-${itens.length}-${h}`,
       templateData: {
         carga: carga?.numero_carga ?? '', placa: carga?.placa ?? '',
         data: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
         operador: perfil?.full_name || perfil?.email || '',
         itens: itens.map((i) => ({ nf: i.numero_nf, codigo: i.c_prod ? String(i.c_prod).replace(/^0+/, '') : '', descricao: i.x_prod ?? '',
-          tipo: TIPOS[i.tipo] ?? i.tipo, quantidade: i.quantidade, observacao: i.observacao ?? '', fotos: (i.fotos ?? []).length })),
+          tipo: TIPOS[i.tipo] ?? i.tipo, quantidade: i.quantidade, observacao: i.observacao ?? '', fotos: (i.fotos ?? []).length,
+          fotoUrls: (i.fotos ?? []).map((f: string) => urls.get(f)).filter(Boolean) })),
         canceladas: itens.filter((i) => i.tipo === 'falta_total').map((i) => i.numero_nf),
       },
     },

@@ -1,8 +1,8 @@
 import * as React from 'npm:react@18.3.1'
-import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr } from 'npm:@react-email/components@0.0.22'
+import { Body, Container, Head, Heading, Html, Preview, Section, Text, Hr, Img, Link } from 'npm:@react-email/components@0.0.22'
 import type { TemplateEntry } from './registry.ts'
 
-interface Item { nf?: string; codigo?: string; descricao?: string; tipo?: string; quantidade?: number; observacao?: string; fotos?: number }
+interface Item { nf?: string; codigo?: string; descricao?: string; tipo?: string; quantidade?: number; observacao?: string; fotos?: number; fotoUrls?: string[] }
 interface Props { carga?: string; placa?: string; data?: string; operador?: string; itens?: Item[]; canceladas?: string[] }
 
 const Email = ({ carga = '', placa = '', data = '', operador = '', itens = [], canceladas = [] }: Props) => (
@@ -21,6 +21,10 @@ const Email = ({ carga = '', placa = '', data = '', operador = '', itens = [], c
             {i.descricao ? <Text style={muted2}>{i.descricao}</Text> : null}
             {i.observacao ? <Text style={muted2}>Obs.: {i.observacao}</Text> : null}
             <Text style={muted2}>Fotos: {i.fotos ?? 0}</Text>
+            {(i.fotoUrls ?? []).map((u, n) => (
+              <Link key={n} href={u}><Img src={u} alt={`Foto ${n + 1} NF ${i.nf}`} width="260" style={foto} /></Link>
+            ))}
+            {(i.fotoUrls ?? []).length ? <Text style={muted2}>Clique na foto para abrir em tamanho original (link válido por 30 dias).</Text> : null}
           </Section>
         ))}
         {canceladas.length > 0 ? (
@@ -29,7 +33,7 @@ const Email = ({ carga = '', placa = '', data = '', operador = '', itens = [], c
             <Text style={alert}><strong>NFs canceladas por falta total</strong> (motivo de devolução: Não veio produto — Falta oriunda da origem): {canceladas.join(', ')}</Text>
           </>
         ) : null}
-        <Text style={muted}>A planilha e as fotos são baixadas na tela de divergência do sistema. Expresso Ebenezer.</Text>
+        <Text style={muted}>A planilha e as fotos originais também podem ser baixadas na tela de divergência do sistema. Expresso Ebenezer.</Text>
       </Container>
     </Body>
   </Html>
@@ -52,4 +56,5 @@ const item = { borderBottom: '1px solid #eef1f4', paddingBottom: '6px', marginBo
 const text = { color: '#333333', fontSize: '15px', lineHeight: '22px', margin: '2px 0' }
 const muted2 = { color: '#555555', fontSize: '13px', margin: '2px 0' }
 const alert = { color: '#b42318', fontSize: '14px', lineHeight: '20px' }
+const foto = { display: 'inline-block', margin: '4px 6px 4px 0', borderRadius: '4px', border: '1px solid #e6ebf1' }
 const muted = { color: '#8898aa', fontSize: '12px', marginTop: '24px' }
