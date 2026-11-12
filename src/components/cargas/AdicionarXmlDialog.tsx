@@ -97,7 +97,7 @@ export function AdicionarXmlDialog({
               x_prod: g.x_prod,
               seq: i,
               total: g.total,
-              qr_payload: `{CARGA_ID}|${d.chaveAcesso}|${g.c_prod}|${i}/${g.total}`,
+              qr_payload: `{CARGA_ID};${d.numeroNf};${g.c_prod};${i};${g.total};${d.chaveAcesso}`,
             });
           }
         });
