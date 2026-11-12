@@ -5313,6 +5313,7 @@ export type Database = {
         Args: { p_conversa: string }
         Returns: string
       }
+      agente_otd_conferir: { Args: { p_nfs: string[] }; Returns: Json }
       aplicar_baixa_retroativa: {
         Args: { p_dry_run?: boolean; p_origem?: string; p_rows: Json }
         Returns: Json

@@ -13,6 +13,7 @@ import { useAgenteGerencial } from '@/hooks/useAgenteGerencial';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { exportReport, textOf, type AgentMessage, type AgentThread, type Report } from '@/lib/agente-gerencial';
+import { ConferenciaOtdBauducco } from '@/components/agente/ConferenciaOtdBauducco';
 import logo from '@/assets/agente-gerencial.jpg';
 import { toast } from 'sonner';
 
@@ -128,7 +129,7 @@ export default function AgenteGerencial(){
   return <MainLayout><div className="flex flex-col h-[calc(100vh-3rem)] min-w-0">
     <header className="flex items-center gap-3 pb-4 border-b"><img src={logo} alt="" width={44} height={44} className="rounded-md"/><h1 className="text-2xl flex-1">Agente Gerencial</h1><span className="text-xs text-muted-foreground flex items-center gap-1"><LockKeyhole className="h-3 w-3"/>Somente consulta</span></header>
     <div className="flex flex-1 min-h-0">
-      <aside className="w-56 shrink-0 border-r pr-3 pt-4 flex flex-col gap-3"><Button onClick={create} disabled={creating}><Plus/>Nova conversa</Button><nav aria-label="Conversas gerenciais" className="overflow-y-auto flex-1 space-y-1">{threads.map(t=><Button key={t.id} variant={threadId===t.id?'secondary':'ghost'} asChild className="w-full justify-start h-auto py-3 whitespace-normal text-left"><Link to={`/agente-gerencial/${t.id}`}><span className="line-clamp-2 break-words">{t.titulo}</span></Link></Button>)}</nav></aside>
+      <aside className="w-56 shrink-0 border-r pr-3 pt-4 flex flex-col gap-3"><Button onClick={create} disabled={creating}><Plus/>Nova conversa</Button><ConferenciaOtdBauducco/><nav aria-label="Conversas gerenciais" className="overflow-y-auto flex-1 space-y-1">{threads.map(t=><Button key={t.id} variant={threadId===t.id?'secondary':'ghost'} asChild className="w-full justify-start h-auto py-3 whitespace-normal text-left"><Link to={`/agente-gerencial/${t.id}`}><span className="line-clamp-2 break-words">{t.titulo}</span></Link></Button>)}</nav></aside>
       <div className="flex-1 min-w-0">{threadId?<AgentConversation key={threadId} threadId={threadId} onUpdate={()=>void load()}/>:<div className="h-full flex flex-col items-center justify-center gap-5"><img src={logo} alt="" width={128} height={128} className="rounded-md"/><h2 className="text-xl">Agente Gerencial</h2><Button onClick={create} disabled={creating}><Plus/>Nova conversa</Button></div>}</div>
     </div>
   </div></MainLayout>;
