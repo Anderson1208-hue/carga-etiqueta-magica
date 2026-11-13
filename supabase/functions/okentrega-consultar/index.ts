@@ -44,24 +44,34 @@ Deno.serve(async req => {
         if (!dates.has(l.nf_id) || d > dates.get(l.nf_id)!) dates.set(l.nf_id, d);
       }
     }
-    const work = (items ?? []).filter(i => dates.has(i.nf_id));
+    const all = items ?? [];
+    const work = all.filter(i => dates.has(i.nf_id));
+    // Orçamento de tempo: o processo em segundo plano é encerrado pelo runtime se demorar demais,
+    // o que quebrava o encadeamento. Paramos antes e continuamos do último id realmente percorrido.
     const run = async () => {
+      let lastIdx = -1;
       try {
-        for (let i = 0; i < work.length; i += 3) {
-          await Promise.all(work.slice(i, i + 3).map(async item => {
+        for (let i = 0; i < all.length; i += 3) {
+          if (Date.now() - started > 90000) break;
+          const group = all.slice(i, i + 3);
+          await Promise.all(group.filter(it => dates.has(it.nf_id)).map(async item => {
             try {
-              const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(45000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
+              const response = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(30000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'atualizar', data: dates.get(item.nf_id), nf: item.numero_nf, queue_id: item.id }) });
               const result = await response.json().catch(() => ({}));
               console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: result.atualizado === true, status_http: response.status }));
             } catch {
               console.log(JSON.stringify({ consulta_nf: item.numero_nf, atualizado: false, erro: 'consulta_indisponivel' }));
             }
           }));
+          lastIdx = i + group.length - 1;
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       } finally {
-        if (items?.length === 15) {
-          await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor: items[items.length - 1].id }) }).catch(() => console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor: items[items.length - 1].id })));
+        const fullBlock = all.length === 15;
+        const cutShort = lastIdx < all.length - 1;
+        const cursor = lastIdx >= 0 ? all[lastIdx].id : input.data.cursor;
+        if ((fullBlock || cutShort) && (lastIdx >= 0)) {
+          await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(20000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor }) }).catch(() => console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor })));
         }
       }
     };
