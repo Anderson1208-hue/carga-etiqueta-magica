@@ -20,6 +20,7 @@ import {
   Loader2,
   Download,
   Navigation,
+  Printer,
   Clock,
   Package,
   FileText,
@@ -48,6 +49,8 @@ import { generateRoteirizacaoPDF } from "@/lib/roteirizacao-pdf";
 import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
+import { PDFDocument } from "pdf-lib";
+import { appendPdf, savePrintBundle } from "@/lib/vehicle-print-bundle";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
 import { generateResumoDiaExcel } from "@/lib/resumo-dia-excel";
@@ -1381,6 +1384,8 @@ export default function Roteirizacao() {
 
   const [generatingPdfVeiculoId, setGeneratingPdfVeiculoId] = useState<string | null>(null);
   const [generatingResumoPdfId, setGeneratingResumoPdfId] = useState<string | null>(null);
+  const [generatingPrintBundle, setGeneratingPrintBundle] = useState<string | null>(null);
+  const [printBundleProgress, setPrintBundleProgress] = useState("");
   const [generatingResumoDiaDate, setGeneratingResumoDiaDate] = useState<string | null>(null);
   const [generatingResumoDiaFormat, setGeneratingResumoDiaFormat] = useState<"pdf" | "xlsx" | null>(null);
 
@@ -1512,29 +1517,32 @@ export default function Roteirizacao() {
     }
   }
 
-  async function handleGerarResumoVeiculo(veiculo: any) {
+  async function handleGerarResumoVeiculo(veiculo: any, pdfOnly = false): Promise<Blob | undefined> {
     setGeneratingResumoPdfId(veiculo.id);
     try {
       // Fetch data directly if not cached
-      let nfsData = veiculoNfs[veiculo.id];
+      let nfsData = pdfOnly ? undefined : veiculoNfs[veiculo.id];
       if (!nfsData) {
-        const { data } = await supabase
+        const data = await fetchAllPages<any>((from, to) => supabase
           .from("veiculo_nfs")
           .select(`
             id, nf_id, carga_origem_id,
             notas_fiscais!inner(numero_nf, dest_razao_social, dest_bairro, dest_cep, dest_logradouro, dest_numero, dest_cidade, dest_uf, peso_bruto, volume_m3, cnpj_destinatario, razao_social_emitente, qtd_volumes, itens_nf(q_com, x_prod))
           `)
           .eq("veiculo_id", veiculo.id)
-          .limit(2000);
+          .order("id")
+          .range(from, to));
         const nfIds = (data || []).map((vnf: any) => vnf.nf_id);
         let ctesMap: Record<string, any[]> = {};
         if (nfIds.length > 0) {
-          const { data: ctesData } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
+          const { data: ctesData, error: ctesError } = await supabase.from("ctes").select("nf_id, numero_cte").in("nf_id", nfIds).limit(2000);
+          if (ctesError) throw ctesError;
           if (ctesData) { for (const c of ctesData) { if (!ctesMap[c.nf_id!]) ctesMap[c.nf_id!] = []; ctesMap[c.nf_id!].push(c); } }
         }
         nfsData = (data || []).map((vnf: any) => ({ ...vnf, ctes: ctesMap[vnf.nf_id] || [] }));
       }
       if (!nfsData || nfsData.length === 0) {
+        if (pdfOnly) throw new Error(`Veículo ${veiculo.placa} sem NFs vinculadas`);
         toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
         return;
       }
@@ -1557,12 +1565,13 @@ export default function Roteirizacao() {
       const nfIdsResumo = nfsData.map((v: any) => v.nf_id).filter(Boolean);
       const reentregaMapResumo = new Map<string, string>();
       if (nfIdsResumo.length > 0) {
-        const { data: agdsR } = await supabase
+        const { data: agdsR, error: agendaError } = await supabase
           .from("agendamentos")
           .select("nf_id, observacao")
           .in("nf_id", nfIdsResumo)
           .eq("status", "REENTREGA")
           .limit(2000);
+        if (agendaError) throw agendaError;
         (agdsR || []).forEach((a: any) => reentregaMapResumo.set(a.nf_id, a.observacao || ""));
       }
 
@@ -1592,8 +1601,10 @@ export default function Roteirizacao() {
         nfs,
         totalEntregasRota: totalEntregasResumo || undefined,
       });
+      if (pdfOnly) return blob;
       downloadBlob(blob, `resumo_entregas_${veiculo.placa}_${veiculo.data}.pdf`);
     } catch (err) {
+      if (pdfOnly) throw err;
       console.error("Error generating resumo PDF:", err);
       toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
@@ -1601,11 +1612,11 @@ export default function Roteirizacao() {
     }
   }
 
-  async function handleGerarNotaDeCargaVeiculo(veiculo: any) {
+  async function handleGerarNotaDeCargaVeiculo(veiculo: any, pdfOnly = false): Promise<Blob | undefined> {
     setGeneratingPdfVeiculoId(veiculo.id);
     try {
       // Fetch NFs with items for this vehicle
-      const { data: vnfs } = await supabase
+      const vnfs = await fetchAllPages<any>((from, to) => supabase
         .from("veiculo_nfs")
         .select(`
           nf_id, carga_origem_id,
@@ -1617,9 +1628,11 @@ export default function Roteirizacao() {
           )
         `)
         .eq("veiculo_id", veiculo.id)
-        .limit(2000);
+        .order("id")
+        .range(from, to));
 
       if (!vnfs || vnfs.length === 0) {
+        if (pdfOnly) throw new Error(`Veículo ${veiculo.placa} sem NFs vinculadas`);
         toast({ title: "Sem NFs", description: "Este veículo não possui NFs vinculadas", variant: "destructive" });
         return;
       }
@@ -1642,12 +1655,13 @@ export default function Roteirizacao() {
       const nfIdsVeic = vnfs.map((v: any) => v.nf_id).filter(Boolean);
       const reentregaMap = new Map<string, string>();
       if (nfIdsVeic.length > 0) {
-        const { data: agds } = await supabase
+        const { data: agds, error: agendaError } = await supabase
           .from("agendamentos")
           .select("nf_id, status, observacao")
           .in("nf_id", nfIdsVeic)
           .eq("status", "REENTREGA")
           .limit(2000);
+        if (agendaError) throw agendaError;
         (agds || []).forEach((a: any) => {
           reentregaMap.set(a.nf_id, a.observacao || "");
         });
@@ -1691,6 +1705,7 @@ export default function Roteirizacao() {
         "default",
         { resumoPorEntregaCacau: true }
       );
+      if (pdfOnly) return blob;
       downloadBlob(blob, `nota_carga_${veiculo.placa}_${veiculo.data}.pdf`);
       await registrarImpressao("nota_carga", {
         data_programacao: veiculo.data,
@@ -1699,10 +1714,67 @@ export default function Roteirizacao() {
       }, veiculo.id);
       toast({ title: "PDF gerado", description: `Nota de Carga do veículo ${veiculo.placa}` });
     } catch (err) {
+      if (pdfOnly) throw err;
       console.error("Error generating PDF:", err);
       toast({ title: "Erro", description: "Erro ao gerar PDF", variant: "destructive" });
     } finally {
       setGeneratingPdfVeiculoId(null);
+    }
+  }
+
+  async function handlePrintBundle(dateStr: string, vehicle?: any) {
+    if (generatingPrintBundle) return;
+    setGeneratingPrintBundle(vehicle?.id || dateStr);
+    try {
+      const selected = vehicle ? [vehicle] : await fetchAllPages<any>((from, to) => supabase
+        .from("veiculos")
+        .select("*")
+        .eq("data", dateStr)
+        .neq("status", "cancelada")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to));
+      const bundle = await PDFDocument.create();
+      const printed: any[] = [];
+      for (let index = 0; index < selected.length; index++) {
+        const current = selected[index];
+        if (current.pernoite_origem_id) {
+          let cursor: string | null = current.id;
+          for (let hop = 0; hop < 10 && cursor; hop++) {
+            const { data: origin, error } = await supabase.from("veiculos")
+              .select("access_code, pernoite_origem_id").eq("id", cursor).maybeSingle();
+            if (error) throw error;
+            if (!origin) throw new Error(`Origem do pernoite não localizada: ${current.placa}`);
+            if (origin.access_code) current.access_code = origin.access_code;
+            cursor = origin.pernoite_origem_id;
+          }
+        }
+        setPrintBundleProgress(`${index + 1}/${selected.length} — ${current.placa}`);
+        const { count, error } = await supabase.from("veiculo_nfs")
+          .select("id", { count: "exact", head: true }).eq("veiculo_id", current.id);
+        if (error) throw error;
+        if (!count) continue;
+        const summary = await handleGerarResumoVeiculo(current, true);
+        const loadNote = await handleGerarNotaDeCargaVeiculo(current, true);
+        if (!summary || !loadNote) throw new Error(`Documentos incompletos: ${current.placa}`);
+        await appendPdf(bundle, summary);
+        await appendPdf(bundle, loadNote);
+        printed.push(current);
+      }
+      const blob = await savePrintBundle(bundle);
+      if (!vehicle) void loadVeiculos();
+      downloadBlob(blob, `resumos_notas_carga_${vehicle?.placa || "dia"}_${dateStr}.pdf`);
+      await registrarImpressao("nota_carga", {
+        data_programacao: dateStr, formato: "resumo_e_nota_carga",
+        total_veiculos: printed.length, placas: printed.map(v => v.placa),
+      }, vehicle?.id);
+      toast({ title: "Documentos prontos", description: `${printed.length} veículo(s): resumo e nota de carga no mesmo PDF.` });
+    } catch (error) {
+      console.error("Erro na impressão conjunta", error);
+      toast({ title: "Não foi possível gerar os documentos", description: error instanceof Error ? error.message : "Tente novamente. Nenhum PDF incompleto foi baixado.", variant: "destructive" });
+    } finally {
+      setGeneratingPrintBundle(null);
+      setPrintBundleProgress("");
     }
   }
 
@@ -2658,13 +2730,23 @@ export default function Roteirizacao() {
               <div className="space-y-4">
                 {Object.entries(veiculosByDate).map(([dateStr, veics]) => (
                   <div key={dateStr}>
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-semibold text-muted-foreground">
                         {format(new Date(dateStr + "T12:00:00"), "dd/MM/yyyy")}
                       </span>
                       <Badge variant="outline" className="text-xs">{veics.length} veículo(s)</Badge>
-                      <div className="ml-auto flex items-center gap-1">
+                      <div className="ml-auto flex flex-wrap items-center gap-1">
+                        <Button
+                          size="sm"
+                          className="h-7 px-2"
+                          disabled={generatingPrintBundle !== null}
+                          onClick={() => handlePrintBundle(dateStr)}
+                          title="Resumo e nota de carga de todos os veículos deste dia em um único PDF"
+                        >
+                          {generatingPrintBundle === dateStr ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Printer className="w-3.5 h-3.5 mr-1" />}
+                          {generatingPrintBundle === dateStr ? printBundleProgress || "Gerando..." : "Imprimir todos"}
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -2716,7 +2798,7 @@ export default function Roteirizacao() {
                         >
                           <button
                             onClick={() => toggleExpandVeiculo(v.id)}
-                            className="w-full text-left p-4 flex items-center justify-between hover:bg-accent/50 transition-colors"
+                            className="w-full text-left p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-accent/50 transition-colors"
                           >
                             <div className="flex items-center gap-4">
                               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${v.pernoite ? "bg-blue-500/20" : "bg-primary/10"}`}>
@@ -2737,7 +2819,7 @@ export default function Roteirizacao() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
                               {codigoParaExibir(v) && (
                                 <code
                                   className="text-xs font-mono bg-muted px-2 py-1 rounded"
@@ -2749,6 +2831,17 @@ export default function Roteirizacao() {
                               <Badge variant={v.status === "pendente" ? "secondary" : "default"} className="text-xs capitalize">
                                 {v.status}
                               </Badge>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 shrink-0"
+                                aria-label={`Imprimir resumo e nota de carga de ${v.placa}`}
+                                title="Imprimir resumo e nota de carga juntos"
+                                disabled={generatingPrintBundle !== null}
+                                onClick={(e) => { e.stopPropagation(); handlePrintBundle(v.data, v); }}
+                              >
+                                {generatingPrintBundle === v.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
