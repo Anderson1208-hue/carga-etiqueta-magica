@@ -1,0 +1,1 @@
+- Managerial agent attachments: spreadsheets are parsed in the browser to text; PDFs/photos go to the private per-user `agente-anexos` bucket and the function only reads paths under the caller's own user/conversation prefix; NF cross-checks use the read-only `agente_cruzar_nfs` RPC, so attachments can never drive system changes.
