@@ -6,7 +6,10 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
-import { PromptInput, PromptInputTextarea, PromptInputFooter, PromptInputSubmit } from '@/components/ai-elements/prompt-input';
+import { PromptInput, PromptInputTextarea, PromptInputFooter, PromptInputSubmit, usePromptInputAttachments } from '@/components/ai-elements/prompt-input';
+import type { FileUIPart } from 'ai';
+import ExcelJS from 'exceljs';
+import { Paperclip, X } from 'lucide-react';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { Tool, ToolHeader, ToolContent } from '@/components/ai-elements/tool';
 import { useAgenteGerencial } from '@/hooks/useAgenteGerencial';
@@ -39,6 +42,28 @@ function ReportView({ report }: {report: Report}) {
   </section>;
 }
 
+const ARQ_MIMES = ['application/pdf','image/png','image/jpeg','image/webp','image/gif'];
+const isPlanilha = (f: FileUIPart) => /\.(xlsx|csv)$/i.test(f.filename ?? '');
+async function planilhaTexto(f: FileUIPart): Promise<string> {
+  const buf = await (await fetch(f.url)).arrayBuffer();
+  if (/\.csv$/i.test(f.filename ?? '')) return new TextDecoder().decode(buf).slice(0, 80000);
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buf);
+  let out = '';
+  for (const ws of wb.worksheets) {
+    out += `### Aba ${ws.name}\n`;
+    ws.eachRow(r => { const v = (r.values as ExcelJS.CellValue[]).slice(1).map(c => { const x = c && typeof c === 'object' && !(c instanceof Date) ? ('result' in c ? c.result : 'text' in c ? c.text : '') : c; return x instanceof Date ? x.toISOString().slice(0,10) : String(x ?? '').replace(/[;\n]/g,' '); }); out += v.join(';') + '\n'; });
+    if (out.length > 80000) break;
+  }
+  return out.slice(0, 80000);
+}
+function AnexosBar() {
+  const a = usePromptInputAttachments();
+  return <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+    <Button type="button" variant="ghost" size="sm" onClick={()=>a.openFileDialog()}><Paperclip/>Anexar</Button>
+    {a.files.map(f=><span key={f.id} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs max-w-48"><span className="truncate">{f.filename}</span><button type="button" aria-label={`Remover ${f.filename}`} onClick={()=>a.remove(f.id)}><X className="h-3 w-3"/></button></span>)}
+  </div>;
+}
+
 function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>void}) {
   const [messages,setMessages] = useState<AgentMessage[]>([]);
   const [status,setStatus] = useState<'ready'|'submitted'|'streaming'|'error'>('ready');
@@ -59,20 +84,35 @@ function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>
     });
     return()=>{live=false;abort.current?.abort();};
   },[threadId]);
-  async function send(input:{text:string}) {
-    const parsed = z.string().trim().min(1).max(4000).safeParse(input.text);
+  async function send(input:{text:string;files?:FileUIPart[]}) {
+    const files=input.files??[];
+    const parsed = z.string().trim().min(1).max(4000).safeParse(input.text || (files.length?'Analise os anexos.':''));
     if(!parsed.success||status==='submitted'||status==='streaming')return;
     const requestText=parsed.data;
+    const anexos:{path:string;name:string;mime:string}[]=[];const planilhas:{name:string;texto:string}[]=[];
+    try{
+      const {data:{user:u}}=await supabase.auth.getUser();if(!u)throw new Error('Entre na sua conta novamente');
+      for(const f of files){
+        const name=(f.filename??'arquivo').slice(0,200);
+        if(isPlanilha(f)){planilhas.push({name,texto:await planilhaTexto(f)});continue;}
+        if(!ARQ_MIMES.includes(f.mediaType))throw new Error(`Formato não aceito: ${name}. Use Excel (.xlsx), CSV, PDF ou foto.`);
+        const blob=await (await fetch(f.url)).blob();
+        const path=`${u.id}/${threadId}/${crypto.randomUUID()}-${name.replace(/[^\w.-]+/g,'_')}`;
+        const up=await supabase.storage.from('agente-anexos').upload(path,blob,{contentType:f.mediaType});
+        if(up.error)throw new Error(`Não foi possível enviar ${name}`);
+        anexos.push({path,name,mime:f.mediaType});
+      }
+    }catch(e){toast.error(e instanceof Error?e.message:'Não foi possível ler os anexos');setText(requestText);return;}
     setText('');setError('');setStatus('submitted');
     const assistantId=crypto.randomUUID();
-    setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',parts:[{type:'text',text:requestText}]},{id:assistantId,role:'assistant',parts:[]}]);
+    setMessages(m=>[...m,{id:crypto.randomUUID(),role:'user',parts:[{type:'text',text:requestText+(files.length?`\n\n📎 ${files.map(f=>f.filename).join(', ')}`:'')}]},{id:assistantId,role:'assistant',parts:[]}]);
     focus();
     abort.current=new AbortController();
     let done=false;
     try {
       const {data:{session}}=await supabase.auth.getSession();
       if(!session)throw new Error('Entre na sua conta novamente');
-      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agente-gerencial`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({conversa_id:threadId,text:requestText}),signal:abort.current.signal});
+      const response=await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agente-gerencial`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`,apikey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({conversa_id:threadId,text:requestText,anexos,planilhas}),signal:abort.current.signal});
       if(!response.ok){const body=await response.json();throw new Error(body.error??'Não foi possível consultar');}
       if(!response.body)throw new Error('Resposta indisponível');
       const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
@@ -111,9 +151,9 @@ function AgentConversation({ threadId,onUpdate }: {threadId:string;onUpdate:()=>
       </Message>)}
     </ConversationContent><ConversationScrollButton/></Conversation>
     {error&&<p role="alert" className="mx-4 mb-2 text-sm text-destructive">{error}</p>}
-    <div className="border-t p-4 pb-20 lg:px-8"><PromptInput onSubmit={send} maxFiles={0} className="w-full">
-      <PromptInputTextarea autoFocus aria-label="Pedido ao Agente Gerencial" placeholder="Solicite um relatório, informando período e critérios…" value={text} onChange={e=>setText(e.target.value)} maxLength={4000} disabled={loading} className="min-h-20 max-h-40"/>
-      <PromptInputFooter className="justify-end"><PromptInputSubmit status={status} disabled={loading || (status!=='submitted'&&status!=='streaming'&&!text.trim())} onStop={()=>abort.current?.abort()} aria-label={status==='submitted'||status==='streaming'?'Interromper pedido':'Enviar pedido'}/></PromptInputFooter>
+    <div className="border-t p-4 pb-20 lg:px-8"><PromptInput onSubmit={send} maxFiles={5} maxFileSize={10*1024*1024} accept=".xlsx,.csv,.pdf,image/png,image/jpeg,image/webp,image/gif" onError={e=>toast.error(e.code==='max_file_size'?'Arquivo acima de 10 MB':e.code==='max_files'?'Até 5 arquivos por mensagem':'Formato não aceito')} className="w-full">
+      <PromptInputTextarea autoFocus aria-label="Pedido ao Agente Gerencial" placeholder="Pergunte, peça relatórios ou anexe planilhas, PDFs e fotos para cruzar com o sistema…" value={text} onChange={e=>setText(e.target.value)} maxLength={4000} disabled={loading} className="min-h-20 max-h-40"/>
+      <PromptInputFooter className="justify-between"><AnexosBar/><PromptInputSubmit status={status} disabled={loading || (status!=='submitted'&&status!=='streaming'&&!text.trim())} onStop={()=>abort.current?.abort()} aria-label={status==='submitted'||status==='streaming'?'Interromper pedido':'Enviar pedido'}/></PromptInputFooter>
     </PromptInput></div>
   </div>;
 }

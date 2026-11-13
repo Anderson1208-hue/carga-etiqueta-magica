@@ -5281,6 +5281,7 @@ export type Database = {
         Returns: string
       }
       adicionar_nfs_carga: { Args: { payload: Json }; Returns: Json }
+      agente_cruzar_nfs: { Args: { p_nfs: string[] }; Returns: Json }
       agente_gerencial_consultar: {
         Args: {
           p_dataset: string
