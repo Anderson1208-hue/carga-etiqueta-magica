@@ -6,7 +6,7 @@ import { portalDocumentId, portalValidationText, portalConsultationStatus, lates
 import { CONSULTA_INICIO, AUTOMACAO_INICIO, dataBrasilia, dataConsultaPermitida } from '../_shared/okentrega-consulta-regras.ts';
 
 const BASE = 'https://www.okentrega.com.br';
-const schema = z.object({ data: z.string().refine(v => dataConsultaPermitida(v)).optional(), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar', 'lote']).default('diagnosticar'), queue_id: z.string().uuid().optional(), cursor: z.string().uuid().optional() }).strict();
+const schema = z.object({ data: z.string().refine(v => dataConsultaPermitida(v)).optional(), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar', 'lote']).default('diagnosticar'), queue_id: z.string().uuid().optional(), cursor: z.string().uuid().optional(), inicio: z.string().datetime().optional() }).strict();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async req => {
@@ -29,8 +29,10 @@ Deno.serve(async req => {
   if (input.data.acao === 'lote') {
     const hoje = dataBrasilia();
     if (cron && hoje < AUTOMACAO_INICIO) return json({ status: 'aguardando_inicio', inicio: AUTOMACAO_INICIO });
+    // Rodada: notas já consultadas depois de `inicio` são puladas, então qualquer nova rodada (retry) retoma de onde parou.
+    const inicio = input.data.inicio ?? new Date(Date.now() - 60 * 60 * 1000).toISOString();
     // Seleciona direto as notas OK Entrega enviadas e ainda sem resultado final (blocos de 15, cursor por id).
-    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).gte('enviado_em', `${CONSULTA_INICIO}T03:00:00Z`).order('id').limit(15);
+    let pending = db.from('okentrega_queue').select('id,numero_nf,nf_id').eq('ambiente', 'producao').not('ocorrencia_entrega_id', 'is', null).in('status', ['aguardando_aprovacao', 'enviado']).gte('enviado_em', `${CONSULTA_INICIO}T03:00:00Z`).or(`conciliado_em.is.null,conciliado_em.lt.${inicio}`).order('id').limit(15);
     if (input.data.cursor) pending = pending.gt('id', input.data.cursor);
     const { data: items, error } = await pending;
     if (error) return json({ erro: 'Falha ao selecionar fila' }, 502);
@@ -71,7 +73,25 @@ Deno.serve(async req => {
         const cutShort = lastIdx < all.length - 1;
         const cursor = lastIdx >= 0 ? all[lastIdx].id : input.data.cursor;
         if ((fullBlock || cutShort) && (lastIdx >= 0)) {
-          await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(20000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor }) }).catch(() => console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor })));
+          // Encadeia o próximo bloco com até 3 tentativas; se todas falharem, arma a repetição do guardião (10 min),
+          // que retoma só as notas ainda não consultadas nesta rodada.
+          let encadeado = false;
+          for (let t = 0; t < 3 && !encadeado; t++) {
+            if (t) await new Promise(r => setTimeout(r, 3000 * t));
+            try {
+              const r = await fetch(`${url}/functions/v1/okentrega-consultar`, { method: 'POST', signal: AbortSignal.timeout(60000), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body: JSON.stringify({ acao: 'lote', data: input.data.data, cursor, inicio }) });
+              encadeado = r.ok;
+              await r.body?.cancel();
+            } catch { /* nova tentativa */ }
+          }
+          if (!encadeado) {
+            console.log(JSON.stringify({ erro: 'encadeamento_falhou', cursor }));
+            if (!input.data.data) {
+              const desde = new Date(); desde.setUTCHours(0, 0, 0, 0);
+              const { count } = await db.from('integracao_tentativas').select('id', { count: 'exact', head: true }).eq('integracao', 'okentrega').gte('created_at', desde.toISOString());
+              await db.rpc('integracao_retry_agendar', { p_integracao: 'okentrega', p_tentativa: Math.min((count ?? 0) + 1, 5) });
+            }
+          }
         }
       }
     };
