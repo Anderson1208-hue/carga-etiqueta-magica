@@ -43,6 +43,7 @@ import { TipoCargaBadge, chocolateRowClass, isChocolate } from "@/components/Tip
 import * as XLSX from "xlsx";
 import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
+import { correspondeBuscaPreparacao } from "@/lib/preparacao-busca";
 
 interface NfDisponivel {
   id: string;
@@ -551,11 +552,7 @@ export default function Programacao() {
     const matchingKeys = new Set<string>();
     nfsDisponiveis.forEach((nf) => {
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return;
-      const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
-      const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
-      const matchBairro = nf.dest_bairro.toLowerCase().includes(searchTerm);
-      const matchCidade = (nf.dest_cidade || "").toLowerCase().includes(searchTerm);
-      if (matchNf || matchRazao || matchBairro || matchCidade) {
+      if (correspondeBuscaPreparacao(nf, searchTerm)) {
         const cnpj = nf.cnpj_destinatario || nf.id;
         matchingKeys.add(`${nf.macroRegiao}_${cnpj}`);
       }
@@ -588,13 +585,7 @@ export default function Programacao() {
       if (filtroMR !== "todas" && nf.macroRegiao !== parseInt(filtroMR)) return false;
       if (filtroTipoCarga !== "todos" && nf.carga_tipo_carga !== filtroTipoCarga) return false;
       if (filtroBairro !== "todos" && nf.dest_bairro !== filtroBairro) return false;
-      if (searchTerm) {
-        const matchNf = nf.numero_nf.toLowerCase().includes(searchTerm);
-        const matchRazao = nf.dest_razao_social.toLowerCase().includes(searchTerm);
-        const matchBairro = nf.dest_bairro.toLowerCase().includes(searchTerm);
-        const matchCidade = (nf.dest_cidade || "").toLowerCase().includes(searchTerm);
-        if (!matchNf && !matchRazao && !matchBairro && !matchCidade) return false;
-      }
+      if (!correspondeBuscaPreparacao(nf, searchTerm)) return false;
       return true;
     });
   }, [nfsDisponiveis, filtroMR, buscaNf, filtroTipoCarga, filtroBairro]);
@@ -750,12 +741,14 @@ export default function Programacao() {
           <CardContent>
             <div className="flex gap-4 flex-wrap">
               <div className="min-w-[200px] flex-1 max-w-sm">
-                <Label className="text-xs">Buscar NF</Label>
+                <Label htmlFor="busca-preparacao" className="text-xs">Buscar NF / CNPJ</Label>
                 <div className="relative flex gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Nº NF, destinatário, bairro..."
+                      id="busca-preparacao"
+                      placeholder="NF, CNPJ, destinatário, bairro..."
+                      maxLength={255}
                       value={buscaNf}
                       onChange={(e) => setBuscaNf(e.target.value)}
                       className="pl-9"
