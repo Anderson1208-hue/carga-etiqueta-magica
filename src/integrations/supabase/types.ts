@@ -1582,6 +1582,8 @@ export type Database = {
       }
       divergencias_recebimento: {
         Row: {
+          alteracao_motivo: string | null
+          anterior_id: string | null
           c_prod: string | null
           cancelado_em: string | null
           cancelado_motivo: string | null
@@ -1605,6 +1607,8 @@ export type Database = {
           x_prod: string | null
         }
         Insert: {
+          alteracao_motivo?: string | null
+          anterior_id?: string | null
           c_prod?: string | null
           cancelado_em?: string | null
           cancelado_motivo?: string | null
@@ -1628,6 +1632,8 @@ export type Database = {
           x_prod?: string | null
         }
         Update: {
+          alteracao_motivo?: string | null
+          anterior_id?: string | null
           c_prod?: string | null
           cancelado_em?: string | null
           cancelado_motivo?: string | null
@@ -1652,6 +1658,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "divergencias_recebimento_anterior_id_fkey"
+            columns: ["anterior_id"]
+            isOneToOne: false
+            referencedRelation: "divergencias_recebimento"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "divergencias_recebimento_nf_id_fkey"
             columns: ["nf_id"]
             isOneToOne: false
@@ -1662,6 +1675,8 @@ export type Database = {
       }
       divergencias_recebimento_clientes: {
         Row: {
+          alteracao_motivo: string | null
+          anterior_id: string | null
           c_prod: string
           cancelado_em: string | null
           cancelado_motivo: string | null
@@ -1684,6 +1699,8 @@ export type Database = {
           x_prod: string
         }
         Insert: {
+          alteracao_motivo?: string | null
+          anterior_id?: string | null
           c_prod: string
           cancelado_em?: string | null
           cancelado_motivo?: string | null
@@ -1706,6 +1723,8 @@ export type Database = {
           x_prod: string
         }
         Update: {
+          alteracao_motivo?: string | null
+          anterior_id?: string | null
           c_prod?: string
           cancelado_em?: string | null
           cancelado_motivo?: string | null
@@ -1728,6 +1747,13 @@ export type Database = {
           x_prod?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "divergencias_recebimento_clientes_anterior_id_fkey"
+            columns: ["anterior_id"]
+            isOneToOne: false
+            referencedRelation: "divergencias_recebimento_clientes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "divergencias_recebimento_clientes_nf_id_fkey"
             columns: ["nf_id"]
@@ -5401,6 +5427,22 @@ export type Database = {
         }[]
       }
       e_dia_util_rj: { Args: { p_data: string }; Returns: boolean }
+      editar_divergencia: {
+        Args: {
+          p_c_prod: string
+          p_fotos?: string[]
+          p_id: string
+          p_motivo: string
+          p_observacao: string
+          p_origem: string
+          p_qtd_recebida?: number
+          p_quantidade: number
+          p_retorno_cd?: string
+          p_tipo: string
+          p_x_prod?: string
+        }
+        Returns: Json
+      }
       embarcador_divergencia_cliente: {
         Args: { p_cnpj: string }
         Returns: string

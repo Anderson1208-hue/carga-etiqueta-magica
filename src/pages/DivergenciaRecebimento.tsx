@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ProdutoSobraFields } from "@/components/ProdutoSobraFields";
+import { EditarDivergenciaDialog } from "@/components/EditarDivergenciaDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +31,7 @@ interface NfBusca {
   cargas: { numero_carga: string | null; placa: string | null; data: string } | null;
   itens_nf: ItemNf[];
 }
-type Linha = DivergenciaRow & { carga_id: string | null; embarcador?: string | null; notas_fiscais?: { cnpj_emitente: string | null } | null };
+type Linha = DivergenciaRow & { nf_id: string | null; carga_id: string | null; embarcador?: string | null; notas_fiscais?: { cnpj_emitente: string | null } | null };
 
 function baixar(blob: Blob, nome: string) {
   const url = URL.createObjectURL(blob);
@@ -122,7 +123,7 @@ export default function DivergenciaRecebimento({ embedded = false, embarcador }:
     queryKey: ["divergencias-recebimento", embarcador],
     queryFn: async () => {
       const { data, error } = await supabase.from("divergencias_recebimento")
-        .select("id, carga_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome, cancelado_em, embarcador, notas_fiscais(cnpj_emitente)")
+        .select("id, carga_id, nf_id, numero_nf, c_prod, x_prod, tipo, quantidade, observacao, fotos, criado_em, criado_por_nome, cancelado_em, embarcador, notas_fiscais(cnpj_emitente)")
         .is("cancelado_em", null).order("criado_em", { ascending: false }).order("id").limit(500);
       if (error) throw error;
       return ((data ?? []) as unknown as Linha[]).filter((d) => !embarcador || (d.embarcador ? d.embarcador === embarcador : pertence(d.notas_fiscais?.cnpj_emitente ?? null)));
@@ -469,7 +470,7 @@ export default function DivergenciaRecebimento({ embedded = false, embarcador }:
                         <TableCell className="text-right">{d.tipo === "falta_total" ? "todas" : d.quantidade}</TableCell>
                         <TableCell>{d.fotos.length}</TableCell>
                         <TableCell className="text-xs">{d.criado_por_nome}<br />{new Date(d.criado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</TableCell>
-                        <TableCell>{isAdmin && <Button size="sm" variant="ghost" onClick={() => cancelar(d)} title="Cancelar lançamento"><Ban className="h-4 w-4" /></Button>}</TableCell>
+                        <TableCell><div className="flex"><EditarDivergenciaDialog linha={d} origem="cacau" onSaved={() => { setPacotes([]); qc.invalidateQueries({ queryKey: ["divergencias-recebimento"] }); }} />{isAdmin && <Button size="sm" variant="ghost" onClick={() => cancelar(d)} title="Cancelar lançamento"><Ban className="h-4 w-4" /></Button>}</div></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

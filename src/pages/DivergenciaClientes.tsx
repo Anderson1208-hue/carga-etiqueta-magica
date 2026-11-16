@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ProdutoSobraFields } from "@/components/ProdutoSobraFields";
+import { EditarDivergenciaDialog } from "@/components/EditarDivergenciaDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +25,7 @@ const BUCKET = "divergencias-recebimento";
 const semZeros = (c: string | null | undefined) => String(c ?? "").replace(/^0+(?=\d)/, "");
 type Carga = { id: string; numero_carga: string | null; placa: string | null; data: string; motorista: string | null; lacre: string | null };
 interface NfBusca { id: string; numero_nf: string; carga_id: string | null; cnpj_emitente: string | null; razao_social_emitente: string | null; itens_nf: { c_prod: string; x_prod: string; q_com: number }[] }
-interface Linha { id: string; carga_id: string; numero_nf: string; embarcador: EmbarcadorCliente; c_prod: string; x_prod: string; status: string; retorno_cd: string | null;
+interface Linha { id: string; nf_id: string | null; carga_id: string; numero_nf: string; embarcador: EmbarcadorCliente; c_prod: string; x_prod: string; status: string; retorno_cd: string | null;
   qtd_nf: number | null; qtd_recebida: number | null; quantidade: number; observacao: string | null; fotos: string[]; criado_em: string; criado_por_nome: string | null; notas_fiscais?: { dest_razao_social: string | null } | null }
 
 function baixar(blob: Blob, nome: string) {
@@ -68,7 +69,7 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
     queryKey: ["div-clientes", cargaId], enabled: !!cargaId,
     queryFn: async () => {
       const { data, error } = await supabase.from("divergencias_recebimento_clientes")
-        .select("id, carga_id, numero_nf, embarcador, c_prod, x_prod, status, retorno_cd, qtd_nf, qtd_recebida, quantidade, observacao, fotos, criado_em, criado_por_nome, notas_fiscais(dest_razao_social)")
+        .select("id, carga_id, nf_id, numero_nf, embarcador, c_prod, x_prod, status, retorno_cd, qtd_nf, qtd_recebida, quantidade, observacao, fotos, criado_em, criado_por_nome, notas_fiscais(dest_razao_social)")
         .eq("carga_id", cargaId).is("cancelado_em", null).order("criado_em").order("id").limit(1000);
       if (error) throw error; return (data ?? []) as Linha[];
     },
@@ -295,7 +296,7 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
                       <TableCell><Badge variant={d.status === "SOBRA" || d.status === "AVARIA" ? "secondary" : "destructive"}>{d.status}</Badge></TableCell>
                       <TableCell className="text-xs">{d.retorno_cd ?? "—"}</TableCell><TableCell>{d.fotos.length}</TableCell>
                       <TableCell className="text-xs">{d.criado_por_nome}<br />{new Date(d.criado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</TableCell>
-                      <TableCell>{isAdmin && <Button size="sm" variant="ghost" onClick={() => cancelar(d)} title="Cancelar lançamento"><Ban className="h-4 w-4" /></Button>}</TableCell>
+                      <TableCell><div className="flex"><EditarDivergenciaDialog linha={d} origem="clientes" onSaved={() => { setPacotes([]); qc.invalidateQueries({ queryKey: ["div-clientes", cargaId] }); }} />{isAdmin && <Button size="sm" variant="ghost" onClick={() => cancelar(d)} title="Cancelar lançamento"><Ban className="h-4 w-4" /></Button>}</div></TableCell>
                     </TableRow>
                   ))}
                   {!itens.length && <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Nenhuma ocorrência nesta carreta</TableCell></TableRow>}

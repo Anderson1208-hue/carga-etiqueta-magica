@@ -1,0 +1,2 @@
+# Divergence editing
+- Use the shared edit dialog and the authenticated versioning RPC for divergence corrections; atomic replacement preserves original photos, audit history and existing conference rules.
