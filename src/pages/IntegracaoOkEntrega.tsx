@@ -20,6 +20,7 @@ import { ArrowLeft, Send, RefreshCw, FlaskConical, Loader2, ListPlus, Copy, KeyR
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Slider } from "@/components/ui/slider";
 import { compararNfsCrescente } from "@/lib/okentrega-acompanhamento";
+import { atualizarResultadosOkEntrega, INICIO_CONSULTA_OKENTREGA, STATUS_CONSULTA_OKENTREGA, type ResumoConsultaOkEntrega } from "@/lib/okentrega-atualizar";
 import {
   previewCanhotoOkEntrega,
   AJUSTE_PADRAO,
@@ -98,12 +99,70 @@ export default function IntegracaoOkEntrega() {
   const arquivoCorrecao = useRef<HTMLInputElement>(null);
   const [notaAnexo, setNotaAnexo] = useState<any>(null);
   const [notaReenvio, setNotaReenvio] = useState<any>(null);
+  const [resumoConsulta, setResumoConsulta] = useState<ResumoConsultaOkEntrega | null>(null);
+  const consultaEmCurso = useRef(false);
 
   const atualizarCorrecao = () => {
     qc.invalidateQueries({ queryKey: ["okentrega-fila"] });
     qc.invalidateQueries({ queryKey: ["okentrega-roteirizadas-hoje"] });
     qc.invalidateQueries({ queryKey: ["okentrega-stats"] });
   };
+  const consultarPortal = useMutation({
+    mutationFn: async () => {
+      if (consultaEmCurso.current) throw new Error("Uma consulta já está em andamento.");
+      consultaEmCurso.current = true;
+      setResumoConsulta(null);
+      const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      try {
+        return await atualizarResultadosOkEntrega({
+          pagina: async (cursor) => {
+            let query = supabase.from("okentrega_queue").select("id,nf_id,numero_nf")
+              .eq("ambiente", "producao").in("status", STATUS_CONSULTA_OKENTREGA)
+              .not("ocorrencia_entrega_id", "is", null)
+              .gte("enviado_em", `${INICIO_CONSULTA_OKENTREGA}T03:00:00Z`).order("id").limit(100);
+            if (cursor) query = query.gt("id", cursor);
+            const { data, error } = await query;
+            if (error) throw error;
+            return data ?? [];
+          },
+          datas: async (notas) => {
+            const datas = new Map<string, string>();
+            for (let offset = 0; ; offset += 200) {
+              const { data, error } = await supabase.from("veiculo_nfs")
+                .select("id,nf_id,veiculos!inner(data)")
+                .in("nf_id", [...new Set(notas.map(n => n.nf_id))])
+                .gte("veiculos.data", INICIO_CONSULTA_OKENTREGA).lte("veiculos.data", hoje)
+                .order("id").range(offset, offset + 199);
+              if (error) throw error;
+              for (const vinculo of data ?? []) {
+                const dia = (vinculo.veiculos as unknown as { data: string }).data;
+                const anterior = datas.get(vinculo.nf_id);
+                if (!anterior || dia > anterior) datas.set(vinculo.nf_id, dia);
+              }
+              if ((data ?? []).length < 200) break;
+            }
+            return datas;
+          },
+          consultar: async (nota, dataRota) => {
+            const { data, error } = await supabase.functions.invoke("okentrega-consultar", {
+              body: { acao: "atualizar", data: dataRota, nf: nota.numero_nf, queue_id: nota.id },
+            });
+            if (error || data?.erro || !data) throw new Error("Consulta indisponível");
+            return data;
+          },
+          progresso: setResumoConsulta,
+          pausa: () => new Promise(resolve => setTimeout(resolve, 600)),
+        });
+      } finally { consultaEmCurso.current = false; }
+    },
+    onSuccess: (resumo) => {
+      setResumoConsulta(resumo);
+      atualizarCorrecao();
+      if (resumo.incompleta || resumo.falhas) toast.warning("Consulta parcial: confira o resultado da atualização.");
+      else toast.success(`Consulta concluída: ${resumo.atualizadas} nota(s) atualizada(s).`);
+    },
+    onError: (erro: Error) => { toast.error(erro.message); atualizarCorrecao(); },
+  });
   const corrigirImagem = useMutation({
     mutationFn: async ({ item, arquivo }: { item: any; arquivo?: File }) => {
       let path: string | undefined;
@@ -733,12 +792,23 @@ export default function IntegracaoOkEntrega() {
               {ambiente === "producao" ? "Produção" : "Homologação"}
             </Badge>
             <Badge variant={envioAtivo ? "default" : "outline"}>{envioAtivo ? "Envio ativo" : "Envio bloqueado"}</Badge>
+            <Button className="ml-auto" onClick={() => consultarPortal.mutate()} disabled={consultarPortal.isPending || !profile?.ativo}>
+              {consultarPortal.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+              {consultarPortal.isPending ? "Consultando OK Entrega…" : "Atualizar sistema"}
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground">
             Envio de baixas de entrega (IOD + POD) para a Torre de Controle OK Entrega. A imagem do canhoto é
             convertida automaticamente para JPEG 1536 × 240 px a 150 dpi, conforme exigência do manual.
           </p>
         </div>
+
+        {resumoConsulta && <div role="status" aria-live="polite" className="border rounded-md p-3 space-y-1 text-sm">
+          <p className="font-medium">{consultarPortal.isPending ? "Consulta em andamento" : resumoConsulta.incompleta || resumoConsulta.falhas ? "Consulta parcial" : "Consulta concluída"} · desde 22/10/2026</p>
+          <p>{resumoConsulta.consultadas} consultadas · {resumoConsulta.aprovadas} aprovadas · {resumoConsulta.recusadas} recusadas · {resumoConsulta.emAnalise} em análise</p>
+          <p className="text-muted-foreground">{resumoConsulta.semResultado} sem validação conclusiva · {resumoConsulta.foraPeriodo} fora do período · {resumoConsulta.falhas} falhas</p>
+          {(resumoConsulta.incompleta || resumoConsulta.falhas > 0) && <p className="text-destructive">A atualização não foi integral. Resultados já confirmados foram salvos; os demais registros foram preservados.</p>}
+        </div>}
 
         <div className="grid grid-cols-3 gap-4">
           <Card>
@@ -1031,7 +1101,7 @@ export default function IntegracaoOkEntrega() {
                   </p>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => { refetchFila(); refetchRoteirizadas(); }}>
-                  <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
+                  <RefreshCw className="w-4 h-4 mr-2" /> Recarregar lista
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
