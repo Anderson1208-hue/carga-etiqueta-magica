@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Search, PackageOpen, Mail, Download, Ban, Camera } from "lucide-react";
 import { toast } from "sonner";
+import { gerarCacau } from "@/lib/divergencia-modelos";
 import { isEmitenteCacau } from "@/lib/embarcadores-cacau";
 import {
   CABECALHO, TIPO_LABEL, MOTIVO_DEVOLUCAO_FALTA_TOTAL, dividirPacotes, linhasPlanilha, nomesFotos, semZeros,
@@ -237,11 +238,9 @@ export default function DivergenciaRecebimento({ embedded = false, embarcador }:
       const emissao: Record<string, string | null> = {}; const itensPorNf: Record<string, ItemNf[]> = {};
       for (const n of (nfs ?? []) as any[]) { emissao[n.numero_nf] = n.data_emissao; itensPorNf[n.numero_nf] = n.itens_nf ?? []; }
       const c = cargasInfo.data?.[cargaSel];
-      const ws = XLSX.utils.aoa_to_sheet([CABECALHO, ...linhasPlanilha(itensCarga, { numeroCarga: c?.numero_carga ?? "", placa: c?.placa ?? "", emissaoPorNf: emissao, itensPorNf })]);
-      ws["!cols"] = CABECALHO.map((h) => ({ wch: Math.max(12, Math.min(40, h.length + 4)) }));
-      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "BASE");
+      const bytes = await gerarCacau(itensCarga, { numeroCarga: c?.numero_carga ?? "", placa: c?.placa ?? "", emissaoPorNf: emissao, itensPorNf });
       const nomeBase = `DIVERGENCIA - CARGA ${c?.numero_carga || c?.placa || cargaSel.slice(0, 8)}`;
-      const planilha = { nome: `${nomeBase}.xlsx`, blob: new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }) };
+      const planilha = { nome: `${nomeBase}.xlsx`, blob: new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }) };
       const arqs: { nome: string; blob: Blob; size: number }[] = [];
       for (const d of itensCarga) {
         const nomes = nomesFotos(d);
