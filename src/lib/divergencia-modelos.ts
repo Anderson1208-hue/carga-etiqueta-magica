@@ -91,7 +91,7 @@ export async function gerarDocile(itens: DivergenciaCliente[], ctx: { dataColeta
   return buf(wb);
 }
 
-/** Cacau Show (IBAC/IBAE) — modelo original "DIVERGÊNCIA T - CARGA" (aba BASE, colunas A–M; listas N/O e demais abas preservadas). */
+/** Cacau Show (IBAC/IBAE) — modelo original "DIVERGÊNCIA T - CARGA" (aba BASE A–O; demais abas preservadas). */
 export async function gerarCacau(
   itens: DivergenciaRow[],
   ctx: { numeroCarga: string; placa: string; emissaoPorNf: Record<string, string | null>; itensPorNf: Record<string, ItemNf[]> },
@@ -100,15 +100,14 @@ export async function gerarCacau(
   const ws = wb.getWorksheet("BASE") ?? wb.worksheets[0];
   const linhas = linhasModeloCacau(itens, ctx);
   const estilo = (col: number) => ({ ...ws.getRow(2).getCell(col).style });
-  const estilos = Array.from({ length: 13 }, (_, j) => estilo(j + 1));
-  for (let r = 2; r <= Math.max(4, linhas.length + 1); r++) for (let c = 1; c <= 13; c++) ws.getRow(r).getCell(c).value = null;
+  const estilos = Array.from({ length: 15 }, (_, j) => estilo(j + 1));
+  for (let r = 2; r <= Math.max(ws.rowCount, linhas.length + 1); r++) for (let c = 1; c <= 15; c++) ws.getRow(r).getCell(c).value = null;
   linhas.forEach((l, i) => {
     const row = ws.getRow(2 + i);
     l.forEach((v, j) => {
       const c = row.getCell(j + 1);
       c.style = estilos[j];
       c.value = v === "" ? null : v;
-      if (j === 9) c.dataValidation = { type: "list", allowBlank: true, formulae: ["$O$2:$O$4"] };
     });
     row.commit();
   });

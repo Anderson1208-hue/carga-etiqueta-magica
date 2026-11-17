@@ -8,26 +8,24 @@ const dataSo = (iso: string | null | undefined): Date | "" => {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 };
-const STATUS_FALTA = "NF'S SEGUIRAM PARA AS ENTREGAS COM FALTA";
+const STATUS_PADRAO = "AG. ENVIO DAS MERCADORIAS";
+const qtdCacau = (n: number, tipo: string) => `${String(n).padStart(2, "0")}-${tipo}`;
 
-/** Linhas A–M do modelo Cacau "DIVERGÊNCIA T - CARGA" (mesmas colunas e tipos do arquivo enviado pela Cacau). */
+/** Linhas A–O do modelo Cacau "DIVERGÊNCIA T - CARGA" preenchido pela Cacau (NF na coluna E, "-" na sobra). */
 export function linhasModeloCacau(
   itens: DivergenciaRow[],
-  ctx: { numeroCarga: string; placa: string; emissaoPorNf: Record<string, string | null> ; itensPorNf: Record<string, ItemNf[]> },
+  ctx: { numeroCarga: string; placa: string; emissaoPorNf: Record<string, string | null>; itensPorNf: Record<string, ItemNf[]> },
 ): (string | number | Date)[][] {
-  const carga = /^\d{1,15}$/.test(ctx.numeroCarga) ? Number(ctx.numeroCarga) : ctx.numeroCarga;
   const out: (string | number | Date)[][] = [];
+  const num = (v: string) => (/^\d{1,15}$/.test(v) ? Number(v) : v);
   for (const d of itens) {
-    const linha = (cod: string, desc: string, qtd: string, status: string) => {
-      const c = /^\d{1,15}$/.test(cod) ? Number(cod) : cod;
-      out.push([dataSo(ctx.emissaoPorNf[d.numero_nf]), dataSo(d.criado_em), "SIM", d.criado_por_nome ?? "", ctx.placa,
-        c, desc, qtd, carga, status, "", "", turnoDe(d.criado_em)]);
-    };
+    const nf = d.tipo === "sobra" || !d.numero_nf ? "-" : num(d.numero_nf);
+    const linha = (cod: string, desc: string, qtd: string) =>
+      out.push([dataSo(ctx.emissaoPorNf[d.numero_nf]), dataSo(d.criado_em), "NÃO", "NÃO", nf, num(cod), desc, qtd, ctx.numeroCarga.split(/\s*[-–/,]\s*/).filter(Boolean).join(", "), STATUS_PADRAO, "", "", "", "", ""]);
     if (d.tipo === "falta_total") {
-      for (const it of ctx.itensPorNf[d.numero_nf] ?? []) linha(semZeros(it.c_prod), it.x_prod, `${Math.ceil(Number(it.q_com) || 0)} - falta`, "");
+      for (const it of ctx.itensPorNf[d.numero_nf] ?? []) linha(semZeros(it.c_prod), it.x_prod, qtdCacau(Math.ceil(Number(it.q_com) || 0), "falta"));
     } else {
-      linha(semZeros(d.c_prod), d.x_prod ?? "", `${d.quantidade} - ${d.tipo === "avaria" ? "avaria" : d.tipo === "sobra" ? "sobra" : "falta"}`,
-        d.tipo === "falta_parcial" ? STATUS_FALTA : "");
+      linha(semZeros(d.c_prod), d.x_prod ?? "", qtdCacau(d.quantidade, d.tipo === "avaria" ? "avaria" : d.tipo === "sobra" ? "sobra" : "falta"));
     }
   }
   return out;
