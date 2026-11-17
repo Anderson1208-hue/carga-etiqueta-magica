@@ -451,20 +451,51 @@ Deno.serve(async (req) => {
           let bytes = originais;
           let comprimida = false;
           if (originais.byteLength > maxImagemKb * 1024) {
+            const { lerDimensoesJpeg, megapixels, MAX_MEGAPIXELS_DECODE } = await import("../_shared/jpeg-dimensoes.ts");
+            const dim = lerDimensoesJpeg(originais);
+            const grande = !dim || megapixels(dim) > MAX_MEGAPIXELS_DECODE;
+            // 1) Redução feita pelo armazenamento (fora da memória da função); original intacto.
             try {
-              const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
-              const { lerOrientacaoExif, endireitar } = await import("../_shared/exif-orientacao.ts");
-              const img = endireitar(await Image.decode(originais), lerOrientacaoExif(originais));
-              if (img.width > MAX_LARGURA_PX) {
-                img.resize(MAX_LARGURA_PX, Image.RESIZE_AUTO);
-              }
-              const jpeg = await img.encodeJPEG(JPEG_QUALIDADE);
-              if (jpeg.byteLength < originais.byteLength) {
-                bytes = jpeg;
-                comprimida = true;
+              const { data: sig } = await supabase.storage
+                .from("comprovantes")
+                .createSignedUrl(caminhoImagem, 120, {
+                  transform: { width: MAX_LARGURA_PX, quality: JPEG_QUALIDADE, resize: "contain" },
+                });
+              if (sig?.signedUrl) {
+                const r = await fetch(sig.signedUrl);
+                const ct = r.headers.get("content-type") ?? "";
+                if (r.ok && ct.startsWith("image/")) {
+                  const red = new Uint8Array(await r.arrayBuffer());
+                  if (red.byteLength > 0 && red.byteLength < originais.byteLength) {
+                    bytes = red;
+                    comprimida = true;
+                  }
+                } else {
+                  await r.body?.cancel();
+                }
               }
             } catch (e) {
-              console.error("[ibac-sync] Falha ao comprimir canhoto:", e);
+              console.error("[ibac-sync] Falha na redução pelo armazenamento:", e);
+            }
+            // 2) Fallback local só para fotos pequenas o bastante para não estourar memória.
+            if (!comprimida && !grande) {
+              try {
+                const { Image } = await import("https://deno.land/x/imagescript@1.2.15/mod.ts");
+                const { lerOrientacaoExif, endireitar } = await import("../_shared/exif-orientacao.ts");
+                const img = endireitar(await Image.decode(originais), lerOrientacaoExif(originais));
+                if (img.width > MAX_LARGURA_PX) {
+                  img.resize(MAX_LARGURA_PX, Image.RESIZE_AUTO);
+                }
+                const jpeg = await img.encodeJPEG(JPEG_QUALIDADE);
+                if (jpeg.byteLength < originais.byteLength) {
+                  bytes = jpeg;
+                  comprimida = true;
+                }
+              } catch (e) {
+                console.error("[ibac-sync] Falha ao comprimir canhoto:", e);
+              }
+            } else if (!comprimida && grande) {
+              console.error(`[ibac-sync] Foto ${dim ? `${dim.largura}x${dim.altura}` : "sem dimensão"} grande demais para reduzir localmente; item segue com erro sem travar a fila.`);
             }
           }
 
