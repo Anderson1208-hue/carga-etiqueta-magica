@@ -435,6 +435,13 @@
       "when": 1795011992041,
       "tag": "0061_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795023893505,
+      "tag": "0062_novos_status_agendamento",
+      "breakpoints": true
     }
   ]
 }

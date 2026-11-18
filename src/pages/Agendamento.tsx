@@ -56,8 +56,11 @@ import { TipoCargaBadge, chocolateRowClass } from "@/components/TipoCargaBadge";
 import { generateAgendamentosResumoPDF, type AgendamentoResumoItem } from "@/lib/agendamentos-resumo-pdf";
 import { generateAgendamentosResumoExcel } from "@/lib/agendamentos-resumo-excel";
 import { calculateBoxes } from "@/lib/xml-parser";
-
-type AgendamentoStatus = "AGENDAMENTO" | "AGUARDANDO AGENDA" | "AGUARDANDO REAGENDA" | "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO" | "REENTREGA" | "DEVOLUCAO";
+import {
+  agendamentoExigeData,
+  agendamentoLiberaParaDeposito,
+  type AgendamentoStatus,
+} from "@/lib/agendamento-status";
 
 interface NfResult {
   id: string;
@@ -98,6 +101,10 @@ const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.Rea
   { value: "AGUARDANDO REAGENDA", label: "Aguardando Reagenda", icon: <Clock className="w-4 h-4" />, color: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100", requiresDate: false },
   { value: "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO", label: "Entrega Imediata aguardando definição", icon: <Clock className="w-4 h-4 shrink-0" />, color: "bg-muted text-muted-foreground", requiresDate: false },
   { value: "REENTREGA", label: "Reentrega", icon: <RotateCcw className="w-4 h-4" />, color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", requiresDate: true },
+  { value: "REENTREGA COM CUSTO", label: "Reentrega com Custo", icon: <RotateCcw className="w-4 h-4" />, color: "bg-accent text-accent-foreground", requiresDate: false },
+  { value: "REENTREGA SEM CUSTO", label: "Reentrega sem custo", icon: <RotateCcw className="w-4 h-4" />, color: "bg-accent text-accent-foreground", requiresDate: false },
+  { value: "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA", label: "Perda de agendamento, aguardando nova agenda", icon: <Clock className="w-4 h-4 shrink-0" />, color: "bg-muted text-muted-foreground", requiresDate: false },
+  { value: "SINISTRO", label: "Sinistro", icon: <PackageX className="w-4 h-4" />, color: "bg-destructive/10 text-destructive", requiresDate: false },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];
 
@@ -430,7 +437,7 @@ export default function Agendamento() {
   async function saveAgendamento() {
     if (!selectedNf || !user) return;
 
-    const needsDate = agStatus === "AGENDAMENTO" || agStatus === "REENTREGA";
+    const needsDate = agendamentoExigeData(agStatus);
     if (needsDate && !agDate) {
       toast({ title: "Atenção", description: "Selecione a data do agendamento", variant: "destructive" });
       return;
@@ -453,7 +460,7 @@ export default function Agendamento() {
       // REENTREGA ou novo AGENDAMENTO de NF que já saiu para rota:
       // libera a NF do veículo antigo e devolve para o depósito,
       // para reaparecer na Programação na véspera da nova data agendada.
-      if (finalStatus === "REENTREGA" || finalStatus === "AGENDAMENTO") {
+      if (agendamentoLiberaParaDeposito(finalStatus)) {
         await supabase.from("veiculo_nfs").delete().eq("nf_id", selectedNf.id);
         await supabase
           .from("notas_fiscais")
@@ -480,7 +487,7 @@ export default function Agendamento() {
   async function saveBulkAgendamento() {
     if (!user || selectedNfIds.size === 0) return;
 
-    const needsDate = bulkStatus === "AGENDAMENTO" || bulkStatus === "REENTREGA";
+    const needsDate = agendamentoExigeData(bulkStatus);
     if (needsDate && !bulkDate) {
       toast({ title: "Atenção", description: "Selecione a data do agendamento", variant: "destructive" });
       return;
@@ -502,7 +509,7 @@ export default function Agendamento() {
       if (error) throw error;
 
       // REENTREGA/AGENDAMENTO em lote: libera NFs que estavam em rota.
-      if (finalStatus === "REENTREGA" || finalStatus === "AGENDAMENTO") {
+      if (agendamentoLiberaParaDeposito(finalStatus)) {
         const ids = Array.from(selectedNfIds);
         await supabase.from("veiculo_nfs").delete().in("nf_id", ids);
         await supabase
@@ -968,7 +975,7 @@ export default function Agendamento() {
                 </Select>
               </div>
 
-              {(agStatus === "AGENDAMENTO" || agStatus === "REENTREGA") && (
+              {(agendamentoExigeData(agStatus)) && (
                 <div className="space-y-2">
                   <Label>Data do Agendamento *</Label>
                   <Popover>
@@ -1059,7 +1066,7 @@ export default function Agendamento() {
               </Select>
             </div>
 
-            {(bulkStatus === "AGENDAMENTO" || bulkStatus === "REENTREGA") && (
+            {(agendamentoExigeData(bulkStatus)) && (
               <div className="space-y-2">
                 <Label>Data do Agendamento *</Label>
                 <Popover>

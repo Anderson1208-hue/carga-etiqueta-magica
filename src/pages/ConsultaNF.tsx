@@ -107,6 +107,10 @@ const agendamentoColors: Record<string, string> = {
   "AGUARDANDO AGENDA": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
   "AGUARDANDO REAGENDA": "bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100",
   "REENTREGA": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  "REENTREGA COM CUSTO": "bg-accent text-accent-foreground",
+  "REENTREGA SEM CUSTO": "bg-accent text-accent-foreground",
+  "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA": "bg-muted text-muted-foreground",
+  "SINISTRO": "bg-destructive/10 text-destructive",
   "DEVOLUCAO": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 

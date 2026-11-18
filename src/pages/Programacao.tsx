@@ -44,6 +44,10 @@ import * as XLSX from "xlsx";
 import { gerarPreparacaoPdf } from "@/lib/preparacao-pdf";
 import { proximoDiaUtilApos } from "@/lib/feriados-rj";
 import { correspondeBuscaPreparacao } from "@/lib/preparacao-busca";
+import {
+  agendamentoBloqueiaPreparacao,
+  isReentregaStatus,
+} from "@/lib/agendamento-status";
 
 interface NfDisponivel {
   id: string;
@@ -235,14 +239,14 @@ export default function Programacao() {
       const proximoDiaUtil = proximoDiaUtilApos(hoje);
       const limiteLiberacao = format(proximoDiaUtil, "yyyy-MM-dd");
 
-      const ehAgendada = (ag?: { status: string }) => !!ag && (ag.status === 'AGENDAMENTO' || ag.status === 'REENTREGA');
+      const ehAgendada = (ag?: { status: string }) => !!ag && (ag.status === 'AGENDAMENTO' || isReentregaStatus(ag.status));
       // CNPJs com agenda liberada hoje: suas agendas futuras entram como opção de antecipação.
       const cnpjsLiberados = new Set<string>();
       for (const nf of nfs) {
         if (assignedIds.has(nf.id) || !nf.cnpj_destinatario) continue;
         const ag = agendamentoMap.get(nf.id);
         const bloqueada = ag && (
-          ['AGUARDANDO AGENDA', 'AGUARDANDO REAGENDA', 'DEVOLUCAO', 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO'].includes(ag.status) ||
+          (agendamentoBloqueiaPreparacao(ag.status) || ag.status === 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO') ||
           (ehAgendada(ag) && !!ag.data_agendamento && ag.data_agendamento > limiteLiberacao)
         );
         if (!bloqueada) cnpjsLiberados.add(nf.cnpj_destinatario);
@@ -255,7 +259,7 @@ export default function Programacao() {
           const ag = agendamentoMap.get(nf.id);
           if (ag) {
             // AGUARDANDO AGENDA ou DEVOLUCAO: NF bloqueada, nunca libera
-            if (ag.status === 'AGUARDANDO AGENDA' || ag.status === 'AGUARDANDO REAGENDA' || ag.status === 'DEVOLUCAO') return false;
+            if (agendamentoBloqueiaPreparacao(ag.status)) return false;
             // ENTREGA IMEDIATA: só aparece se o CNPJ tiver outra nota liberada
             if (ag.status === 'ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO') {
               return !!nf.cnpj_destinatario && cnpjsLiberados.has(nf.cnpj_destinatario);
@@ -1190,7 +1194,7 @@ export default function Programacao() {
                                           )}
                                           {nf.tem_agendamento && (
                                             <Badge className="text-[10px] h-4 px-1 bg-green-600 hover:bg-green-700 text-white border-transparent">
-                                              {nf.status_agendamento === 'REENTREGA' ? 'REENTREGA' : 'AGENDADA'}{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
+                                              {isReentregaStatus(nf.status_agendamento) ? 'REENTREGA' : 'AGENDADA'}{nf.data_agendamento ? ` ${format(new Date(nf.data_agendamento + "T00:00:00"), "dd/MM")}` : ""}
                                             </Badge>
                                           )}
                                           {nf.entrega_imediata && (

@@ -37,6 +37,10 @@ const STATUS_OPTIONS = [
   { value: "AGUARDANDO AGENDA", label: "Aguardando Agenda" },
   { value: "AGUARDANDO REAGENDA", label: "Aguardando Reagenda" },
   { value: "REENTREGA", label: "Reentrega" },
+  { value: "REENTREGA COM CUSTO", label: "Reentrega com Custo" },
+  { value: "REENTREGA SEM CUSTO", label: "Reentrega sem custo" },
+  { value: "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA", label: "Perda de agendamento, aguardando nova agenda" },
+  { value: "SINISTRO", label: "Sinistro" },
   { value: "DEVOLUCAO", label: "Devolução" },
 ];
 
@@ -282,6 +286,10 @@ export default function RelatorioAgendamentosFornecedor() {
       "AGUARDANDO AGENDA": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
       "AGUARDANDO REAGENDA": "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100",
       REENTREGA: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+      "REENTREGA COM CUSTO": "bg-accent text-accent-foreground",
+      "REENTREGA SEM CUSTO": "bg-accent text-accent-foreground",
+      "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA": "bg-muted text-muted-foreground",
+      SINISTRO: "bg-destructive/10 text-destructive",
       DEVOLUCAO: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };
     return <Badge className={map[status] || ""}>{status}</Badge>;

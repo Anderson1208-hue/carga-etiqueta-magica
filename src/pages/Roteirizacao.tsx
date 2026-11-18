@@ -54,6 +54,7 @@ import { appendPdf, savePrintBundle } from "@/lib/vehicle-print-bundle";
 import { generateResumoVeiculoPDF } from "@/lib/resumo-veiculo-pdf";
 import { generateResumoDiaPDF, type VeiculoDiaData } from "@/lib/resumo-dia-pdf";
 import { generateResumoDiaExcel } from "@/lib/resumo-dia-excel";
+import { STATUS_REENTREGA } from "@/lib/agendamento-status";
 import {
   getMacroRegiao,
   getMacroRegiaoLabel,
@@ -1442,7 +1443,7 @@ export default function Roteirizacao() {
             .from("agendamentos")
             .select("nf_id, observacao")
             .in("nf_id", nfIds)
-            .eq("status", "REENTREGA")
+            .in("status", [...STATUS_REENTREGA])
             .limit(2000);
           (agds || []).forEach((a: any) => reentregaMap.set(a.nf_id, a.observacao || ""));
         }
@@ -1569,7 +1570,7 @@ export default function Roteirizacao() {
           .from("agendamentos")
           .select("nf_id, observacao")
           .in("nf_id", nfIdsResumo)
-          .eq("status", "REENTREGA")
+          .in("status", [...STATUS_REENTREGA])
           .limit(2000);
         if (agendaError) throw agendaError;
         (agdsR || []).forEach((a: any) => reentregaMapResumo.set(a.nf_id, a.observacao || ""));
@@ -1659,7 +1660,7 @@ export default function Roteirizacao() {
           .from("agendamentos")
           .select("nf_id, status, observacao")
           .in("nf_id", nfIdsVeic)
-          .eq("status", "REENTREGA")
+          .in("status", [...STATUS_REENTREGA])
           .limit(2000);
         if (agendaError) throw agendaError;
         (agds || []).forEach((a: any) => {
