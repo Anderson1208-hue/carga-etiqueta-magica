@@ -111,3 +111,28 @@ export function sugerirComponentes(fontes: FonteParalela[]) {
   }
   return {componentes,pendencias};
 }
+export type ConferenciaCte = { status: 'ok' | 'diferente' | 'sem_regiao' | 'sem_tarifa' | 'sem_dados'; cobrado: number; esperado: number | null; regiao: string | null };
+const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+/** Compara o FRETE PESO cobrado no CT-e com as tarifas cadastradas da região do cliente/cidade (tolerância 1%). */
+export function conferirCte(f: FonteParalela, cnpj: string, clientes: ClienteParalelo[], regioes: RegiaoParalela[], tarifas: TarifaParalela[]): ConferenciaCte {
+  const cobrado = f.componentes.filter(c => /^FRETE PESO/i.test(c.nome)).reduce((s, c) => s + Number(c.valor || 0), 0);
+  const q = (t: string) => Math.max(0, ...f.quantidades.filter(x => x.tipo === t).map(x => Number(x.quantidade) || 0));
+  const real = q('PESO'), cubado = q('PESO_CUBADO');
+  if (!cobrado || !real) return { status: 'sem_dados', cobrado, esperado: null, regiao: null };
+  const ids = new Set(clientes.filter(c => normalizarCnpjParalelo(c.cnpj) === normalizarCnpjParalelo(cnpj) && c.ativo).map(c => c.id));
+  const cidade = semAcento(f.municipio_fim);
+  const regs = regioes.filter(r => r.ativo && ids.has(r.cliente_id) && r.cidades.some(c => semAcento(c.nome) === cidade && c.uf.toUpperCase() === f.uf_fim.toUpperCase()));
+  if (!regs.length) return { status: 'sem_regiao', cobrado, esperado: null, regiao: null };
+  const data = f.data_emissao || '9999-12-31';
+  let melhor: { esperado: number; regiao: string } | null = null;
+  for (const r of regs) for (const t of tarifas.filter(t => t.regiao_id === r.id && t.vigente_de <= data && (!t.vigente_ate || t.vigente_ate >= data))) {
+    const peso = t.componentes.find(c => c.nome === 'FRETE PESO' && (c.base === 'ton_real' || c.base === 'ton_cubada'));
+    if (!peso) continue;
+    const kg = peso.base === 'ton_cubada' ? Math.max(real, cubado) : real;
+    const minimo = Math.max(0, ...t.componentes.filter(c => c.base === 'minimo').map(c => Number(c.valor) || 0));
+    const esperado = Math.round(Math.max(minimo, kg * peso.valor / 1000) * 100) / 100;
+    if (!melhor || Math.abs(esperado - cobrado) < Math.abs(melhor.esperado - cobrado)) melhor = { esperado, regiao: r.nome };
+  }
+  if (!melhor) return { status: 'sem_tarifa', cobrado, esperado: null, regiao: regs[0].nome };
+  return { status: Math.abs(melhor.esperado - cobrado) <= Math.max(0.05, melhor.esperado * 0.01) ? 'ok' : 'diferente', cobrado, ...melhor };
+}

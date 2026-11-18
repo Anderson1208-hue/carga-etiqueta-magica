@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, LockKeyhole, Plus, Pencil, Save, Search, Copy, X, History } from 'lucide-react';
 import { toast } from 'sonner';
-import { agruparFontes, basesParalelas, cidadesDoTexto, validarTarifa, normalizarCnpjParalelo, sugerirComponentes, fonteDeEntrada, type ClienteParalelo, type RegiaoParalela, type TarifaParalela, type FonteParalela, type EntradaParalela } from '@/lib/comercial-paralelo';
+import { agruparFontes, basesParalelas, cidadesDoTexto, validarTarifa, normalizarCnpjParalelo, sugerirComponentes, fonteDeEntrada, conferirCte, type ConferenciaCte, type ClienteParalelo, type RegiaoParalela, type TarifaParalela, type FonteParalela, type EntradaParalela } from '@/lib/comercial-paralelo';
 import type { Json } from '@/integrations/supabase/types';
 
 const db = supabase;
@@ -75,6 +75,24 @@ export default function ComercialParalelo() {
   const [entradasLoading,setEntradasLoading] = useState(false);
   const [entradasMore,setEntradasMore] = useState(false);
   const [entradasCursor,setEntradasCursor] = useState<{created_at:string;id:string}|null>(null);
+  const [conf,setConf] = useState<{e:EntradaParalela;r:ConferenciaCte}[]>([]);
+  const [confLoading,setConfLoading] = useState(false);
+  const [confFiltro,setConfFiltro] = useState<'problemas'|'todos'>('problemas');
+  const conferir = async () => {
+    setConfLoading(true);
+    try {
+      const rows: EntradaParalela[] = []; let cursor = '';
+      for (let i = 0; i < 40; i++) {
+        let q = db.from('paralelo_entradas').select('*').eq('tipo','CTE').gte('data_documento',inicio).lte('data_documento',fim).order('id').limit(500);
+        if (cursor) q = q.gt('id', cursor);
+        const { data, error } = await q; if (error) throw error;
+        rows.push(...((data||[]) as unknown as EntradaParalela[]));
+        if (!data || data.length < 500) break; cursor = data[data.length-1].id;
+      }
+      const vistos = new Set<string>();
+      setConf(rows.filter(e=>!vistos.has(e.fonte_id)&&!!vistos.add(e.fonte_id)).flatMap(e=>{const f=fonteDeEntrada(e);return f?[{e,r:conferirCte(f,e.cnpj,clientes,regioes,tarifas)}]:[];}));
+    } catch (err) { toast.error('Falha ao conferir CT-es: '+(err as Error).message); } finally { setConfLoading(false); }
+  };
   useEffect(()=>{if(!allowed){setFontes([]);setClientesFonte([]);setEntradas([]);}},[allowed]);
   const reload = () => cache.invalidateQueries({queryKey:['cadastros-paralelos']});
   const regs = regioes.filter(r=>r.cliente_id===clienteId).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR',{numeric:true}));
@@ -189,7 +207,7 @@ export default function ComercialParalelo() {
     <header className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold flex items-center gap-2"><LockKeyhole className="h-6 w-6"/>Cadastro Paralelo</h1><Badge variant="outline" className="mt-2">Exclusivo • Anderson</Badge></div><Button variant="outline" onClick={()=>carregarHistorico()}><History className="mr-2 h-4 w-4"/>Histórico</Button></header>
     {query.error && <div role="alert" className="text-destructive">Não foi possível carregar os cadastros. <Button variant="outline" onClick={()=>query.refetch()}>Tentar novamente</Button></div>}
     {query.isLoading ? <Loader2 className="animate-spin"/> : <Tabs value={tab} onValueChange={setTab}>
-      <TabsList className="flex h-auto flex-wrap justify-start"><TabsTrigger value="clientes">Clientes ({clientes.length})</TabsTrigger><TabsTrigger value="entradas">Entradas novas</TabsTrigger><TabsTrigger value="regioes">Regiões e cidades</TabsTrigger><TabsTrigger value="tarifas">Tarifas e fiscal</TabsTrigger><TabsTrigger value="fontes">Analisar CT-es</TabsTrigger></TabsList>
+      <TabsList className="flex h-auto flex-wrap justify-start"><TabsTrigger value="clientes">Clientes ({clientes.length})</TabsTrigger><TabsTrigger value="entradas">Entradas novas</TabsTrigger><TabsTrigger value="regioes">Regiões e cidades</TabsTrigger><TabsTrigger value="tarifas">Tarifas e fiscal</TabsTrigger><TabsTrigger value="fontes">Analisar CT-es</TabsTrigger><TabsTrigger value="conferencia">Conferência</TabsTrigger></TabsList>
       <TabsContent value="clientes" className="space-y-4"><div className="flex flex-wrap gap-2"><Button onClick={()=>setClienteForm(clienteVazio())}><Plus className="mr-2 h-4 w-4"/>Novo cliente</Button><Button variant="outline" disabled={analisando} onClick={buscarClientes}><Search className="mr-2 h-4 w-4"/>Buscar clientes existentes</Button></div>
         <Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CNPJ</TableHead><TableHead>Status</TableHead><TableHead>Ações</TableHead></TableRow></TableHeader><TableBody>{clientes.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR',{numeric:true})).map(c=><TableRow key={c.id}><TableCell className="font-medium">{c.nome}</TableCell><TableCell>{c.cnpj}</TableCell><TableCell>{c.ativo?'Ativo':'Inativo'}</TableCell><TableCell className="flex gap-2"><Button size="icon" variant="ghost" aria-label={`Editar ${c.nome}`} title="Editar cliente" onClick={()=>setClienteForm(c)}><Pencil className="h-4 w-4"/></Button><Button variant="outline" size="sm" onClick={()=>{setClienteId(c.id);setTab('regioes');}}>Regiões</Button></TableCell></TableRow>)}</TableBody></Table>
         {!clientes.length && <p className="text-muted-foreground py-8">Nenhum cliente cadastrado.</p>}
@@ -206,6 +224,11 @@ export default function ComercialParalelo() {
         {!entradasLoading&&!entradas.length&&<p className="py-8 text-muted-foreground">Nenhuma NF ou CT-e novo entrou desde a ativação. Os próximos documentos aparecerão aqui automaticamente.</p>}
         {entradasLoading&&entradas.length>0&&<Loader2 className="animate-spin"/>}
         {entradasMore&&<Button variant="outline" disabled={entradasLoading} onClick={()=>carregarEntradas(false)}><Plus className="mr-2 h-4 w-4"/>Carregar mais</Button>}
+      </TabsContent>
+      <TabsContent value="conferencia" className="space-y-4"><div className="flex flex-wrap gap-3 items-end"><Campo nome="De"><Input type="date" value={inicio} onChange={e=>setInicio(e.target.value)}/></Campo><Campo nome="Até"><Input type="date" value={fim} onChange={e=>setFim(e.target.value)}/></Campo><Button onClick={conferir} disabled={confLoading}>{confLoading?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<Search className="mr-2 h-4 w-4"/>}Conferir CT-es</Button><Select value={confFiltro} onValueChange={v=>setConfFiltro(v as 'problemas'|'todos')}><SelectTrigger className="w-48"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="problemas">Só diferenças</SelectItem><SelectItem value="todos">Todos</SelectItem></SelectContent></Select></div>
+        <p className="text-sm text-muted-foreground">Compara o frete peso de cada CT-e com a tarifa da região (tolerância de 1%, considera frete mínimo). Só leitura.</p>
+        {conf.length>0&&<Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CT-es</TableHead><TableHead>Batem</TableHead><TableHead>Diferentes</TableHead><TableHead>Sem região</TableHead><TableHead>Sem tarifa</TableHead><TableHead>Sem dados</TableHead></TableRow></TableHeader><TableBody>{Object.entries(conf.reduce<Record<string,Record<string,number>>>((a,{e,r})=>{const k=a[e.cliente]||(a[e.cliente]={total:0});k.total++;k[r.status]=(k[r.status]||0)+1;return a;},{})).sort(([a],[b])=>a.localeCompare(b)).map(([c,k])=><TableRow key={c}><TableCell>{c}</TableCell><TableCell>{k.total}</TableCell><TableCell>{k.ok||0}</TableCell><TableCell className={k.diferente?'text-destructive font-semibold':''}>{k.diferente||0}</TableCell><TableCell>{k.sem_regiao||0}</TableCell><TableCell>{k.sem_tarifa||0}</TableCell><TableCell>{k.sem_dados||0}</TableCell></TableRow>)}</TableBody></Table>}
+        {conf.length>0&&<Table><TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CT-e</TableHead><TableHead>Data</TableHead><TableHead>Cidade</TableHead><TableHead>Região</TableHead><TableHead>Cobrado</TableHead><TableHead>Esperado</TableHead><TableHead>Situação</TableHead></TableRow></TableHeader><TableBody>{conf.filter(x=>confFiltro==='todos'||x.r.status!=='ok').slice(0,500).map(({e,r})=><TableRow key={e.id}><TableCell>{e.cliente}</TableCell><TableCell>{e.documento||e.dados.numero_cte}</TableCell><TableCell>{e.data_documento?.split('-').reverse().join('/')}</TableCell><TableCell>{e.cidade}</TableCell><TableCell>{r.regiao||'—'}</TableCell><TableCell>{moeda(r.cobrado)}</TableCell><TableCell>{r.esperado===null?'—':moeda(r.esperado)}</TableCell><TableCell><Badge variant={r.status==='ok'?'outline':r.status==='diferente'?'destructive':'secondary'}>{({ok:'Bate',diferente:'Diferente',sem_regiao:'Cidade sem região',sem_tarifa:'Sem tarifa',sem_dados:'Sem peso/frete'} as const)[r.status]}</Badge></TableCell></TableRow>)}</TableBody></Table>}
       </TabsContent>
       <TabsContent value="fontes" className="space-y-4"><div className="flex flex-wrap gap-3 items-end"><Campo nome="De"><Input type="date" value={inicio} onChange={e=>setInicio(e.target.value)}/></Campo><Campo nome="Até"><Input type="date" value={fim} onChange={e=>setFim(e.target.value)}/></Campo><Button onClick={analisar} disabled={analisando}>{analisando?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:<Search className="mr-2 h-4 w-4"/>}Analisar CT-es</Button></div>
         {parcial&&<div role="alert" className="text-destructive">Consulta parcial: o tempo de consulta foi atingido. Reduza o período para conferir todos os CT-es.</div>}
