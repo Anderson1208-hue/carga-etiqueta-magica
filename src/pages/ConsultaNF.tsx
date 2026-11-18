@@ -35,6 +35,7 @@ import { generateNotaDeCargaPDF, downloadBlob } from "@/lib/pdf-generator";
 import { fetchEnderecamentosByNfIds } from "@/lib/enderecamento";
 import { getMacroRegiao, getMacroRegiaoLabel } from "@/lib/macro-regioes";
 import { CanhotoConsulta } from "@/components/consulta/CanhotoConsulta";
+import { faltaTotalAtiva, type DivergenciaConsulta } from "@/lib/consulta-nf-divergencia";
 
 interface NfResult {
   id: string;
@@ -90,6 +91,7 @@ interface NfResult {
     registrado_em: string | null;
     foto_path: string | null;
   } | null;
+  faltaTotal?: DivergenciaConsulta | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -192,7 +194,8 @@ export default function ConsultaNF() {
           agendamentos(status, data_agendamento, created_at),
           ctes(numero_cte, chave_cte, razao_social_emitente, cnpj_emitente, valor_frete),
           veiculo_nfs(veiculos(placa, motorista, data, status)),
-          baixas_entrega(status, ocorrencia, recebedor_nome, registrado_em, foto_path)
+          baixas_entrega(status, ocorrencia, recebedor_nome, registrado_em, foto_path),
+          divergencias_recebimento(tipo, observacao, criado_em, cancelado_em)
         `)
         .ilike("numero_nf", `%${termo}%`)
         .limit(50);
@@ -227,6 +230,7 @@ export default function ConsultaNF() {
           ctes: nf.ctes || [],
           veiculo,
           baixa: latestBaixa,
+          faltaTotal: faltaTotalAtiva(nf.divergencias_recebimento),
         };
       });
 
@@ -333,6 +337,19 @@ export default function ConsultaNF() {
                 </TabsList>
 
                 <TabsContent value="detalhes" className="space-y-6 mt-0">
+              {selectedNf.faltaTotal && (
+                <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-4 space-y-1">
+                  <Badge variant="destructive">FALTA TOTAL — NF CANCELADA</Badge>
+                  <p className="text-sm font-medium text-destructive">
+                    A nota foi cancelada porque não veio produto — falta oriunda da origem.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Registrada em {format(new Date(selectedNf.faltaTotal.criado_em), "dd/MM/yyyy HH:mm")}
+                    {selectedNf.faltaTotal.observacao ? ` · ${selectedNf.faltaTotal.observacao}` : ""}
+                  </p>
+                </div>
+              )}
+
               {/* Status & Carga */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -640,6 +657,11 @@ export default function ConsultaNF() {
                               <Badge variant="outline" className={`text-xs ${statusColors[nf.status_entrega] || ""}`}>
                                 {nf.status_entrega}
                               </Badge>
+                              {nf.faltaTotal && (
+                                <Badge variant="destructive" className="text-xs">
+                                  FALTA TOTAL — NF CANCELADA
+                                </Badge>
+                              )}
                               {nf.agendamento && (
                                 <Badge variant="outline" className={`text-xs ${agendamentoColors[nf.agendamento.status] || ""}`}>
                                   {nf.agendamento.status}
