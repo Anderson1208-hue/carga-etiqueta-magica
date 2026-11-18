@@ -41,3 +41,11 @@ export function latestPortalDelivery(entries: Record<string, PortalOccurrence>, 
   if (dated.length > 1 && dated[0].order === dated[1].order) return null;
   return dated[0];
 }
+// Converte "dd/mm/aaaa hh:mm[:ss]" (horário de Brasília, UTC-3) em ISO; formato desconhecido = null.
+export function portalDateToIso(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const m = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const d = new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]}:${m[5]}:${m[6] ?? '00'}-03:00`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}

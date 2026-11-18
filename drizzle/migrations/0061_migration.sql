@@ -1,0 +1,2 @@
+alter table public.okentrega_queue add column if not exists validado_portal_em timestamptz;
+comment on column public.okentrega_queue.validado_portal_em is 'Data/hora da validação informada pelo portal OK Entrega (DTVALIDACAO, horário de Brasília).';

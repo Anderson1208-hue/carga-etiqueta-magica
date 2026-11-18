@@ -3688,6 +3688,7 @@ export type Database = {
           ultima_tentativa_em: string | null
           validacao_imagem: Json | null
           validado_em: string | null
+          validado_portal_em: string | null
         }
         Insert: {
           ambiente?: string
@@ -3715,6 +3716,7 @@ export type Database = {
           ultima_tentativa_em?: string | null
           validacao_imagem?: Json | null
           validado_em?: string | null
+          validado_portal_em?: string | null
         }
         Update: {
           ambiente?: string
@@ -3742,6 +3744,7 @@ export type Database = {
           ultima_tentativa_em?: string | null
           validacao_imagem?: Json | null
           validado_em?: string | null
+          validado_portal_em?: string | null
         }
         Relationships: []
       }
@@ -5648,6 +5651,7 @@ export type Database = {
           ultima_tentativa_em: string | null
           validacao_imagem: Json | null
           validado_em: string | null
+          validado_portal_em: string | null
         }[]
         SetofOptions: {
           from: "*"

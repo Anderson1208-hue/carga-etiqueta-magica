@@ -43,3 +43,14 @@ describe('consulta de ocorrência OK Entrega', () => {
     expect(portalValidationText(['Recusado'])).toBe('Recusado');
   });
 });
+import { portalDateToIso } from '../../supabase/functions/_shared/okentrega-portal-parser';
+describe('horário de validação do portal', () => {
+  it('converte horário de Brasília para UTC', () => {
+    expect(portalDateToIso('17/11/2026 07:50')).toBe('2026-11-17T10:50:00.000Z');
+    expect(portalDateToIso('17/11/2026 07:50:12')).toBe('2026-11-17T10:50:12.000Z');
+  });
+  it('rejeita formatos desconhecidos', () => {
+    expect(portalDateToIso('2026-11-17')).toBeNull();
+    expect(portalDateToIso(null)).toBeNull();
+  });
+});

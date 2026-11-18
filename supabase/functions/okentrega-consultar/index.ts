@@ -2,11 +2,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { portalDocumentId, portalValidationText, portalConsultationStatus, latestPortalDelivery } from '../_shared/okentrega-portal-parser.ts';
+import { portalDocumentId, portalValidationText, portalConsultationStatus, latestPortalDelivery, portalDateToIso } from '../_shared/okentrega-portal-parser.ts';
 import { CONSULTA_INICIO, AUTOMACAO_INICIO, dataBrasilia, dataConsultaPermitida } from '../_shared/okentrega-consulta-regras.ts';
 
 const BASE = 'https://www.okentrega.com.br';
-const schema = z.object({ data: z.string().refine(v => dataConsultaPermitida(v)).optional(), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar', 'lote']).default('diagnosticar'), queue_id: z.string().uuid().optional(), cursor: z.string().uuid().optional(), inicio: z.string().datetime().optional() }).strict();
+const schema = z.object({ data: z.string().refine(v => dataConsultaPermitida(v)).optional(), nf: z.string().regex(/^\d{1,9}$/).default('767250'), acao: z.enum(['diagnosticar', 'atualizar', 'lote', 'historico']).default('diagnosticar'), queue_id: z.string().uuid().optional(), cursor: z.string().uuid().optional(), inicio: z.string().datetime().optional() }).strict();
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async req => {
@@ -101,7 +101,7 @@ Deno.serve(async req => {
   if (!input.data.data) return json({ erro: 'Informe a data da roteirização' }, 400);
   const nf = input.data.nf;
   let queue: { id: string; nf_id: string; ocorrencia_entrega_id: string | null } | null = null;
-  if (input.data.acao === 'atualizar') {
+  if (input.data.acao === 'atualizar' || input.data.acao === 'historico') {
     if (!input.data.queue_id) return json({ erro: 'Informe o registro da fila' }, 400);
     const { data: item, error } = await db.from('okentrega_queue').select('id,nf_id,numero_nf,ocorrencia_entrega_id,ambiente').eq('id', input.data.queue_id).maybeSingle();
     if (error || !item || item.ambiente !== 'producao' || String(Number(item.numero_nf)) !== String(Number(nf)) || !item.ocorrencia_entrega_id) return json({ erro: 'Registro não elegível para consulta' }, 400);
@@ -185,10 +185,18 @@ Deno.serve(async req => {
       const latest = latestPortalDelivery(entries, queue.ocorrencia_entrega_id ?? '');
       if (!latest) return json({ nf, atualizado: false, motivo: 'Ocorrência atual não identificada de forma segura', duracao_ms: Date.now() - started });
       const occurrence = latest.value;
+      const validadoPortalEm = portalDateToIso(plain(occurrence.INFO_ORI?.DTVALIDACAO));
+      if (input.data.acao === 'historico') {
+        // Somente leitura do horário de validação do portal para notas já finalizadas; não altera status.
+        if (!validadoPortalEm) return json({ nf, atualizado: false, motivo: 'Portal sem data de validação', duracao_ms: Date.now() - started });
+        const { data: hist, error: histError } = await db.from('okentrega_queue').update({ validado_portal_em: validadoPortalEm }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).in('status', ['aprovado', 'recusado']).select('id').maybeSingle();
+        if (histError) return json({ nf, atualizado: false, erro: 'Não foi possível salvar horário' }, 502);
+        return json({ nf, atualizado: Boolean(hist), validado_portal_em: validadoPortalEm, duracao_ms: Date.now() - started });
+      }
       const status = portalConsultationStatus(occurrence.RESULTADO_VALIDA);
       if (!status) return json({ nf, atualizado: false, status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), motivo: 'Sem resultado definitivo reconhecido', duracao_ms: Date.now() - started });
       const motivo = status.status === 'recusado' ? plain(occurrence.INFO_ORI?.MOTIVORECUSA ?? occurrence.INFO_ORI?.MOTIVOOCORRENCIA ?? occurrence.INFO_ORI?.MOTIVO) : null;
-      const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).neq('status', 'processando').select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
+      const { data: saved, error } = await db.from('okentrega_queue').update({ ...status, motivo_recusa: motivo, ...(status.status !== 'aguardando_aprovacao' && validadoPortalEm ? { validado_portal_em: validadoPortalEm } : {}), erro_mensagem: null, conciliado_em: new Date().toISOString() }).eq('id', queue.id).eq('ocorrencia_entrega_id', queue.ocorrencia_entrega_id).neq('status', 'processando').select('id,status,status_comprovante,motivo_recusa,conciliado_em').single();
       if (error || !saved) return json({ nf, atualizado: false, erro: 'Não foi possível salvar validação' }, 502);
       return json({ nf, atualizado: true, ...saved, ocorrencia_atual_portal: latest.id.replace(/^[A-Za-z]+/, ''), status_portal: portalValidationText(occurrence.RESULTADO_VALIDA), data_validacao_portal: plain(occurrence.INFO_ORI?.DTVALIDACAO), duracao_ms: Date.now() - started });
     }
