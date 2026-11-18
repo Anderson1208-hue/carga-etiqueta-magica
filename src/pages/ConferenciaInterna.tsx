@@ -560,14 +560,22 @@ export default function ConferenciaInterna() {
           .filter((e) => e.numero_nf === numeroNf)
           .map((e) => ({ qr_payload: e.qr_payload, id: e.id, status: e.status, x_prod: e.x_prod, c_prod: e.c_prod }));
       } else {
-        const { data, error } = await supabase
-          .from("etiquetas")
-          .select("qr_payload, id, status, x_prod, c_prod")
-          .eq("carga_id", cargaId)
-          .eq("numero_nf", numeroNf)
-          .limit(5000);
-        if (error) throw error;
-        rows = (data as any[]) || [];
+        // Paginação determinística: a API limita 1000 linhas por leitura e
+        // NFs grandes (ex.: 4517028 com 1067 etiquetas) ficavam incompletas.
+        const PAGE = 1000;
+        for (let from = 0; ; from += PAGE) {
+          const { data, error } = await supabase
+            .from("etiquetas")
+            .select("qr_payload, id, status, x_prod, c_prod")
+            .eq("carga_id", cargaId)
+            .eq("numero_nf", numeroNf)
+            .order("id", { ascending: true })
+            .range(from, from + PAGE - 1);
+          if (error) throw error;
+          const page = (data as any[]) || [];
+          rows.push(...page);
+          if (page.length < PAGE) break;
+        }
       }
       const map = new Map<string, EtiquetaCache>();
       const cprods = new Set<string>();
