@@ -40,6 +40,7 @@ const STATUS_OPTIONS = [
   { value: "REENTREGA COM CUSTO", label: "Reentrega com Custo" },
   { value: "REENTREGA SEM CUSTO", label: "Reentrega sem custo" },
   { value: "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA", label: "Perda de agendamento, aguardando nova agenda" },
+  { value: "FALTA DIRETA DO CD", label: "Falta Direta do CD" },
   { value: "SINISTRO", label: "Sinistro" },
   { value: "DEVOLUCAO", label: "Devolução" },
 ];
@@ -66,7 +67,7 @@ export default function RelatorioAgendamentosFornecedor() {
     setLoading(true);
     try {
       // Statuses sem data_agendamento (pendentes) — sempre incluir quando o filtro permite
-      const STATUS_SEM_DATA = ["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA"];
+      const STATUS_SEM_DATA = ["AGUARDANDO AGENDA", "AGUARDANDO REAGENDA", "FALTA DIRETA DO CD"];
 
       // 1) Agendamentos com data dentro do período
       let qComData = supabase
@@ -289,6 +290,7 @@ export default function RelatorioAgendamentosFornecedor() {
       "REENTREGA COM CUSTO": "bg-accent text-accent-foreground",
       "REENTREGA SEM CUSTO": "bg-accent text-accent-foreground",
       "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA": "bg-muted text-muted-foreground",
+      "FALTA DIRETA DO CD": "bg-destructive/10 text-destructive",
       SINISTRO: "bg-destructive/10 text-destructive",
       DEVOLUCAO: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };

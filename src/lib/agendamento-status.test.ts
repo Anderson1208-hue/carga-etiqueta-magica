@@ -26,6 +26,12 @@ describe("novos status de agendamento", () => {
     },
   );
 
+  it("Falta Direta do CD não exige data nem libera a NF para programação", () => {
+    expect(agendamentoExigeData("FALTA DIRETA DO CD")).toBe(false);
+    expect(agendamentoLiberaParaDeposito("FALTA DIRETA DO CD")).toBe(false);
+    expect(agendamentoBloqueiaPreparacao("FALTA DIRETA DO CD")).toBe(true);
+  });
+
   it("preserva as regras da reentrega e do agendamento atuais", () => {
     expect(agendamentoExigeData("REENTREGA")).toBe(true);
     expect(agendamentoExigeData("AGENDAMENTO")).toBe(true);

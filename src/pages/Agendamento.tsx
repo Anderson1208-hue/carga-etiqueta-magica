@@ -104,6 +104,7 @@ const STATUS_OPTIONS: { value: AgendamentoStatus; label: string; icon: React.Rea
   { value: "REENTREGA COM CUSTO", label: "Reentrega com Custo", icon: <RotateCcw className="w-4 h-4" />, color: "bg-accent text-accent-foreground", requiresDate: false },
   { value: "REENTREGA SEM CUSTO", label: "Reentrega sem custo", icon: <RotateCcw className="w-4 h-4" />, color: "bg-accent text-accent-foreground", requiresDate: false },
   { value: "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA", label: "Perda de agendamento, aguardando nova agenda", icon: <Clock className="w-4 h-4 shrink-0" />, color: "bg-muted text-muted-foreground", requiresDate: false },
+  { value: "FALTA DIRETA DO CD", label: "Falta Direta do CD", icon: <PackageX className="w-4 h-4" />, color: "bg-destructive/10 text-destructive", requiresDate: false },
   { value: "SINISTRO", label: "Sinistro", icon: <PackageX className="w-4 h-4" />, color: "bg-destructive/10 text-destructive", requiresDate: false },
   { value: "DEVOLUCAO", label: "Devolução", icon: <PackageX className="w-4 h-4" />, color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", requiresDate: false },
 ];

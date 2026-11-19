@@ -11,6 +11,7 @@ export type AgendamentoStatus =
   | "ENTREGA IMEDIATA AGUARDANDO DEFINIÇÃO"
   | (typeof STATUS_REENTREGA)[number]
   | "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA"
+  | "FALTA DIRETA DO CD"
   | "SINISTRO"
   | "DEVOLUCAO";
 
@@ -32,6 +33,7 @@ export function agendamentoBloqueiaPreparacao(status: string | null | undefined)
     "AGUARDANDO REAGENDA",
     "DEVOLUCAO",
     "PERDA DE AGENDAMENTO, AGUARDANDO NOVA AGENDA",
+    "FALTA DIRETA DO CD",
     "SINISTRO",
   ].includes(status);
 }
