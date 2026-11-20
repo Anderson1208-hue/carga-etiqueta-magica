@@ -687,7 +687,7 @@ export default function Cargas() {
                 <TableHead className="text-center">NFs</TableHead>
                 <TableHead className="text-center">Itens</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -710,7 +710,10 @@ export default function Cargas() {
                 </TableRow>
               ) : (
                 filteredCargas.map((carga) => (
-                  <TableRow key={carga.id} className={`wms-table-row ${chocolateRowClass(carga.tipo_carga)}`}>
+                  <TableRow
+                    key={carga.id}
+                    className={`wms-table-row group ${chocolateRowClass(carga.tipo_carga) || "bg-card"}`}
+                  >
                     <TableCell className="font-medium">
                       {formatCargaDate(carga.data)}
                     </TableCell>
@@ -763,7 +766,7 @@ export default function Cargas() {
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right sticky right-0 z-10 bg-inherit border-l">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setEdiCacauCarga(carga)} title="Importar EDI Cacau (NOTFIS) — m³ pelo peso cubado ÷ 300">
                           <FileDown className="w-4 h-4" />
@@ -788,15 +791,17 @@ export default function Cargas() {
                           <FileType className="w-4 h-4" />
                         </Button>
                         <Link to={`/romaneio?carga=${carga.id}`}>
-                          <Button variant="ghost" size="sm"><FileText className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="sm" title="Romaneio"><FileText className="w-4 h-4" /></Button>
                         </Link>
                         <Link to={`/etiquetas?carga=${carga.id}`}>
-                          <Button variant="ghost" size="sm"><Eye className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="sm" title="Ver etiquetas"><Eye className="w-4 h-4" /></Button>
                         </Link>
                         {isAdmin && (
                           <Button
                             variant="ghost"
                             size="sm"
+                            title="Excluir carga"
+                            aria-label="Excluir carga"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => handleDeleteClick(carga)}
                           >
