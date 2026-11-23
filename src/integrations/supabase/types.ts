@@ -3769,6 +3769,86 @@ export type Database = {
         }
         Relationships: []
       }
+      ordens_coleta: {
+        Row: {
+          cidade: string | null
+          contato: string | null
+          created_at: string
+          created_by: string | null
+          data_coleta: string
+          embarcador_id: string | null
+          embarcador_nome: string
+          endereco: string
+          hora_prevista: string | null
+          id: string
+          motorista: string | null
+          notas_fiscais: string | null
+          numero: number
+          observacoes: string | null
+          peso_kg: number
+          placa: string | null
+          status: string
+          telefone: string | null
+          uf: string | null
+          updated_at: string
+          volumes: number
+        }
+        Insert: {
+          cidade?: string | null
+          contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_coleta?: string
+          embarcador_id?: string | null
+          embarcador_nome: string
+          endereco: string
+          hora_prevista?: string | null
+          id?: string
+          motorista?: string | null
+          notas_fiscais?: string | null
+          numero?: number
+          observacoes?: string | null
+          peso_kg?: number
+          placa?: string | null
+          status?: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string
+          volumes?: number
+        }
+        Update: {
+          cidade?: string | null
+          contato?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_coleta?: string
+          embarcador_id?: string | null
+          embarcador_nome?: string
+          endereco?: string
+          hora_prevista?: string | null
+          id?: string
+          motorista?: string | null
+          notas_fiscais?: string | null
+          numero?: number
+          observacoes?: string | null
+          peso_kg?: number
+          placa?: string | null
+          status?: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string
+          volumes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_coleta_embarcador_id_fkey"
+            columns: ["embarcador_id"]
+            isOneToOne: false
+            referencedRelation: "embarcadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       overhaul_sm: {
         Row: {
           created_at: string

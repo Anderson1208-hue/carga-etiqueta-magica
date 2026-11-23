@@ -26,6 +26,7 @@ import {
   History,
   Warehouse,
   Package,
+  PackageOpen,
   MapPin,
   CalendarClock,
   CalendarDays,
@@ -75,6 +76,7 @@ const transporteItems = [
   { name: "Conf. Externa", href: "/conferencia-externa", icon: Smartphone },
   { name: "Roteirização", href: "/roteirizacao", icon: Route },
   { name: "Preparação", href: "/programacao", icon: ClipboardList },
+  { name: "Ordem de Coleta", href: "/ordem-coleta", icon: PackageOpen },
   { name: "Baixa Entrega", href: "/baixa-entrega", icon: ClipboardCheck },
   { name: "Pré-CT-e", href: "/pre-cte", icon: FileText },
   { name: "Prestação de Contas", href: "/prestacao-contas", icon: HandCoins },
@@ -307,7 +309,7 @@ export function Sidebar() {
   const relatoriosActive = relatoriosItems.some((i) => location.pathname === i.href);
   const cadastrosActive = cadastrosItems.some((i) => location.pathname === i.href);
 
-  const financeiroItems = [transporteItems[4]];
+  const financeiroItems = transporteItems.filter((item) => item.href === "/pre-cte");
   const comercialItems = podeGestaoComercial ? [
     { name: "Regiões e SLA", href: "/comercial/sla-fornecedor", icon: Calculator },
     { name: "Tarifas por Região", href: "/comercial/tarifas-regiao", icon: HandCoins },

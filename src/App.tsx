@@ -62,6 +62,7 @@ import EnvioCanhoto from "./pages/EnvioCanhoto";
 import TrackingPandurata from "./pages/TrackingPandurata";
 
 import PreCte from "./pages/PreCte";
+import OrdemColeta from "./pages/OrdemColeta";
 import ImportarOcoren from "./pages/ImportarOcoren";
 import FiscalConfiguracao from "./pages/FiscalConfiguracao";
 import MotoristasFiscal from "./pages/fiscal/Motoristas";
@@ -416,6 +417,7 @@ function AppRoutes() {
       <Route path="/integracoes/tracking-pandurata" element={<ProtectedRoute><TrackingPandurata /></ProtectedRoute>} />
 
       <Route path="/pre-cte" element={<ProtectedRoute><PreCte /></ProtectedRoute>} />
+      <Route path="/ordem-coleta" element={<ProtectedRoute><OrdemColeta /></ProtectedRoute>} />
       <Route path="/integracoes/ocoren" element={<ProtectedRoute><ImportarOcoren /></ProtectedRoute>} />
       <Route path="/fiscal/configuracao" element={<ProtectedRoute><FiscalConfiguracao /></ProtectedRoute>} />
       <Route path="/fiscal/motoristas" element={<ProtectedRoute><MotoristasFiscal /></ProtectedRoute>} />
