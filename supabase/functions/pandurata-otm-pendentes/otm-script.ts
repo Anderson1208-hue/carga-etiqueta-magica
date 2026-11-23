@@ -25,7 +25,7 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
       let ordenado = 'nao';
       try {
         const rf = rdoc.querySelector('form[name=result]');
-        if (rf) {
+        if (rf && false) {
           const q = new URLSearchParams();
           for (const el of rf.elements) { if (el.name && !((el.type === 'radio' || el.type === 'checkbox') && !el.checked)) q.append(el.name, el.value); }
           q.set('sort_col1', 'shipment.start_time'); q.set('sort_col1_ascend', 'false');

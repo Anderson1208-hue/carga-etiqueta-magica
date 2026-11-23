@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
         { type: 'click', selector: 'input[type=password]' },
         { type: 'write', text: senha },
         { type: 'press', key: 'Enter' },
-        { type: 'wait', milliseconds: 15000 },
+        { type: 'wait', milliseconds: 30000 },
         { type: 'executeJavascript', script: montarScriptOtm([...conhecidos], MAX_DETALHES) },
         { type: 'wait', selector: '#lovout' },
       ],
@@ -88,6 +88,8 @@ Deno.serve(async (req) => {
     const creditos = fc?.data?.metadata?.creditsUsed ?? fc?.creditsUsed ?? null;
     const saida: any = extrairSaida(String(fc?.data?.rawHtml ?? ''));
     if (!saida?.ok) {
+      const raw = String(fc?.data?.rawHtml ?? '');
+      console.error('otm sem saida', fc?.data?.metadata?.url, raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 400));
       const erro = saida?.erro ?? 'Não foi possível entrar no portal ou ler a lista';
       await fim({ sucesso: false, erro, creditos_firecrawl: creditos });
       return json({ error: erro, creditos, campos: saida?.campos }, 502);
