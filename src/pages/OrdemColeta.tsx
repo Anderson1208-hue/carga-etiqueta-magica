@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/table";
 import {
   coletaParaFormulario,
+  formatarCpfColeta,
+  formatarCubagemColeta,
   formatarDataColeta,
   formatarNumeroColeta,
   formatarPesoColeta,
@@ -99,10 +101,15 @@ export default function OrdemColetaPage() {
         contato: dados.contato.trim() || null,
         telefone: dados.telefone.trim() || null,
         motorista: dados.motorista.trim() || null,
+        cpf_motorista: dados.cpf_motorista || null,
         placa: dados.placa || null,
+        placa_carreta: dados.placa_carreta || null,
+        codigo_otm: dados.codigo_otm.trim() || null,
+        numero_roteiro: dados.numero_roteiro.trim() || null,
         notas_fiscais: dados.notas_fiscais.trim() || null,
         volumes: Number(dados.volumes),
         peso_kg: Number(dados.peso_kg),
+        cubagem_m3: dados.cubagem_m3.trim() ? Number(dados.cubagem_m3) : null,
         observacoes: dados.observacoes.trim() || null,
         status: dados.status,
       };
@@ -140,7 +147,11 @@ export default function OrdemColetaPage() {
         ordem.endereco,
         ordem.cidade,
         ordem.motorista,
+        ordem.cpf_motorista,
         ordem.placa,
+        ordem.placa_carreta,
+        ordem.codigo_otm,
+        ordem.numero_roteiro,
         ordem.notas_fiscais,
       ].filter(Boolean).join(" ").toLocaleLowerCase("pt-BR");
       return texto.includes(termo) || (termoNumerico.length > 0 && texto.includes(termoNumerico));
@@ -180,7 +191,7 @@ export default function OrdemColetaPage() {
                 <Input
                   id="busca-coleta"
                   className="pl-9"
-                  placeholder="Número, embarcador, placa, motorista ou NF"
+                  placeholder="Número, embarcador, placa, CPF, OTM, roteiro ou NF"
                   value={busca}
                   onChange={(event) => setBusca(event.target.value)}
                 />
@@ -221,9 +232,9 @@ export default function OrdemColetaPage() {
                   <TableHead>Data / horário</TableHead>
                   <TableHead>Embarcador</TableHead>
                   <TableHead>Local da coleta</TableHead>
-                  <TableHead>Motorista / placa</TableHead>
+                  <TableHead>Motorista / placas</TableHead>
                   <TableHead className="text-right">Volumes</TableHead>
-                  <TableHead className="text-right">Peso (kg)</TableHead>
+                  <TableHead className="text-right">Peso / cubagem</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-14"><span className="sr-only">Ações</span></TableHead>
                 </TableRow>
@@ -239,7 +250,11 @@ export default function OrdemColetaPage() {
                   const statusInfo = STATUS_ORDEM_COLETA.find((item) => item.value === ordem.status);
                   return (
                     <TableRow key={ordem.id}>
-                      <TableCell className="whitespace-nowrap font-medium">{formatarNumeroColeta(ordem.numero)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-medium">
+                        {formatarNumeroColeta(ordem.numero)}
+                        {ordem.codigo_otm && <div className="text-xs font-normal text-muted-foreground">OTM: {ordem.codigo_otm}</div>}
+                        {ordem.numero_roteiro && <div className="text-xs font-normal text-muted-foreground">Roteiro: {ordem.numero_roteiro}</div>}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {formatarDataColeta(ordem.data_coleta)}
                         {ordem.hora_prevista && <span className="block text-xs text-muted-foreground">{ordem.hora_prevista.slice(0, 5)}</span>}
@@ -252,12 +267,17 @@ export default function OrdemColetaPage() {
                         <div>{ordem.endereco}</div>
                         {(ordem.cidade || ordem.uf) && <div className="text-xs text-muted-foreground">{[ordem.cidade, ordem.uf].filter(Boolean).join(" / ")}</div>}
                       </TableCell>
-                      <TableCell className="min-w-36">
+                      <TableCell className="min-w-44">
                         <div>{ordem.motorista || "—"}</div>
-                        {ordem.placa && <div className="text-xs text-muted-foreground">{ordem.placa}</div>}
+                        {ordem.cpf_motorista && <div className="text-xs text-muted-foreground">CPF: {formatarCpfColeta(ordem.cpf_motorista)}</div>}
+                        {ordem.placa && <div className="text-xs text-muted-foreground">Cavalo: {ordem.placa}</div>}
+                        {ordem.placa_carreta && <div className="text-xs text-muted-foreground">Carreta: {ordem.placa_carreta}</div>}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{ordem.volumes}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatarPesoColeta(ordem.peso_kg)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatarPesoColeta(ordem.peso_kg)}
+                        {ordem.cubagem_m3 !== null && <div className="text-xs text-muted-foreground">{formatarCubagemColeta(ordem.cubagem_m3)} m³</div>}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={statusBadge[ordem.status as keyof typeof statusBadge] ?? "secondary"}>
                           {statusInfo?.label ?? ordem.status}

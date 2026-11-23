@@ -3772,9 +3772,12 @@ export type Database = {
       ordens_coleta: {
         Row: {
           cidade: string | null
+          codigo_otm: string | null
           contato: string | null
+          cpf_motorista: string | null
           created_at: string
           created_by: string | null
+          cubagem_m3: number | null
           data_coleta: string
           embarcador_id: string | null
           embarcador_nome: string
@@ -3784,9 +3787,11 @@ export type Database = {
           motorista: string | null
           notas_fiscais: string | null
           numero: number
+          numero_roteiro: string | null
           observacoes: string | null
           peso_kg: number
           placa: string | null
+          placa_carreta: string | null
           status: string
           telefone: string | null
           uf: string | null
@@ -3795,9 +3800,12 @@ export type Database = {
         }
         Insert: {
           cidade?: string | null
+          codigo_otm?: string | null
           contato?: string | null
+          cpf_motorista?: string | null
           created_at?: string
           created_by?: string | null
+          cubagem_m3?: number | null
           data_coleta?: string
           embarcador_id?: string | null
           embarcador_nome: string
@@ -3807,9 +3815,11 @@ export type Database = {
           motorista?: string | null
           notas_fiscais?: string | null
           numero?: number
+          numero_roteiro?: string | null
           observacoes?: string | null
           peso_kg?: number
           placa?: string | null
+          placa_carreta?: string | null
           status?: string
           telefone?: string | null
           uf?: string | null
@@ -3818,9 +3828,12 @@ export type Database = {
         }
         Update: {
           cidade?: string | null
+          codigo_otm?: string | null
           contato?: string | null
+          cpf_motorista?: string | null
           created_at?: string
           created_by?: string | null
+          cubagem_m3?: number | null
           data_coleta?: string
           embarcador_id?: string | null
           embarcador_nome?: string
@@ -3830,9 +3843,11 @@ export type Database = {
           motorista?: string | null
           notas_fiscais?: string | null
           numero?: number
+          numero_roteiro?: string | null
           observacoes?: string | null
           peso_kg?: number
           placa?: string | null
+          placa_carreta?: string | null
           status?: string
           telefone?: string | null
           uf?: string | null

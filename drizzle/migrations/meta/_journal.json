@@ -477,6 +477,13 @@
       "when": 1795463745233,
       "tag": "0067_create_ordens_coleta",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795466549048,
+      "tag": "0068_ampliar_ordens_coleta_pandurata",
+      "breakpoints": true
     }
   ]
 }

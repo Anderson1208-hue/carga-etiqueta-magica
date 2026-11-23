@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  formatarCpfColeta,
   formatarNumeroColeta,
+  normalizarCpfColeta,
   normalizarPlacaColeta,
   STATUS_ORDEM_COLETA,
   type OrdemColetaForm,
@@ -122,13 +124,23 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="coleta-placa">Placa</Label>
+            <Label htmlFor="coleta-placa">Placa do cavalo</Label>
             <Input
               id="coleta-placa"
               value={form.placa}
-              maxLength={8}
+              maxLength={7}
               placeholder="ABC1D23"
               onChange={(event) => update({ placa: normalizarPlacaColeta(event.target.value) })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="coleta-placa-carreta">Placa da carreta</Label>
+            <Input
+              id="coleta-placa-carreta"
+              value={form.placa_carreta}
+              maxLength={7}
+              placeholder="ABC1D23"
+              onChange={(event) => update({ placa_carreta: normalizarPlacaColeta(event.target.value) })}
             />
           </div>
 
@@ -169,6 +181,17 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               onChange={(event) => update({ motorista: event.target.value })}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="coleta-cpf-motorista">CPF do motorista</Label>
+            <Input
+              id="coleta-cpf-motorista"
+              inputMode="numeric"
+              maxLength={14}
+              placeholder="000.000.000-00"
+              value={formatarCpfColeta(form.cpf_motorista)}
+              onChange={(event) => update({ cpf_motorista: normalizarCpfColeta(event.target.value) })}
+            />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="coleta-contato">Contato no local</Label>
@@ -196,6 +219,24 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               onChange={(event) => update({ notas_fiscais: event.target.value })}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="coleta-codigo-otm">Código do OTM</Label>
+            <Input
+              id="coleta-codigo-otm"
+              value={form.codigo_otm}
+              maxLength={60}
+              onChange={(event) => update({ codigo_otm: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="coleta-numero-roteiro">Número do roteiro</Label>
+            <Input
+              id="coleta-numero-roteiro"
+              value={form.numero_roteiro}
+              maxLength={60}
+              onChange={(event) => update({ numero_roteiro: event.target.value })}
+            />
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="coleta-volumes">Volumes</Label>
@@ -221,7 +262,19 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               onChange={(event) => update({ peso_kg: event.target.value })}
             />
           </div>
-          <div className="space-y-2 md:col-span-2 lg:col-span-1">
+          <div className="space-y-2">
+            <Label htmlFor="coleta-cubagem">Cubagem (m³)</Label>
+            <Input
+              id="coleta-cubagem"
+              type="number"
+              min="0"
+              step="0.001"
+              placeholder="0,000"
+              value={form.cubagem_m3}
+              onChange={(event) => update({ cubagem_m3: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2 lg:col-span-3">
             <Label htmlFor="coleta-observacoes">Observações</Label>
             <Textarea
               id="coleta-observacoes"
