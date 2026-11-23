@@ -1,0 +1,14 @@
+DO $m$
+DECLARE
+  d text;
+  a1 text := $a$IF EXISTS(SELECT 1 FROM jsonb_each_text(p_filtros) WHERE key NOT IN ('nf','placa','cliente','embarcador','status','validacao_status','cidade','codigo','agenda_status','roteirizacao_data','emissao','regiao') OR length(value)>120 OR value IS NULL) THEN RAISE EXCEPTION 'Filtro não autorizado'; END IF;$a$;
+  n1 text := $n$IF EXISTS(SELECT 1 FROM jsonb_each_text(p_filtros) WHERE key NOT IN ('nf','placa','cliente','embarcador','status','validacao_status','cidade','codigo','agenda_status','roteirizacao_data','emissao','regiao','volume_m3_min','volume_m3_max','peso_kg_min','peso_kg_max') OR length(value)>120 OR value IS NULL) THEN RAISE EXCEPTION 'Filtro não autorizado'; END IF;
+IF EXISTS(SELECT 1 FROM jsonb_each_text(p_filtros) WHERE key IN ('volume_m3_min','volume_m3_max','peso_kg_min','peso_kg_max') AND value !~ '^[0-9]{1,12}([.][0-9]{1,4})?$') THEN RAISE EXCEPTION 'Filtro numérico inválido'; END IF;$n$;
+  a2 text := $a$), selected AS (SELECT d.row_id,d.dados FROM candidates d WHERE NOT EXISTS(SELECT 1 FROM jsonb_each_text(p_filtros) f WHERE CASE WHEN f.key IN ('nf','placa','codigo','roteirizacao_data','emissao') THEN lower(coalesce(d.dados->>f.key,''))<>lower(f.value) ELSE position(lower(f.value) in lower(coalesce(d.dados->>f.key,'')))=0 END) ORDER BY d.row_id LIMIT 5001)$a$;
+  n2 text := $n$), selected AS (SELECT d.row_id,d.dados FROM candidates d WHERE NOT EXISTS(SELECT 1 FROM jsonb_each_text(p_filtros) f WHERE f.key NOT IN ('volume_m3_min','volume_m3_max','peso_kg_min','peso_kg_max') AND CASE WHEN f.key IN ('nf','placa','codigo','roteirizacao_data','emissao') THEN lower(coalesce(d.dados->>f.key,''))<>lower(f.value) ELSE position(lower(f.value) in lower(coalesce(d.dados->>f.key,'')))=0 END) AND (p_filtros->>'volume_m3_min' IS NULL OR (d.dados->>'volume_m3')::numeric >= (p_filtros->>'volume_m3_min')::numeric) AND (p_filtros->>'volume_m3_max' IS NULL OR (d.dados->>'volume_m3')::numeric <= (p_filtros->>'volume_m3_max')::numeric) AND (p_filtros->>'peso_kg_min' IS NULL OR (d.dados->>'peso_kg')::numeric >= (p_filtros->>'peso_kg_min')::numeric) AND (p_filtros->>'peso_kg_max' IS NULL OR (d.dados->>'peso_kg')::numeric <= (p_filtros->>'peso_kg_max')::numeric) ORDER BY d.row_id LIMIT 5001)$n$;
+BEGIN
+  d := pg_get_functiondef('public.agente_gerencial_relatorio(uuid,uuid,text,date,date,jsonb)'::regprocedure);
+  IF position(a1 in d) = 0 THEN RAISE EXCEPTION 'validacao de filtros nao encontrada'; END IF;
+  IF position(a2 in d) = 0 THEN RAISE EXCEPTION 'filtro de linhas nao encontrado'; END IF;
+  EXECUTE replace(replace(d, a1, n1), a2, n2);
+END $m$;

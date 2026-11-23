@@ -1,4 +1,4 @@
-export const DATASETS = ['notas','cargas','veiculos','agendas','entregas','ibac','okentrega','produtos','destinatarios','embarcadores','roteirizacoes','prefaturas','prefatura_itens','ctes','sla','tarifas'] as const;
+export const DATASETS = ['notas','cargas','cargas_agrupadas','veiculos','agendas','entregas','ibac','okentrega','produtos','destinatarios','embarcadores','roteirizacoes','prefaturas','prefatura_itens','ctes','sla','tarifas'] as const;
 export type Dataset = typeof DATASETS[number];
 export type BusinessRow = Record<string, string | number | boolean | null>;
 export interface Report {
@@ -12,6 +12,12 @@ export function validDate(value: string) {
   return !Number.isNaN(date.getTime()) && date.getFullYear() === Number(value.slice(0,4)) && date.getMonth()+1 === Number(value.slice(5,7)) && date.getDate() === Number(value.slice(8,10));
 }
 const numericFields = ['peso_kg','volume_m3','valor_mercadoria','valor_frete','caixas','distancia_total_km'];
+export const NUMERIC_FILTERS = ['volume_m3_min','volume_m3_max','peso_kg_min','peso_kg_max'] as const;
+export type NumericFilter = typeof NUMERIC_FILTERS[number];
+/** Linhas que o modelo recebe: resultados pequenos vêm completos; grandes vêm só com amostra. */
+export function modelSample(rows: BusinessRow[]) {
+  return rows.length <= 60 ? rows : rows.slice(0, 12);
+}
 export function summarize(rows: BusinessRow[]) {
   const totals: Record<string, number> = { registros: rows.length };
   const missing: Record<string, number> = {};
