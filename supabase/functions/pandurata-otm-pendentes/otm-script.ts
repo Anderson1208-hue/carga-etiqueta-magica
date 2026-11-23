@@ -20,7 +20,20 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
       fd.set('finder_action', 'search'); fd.set('searching', 'true');
       const act = form.getAttribute('action').replace('FinderServlet', 'ResultServlet');
       const rh = await (await fetch(act, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })).text();
-      const rdoc = new DOMParser().parseFromString(rh, 'text/html');
+      let rdoc = new DOMParser().parseFromString(rh, 'text/html');
+      // Portal returns only the first 100 rows: re-request the result sorted by trip start, newest first.
+      let ordenado = 'nao';
+      try {
+        const rf = rdoc.querySelector('form[name=result]');
+        if (rf) {
+          const q = new URLSearchParams();
+          for (const el of rf.elements) { if (el.name && !((el.type === 'radio' || el.type === 'checkbox') && !el.checked)) q.append(el.name, el.value); }
+          q.set('sort_col1', 'shipment.start_time'); q.set('sort_col1_ascend', 'false');
+          const sh = await (await fetch(rf.getAttribute('action').replace(/&amp;/g, '&'), { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: q.toString() })).text();
+          const sd = new DOMParser().parseFromString(sh, 'text/html');
+          if (sd.querySelector('div.sgBodyRow[pk]')) { rdoc = sd; ordenado = 'sim'; }
+        }
+      } catch (e) { ordenado = 'erro'; }
       const total = Number((rdoc.body.textContent.match(/Total Encontrado:\\s*(\\d+)/) || [])[1] || 0);
       const m = {};
       rdoc.querySelectorAll('div.sgBodyRow[pk]').forEach((r) => { const k = r.getAttribute('pk'); m[k] = (m[k] || []).concat([...r.querySelectorAll(':scope > .sgBodyCol')].map((c) => norm(c.getAttribute('title') ?? c.textContent))); });
@@ -42,7 +55,7 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
           detalhes.push({ shipment_id: l.shipment_id, remessa_id: (t.match(/ID da Remessa\\s*(\\d+)/) || [])[1] || null, peso_liquido: g('Peso Líquido Total'), volume_liquido: g('Volume Líquido Total'), peso_bruto: g('Peso Bruto Total'), volume_bruto: g('Volume Bruto Total'), custo_total: g('Custo de Transporte Total'), numero_ordens: (t.match(/Número de Ordens\\s*(\\d+)/) || [])[1] || null, remessas, paradas });
         } catch (e) { detalhes.push({ shipment_id: l.shipment_id, erro: String(e) }); }
       }
-      out({ ok: true, total: semVeiculo.length, total_portal: total, diag, lidas: lista.length, novas: novas.length, lista: novas.slice(0, MAX), detalhes, restantes: Math.max(0, novas.length - MAX) });
+      out({ ok: true, ordenado, inicios: lista.slice(0, 3).map((l) => l.inicio_viagem), total: semVeiculo.length, total_portal: total, diag, lidas: lista.length, novas: novas.length, lista: novas.slice(0, MAX), detalhes, restantes: Math.max(0, novas.length - MAX) });
     } catch (e) { out({ ok: false, erro: String(e) }); }
   })();
 })();`;

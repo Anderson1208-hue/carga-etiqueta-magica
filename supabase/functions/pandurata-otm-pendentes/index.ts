@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     }
     const falhas = (saida.detalhes ?? []).filter((d: any) => d.erro).length;
     await fim({ sucesso: true, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, creditos_firecrawl: creditos, erro: falhas ? `${falhas} carga(s) sem detalhe` : null });
-    return json({ ok: true, total_portal: saida.total_portal, lidas: saida.lidas, diag: saida.diag, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, falhas, creditos });
+    return json({ ok: true, ordenado: saida.ordenado, inicios: saida.inicios, total_portal: saida.total_portal, lidas: saida.lidas, diag: saida.diag, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, falhas, creditos });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('pandurata-otm-pendentes', msg);
