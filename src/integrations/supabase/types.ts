@@ -3796,6 +3796,7 @@ export type Database = {
           telefone: string | null
           uf: string | null
           updated_at: string
+          volume_liquido_m3: number | null
           volumes: number
         }
         Insert: {
@@ -3824,6 +3825,7 @@ export type Database = {
           telefone?: string | null
           uf?: string | null
           updated_at?: string
+          volume_liquido_m3?: number | null
           volumes?: number
         }
         Update: {
@@ -3852,6 +3854,7 @@ export type Database = {
           telefone?: string | null
           uf?: string | null
           updated_at?: string
+          volume_liquido_m3?: number | null
           volumes?: number
         }
         Relationships: [
@@ -3906,6 +3909,149 @@ export type Database = {
           status?: string
           updated_at?: string
           veiculo_id?: string
+        }
+        Relationships: []
+      }
+      pandurata_otm_cargas: {
+        Row: {
+          capturado_em: string
+          cidade_destino: string | null
+          cliente: string | null
+          created_at: string
+          custo_frete: number | null
+          fim_viagem: string | null
+          id: string
+          inicio_viagem: string | null
+          num_paradas: number | null
+          numero_dt: string | null
+          numero_ordens: number | null
+          ordem_coleta_id: string | null
+          paradas: Json
+          peso_bruto_kg: number | null
+          peso_liquido_kg: number | null
+          qtd_caixas: number | null
+          qtd_pallets: number | null
+          remessa_id: string | null
+          remessas: string[]
+          shipment_id: string
+          status_agendamento: string | null
+          status_tender: string | null
+          tipo_carga: string | null
+          tipo_equipamento: string | null
+          uf_destino: string | null
+          valor_mercadoria: number | null
+          volume_bruto_m3: number | null
+          volume_liquido_m3: number | null
+        }
+        Insert: {
+          capturado_em?: string
+          cidade_destino?: string | null
+          cliente?: string | null
+          created_at?: string
+          custo_frete?: number | null
+          fim_viagem?: string | null
+          id?: string
+          inicio_viagem?: string | null
+          num_paradas?: number | null
+          numero_dt?: string | null
+          numero_ordens?: number | null
+          ordem_coleta_id?: string | null
+          paradas?: Json
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          qtd_caixas?: number | null
+          qtd_pallets?: number | null
+          remessa_id?: string | null
+          remessas?: string[]
+          shipment_id: string
+          status_agendamento?: string | null
+          status_tender?: string | null
+          tipo_carga?: string | null
+          tipo_equipamento?: string | null
+          uf_destino?: string | null
+          valor_mercadoria?: number | null
+          volume_bruto_m3?: number | null
+          volume_liquido_m3?: number | null
+        }
+        Update: {
+          capturado_em?: string
+          cidade_destino?: string | null
+          cliente?: string | null
+          created_at?: string
+          custo_frete?: number | null
+          fim_viagem?: string | null
+          id?: string
+          inicio_viagem?: string | null
+          num_paradas?: number | null
+          numero_dt?: string | null
+          numero_ordens?: number | null
+          ordem_coleta_id?: string | null
+          paradas?: Json
+          peso_bruto_kg?: number | null
+          peso_liquido_kg?: number | null
+          qtd_caixas?: number | null
+          qtd_pallets?: number | null
+          remessa_id?: string | null
+          remessas?: string[]
+          shipment_id?: string
+          status_agendamento?: string | null
+          status_tender?: string | null
+          tipo_carga?: string | null
+          tipo_equipamento?: string | null
+          uf_destino?: string | null
+          valor_mercadoria?: number | null
+          volume_bruto_m3?: number | null
+          volume_liquido_m3?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pandurata_otm_cargas_ordem_coleta_id_fkey"
+            columns: ["ordem_coleta_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_coleta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pandurata_otm_execucoes: {
+        Row: {
+          concluido_em: string | null
+          creditos_firecrawl: number | null
+          erro: string | null
+          gravadas: number | null
+          id: string
+          iniciado_em: string
+          iniciado_por: string | null
+          novas: number | null
+          restantes: number | null
+          sucesso: boolean | null
+          total_sem_veiculo: number | null
+        }
+        Insert: {
+          concluido_em?: string | null
+          creditos_firecrawl?: number | null
+          erro?: string | null
+          gravadas?: number | null
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          novas?: number | null
+          restantes?: number | null
+          sucesso?: boolean | null
+          total_sem_veiculo?: number | null
+        }
+        Update: {
+          concluido_em?: string | null
+          creditos_firecrawl?: number | null
+          erro?: string | null
+          gravadas?: number | null
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string | null
+          novas?: number | null
+          restantes?: number | null
+          sucesso?: boolean | null
+          total_sem_veiculo?: number | null
         }
         Relationships: []
       }

@@ -5,6 +5,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { OrdemColetaDialog } from "@/components/ordens/OrdemColetaDialog";
+import { CargasPendentesPandurata } from "@/components/ordens/CargasPendentesPandurata";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { coletaDePendentePandurata, type CargaPendentePandurata } from "@/lib/pandurata-pendentes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,6 +113,7 @@ export default function OrdemColetaPage() {
         volumes: Number(dados.volumes),
         peso_kg: Number(dados.peso_kg),
         cubagem_m3: dados.cubagem_m3.trim() ? Number(dados.cubagem_m3) : null,
+        volume_liquido_m3: dados.volume_liquido_m3.trim() ? Number(dados.volume_liquido_m3) : null,
         observacoes: dados.observacoes.trim() || null,
         status: dados.status,
       };
@@ -123,15 +127,23 @@ export default function OrdemColetaPage() {
       const { data, error } = await supabase
         .from("ordens_coleta")
         .insert(payload)
-        .select("numero")
+        .select("id, numero")
         .single();
       if (error) throw error;
+      if (dados.pandurata_otm_id) {
+        const { error: vinculoErro } = await supabase
+          .from("pandurata_otm_cargas")
+          .update({ ordem_coleta_id: data.id })
+          .eq("id", dados.pandurata_otm_id);
+        if (vinculoErro) toast.error("Ordem criada, mas não foi possível tirá-la da lista de pendentes.");
+      }
       return data.numero;
     },
     onSuccess: (numero) => {
       toast.success(numero ? `${formatarNumeroColeta(numero)} criada com sucesso` : "Ordem de coleta atualizada");
       setForm(null);
       queryClient.invalidateQueries({ queryKey: ["ordens-coleta"] });
+      queryClient.invalidateQueries({ queryKey: ["pandurata-otm-pendentes"] });
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -158,6 +170,11 @@ export default function OrdemColetaPage() {
     });
   }, [busca, ordensQuery.data]);
 
+  const emitirDoPortal = (carga: CargaPendentePandurata) => {
+    const pandurata = embarcadores.find((e) => /pandurata|bauducco/i.test(`${e.razao_social} ${e.nome_fantasia ?? ""}`));
+    setForm(coletaDePendentePandurata(carga, pandurata ? { id: pandurata.id, nome: pandurata.razao_social } : null));
+  };
+
   const limparFiltros = () => {
     setBusca("");
     setStatus("todos");
@@ -182,6 +199,15 @@ export default function OrdemColetaPage() {
           </Button>
         </div>
 
+        <Tabs defaultValue="pendentes">
+          <TabsList>
+            <TabsTrigger value="pendentes">Cargas pendentes Pandurata</TabsTrigger>
+            <TabsTrigger value="ordens">Ordens emitidas</TabsTrigger>
+          </TabsList>
+          <TabsContent value="pendentes" className="mt-4">
+            <CargasPendentesPandurata onEmitir={emitirDoPortal} />
+          </TabsContent>
+          <TabsContent value="ordens" className="mt-4 space-y-6">
         <Card>
           <CardContent className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_auto] xl:items-end">
             <div className="space-y-2 md:col-span-2 xl:col-span-1">
@@ -307,6 +333,8 @@ export default function OrdemColetaPage() {
             </div>
           )}
         </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <OrdemColetaDialog

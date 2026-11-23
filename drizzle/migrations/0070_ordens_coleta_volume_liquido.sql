@@ -1,0 +1,1 @@
+ALTER TABLE public.ordens_coleta ADD COLUMN volume_liquido_m3 numeric;

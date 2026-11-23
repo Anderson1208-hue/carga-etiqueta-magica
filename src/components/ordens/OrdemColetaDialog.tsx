@@ -263,7 +263,7 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="coleta-cubagem">Cubagem (m³)</Label>
+            <Label htmlFor="coleta-cubagem">Volume bruto / cubagem (m³)</Label>
             <Input
               id="coleta-cubagem"
               type="number"
@@ -272,6 +272,18 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               placeholder="0,000"
               value={form.cubagem_m3}
               onChange={(event) => update({ cubagem_m3: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="coleta-volume-liquido">Volume líquido (m³)</Label>
+            <Input
+              id="coleta-volume-liquido"
+              type="number"
+              min="0"
+              step="0.001"
+              placeholder="0,000"
+              value={form.volume_liquido_m3}
+              onChange={(event) => update({ volume_liquido_m3: event.target.value })}
             />
           </div>
           <div className="space-y-2 md:col-span-2 lg:col-span-3">

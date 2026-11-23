@@ -34,8 +34,10 @@ export type OrdemColetaForm = {
   volumes: string;
   peso_kg: string;
   cubagem_m3: string;
+  volume_liquido_m3: string;
   observacoes: string;
   status: StatusOrdemColeta;
+  pandurata_otm_id?: string;
 };
 
 export function dataHojeBrasilia() {
@@ -68,6 +70,7 @@ export function formularioColetaVazio(): OrdemColetaForm {
     volumes: "0",
     peso_kg: "0",
     cubagem_m3: "",
+    volume_liquido_m3: "",
     observacoes: "",
     status: "pendente",
   };
@@ -100,6 +103,7 @@ export function coletaParaFormulario(ordem: OrdemColeta): OrdemColetaForm {
     volumes: String(ordem.volumes),
     peso_kg: String(ordem.peso_kg),
     cubagem_m3: ordem.cubagem_m3 === null ? "" : String(ordem.cubagem_m3),
+    volume_liquido_m3: ordem.volume_liquido_m3 === null ? "" : String(ordem.volume_liquido_m3),
     observacoes: ordem.observacoes ?? "",
     status,
   };
@@ -155,6 +159,10 @@ export function validarColeta(form: OrdemColetaForm) {
   if (form.cubagem_m3.trim()) {
     const cubagem = Number(form.cubagem_m3);
     if (!Number.isFinite(cubagem) || cubagem < 0) return "A cubagem deve ser maior ou igual a zero.";
+  }
+  if (form.volume_liquido_m3.trim()) {
+    const liquido = Number(form.volume_liquido_m3);
+    if (!Number.isFinite(liquido) || liquido < 0) return "O volume líquido deve ser maior ou igual a zero.";
   }
 
   return null;

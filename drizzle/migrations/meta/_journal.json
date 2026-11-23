@@ -484,6 +484,20 @@
       "when": 1795466549048,
       "tag": "0068_ampliar_ordens_coleta_pandurata",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795472843180,
+      "tag": "0069_pandurata_otm_cargas_pendentes",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1795472940567,
+      "tag": "0070_ordens_coleta_volume_liquido",
+      "breakpoints": true
     }
   ]
 }
