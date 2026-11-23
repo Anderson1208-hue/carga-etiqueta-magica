@@ -442,6 +442,13 @@
       "when": 1795023893505,
       "tag": "0062_novos_status_agendamento",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795444394276,
+      "tag": "0063_agendamento_status_falta_direta_cd",
+      "breakpoints": true
     }
   ]
 }
