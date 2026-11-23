@@ -1,0 +1,1 @@
+- Read-only: Firecrawl login + in-page finder/view fetches only, never OTM management forms; skip loads already captured, in cargas.numero_carga or ordens de coleta; log credits per run so cost stays measurable.
