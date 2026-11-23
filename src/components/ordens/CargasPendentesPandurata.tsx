@@ -50,7 +50,7 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
         const det = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
         throw new Error(det?.error ? `Portal Pandurata: ${det.error}` : "Não foi possível consultar o portal Pandurata.");
       }
-      return data as { gravadas: number; total_sem_veiculo: number; restantes: number };
+      return data as { gravadas: number; total_sem_veiculo: number; restantes: number; total_portal?: number; lidas?: number };
     },
     onSuccess: (r) => {
       toast.success(
@@ -58,6 +58,9 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
           ? `${r.gravadas} carga(s) nova(s) do portal.${r.restantes ? ` Faltam ${r.restantes}; clique novamente.` : ""}`
           : `Nenhuma carga nova. Sem veículo no portal: ${r.total_sem_veiculo}.`,
       );
+      if (r.total_portal && r.lidas != null && r.lidas < r.total_portal) {
+        toast.warning(`Atenção: o portal tem ${r.total_portal} cargas, mas só ${r.lidas} foram lidas. Pode haver cargas sem veículo fora da leitura.`);
+      }
       qc.invalidateQueries({ queryKey: ["pandurata-otm-pendentes"] });
       qc.invalidateQueries({ queryKey: ["pandurata-otm-execucao"] });
     },
