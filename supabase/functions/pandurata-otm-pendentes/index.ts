@@ -6,7 +6,7 @@ import { chaveDt, dataOtm, extrairSaida, inteiro, numeroBR } from './parse.ts';
 
 const OTM_URL = 'https://otmgtm-bauducco.otmgtm.us-phoenix-1.ocs.oraclecloud.com/GC3/glog.webserver.home.HomeServlet?ojr=maincontent';
 const GATEWAY = 'https://connector-gateway.lovable.dev/firecrawl/v2';
-const MAX_DETALHES = 25;
+const MAX_DETALHES = 8;
 
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
@@ -68,8 +68,9 @@ Deno.serve(async (req) => {
         { type: 'click', selector: 'input[type=password]' },
         { type: 'write', text: senha },
         { type: 'press', key: 'Enter' },
-        { type: 'wait', milliseconds: 30000 },
+        { type: 'wait', milliseconds: 15000 },
         { type: 'executeJavascript', script: montarScriptOtm([...conhecidos], MAX_DETALHES) },
+        { type: 'wait', milliseconds: 40000 },
         { type: 'wait', selector: '#lovout' },
       ],
     };
