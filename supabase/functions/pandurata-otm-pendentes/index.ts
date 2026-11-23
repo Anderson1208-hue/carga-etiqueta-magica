@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     if (!saida?.ok) {
       const erro = saida?.erro ?? 'Não foi possível entrar no portal ou ler a lista';
       await fim({ sucesso: false, erro, creditos_firecrawl: creditos });
-      return json({ error: erro, creditos }, 502);
+      return json({ error: erro, creditos, campos: saida?.campos }, 502);
     }
 
     const det = new Map<string, any>((saida.detalhes ?? []).map((d: any) => [d.shipment_id, d]));
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     }
     const falhas = (saida.detalhes ?? []).filter((d: any) => d.erro).length;
     await fim({ sucesso: true, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, creditos_firecrawl: creditos, erro: falhas ? `${falhas} carga(s) sem detalhe` : null });
-    return json({ ok: true, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, falhas, creditos });
+    return json({ ok: true, total_portal: saida.total_portal, lidas: saida.lidas, diag: saida.diag, total_sem_veiculo: saida.total, novas: saida.novas, gravadas, restantes: saida.restantes, falhas, creditos });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('pandurata-otm-pendentes', msg);

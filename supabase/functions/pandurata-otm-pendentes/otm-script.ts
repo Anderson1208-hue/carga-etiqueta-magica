@@ -17,7 +17,6 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
       if (!form) { out({ ok: false, erro: 'login_ou_tela_indisponivel' }); return; }
       const fd = new URLSearchParams();
       for (const el of form.elements) { if (!el.name) continue; if ((el.type === 'radio' || el.type === 'checkbox') && !el.checked) continue; fd.append(el.name, el.value); }
-      fd.set('srShipmentRefnumValue82_operator', 'isnull');
       fd.set('finder_action', 'search'); fd.set('searching', 'true');
       const act = form.getAttribute('action').replace('FinderServlet', 'ResultServlet');
       const rh = await (await fetch(act, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: fd.toString() })).text();
@@ -26,7 +25,9 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
       const m = {};
       rdoc.querySelectorAll('div.sgBodyRow[pk]').forEach((r) => { const k = r.getAttribute('pk'); m[k] = (m[k] || []).concat([...r.querySelectorAll(':scope > .sgBodyCol')].map((c) => norm(c.getAttribute('title') ?? c.textContent))); });
       const lista = Object.keys(m).map((pk) => { const c = m[pk]; return { shipment_id: c[3] || pk, status_tender: c[5], status_agendamento: c[6], numero_dt: c[7], inicio_viagem: c[8], fim_viagem: c[9], motorista: c[10], cpf_motorista: c[11], placa_cavalo: c[12], placa_carreta: c[13], tipo_equipamento: c[17], tipo_carga: c[18], qtd_pallets: c[19], qtd_caixas: c[20], cliente: c[21], cidade_destino: c[22], uf_destino: c[23], obs_recusa: c[24], valor_mercadoria: c[25], num_paradas: c[26] }; });
-      const novas = lista.filter((l) => !KNOWN.has(l.shipment_id) && !KNOWN.has('DT:' + dtKey(l.numero_dt)));
+      const semVeiculo = lista.filter((l) => !l.placa_cavalo && !l.placa_carreta && !l.motorista);
+      const diag = {}; lista.forEach((l) => { const k = (l.status_tender || '-') + (l.placa_cavalo ? ' | com placa' : ' | sem placa'); diag[k] = (diag[k] || 0) + 1; });
+      const novas = semVeiculo.filter((l) => !KNOWN.has(l.shipment_id) && !KNOWN.has('DT:' + dtKey(l.numero_dt)));
       const detalhes = [];
       for (const l of novas.slice(0, MAX)) {
         try {
@@ -41,7 +42,7 @@ export function montarScriptOtm(conhecidos: string[], maxDetalhes: number): stri
           detalhes.push({ shipment_id: l.shipment_id, remessa_id: (t.match(/ID da Remessa\\s*(\\d+)/) || [])[1] || null, peso_liquido: g('Peso Líquido Total'), volume_liquido: g('Volume Líquido Total'), peso_bruto: g('Peso Bruto Total'), volume_bruto: g('Volume Bruto Total'), custo_total: g('Custo de Transporte Total'), numero_ordens: (t.match(/Número de Ordens\\s*(\\d+)/) || [])[1] || null, remessas, paradas });
         } catch (e) { detalhes.push({ shipment_id: l.shipment_id, erro: String(e) }); }
       }
-      out({ ok: true, total, lidas: lista.length, novas: novas.length, lista: novas.slice(0, MAX), detalhes, restantes: Math.max(0, novas.length - MAX) });
+      out({ ok: true, total: semVeiculo.length, total_portal: total, diag, lidas: lista.length, novas: novas.length, lista: novas.slice(0, MAX), detalhes, restantes: Math.max(0, novas.length - MAX) });
     } catch (e) { out({ ok: false, erro: String(e) }); }
   })();
 })();`;
