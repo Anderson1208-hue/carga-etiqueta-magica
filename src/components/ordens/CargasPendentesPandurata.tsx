@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FunctionsHttpError } from "@supabase/supabase-js";
-import { FileText, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { FileText, RefreshCw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CargaPendentePandurata } from "@/lib/pandurata-pendentes";
 
@@ -13,6 +15,8 @@ const dataHora = (iso: string | null) =>
 
 export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: CargaPendentePandurata) => void }) {
   const qc = useQueryClient();
+  const [pesquisa, setPesquisa] = useState("");
+  const [termo, setTermo] = useState("");
 
   const pendentes = useQuery({
     queryKey: ["pandurata-otm-pendentes"],
@@ -70,7 +74,10 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
     },
   });
 
-  const lista = pendentes.data ?? [];
+  const normalizar = (valor: string) => valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
+  const lista = (pendentes.data ?? []).filter((c) =>
+    normalizar([c.numero_dt, c.remessa_id, c.shipment_id, c.cliente, c.cidade_destino, c.uf_destino].filter(Boolean).join(" ")).includes(normalizar(termo)),
+  );
 
   return (
     <div className="space-y-4">
@@ -89,6 +96,25 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
           {atualizar.isPending ? "Consultando portal..." : "Atualizar do portal"}
         </Button>
       </div>
+
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => { event.preventDefault(); setTermo(pesquisa.trim()); }}
+      >
+        <Input
+          aria-label="Pesquisar cargas pendentes"
+          placeholder="DT, remessa, cliente ou destino"
+          className="w-full sm:max-w-sm"
+          value={pesquisa}
+          onChange={(event) => setPesquisa(event.target.value)}
+        />
+        <Button type="submit" variant="outline"><Search className="mr-2 h-4 w-4" />Pesquisar</Button>
+        {(pesquisa || termo) && (
+          <Button type="button" variant="ghost" size="icon" aria-label="Limpar pesquisa" title="Limpar pesquisa" onClick={() => { setPesquisa(""); setTermo(""); }}>
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </form>
 
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className="overflow-x-auto">
@@ -111,7 +137,7 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
               ) : pendentes.isError ? (
                 <TableRow><TableCell colSpan={8} className="py-10 text-center text-destructive">Não foi possível carregar as cargas pendentes.</TableCell></TableRow>
               ) : lista.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">Nenhuma carga pendente. Clique em "Atualizar do portal" para consultar.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="py-10 text-center text-muted-foreground">{termo ? "Nenhuma carga encontrada para esta pesquisa." : 'Nenhuma carga pendente. Clique em "Atualizar do portal" para consultar.'}</TableCell></TableRow>
               ) : lista.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="whitespace-nowrap font-medium">
