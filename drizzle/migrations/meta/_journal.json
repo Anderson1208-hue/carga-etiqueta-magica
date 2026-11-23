@@ -449,6 +449,13 @@
       "when": 1795444394276,
       "tag": "0063_agendamento_status_falta_direta_cd",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1795456373055,
+      "tag": "0064_migration",
+      "breakpoints": true
     }
   ]
 }
