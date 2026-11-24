@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { autorizarEnvioSap, compararFrota, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
+import { autorizarEnvioSap, compararFrota, definirStatusEnvio, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
 
 const ordem = { status: 'pendente', codigo_otm: '737681', numero_roteiro: '0001813327', motorista: 'IVAN EMIDIO ROZA', cpf_motorista: '12345678901', placa: 'CUC6D38', placa_carreta: 'ARM8143' };
 const vinculo = { shipment_id: 'BAU.737681', numero_dt: '0001813327' };
@@ -23,5 +23,14 @@ describe('Envio manual da frota Pandurata', () => {
   it('nunca aciona o SAP durante uma consulta somente leitura', () => {
     expect(autorizarEnvioSap(false, true)).toBe(false);
     expect(autorizarEnvioSap(false, false)).toBe(false);
+  });
+  it('mantém bloqueada uma tentativa incerta mesmo quando a conferência ainda não encontra o SAP', () => {
+    expect(definirStatusEnvio({ ok: false, codigo: 'sap_nao_confirmado', gravou: false, sap_acionado: false }, true)).toBe('incerto');
+  });
+  it('permite concluir uma frota já confirmada quando não houve tentativa incerta anterior', () => {
+    expect(definirStatusEnvio({ ok: false, codigo: 'sap_nao_confirmado', gravou: false, sap_acionado: false }, false)).toBe('erro');
+  });
+  it('não libera repetição depois de acionar o SAP sem conseguir confirmar', () => {
+    expect(definirStatusEnvio({ ok: false, codigo: 'sap_nao_confirmado', gravou: false, sap_acionado: true }, false)).toBe('incerto');
   });
 });

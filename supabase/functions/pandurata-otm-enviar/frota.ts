@@ -13,6 +13,16 @@ export function autorizarEnvioSap(confirmacaoExplicita: boolean, frotaConfirmada
   return confirmacaoExplicita && frotaConfirmada;
 }
 
+export function definirStatusEnvio(
+  saida: { ok?: boolean; gravou?: boolean; sap_acionado?: boolean; codigo?: string },
+  verificacaoDeTentativaIncerta: boolean,
+) {
+  if (saida.ok === true) return 'confirmado';
+  if (verificacaoDeTentativaIncerta) return 'incerto';
+  const falhaDefinitiva = !saida.gravou && !saida.sap_acionado && (saida.codigo === 'frota_divergente' || saida.codigo === 'sap_nao_confirmado');
+  return falhaDefinitiva ? 'erro' : 'incerto';
+}
+
 export function compararFrota(atual: string[], esperada: string[]) {
   const norm = (s: string, i: number) => i === 1 ? s.replace(/\D/g, '') : s.replace(/\s+/g, ' ').trim().toUpperCase();
   if (atual.length !== 4 || esperada.length !== 4) return 'conflito';

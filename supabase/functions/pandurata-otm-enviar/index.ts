@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { validarFrota, type Frota } from './frota.ts';
+import { definirStatusEnvio, validarFrota, type Frota } from './frota.ts';
 import { montarScriptEnvio } from './portal-script.ts';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -82,9 +82,13 @@ Deno.serve(async (req) => {
     const match = raw.match(/<pre[^>]*id=["']lovenvio["'][^>]*>([\s\S]*?)<\/pre>/i);
     let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean } = {};
     if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
-    const falhaDefinitiva = !saida.gravou && !saida.sap_acionado && (saida.codigo === 'frota_divergente' || saida.codigo === 'sap_nao_confirmado');
-    const status = saida.ok === true ? 'confirmado' : falhaDefinitiva ? 'erro' : 'incerto';
-    const mensagem = status === 'confirmado' ? 'Frota confirmada e envio ao SAP registrado no portal.' : mensagens[saida.codigo ?? 'consulta_incompleta'] ?? mensagens.consulta_incompleta;
+    const verificacaoIncerta = Boolean(body.consultar && aberto?.status === 'incerto' && saida.ok !== true);
+    const status = definirStatusEnvio(saida, verificacaoIncerta);
+    const mensagem = status === 'confirmado'
+      ? 'Frota confirmada e envio ao SAP registrado no portal.'
+      : verificacaoIncerta
+        ? 'A confirmação ainda não apareceu. Aguarde e use Verificar portal; o envio não será liberado para repetição.'
+        : mensagens[saida.codigo ?? 'consulta_incompleta'] ?? mensagens.consulta_incompleta;
     const { error: saveError } = await sb.from('pandurata_otm_envios').update({ status, mensagem, status_portal: saida.status_portal ?? null, creditos_firecrawl: credits, creditos_lovable: credits === null ? null : Number(credits) * 0.004, concluido_em: new Date().toISOString() }).eq('id', envioId);
     if (saveError) throw new Error('O portal foi consultado, mas o histórico não pôde ser confirmado.');
     return json({ ok: status === 'confirmado', status, mensagem, status_portal: saida.status_portal, creditos_lovable: credits === null ? null : Number(credits) * 0.004 });
