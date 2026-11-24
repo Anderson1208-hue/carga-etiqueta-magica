@@ -4013,6 +4013,59 @@ export type Database = {
           },
         ]
       }
+      pandurata_otm_envios: {
+        Row: {
+          concluido_em: string | null
+          creditos_firecrawl: number | null
+          creditos_lovable: number | null
+          dados: Json
+          id: string
+          iniciado_em: string
+          iniciado_por: string
+          mensagem: string | null
+          ordem_coleta_id: string
+          shipment_id: string
+          status: string
+          status_portal: string | null
+        }
+        Insert: {
+          concluido_em?: string | null
+          creditos_firecrawl?: number | null
+          creditos_lovable?: number | null
+          dados: Json
+          id?: string
+          iniciado_em?: string
+          iniciado_por: string
+          mensagem?: string | null
+          ordem_coleta_id: string
+          shipment_id: string
+          status?: string
+          status_portal?: string | null
+        }
+        Update: {
+          concluido_em?: string | null
+          creditos_firecrawl?: number | null
+          creditos_lovable?: number | null
+          dados?: Json
+          id?: string
+          iniciado_em?: string
+          iniciado_por?: string
+          mensagem?: string | null
+          ordem_coleta_id?: string
+          shipment_id?: string
+          status?: string
+          status_portal?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pandurata_otm_envios_ordem_coleta_id_fkey"
+            columns: ["ordem_coleta_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_coleta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pandurata_otm_execucoes: {
         Row: {
           concluido_em: string | null

@@ -1,0 +1,4 @@
+- Keep fleet sending separate from the read-only pending-load robot; accept only a linked saved order and explicit confirmation, so discovery never writes to OTM.
+- Reserve the shipment before calling Firecrawl; an uncertain attempt permits read-only verification only, never automatic replay, because a timeout can follow a successful write.
+- Update only empty fleet cells of the uniquely matching accepted shipment; verify all four values through a fresh search and never invoke SAP actions, bulk updates or overwrite different portal data.
+- Return only allowlisted confirmation/error fields and record usage; never store portal HTML or log credentials/CPF.

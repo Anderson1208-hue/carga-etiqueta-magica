@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PackageOpen, Pencil, Plus, Search } from "lucide-react";
+import { PackageOpen, Pencil, Plus, Search, Send, RefreshCw } from "lucide-react";
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -57,6 +59,38 @@ export default function OrdemColetaPage() {
   const [status, setStatus] = useState("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [envio, setEnvio] = useState<{ ordem: OrdemColeta; consultar: boolean } | null>(null);
+
+  const historicoQuery = useQuery({
+    queryKey: ["ordens-coleta", "envios-portal"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("pandurata_otm_envios")
+        .select("id,ordem_coleta_id,status,mensagem,status_portal,creditos_lovable,iniciado_em")
+        .order("iniciado_em", { ascending: false }).order("id").limit(500);
+      if (error) throw error;
+      return data;
+    },
+    refetchInterval: envio ? 10000 : false,
+  });
+  const enviarMutation = useMutation({
+    mutationFn: async () => {
+      if (!envio) throw new Error("Selecione uma ordem.");
+      const { data, error } = await supabase.functions.invoke("pandurata-otm-enviar", {
+        body: { ordem_id: envio.ordem.id, confirmar: true, consultar: envio.consultar },
+      });
+      if (error) {
+        const detalhe = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+        throw new Error(detalhe?.error ?? "Não foi possível confirmar o resultado. Use Verificar portal antes de repetir.");
+      }
+      return data as { ok: boolean; mensagem: string; creditos_lovable: number | null };
+    },
+    onSuccess: (r) => {
+      if (r.ok) toast.success(r.mensagem); else toast.warning(r.mensagem);
+      setEnvio(null);
+    },
+    onError: (e: Error) => { toast.error(e.message); setEnvio(null); },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["ordens-coleta", "envios-portal"] }),
+  });
 
   const { data: embarcadores = [] } = useQuery({
     queryKey: ["ordens-coleta", "embarcadores"],
@@ -262,7 +296,7 @@ export default function OrdemColetaPage() {
                   <TableHead className="text-right">Volumes</TableHead>
                   <TableHead className="text-right">Peso / cubagem</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-14"><span className="sr-only">Ações</span></TableHead>
+                  <TableHead className="sticky right-0 min-w-48 bg-card">Ações / portal</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -274,6 +308,9 @@ export default function OrdemColetaPage() {
                   <TableRow><TableCell colSpan={9} className="py-10 text-center text-muted-foreground">Nenhuma ordem de coleta encontrada.</TableCell></TableRow>
                 ) : ordens.map((ordem: OrdemColeta) => {
                   const statusInfo = STATUS_ORDEM_COLETA.find((item) => item.value === ordem.status);
+                  const historico = historicoQuery.data?.find((h) => h.ordem_coleta_id === ordem.id);
+                  const consultar = historico?.status === "incerto" || historico?.status === "em_andamento" || historico?.status === "confirmado";
+                  const pandurata = /pandurata|bauducco/i.test(ordem.embarcador_nome) && Boolean(ordem.codigo_otm);
                   return (
                     <TableRow key={ordem.id}>
                       <TableCell className="whitespace-nowrap font-medium">
@@ -309,7 +346,8 @@ export default function OrdemColetaPage() {
                           {statusInfo?.label ?? ordem.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="sticky right-0 bg-card">
+                        <div className="flex items-center gap-1">
                         <Button
                           type="button"
                           size="icon"
@@ -320,6 +358,17 @@ export default function OrdemColetaPage() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        {pandurata && (
+                          <Button size="sm" variant="outline" disabled={enviarMutation.isPending || historicoQuery.isLoading || historicoQuery.isError || ordem.status === "cancelada"} onClick={() => setEnvio({ ordem, consultar })}>
+                            {consultar ? <RefreshCw className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                            {consultar ? "Verificar portal" : "Enviar ao portal"}
+                          </Button>
+                        )}
+                        </div>
+                        {historico && <p className={`mt-1 max-w-56 text-xs ${historico.status === "erro" || historico.status === "incerto" ? "text-destructive" : "text-muted-foreground"}`} title={historico.mensagem ?? undefined}>
+                          {historico.status === "confirmado" ? "Frota confirmada no portal" : historico.status === "em_andamento" ? "Aguardando confirmação" : historico.mensagem}
+                          {historico.creditos_lovable !== null && <span className="block">{Number(historico.creditos_lovable).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} crédito Lovable</span>}
+                        </p>}
                       </TableCell>
                     </TableRow>
                   );
@@ -336,6 +385,27 @@ export default function OrdemColetaPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={Boolean(envio)} onOpenChange={(open) => { if (!open && !enviarMutation.isPending) setEnvio(null); }}>
+        <DialogContent onEscapeKeyDown={(e) => { if (enviarMutation.isPending) e.preventDefault(); }} onPointerDownOutside={(e) => { if (enviarMutation.isPending) e.preventDefault(); }}>
+          <DialogHeader><DialogTitle>{envio?.consultar ? "Verificar dados no portal" : "Confirmar envio ao portal"}</DialogTitle></DialogHeader>
+          {envio && <div className="space-y-2 text-sm">
+            <p className="font-medium">{formatarNumeroColeta(envio.ordem.numero)} · DT {envio.ordem.numero_roteiro}</p>
+            <p>Motorista: {envio.ordem.motorista || "Não informado"}</p>
+            <p>CPF: {envio.ordem.cpf_motorista ? formatarCpfColeta(envio.ordem.cpf_motorista) : "Não informado"}</p>
+            <p>Cavalo: {envio.ordem.placa || "Não informado"} · Carreta: {envio.ordem.placa_carreta || "Não informado"}</p>
+            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta, sem repetir a gravação." : "Serão preenchidos somente os dados de frota desta carga. Dados diferentes já existentes no portal não serão substituídos."}</p>
+            <p className="text-muted-foreground">Estimativa: 0,004 crédito Lovable por consulta; consumo registrado após a conclusão.</p>
+          </div>}
+          <DialogFooter>
+            <Button variant="outline" disabled={enviarMutation.isPending} onClick={() => setEnvio(null)}>Cancelar</Button>
+            <Button disabled={enviarMutation.isPending} onClick={() => enviarMutation.mutate()}>
+              {enviarMutation.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              {enviarMutation.isPending ? "Conferindo portal..." : envio?.consultar ? "Consultar portal" : "Confirmar envio"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <OrdemColetaDialog
         form={form}
