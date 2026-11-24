@@ -115,7 +115,22 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     if (!actions) throw new Error('acoes_indisponiveis');
     actions.click();
     etapa = 'acao_sap';
-    const sapAction = await until(() => [...leitura.result.querySelectorAll<HTMLAnchorElement>('a')].find((a) => norm(a.textContent).toLocaleUpperCase('pt-BR') === 'ENVIO FROTA SAP' && a.getBoundingClientRect().width > 0));
+    // The action tree opens in a nested frame of the result page, not in the result document itself.
+    const documentos = (w: Window, depth = 0): Document[] => {
+      if (depth > 6) return [];
+      try {
+        const lista = [w.document];
+        for (let i = 0; i < w.frames.length; i++) lista.push(...documentos(w.frames[i], depth + 1));
+        return lista;
+      } catch { return []; }
+    };
+    const sapAction = await until(() => {
+      const janela = leitura.iframe.contentWindow;
+      if (!janela) return null;
+      const links = documentos(janela).flatMap((d) => [...d.querySelectorAll<HTMLAnchorElement>('a')]).filter((a) => norm(a.textContent).toLocaleUpperCase('pt-BR') === 'ENVIO FROTA SAP' && a.getBoundingClientRect().width > 0);
+      if (links.length > 1) throw new Error('acao_sap_duplicada');
+      return links[0] ?? null;
+    });
     // OTM acknowledges this action in a separate same-origin window/frameset.
     // Capture only windows opened by this selected shipment's single action.
     const janelasSap: Window[] = [];
