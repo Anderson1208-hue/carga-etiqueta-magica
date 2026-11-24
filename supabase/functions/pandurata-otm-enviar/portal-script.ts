@@ -140,8 +140,14 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
       if (visited.has(w)) return;
       visited.add(w);
       const original = w.open;
+      // OTM submits the action form into a named popup; headless browsers block popups,
+      // so open that named target as a same-origin frame and read its response there.
       w.open = function (...args: Parameters<Window['open']>) {
-        const popup = original.apply(w, args);
+        const alvo = w.document.createElement('iframe');
+        alvo.name = String(args[1] ?? ''); alvo.width = '1000'; alvo.height = '600';
+        alvo.src = args[0] ? String(args[0]) : 'about:blank';
+        w.document.body.append(alvo);
+        const popup = alvo.contentWindow;
         if (popup) janelasSap.push(popup);
         return popup;
       };
