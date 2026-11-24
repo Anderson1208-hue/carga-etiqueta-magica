@@ -9,6 +9,10 @@ export function validarFrota(o: { status: string; codigo_otm: string | null; num
   return { shipment_id: shipment, numero_dt: vinculo.numero_dt, motorista: o.motorista.trim(), cpf_motorista: o.cpf_motorista ?? '', placa: o.placa ?? '', placa_carreta: o.placa_carreta ?? '' };
 }
 
+export function autorizarEnvioSap(confirmacaoExplicita: boolean, frotaConfirmada: boolean) {
+  return confirmacaoExplicita && frotaConfirmada;
+}
+
 export function compararFrota(atual: string[], esperada: string[]) {
   const norm = (s: string, i: number) => i === 1 ? s.replace(/\D/g, '') : s.replace(/\s+/g, ' ').trim().toUpperCase();
   if (atual.length !== 4 || esperada.length !== 4) return 'conflito';

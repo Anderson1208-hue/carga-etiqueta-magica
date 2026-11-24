@@ -366,7 +366,7 @@ export default function OrdemColetaPage() {
                         )}
                         </div>
                         {historico && <p className={`mt-1 max-w-56 text-xs ${historico.status === "erro" || historico.status === "incerto" ? "text-destructive" : "text-muted-foreground"}`} title={historico.mensagem ?? undefined}>
-                          {historico.status === "confirmado" ? "Frota confirmada no portal" : historico.status === "em_andamento" ? "Aguardando confirmação" : historico.mensagem}
+                          {historico.status === "confirmado" ? "Frota e envio ao SAP confirmados" : historico.status === "em_andamento" ? "Processando frota e SAP" : historico.mensagem}
                           {historico.creditos_lovable !== null && <span className="block">{Number(historico.creditos_lovable).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} crédito Lovable</span>}
                         </p>}
                       </TableCell>
@@ -388,20 +388,20 @@ export default function OrdemColetaPage() {
 
       <Dialog open={Boolean(envio)} onOpenChange={(open) => { if (!open && !enviarMutation.isPending) setEnvio(null); }}>
         <DialogContent onEscapeKeyDown={(e) => { if (enviarMutation.isPending) e.preventDefault(); }} onPointerDownOutside={(e) => { if (enviarMutation.isPending) e.preventDefault(); }}>
-          <DialogHeader><DialogTitle>{envio?.consultar ? "Verificar dados no portal" : "Confirmar envio ao portal"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{envio?.consultar ? "Verificar frota e SAP no portal" : "Confirmar frota e envio ao SAP"}</DialogTitle></DialogHeader>
           {envio && <div className="space-y-2 text-sm">
             <p className="font-medium">{formatarNumeroColeta(envio.ordem.numero)} · DT {envio.ordem.numero_roteiro}</p>
             <p>Motorista: {envio.ordem.motorista || "Não informado"}</p>
             <p>CPF: {envio.ordem.cpf_motorista ? formatarCpfColeta(envio.ordem.cpf_motorista) : "Não informado"}</p>
             <p>Cavalo: {envio.ordem.placa || "Não informado"} · Carreta: {envio.ordem.placa_carreta || "Não informado"}</p>
-            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta, sem repetir a gravação." : "Serão preenchidos somente os dados de frota desta carga. Dados diferentes já existentes no portal não serão substituídos."}</p>
+            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e verificará o registro do envio. Dados diferentes já existentes não serão substituídos."}</p>
             <p className="text-muted-foreground">Estimativa: 0,004 crédito Lovable por consulta; consumo registrado após a conclusão.</p>
           </div>}
           <DialogFooter>
             <Button variant="outline" disabled={enviarMutation.isPending} onClick={() => setEnvio(null)}>Cancelar</Button>
             <Button disabled={enviarMutation.isPending} onClick={() => enviarMutation.mutate()}>
               {enviarMutation.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              {enviarMutation.isPending ? "Conferindo portal..." : envio?.consultar ? "Consultar portal" : "Confirmar envio"}
+              {enviarMutation.isPending ? "Processando frota e SAP..." : envio?.consultar ? "Consultar portal" : "Confirmar envio completo"}
             </Button>
           </DialogFooter>
         </DialogContent>

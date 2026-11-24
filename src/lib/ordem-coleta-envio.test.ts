@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compararFrota, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
+import { autorizarEnvioSap, compararFrota, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
 
 const ordem = { status: 'pendente', codigo_otm: '737681', numero_roteiro: '0001813327', motorista: 'IVAN EMIDIO ROZA', cpf_motorista: '12345678901', placa: 'CUC6D38', placa_carreta: 'ARM8143' };
 const vinculo = { shipment_id: 'BAU.737681', numero_dt: '0001813327' };
@@ -16,4 +16,12 @@ describe('Envio manual da frota Pandurata', () => {
   it('não sobrescreve frota diferente do portal', () => expect(compararFrota(['OUTRO MOTORISTA','','',''], [ordem.motorista,ordem.cpf_motorista,ordem.placa,ordem.placa_carreta])).toBe('conflito'));
   it('reconhece dados iguais sem repetir gravação', () => expect(compararFrota([ordem.motorista,'123.456.789-01',ordem.placa,ordem.placa_carreta],[ordem.motorista,ordem.cpf_motorista,ordem.placa,ordem.placa_carreta])).toBe('igual'));
   it('permite completar campos vazios sem alterar os já iguais', () => expect(compararFrota([ordem.motorista,'','',''],[ordem.motorista,ordem.cpf_motorista,ordem.placa,ordem.placa_carreta])).toBe('preencher'));
+  it('aciona o SAP somente após frota confirmada e confirmação explícita', () => {
+    expect(autorizarEnvioSap(true, true)).toBe(true);
+    expect(autorizarEnvioSap(true, false)).toBe(false);
+  });
+  it('nunca aciona o SAP durante uma consulta somente leitura', () => {
+    expect(autorizarEnvioSap(false, true)).toBe(false);
+    expect(autorizarEnvioSap(false, false)).toBe(false);
+  });
 });

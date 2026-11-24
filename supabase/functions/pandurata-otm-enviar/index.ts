@@ -9,6 +9,7 @@ const mensagens: Record<string,string> = {
   frota_divergente: 'O portal já tem frota diferente ou a carga não está aceita. Nada foi substituído.',
   nao_confirmado: 'A gravação ainda não foi confirmada. Consulte novamente; não será repetido o envio.',
   consulta_incompleta: 'Não foi possível concluir a consulta. Verifique o resultado antes de qualquer novo envio.',
+  sap_nao_confirmado: 'A frota está confirmada, mas a DT ainda não consta como enviada ao SAP. Use Enviar ao portal para concluir.',
 };
 
 Deno.serve(async (req) => {
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
           { type: 'click', selector: 'input[type=password]' }, { type: 'write', text: senha },
           { type: 'press', key: 'Enter' }, { type: 'wait', milliseconds: 15000 },
           { type: 'executeJavascript', script: montarScriptEnvio(dados, !body.consultar) },
-          { type: 'wait', milliseconds: 30000 }, { type: 'wait', selector: '#lovenvio' },
+          { type: 'wait', milliseconds: 35000 }, { type: 'wait', selector: '#lovenvio' },
         ],
       }),
     });
@@ -79,10 +80,11 @@ Deno.serve(async (req) => {
     const credits = fc?.data?.metadata?.creditsUsed ?? fc?.creditsUsed ?? null;
     const raw = String(fc?.data?.rawHtml ?? '');
     const match = raw.match(/<pre[^>]*id=["']lovenvio["'][^>]*>([\s\S]*?)<\/pre>/i);
-    let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean } = {};
+    let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean } = {};
     if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
-    const status = saida.ok === true ? 'confirmado' : saida.codigo === 'frota_divergente' && !saida.gravou ? 'erro' : 'incerto';
-    const mensagem = status === 'confirmado' ? 'Motorista, CPF e placas conferidos no portal.' : mensagens[saida.codigo ?? 'consulta_incompleta'] ?? mensagens.consulta_incompleta;
+    const falhaDefinitiva = !saida.gravou && !saida.sap_acionado && (saida.codigo === 'frota_divergente' || saida.codigo === 'sap_nao_confirmado');
+    const status = saida.ok === true ? 'confirmado' : falhaDefinitiva ? 'erro' : 'incerto';
+    const mensagem = status === 'confirmado' ? 'Frota confirmada e envio ao SAP registrado no portal.' : mensagens[saida.codigo ?? 'consulta_incompleta'] ?? mensagens.consulta_incompleta;
     const { error: saveError } = await sb.from('pandurata_otm_envios').update({ status, mensagem, status_portal: saida.status_portal ?? null, creditos_firecrawl: credits, creditos_lovable: credits === null ? null : Number(credits) * 0.004, concluido_em: new Date().toISOString() }).eq('id', envioId);
     if (saveError) throw new Error('O portal foi consultado, mas o histórico não pôde ser confirmado.');
     return json({ ok: status === 'confirmado', status, mensagem, status_portal: saida.status_portal, creditos_lovable: credits === null ? null : Number(credits) * 0.004 });
