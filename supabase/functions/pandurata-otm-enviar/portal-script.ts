@@ -158,7 +158,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     };
     observar(window);
     const respostaJanela = (w: Window, depth = 0): ReturnType<typeof interpretarSap> => {
-      if (depth > 5 || w.closed) return 'pendente';
+      if (depth > 8 || w.closed) return 'pendente';
       try {
         if (w.location.origin !== origem) return 'pendente';
         const resposta = interpretarSap(w.document.body?.innerText ?? '');
@@ -177,7 +177,9 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
         const value = respostaJanela(popup);
         if (value !== 'pendente') return value;
       }
-      return null;
+      // Fallback: OTM may render the acknowledgement in another same-origin frame.
+      const geral = respostaJanela(window);
+      return geral !== 'pendente' ? geral : null;
     });
     out({ ok: resposta === 'requisitado', codigo: resposta === 'requisitado' ? 'sap_requisitado' : 'sap_erro_processo', status_portal: leitura.cols[5], gravou, sap_acionado: sapAcionado });
   } catch (e) { const m = e instanceof Error ? e.message : ''; out({ ok: false, codigo: 'consulta_incompleta', etapa: /^[a-z_]{3,40}$/.test(m) ? m : 'erro_script', gravou, sap_acionado: sapAcionado }); }
