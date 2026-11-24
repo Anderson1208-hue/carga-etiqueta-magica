@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
           { type: 'click', selector: 'input[type=password]' }, { type: 'write', text: senha },
           { type: 'press', key: 'Enter' }, { type: 'wait', milliseconds: 15000 },
           { type: 'executeJavascript', script: montarScriptEnvio(dados, !body.consultar) },
-          { type: 'wait', milliseconds: 40000 }, { type: 'wait', selector: '#lovenvio' },
+          { type: 'wait', milliseconds: 30000 }, { type: 'wait', selector: '#lovenvio' },
         ],
       }),
     });

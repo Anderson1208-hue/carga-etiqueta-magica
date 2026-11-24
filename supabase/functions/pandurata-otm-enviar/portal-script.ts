@@ -73,5 +73,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
 }
 
 export function montarScriptEnvio(dados: Frota, permitirGravar: boolean) {
-  return `(${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${compararFrota.toString()});`;
+  // Return immediately to the remote action runner; the following selector wait
+  // observes completion. Awaiting this promise adds to the runner's action budget.
+  return `void (${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${compararFrota.toString()});`;
 }
