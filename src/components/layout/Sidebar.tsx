@@ -52,6 +52,7 @@ import {
   PanelLeftOpen,
   LockKeyhole,
   PackageX,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -398,6 +399,22 @@ export function Sidebar() {
             </p>
           </div>
         </div>
+        {isAdmin && (
+          <a
+            href="https://lovable.dev/settings/billing"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Comprar créditos"
+            title="Comprar créditos"
+            className={cn(
+              "mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+              collapsed && "justify-center"
+            )}
+          >
+            <Coins className="w-4 h-4 shrink-0" />
+            {!collapsed && "Créditos"}
+          </a>
+        )}
         <Button
           variant="ghost"
           size="sm"
