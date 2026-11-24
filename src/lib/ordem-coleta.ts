@@ -155,8 +155,8 @@ export function validarColeta(form: OrdemColetaForm) {
   if (form.uf && !/^[A-Z]{2}$/.test(form.uf)) return "Informe a UF com duas letras.";
   if (form.placa && !/^[A-Z0-9]{7}$/.test(form.placa)) return "A placa do cavalo deve ter 7 letras e números.";
   if (form.placa_carreta && !/^[A-Z0-9]{7}$/.test(form.placa_carreta)) return "A placa da carreta deve ter 7 letras e números.";
-  if (form.placa_carreta_2 && !form.placa_carreta) return "Informe a placa da carreta antes de registrar a segunda carreta.";
-  if (form.placa_carreta_2 && !/^[A-Z0-9]{7}$/.test(form.placa_carreta_2)) return "A placa da segunda carreta deve ter 7 letras e números.";
+  if (form.placa_carreta_2 && !form.placa_carreta) return "Informe a placa da carreta antes de usar o campo rodotrem.";
+  if (form.placa_carreta_2 && !/^[A-Z0-9]{7}$/.test(form.placa_carreta_2)) return "A placa da carreta (rodotrem) deve ter 7 letras e números.";
   if (form.cpf_motorista && !/^[0-9]{11}$/.test(form.cpf_motorista)) return "O CPF do motorista deve ter 11 números.";
 
   const volumes = Number(form.volumes);

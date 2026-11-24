@@ -149,7 +149,7 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="coleta-placa-carreta-2" className="text-xs text-muted-foreground">Placa da 2ª carreta (rodotrem)</Label>
+                <Label htmlFor="coleta-placa-carreta-2" className="text-xs text-muted-foreground">Placa da carreta (rodotrem)</Label>
                 <Input
                   id="coleta-placa-carreta-2"
                   value={form.placa_carreta_2}
@@ -161,7 +161,7 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Use a segunda placa apenas em cargas rodotrem, com dois semirreboques.
+              Use este campo apenas em cargas rodotrem, com dois semirreboques.
             </p>
           </div>
 

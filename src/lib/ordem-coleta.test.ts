@@ -56,12 +56,12 @@ describe("ordem de coleta", () => {
     expect(validarColeta({ ...formularioValido(), placa: "KWS5D11", placa_carreta: "ABC1D23", placa_carreta_2: "XYZ9F88" })).toBeNull();
   });
 
-  it("exige a primeira carreta antes de registrar a segunda", () => {
-    expect(validarColeta({ ...formularioValido(), placa_carreta_2: "XYZ9F88" })).toBe("Informe a placa da carreta antes de registrar a segunda carreta.");
+  it("exige a placa da carreta antes de usar o campo rodotrem", () => {
+    expect(validarColeta({ ...formularioValido(), placa_carreta_2: "XYZ9F88" })).toBe("Informe a placa da carreta antes de usar o campo rodotrem.");
   });
 
-  it("recusa a segunda carreta com placa incompleta", () => {
-    expect(validarColeta({ ...formularioValido(), placa_carreta: "ABC1D23", placa_carreta_2: "XYZ" })).toBe("A placa da segunda carreta deve ter 7 letras e números.");
+  it("recusa a placa rodotrem incompleta", () => {
+    expect(validarColeta({ ...formularioValido(), placa_carreta: "ABC1D23", placa_carreta_2: "XYZ" })).toBe("A placa da carreta (rodotrem) deve ter 7 letras e números.");
   });
 
   it("apresenta as carretas na ordem em que foram lançadas", () => {
