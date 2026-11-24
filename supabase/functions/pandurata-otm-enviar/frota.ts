@@ -15,6 +15,10 @@ export function autorizarEnvioSap(confirmacaoExplicita: boolean, frotaConfirmada
   return confirmacaoExplicita && frotaConfirmada;
 }
 
+export function preservarConfirmacaoSap(statusAnterior?: string) {
+  return statusAnterior === 'confirmado';
+}
+
 export function confirmarResultadoSap(enviado: boolean, semEnvio: boolean) {
   if (enviado && semEnvio) return 'ambiguo';
   return enviado ? 'confirmado' : 'nao_confirmado';

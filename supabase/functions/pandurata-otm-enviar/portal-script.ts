@@ -1,7 +1,8 @@
 import { autorizarEnvioSap, compararFrota, confirmarResultadoSap, type Frota } from './frota.ts';
+import { interpretarRespostaSap } from './sap-resposta.ts';
 
 // Runs only in the authenticated OTM origin and only for the explicitly confirmed shipment.
-async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof compararFrota, autorizarSap: typeof autorizarEnvioSap, confirmarSap: typeof confirmarResultadoSap) {
+async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof compararFrota, autorizarSap: typeof autorizarEnvioSap, confirmarSap: typeof confirmarResultadoSap, interpretarSap: typeof interpretarRespostaSap) {
   const out = (obj: unknown) => {
     const pre = document.createElement('pre'); pre.id = 'lovenvio'; pre.textContent = JSON.stringify(obj);
     document.body.replaceChildren(pre);
@@ -60,6 +61,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
   };
   let gravou = false;
   let sapAcionado = false;
+  const restaurarJanelas: Array<() => void> = [];
   const verificarSap = async () => {
     const enviado = await pesquisar('SHIPMENTS ENVIADOS SAP');
     const semEnvio = await pesquisar('SHIPMENTS SEM ENVIO SAP');
@@ -114,15 +116,55 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     actions.click();
     etapa = 'acao_sap';
     const sapAction = await until(() => [...leitura.result.querySelectorAll<HTMLAnchorElement>('a')].find((a) => norm(a.textContent).toLocaleUpperCase('pt-BR') === 'ENVIO FROTA SAP' && a.getBoundingClientRect().width > 0));
+    // OTM acknowledges this action in a separate same-origin window/frameset.
+    // Capture only windows opened by this selected shipment's single action.
+    const janelasSap: Window[] = [];
+    const origem = window.location.origin;
+    const visited = new Set<Window>();
+    const observar = (w: Window) => {
+      if (visited.has(w)) return;
+      visited.add(w);
+      const original = w.open;
+      w.open = function (...args: Parameters<Window['open']>) {
+        const popup = original.apply(w, args);
+        if (popup) janelasSap.push(popup);
+        return popup;
+      };
+      restaurarJanelas.push(() => { w.open = original; });
+      try {
+        for (let i = 0; i < w.frames.length; i++) observar(w.frames[i]);
+      } catch { /* only same-origin frames are accessible */ }
+    };
+    observar(window);
+    const respostaJanela = (w: Window, depth = 0): ReturnType<typeof interpretarSap> => {
+      if (depth > 5 || w.closed) return 'pendente';
+      try {
+        if (w.location.origin !== origem) return 'pendente';
+        const resposta = interpretarSap(w.document.body?.innerText ?? '');
+        if (resposta !== 'pendente') return resposta;
+        for (let i = 0; i < w.frames.length; i++) {
+          const nested = respostaJanela(w.frames[i], depth + 1);
+          if (nested !== 'pendente') return nested;
+        }
+      } catch { /* wait for the same-origin response to load */ }
+      return 'pendente';
+    };
     sapAcionado = true; sapAction.click();
-    await pause(8000);
-    const sap = await verificarSap();
-    out({ ok: sap === 'confirmado', codigo: sap === 'ambiguo' ? 'sap_ambiguo' : sap === 'confirmado' ? undefined : 'sap_nao_confirmado', status_portal: leitura.cols[5], gravou, sap_acionado: sapAcionado });
+    etapa = 'resposta_acao_sap';
+    const resposta = await until(() => {
+      for (const popup of janelasSap) {
+        const value = respostaJanela(popup);
+        if (value !== 'pendente') return value;
+      }
+      return null;
+    });
+    out({ ok: resposta === 'requisitado', codigo: resposta === 'requisitado' ? 'sap_requisitado' : 'sap_erro_processo', status_portal: leitura.cols[5], gravou, sap_acionado: sapAcionado });
   } catch (e) { const m = e instanceof Error ? e.message : ''; out({ ok: false, codigo: 'consulta_incompleta', etapa: /^[a-z_]{3,40}$/.test(m) ? m : 'erro_script', gravou, sap_acionado: sapAcionado }); }
+  finally { for (const restore of restaurarJanelas.reverse()) restore(); }
 }
 
 export function montarScriptEnvio(dados: Frota, permitirGravar: boolean) {
   // Return immediately to the remote action runner; the following selector wait
   // observes completion. Awaiting this promise adds to the runner's action budget.
-  return `void (${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${compararFrota.toString()},${autorizarEnvioSap.toString()},${confirmarResultadoSap.toString()});`;
+  return `void (${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${compararFrota.toString()},${autorizarEnvioSap.toString()},${confirmarResultadoSap.toString()},${interpretarRespostaSap.toString()});`;
 }

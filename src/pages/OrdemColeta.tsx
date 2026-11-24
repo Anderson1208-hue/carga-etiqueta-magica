@@ -371,7 +371,7 @@ export default function OrdemColetaPage() {
                         )}
                         </div>
                         {historico && <p className={`mt-1 max-w-56 text-xs ${historico.status === "erro" || historico.status === "incerto" ? "text-destructive" : "text-muted-foreground"}`} title={historico.mensagem ?? undefined}>
-                          {historico.status === "confirmado" ? "Frota e envio ao SAP confirmados" : historico.status === "em_andamento" ? "Processando frota e SAP" : historico.mensagem}
+                          {historico.status === "em_andamento" ? "Processando frota e SAP" : historico.mensagem}
                           {historico.creditos_lovable !== null && <span className="block">{Number(historico.creditos_lovable).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} crédito Lovable</span>}
                         </p>}
                       </TableCell>
@@ -399,7 +399,7 @@ export default function OrdemColetaPage() {
             <p>Motorista: {envio.ordem.motorista || "Não informado"}</p>
             <p>CPF: {envio.ordem.cpf_motorista ? formatarCpfColeta(envio.ordem.cpf_motorista) : "Não informado"}</p>
             <p>Cavalo: {envio.ordem.placa || "Não informado"} · Carreta: {placasCarretaColeta(envio.ordem).join(" · ") || "Não informado"}</p>
-            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e verificará o registro do envio. Dados diferentes já existentes não serão substituídos."}</p>
+            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e conferirá a resposta dessa ação no portal. Dados diferentes já existentes não serão substituídos."}</p>
             <p className="text-muted-foreground">Estimativa: 0,004 crédito Lovable por consulta; consumo registrado após a conclusão.</p>
           </div>}
           <DialogFooter>

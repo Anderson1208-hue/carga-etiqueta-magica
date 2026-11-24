@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { operatorAccessStatus } from '../_shared/approved-operator.ts';
-import { definirStatusEnvio, validarFrota, type Frota } from './frota.ts';
+import { definirStatusEnvio, preservarConfirmacaoSap, validarFrota, type Frota } from './frota.ts';
 import { montarScriptEnvio } from './portal-script.ts';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -11,6 +11,8 @@ const mensagens: Record<string,string> = {
   consulta_incompleta: 'Não foi possível concluir a consulta. Verifique o resultado antes de qualquer novo envio.',
   sap_nao_confirmado: 'A frota está confirmada, mas a DT ainda não consta como enviada ao SAP. Use Enviar ao portal para concluir.',
   sap_ambiguo: 'O portal apresenta a DT nas consultas de enviados e sem envio SAP. Não é possível confirmar; o envio não será repetido.',
+  sap_requisitado: 'Frota conferida. O portal confirmou: ação Envio Frota SAP requisitada com sucesso. Isso não confirma o processamento final no SAP nem o recebimento do e-mail.',
+  sap_erro_processo: 'O portal informou erro na ação Envio Frota SAP. Verifique o resultado; a ação não será repetida automaticamente.',
 };
 
 Deno.serve(async (req) => {
@@ -35,6 +37,12 @@ Deno.serve(async (req) => {
     if (oe || ve || !ordem || !vinculo) return json({ error: 'A ordem precisa estar vinculada a uma carga capturada da Pandurata.' }, 400);
     let dados: Frota;
     try { dados = validarFrota(ordem, vinculo); } catch (e) { return json({ error: e instanceof Error ? e.message : 'Dados inválidos' }, 400); }
+    const { data: confirmado, error: ce } = await sb.from('pandurata_otm_envios').select('status,mensagem').eq('shipment_id', vinculo.shipment_id).eq('status', 'confirmado').order('iniciado_em', { ascending: false }).order('id').limit(1).maybeSingle();
+    if (ce) throw new Error('Não foi possível verificar o envio anterior.');
+    if (preservarConfirmacaoSap(confirmado?.status)) {
+      // A acknowledged action is settled: never replay it or downgrade its history.
+      if (!body.consultar) return json({ error: 'Esta carga já tem confirmação registrada. O envio não será repetido; use Verificar portal.' }, 409);
+    }
     const { data: aberto, error: ae } = await sb.from('pandurata_otm_envios').select('id,status,iniciado_em,dados').eq('shipment_id', vinculo.shipment_id).in('status', ['em_andamento','incerto']).maybeSingle();
     if (ae) throw new Error('Não foi possível verificar a reserva da carga.');
     if (aberto) {
@@ -45,7 +53,7 @@ Deno.serve(async (req) => {
         if (Object.entries(dados).some(([k,v]) => aberto.dados[k] !== v)) return json({ error: 'A ordem foi alterada após a tentativa. Confira os dados anteriores antes de prosseguir.' }, 409);
       }
       envioId = aberto.id;
-    } else {
+    } else if (!preservarConfirmacaoSap(confirmado?.status)) {
       const { data: user } = await sb.auth.getUser((authorization ?? '').replace(/^Bearer\s+/i, ''));
       if (!user.user) return json({ error: 'Sessão inválida' }, 401);
       const { data: novo, error: ne } = await sb.from('pandurata_otm_envios').insert({ ordem_coleta_id: ordem.id, shipment_id: vinculo.shipment_id, iniciado_por: user.user.id, dados }).select('id').single();
@@ -74,7 +82,7 @@ Deno.serve(async (req) => {
       const failure = await r.text();
       const limite = /Credit limit reached|Not enough credits|payment_required/i.test(failure);
       const msg = limite ? 'O limite de créditos impediu a consulta ao portal.' : `A consulta ao portal falhou (${r.status}). Verifique antes de repetir.`;
-      await sb.from('pandurata_otm_envios').update({ status: 'incerto', mensagem: msg, concluido_em: new Date().toISOString() }).eq('id', envioId);
+      if (envioId) await sb.from('pandurata_otm_envios').update({ status: 'incerto', mensagem: msg, concluido_em: new Date().toISOString() }).eq('id', envioId);
       return json({ error: msg, status: r.status }, 502);
     }
     const fc = await r.json();
@@ -85,15 +93,17 @@ Deno.serve(async (req) => {
     if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
     const verificacaoIncerta = Boolean(body.consultar && aberto?.status === 'incerto' && saida.ok !== true);
     const status = definirStatusEnvio(saida, verificacaoIncerta);
-    const mensagem = saida.codigo === 'sap_ambiguo' ? mensagens.sap_ambiguo : status === 'confirmado'
+    const mensagem = ['sap_ambiguo', 'sap_requisitado', 'sap_erro_processo'].includes(saida.codigo ?? '') ? mensagens[saida.codigo ?? ''] : status === 'confirmado'
       ? 'Frota confirmada e envio ao SAP registrado no portal.'
       : verificacaoIncerta
         ? 'A confirmação ainda não apareceu. Aguarde e use Verificar portal; o envio não será liberado para repetição.'
         : mensagens[saida.codigo ?? 'consulta_incompleta'] ?? mensagens.consulta_incompleta;
     const etapa = /^[a-z_]{3,40}$/.test(saida.etapa ?? '') ? saida.etapa : (match ? undefined : 'sem_resposta_portal');
     const mensagemFinal = etapa && status !== 'confirmado' ? `${mensagem} (etapa: ${etapa})` : mensagem;
-    const { error: saveError } = await sb.from('pandurata_otm_envios').update({ status, mensagem: mensagemFinal, status_portal: saida.status_portal ?? null, creditos_firecrawl: credits, creditos_lovable: credits === null ? null : Number(credits) * 0.004, concluido_em: new Date().toISOString() }).eq('id', envioId);
-    if (saveError) throw new Error('O portal foi consultado, mas o histórico não pôde ser confirmado.');
+    if (envioId) {
+      const { error: saveError } = await sb.from('pandurata_otm_envios').update({ status, mensagem: mensagemFinal, status_portal: saida.status_portal ?? null, creditos_firecrawl: credits, creditos_lovable: credits === null ? null : Number(credits) * 0.004, concluido_em: new Date().toISOString() }).eq('id', envioId);
+      if (saveError) throw new Error('O portal foi consultado, mas o histórico não pôde ser confirmado.');
+    }
     return json({ ok: status === 'confirmado', status, mensagem: mensagemFinal, etapa, codigo: saida.codigo ?? null, campos: Array.isArray(saida.campos) ? saida.campos.slice(0,4).filter((c) => ['vazio','igual','diferente'].includes(c)) : null, status_portal: saida.status_portal, creditos_lovable: credits === null ? null : Number(credits) * 0.004 });
   } catch {
     const msg = iniciouConsulta ? 'Resultado incerto. Use Verificar portal; não repita o envio.' : 'Não foi possível preparar o envio ao portal.';
