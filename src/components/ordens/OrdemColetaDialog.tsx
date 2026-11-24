@@ -123,25 +123,46 @@ export function OrdemColetaDialog({ form, embarcadores, salvando, onChange, onSa
               onChange={(event) => update({ hora_prevista: event.target.value })}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="coleta-placa">Placa do cavalo</Label>
-            <Input
-              id="coleta-placa"
-              value={form.placa}
-              maxLength={7}
-              placeholder="ABC1D23"
-              onChange={(event) => update({ placa: normalizarPlacaColeta(event.target.value) })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="coleta-placa-carreta">Placa da carreta</Label>
-            <Input
-              id="coleta-placa-carreta"
-              value={form.placa_carreta}
-              maxLength={7}
-              placeholder="ABC1D23"
-              onChange={(event) => update({ placa_carreta: normalizarPlacaColeta(event.target.value) })}
-            />
+          <div className="space-y-2 md:col-span-2 lg:col-span-3">
+            <Label className="text-sm font-medium">Placas do veículo</Label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="coleta-placa" className="text-xs text-muted-foreground">Placa do cavalo</Label>
+                <Input
+                  id="coleta-placa"
+                  value={form.placa}
+                  maxLength={7}
+                  placeholder="ABC1D23"
+                  className="h-11 text-base tracking-wider"
+                  onChange={(event) => update({ placa: normalizarPlacaColeta(event.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coleta-placa-carreta" className="text-xs text-muted-foreground">Placa da carreta</Label>
+                <Input
+                  id="coleta-placa-carreta"
+                  value={form.placa_carreta}
+                  maxLength={7}
+                  placeholder="ABC1D23"
+                  className="h-11 text-base tracking-wider"
+                  onChange={(event) => update({ placa_carreta: normalizarPlacaColeta(event.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coleta-placa-carreta-2" className="text-xs text-muted-foreground">Placa da 2ª carreta (rodotrem)</Label>
+                <Input
+                  id="coleta-placa-carreta-2"
+                  value={form.placa_carreta_2}
+                  maxLength={7}
+                  placeholder="ABC1D23"
+                  className="h-11 text-base tracking-wider"
+                  onChange={(event) => update({ placa_carreta_2: normalizarPlacaColeta(event.target.value) })}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use a segunda placa apenas em cargas rodotrem, com dois semirreboques.
+            </p>
           </div>
 
           <div className="space-y-2 md:col-span-2 lg:col-span-3">

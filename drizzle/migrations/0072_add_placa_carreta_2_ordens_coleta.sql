@@ -1,0 +1,1 @@
+ALTER TABLE public.ordens_coleta ADD COLUMN IF NOT EXISTS placa_carreta_2 text;

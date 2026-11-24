@@ -5,6 +5,7 @@ import {
   formatarDataColeta,
   normalizarCpfColeta,
   normalizarPlacaColeta,
+  placasCarretaColeta,
   validarColeta,
   type OrdemColetaForm,
 } from "./ordem-coleta";
@@ -49,5 +50,23 @@ describe("ordem de coleta", () => {
     expect(validarColeta({ ...formularioValido(), cpf_motorista: "123" })).toBe("O CPF do motorista deve ter 11 números.");
     expect(validarColeta({ ...formularioValido(), placa_carreta: "123" })).toBe("A placa da carreta deve ter 7 letras e números.");
     expect(validarColeta({ ...formularioValido(), cubagem_m3: "-1" })).toBe("A cubagem deve ser maior ou igual a zero.");
+  });
+
+  it("aceita duas carretas em carga rodotrem", () => {
+    expect(validarColeta({ ...formularioValido(), placa: "KWS5D11", placa_carreta: "ABC1D23", placa_carreta_2: "XYZ9F88" })).toBeNull();
+  });
+
+  it("exige a primeira carreta antes de registrar a segunda", () => {
+    expect(validarColeta({ ...formularioValido(), placa_carreta_2: "XYZ9F88" })).toBe("Informe a placa da carreta antes de registrar a segunda carreta.");
+  });
+
+  it("recusa a segunda carreta com placa incompleta", () => {
+    expect(validarColeta({ ...formularioValido(), placa_carreta: "ABC1D23", placa_carreta_2: "XYZ" })).toBe("A placa da segunda carreta deve ter 7 letras e números.");
+  });
+
+  it("apresenta as carretas na ordem em que foram lançadas", () => {
+    expect(placasCarretaColeta({ placa_carreta: "ABC1D23", placa_carreta_2: "XYZ9F88" })).toEqual(["ABC1D23", "XYZ9F88"]);
+    expect(placasCarretaColeta({ placa_carreta: "ABC1D23", placa_carreta_2: null })).toEqual(["ABC1D23"]);
+    expect(placasCarretaColeta({ placa_carreta: null, placa_carreta_2: null })).toEqual([]);
   });
 });

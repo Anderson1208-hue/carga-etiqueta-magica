@@ -28,6 +28,7 @@ export type OrdemColetaForm = {
   cpf_motorista: string;
   placa: string;
   placa_carreta: string;
+  placa_carreta_2: string;
   codigo_otm: string;
   numero_roteiro: string;
   notas_fiscais: string;
@@ -64,6 +65,7 @@ export function formularioColetaVazio(): OrdemColetaForm {
     cpf_motorista: "",
     placa: "",
     placa_carreta: "",
+    placa_carreta_2: "",
     codigo_otm: "",
     numero_roteiro: "",
     notas_fiscais: "",
@@ -97,6 +99,7 @@ export function coletaParaFormulario(ordem: OrdemColeta): OrdemColetaForm {
     cpf_motorista: ordem.cpf_motorista ?? "",
     placa: ordem.placa ?? "",
     placa_carreta: ordem.placa_carreta ?? "",
+    placa_carreta_2: ordem.placa_carreta_2 ?? "",
     codigo_otm: ordem.codigo_otm ?? "",
     numero_roteiro: ordem.numero_roteiro ?? "",
     notas_fiscais: ordem.notas_fiscais ?? "",
@@ -129,6 +132,10 @@ export function normalizarPlacaColeta(placa: string) {
   return placa.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7);
 }
 
+export function placasCarretaColeta(ordem: { placa_carreta: string | null; placa_carreta_2: string | null }) {
+  return [ordem.placa_carreta, ordem.placa_carreta_2].filter((placa): placa is string => Boolean(placa && placa.trim())).map((placa) => placa.trim());
+}
+
 export function normalizarCpfColeta(cpf: string) {
   return cpf.replace(/\D/g, "").slice(0, 11);
 }
@@ -148,6 +155,8 @@ export function validarColeta(form: OrdemColetaForm) {
   if (form.uf && !/^[A-Z]{2}$/.test(form.uf)) return "Informe a UF com duas letras.";
   if (form.placa && !/^[A-Z0-9]{7}$/.test(form.placa)) return "A placa do cavalo deve ter 7 letras e números.";
   if (form.placa_carreta && !/^[A-Z0-9]{7}$/.test(form.placa_carreta)) return "A placa da carreta deve ter 7 letras e números.";
+  if (form.placa_carreta_2 && !form.placa_carreta) return "Informe a placa da carreta antes de registrar a segunda carreta.";
+  if (form.placa_carreta_2 && !/^[A-Z0-9]{7}$/.test(form.placa_carreta_2)) return "A placa da segunda carreta deve ter 7 letras e números.";
   if (form.cpf_motorista && !/^[0-9]{11}$/.test(form.cpf_motorista)) return "O CPF do motorista deve ter 11 números.";
 
   const volumes = Number(form.volumes);

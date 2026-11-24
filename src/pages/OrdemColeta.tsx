@@ -141,6 +141,7 @@ export default function OrdemColetaPage() {
         cpf_motorista: dados.cpf_motorista || null,
         placa: dados.placa || null,
         placa_carreta: dados.placa_carreta || null,
+        placa_carreta_2: dados.placa_carreta_2 || null,
         codigo_otm: dados.codigo_otm.trim() || null,
         numero_roteiro: dados.numero_roteiro.trim() || null,
         notas_fiscais: dados.notas_fiscais.trim() || null,
@@ -196,6 +197,7 @@ export default function OrdemColetaPage() {
         ordem.cpf_motorista,
         ordem.placa,
         ordem.placa_carreta,
+        ordem.placa_carreta_2,
         ordem.codigo_otm,
         ordem.numero_roteiro,
         ordem.notas_fiscais,
@@ -335,6 +337,7 @@ export default function OrdemColetaPage() {
                         {ordem.cpf_motorista && <div className="text-xs text-muted-foreground">CPF: {formatarCpfColeta(ordem.cpf_motorista)}</div>}
                         {ordem.placa && <div className="text-xs text-muted-foreground">Cavalo: {ordem.placa}</div>}
                         {ordem.placa_carreta && <div className="text-xs text-muted-foreground">Carreta: {ordem.placa_carreta}</div>}
+                        {ordem.placa_carreta_2 && <div className="text-xs text-muted-foreground">Carreta 2: {ordem.placa_carreta_2}</div>}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{ordem.volumes}</TableCell>
                       <TableCell className="text-right tabular-nums">
@@ -394,6 +397,7 @@ export default function OrdemColetaPage() {
             <p>Motorista: {envio.ordem.motorista || "Não informado"}</p>
             <p>CPF: {envio.ordem.cpf_motorista ? formatarCpfColeta(envio.ordem.cpf_motorista) : "Não informado"}</p>
             <p>Cavalo: {envio.ordem.placa || "Não informado"} · Carreta: {envio.ordem.placa_carreta || "Não informado"}</p>
+            {envio.ordem.placa_carreta_2 && <p>2ª carreta (rodotrem): {envio.ordem.placa_carreta_2}</p>}
             <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e verificará o registro do envio. Dados diferentes já existentes não serão substituídos."}</p>
             <p className="text-muted-foreground">Estimativa: 0,004 crédito Lovable por consulta; consumo registrado após a conclusão.</p>
           </div>}

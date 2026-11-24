@@ -3792,6 +3792,7 @@ export type Database = {
           peso_kg: number
           placa: string | null
           placa_carreta: string | null
+          placa_carreta_2: string | null
           status: string
           telefone: string | null
           uf: string | null
@@ -3821,6 +3822,7 @@ export type Database = {
           peso_kg?: number
           placa?: string | null
           placa_carreta?: string | null
+          placa_carreta_2?: string | null
           status?: string
           telefone?: string | null
           uf?: string | null
@@ -3850,6 +3852,7 @@ export type Database = {
           peso_kg?: number
           placa?: string | null
           placa_carreta?: string | null
+          placa_carreta_2?: string | null
           status?: string
           telefone?: string | null
           uf?: string | null

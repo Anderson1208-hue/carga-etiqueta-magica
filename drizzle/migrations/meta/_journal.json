@@ -505,6 +505,13 @@
       "when": 1795478601815,
       "tag": "0071_pandurata_otm_envios",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795553841122,
+      "tag": "0072_add_placa_carreta_2_ordens_coleta",
+      "breakpoints": true
     }
   ]
 }
