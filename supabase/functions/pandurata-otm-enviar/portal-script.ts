@@ -57,7 +57,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     const valores = [dados.motorista, dados.cpf_motorista, dados.placa, dados.placa_carreta];
     const decisao = comparar(leitura.cols.slice(10, 14), valores);
     if (decisao !== 'igual') {
-      if (!permitirGravar) { out({ ok: false, codigo: 'nao_confirmado', gravou: false, sap_acionado: false }); return; }
+      if (!permitirGravar) { out({ ok: false, codigo: 'nao_confirmado', status_portal: leitura.cols[5], campos: leitura.cols.slice(10, 14).map((v, i) => !v ? 'vazio' : comparar([v], [valores[i]]) === 'igual' ? 'igual' : 'diferente'), gravou: false, sap_acionado: false }); return; }
       if (decisao === 'conflito' || leitura.cols[5] !== 'SH_ACEITO') { out({ ok: false, codigo: 'frota_divergente', gravou: false, sap_acionado: false }); return; }
       const suffixes = ['NOME_MOTORISTA', 'CPF_MOTORISTA', 'PLACA_VEICULO', 'PLACA_CARRETA'];
       for (let i = 0; i < 4; i++) {
@@ -102,7 +102,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     await pause(8000);
     const sap = await pesquisar('SHIPMENTS ENVIADOS SAP');
     out({ ok: sap.cols.length > 0, codigo: sap.cols.length > 0 ? undefined : 'sap_nao_confirmado', status_portal: leitura.cols[5], gravou, sap_acionado: sapAcionado });
-  } catch { out({ ok: false, codigo: 'consulta_incompleta', gravou, sap_acionado: sapAcionado }); }
+  } catch (e) { const m = e instanceof Error ? e.message : ''; out({ ok: false, codigo: 'consulta_incompleta', etapa: /^[a-z_]{3,40}$/.test(m) ? m : 'erro_script', gravou, sap_acionado: sapAcionado }); }
 }
 
 export function montarScriptEnvio(dados: Frota, permitirGravar: boolean) {
