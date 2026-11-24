@@ -70,6 +70,7 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
           const e = leitura.result.querySelector<HTMLInputElement>(`input[name=rgsrShipmentRefnumValue_RFN_SHP_${suffix}TextEditControl]`);
           return e && e.getBoundingClientRect().width > 0 ? e : null;
         });
+        if (field.maxLength >= 0 && field.maxLength < valores[i].length) throw new Error('campo_portal_curto');
         field.value = valores[i]; field.dispatchEvent(new Event('change', { bubbles: true }));
         const ok = leitura.result.getElementById(`resultsPage:srShipmentRefnumValue_RFN_SHP_${suffix}PopupDialog::ok`);
         if (!ok) throw new Error('editor_indisponivel');

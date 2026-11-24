@@ -10,6 +10,21 @@ describe('Envio manual da frota Pandurata', () => {
     expect(() => validarFrota({ ...ordem, numero_roteiro: '1813320' }, vinculo)).toThrow();
   });
   it('não envia ordem cancelada', () => expect(() => validarFrota({ ...ordem, status: 'cancelada' }, vinculo)).toThrow());
+  it('envia as duas placas juntas no único campo de carreta do portal', () => {
+    expect(validarFrota({ ...ordem, placa_carreta_2: 'XYZ9F88' }, vinculo).placa_carreta).toBe('ARM8143 / XYZ9F88');
+  });
+  it('preserva o envio de uma única carreta', () => {
+    expect(validarFrota({ ...ordem, placa_carreta_2: null }, vinculo).placa_carreta).toBe('ARM8143');
+  });
+  it('bloqueia placa adicional incompleta antes de acessar o portal', () => {
+    expect(() => validarFrota({ ...ordem, placa_carreta_2: 'XYZ' }, vinculo)).toThrow();
+  });
+  it('confirma ambas as placas e não aceita confirmação de apenas uma', () => {
+    const frota = validarFrota({ ...ordem, placa_carreta_2: 'XYZ9F88' }, vinculo);
+    const esperado = [frota.motorista, frota.cpf_motorista, frota.placa, frota.placa_carreta];
+    expect(compararFrota([...esperado], esperado)).toBe('igual');
+    expect(compararFrota([frota.motorista, frota.cpf_motorista, frota.placa, 'ARM8143'], esperado)).toBe('conflito');
+  });
   it('exige os quatro dados apenas para transmitir', () => {
     for (const field of ['motorista','cpf_motorista','placa','placa_carreta']) expect(() => validarFrota({ ...ordem, [field]: '' }, vinculo)).toThrow();
   });
