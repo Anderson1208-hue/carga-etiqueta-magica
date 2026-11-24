@@ -10,6 +10,7 @@ const mensagens: Record<string,string> = {
   nao_confirmado: 'A gravação ainda não foi confirmada. Consulte novamente; não será repetido o envio.',
   consulta_incompleta: 'Não foi possível concluir a consulta. Verifique o resultado antes de qualquer novo envio.',
   sap_nao_confirmado: 'A frota está confirmada, mas a DT ainda não consta como enviada ao SAP. Use Enviar ao portal para concluir.',
+  sap_ambiguo: 'O portal apresenta a DT nas consultas de enviados e sem envio SAP. Não é possível confirmar; o envio não será repetido.',
 };
 
 Deno.serve(async (req) => {
@@ -84,7 +85,7 @@ Deno.serve(async (req) => {
     if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
     const verificacaoIncerta = Boolean(body.consultar && aberto?.status === 'incerto' && saida.ok !== true);
     const status = definirStatusEnvio(saida, verificacaoIncerta);
-    const mensagem = status === 'confirmado'
+    const mensagem = saida.codigo === 'sap_ambiguo' ? mensagens.sap_ambiguo : status === 'confirmado'
       ? 'Frota confirmada e envio ao SAP registrado no portal.'
       : verificacaoIncerta
         ? 'A confirmação ainda não apareceu. Aguarde e use Verificar portal; o envio não será liberado para repetição.'

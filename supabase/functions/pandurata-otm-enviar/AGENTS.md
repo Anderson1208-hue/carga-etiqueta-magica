@@ -2,3 +2,4 @@
 - Reserve the shipment before calling Firecrawl; an uncertain attempt permits read-only verification only, never automatic replay, because a timeout can follow a successful write.
 - Update only empty fleet cells of the uniquely matching accepted shipment and verify all four values through a fresh search; only then, in the same explicitly confirmed attempt, invoke Ações → Envio Frota Sap once for that selected shipment and confirm it through SHIPMENTS ENVIADOS SAP. Read-only verification never invokes SAP; never use bulk updates or overwrite different portal data.
 - Return only allowlisted confirmation/error fields and record usage; never store portal HTML or log credentials/CPF.
+- Cross-check opposite SAP saved queries with the exact DT; contradictory matches remain uncertain, because selecting a query label alone returned unfiltered results during diagnosis.

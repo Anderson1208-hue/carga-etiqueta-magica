@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { autorizarEnvioSap, compararFrota, definirStatusEnvio, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
+import { autorizarEnvioSap, compararFrota, confirmarResultadoSap, definirStatusEnvio, validarFrota } from '../../supabase/functions/pandurata-otm-enviar/frota';
 
 const ordem = { status: 'pendente', codigo_otm: '737681', numero_roteiro: '0001813327', motorista: 'IVAN EMIDIO ROZA', cpf_motorista: '12345678901', placa: 'CUC6D38', placa_carreta: 'ARM8143' };
 const vinculo = { shipment_id: 'BAU.737681', numero_dt: '0001813327' };
 describe('Envio manual da frota Pandurata', () => {
+  it('não confirma SAP quando a DT aparece nas duas consultas opostas', () => {
+    expect(confirmarResultadoSap(true, true)).toBe('ambiguo');
+    expect(definirStatusEnvio({ ok: false, codigo: 'sap_ambiguo', sap_acionado: false }, false)).toBe('incerto');
+  });
+  it('confirma SAP apenas com retorno exclusivo de enviados', () => {
+    expect(confirmarResultadoSap(true, false)).toBe('confirmado');
+    expect(confirmarResultadoSap(false, true)).toBe('nao_confirmado');
+    expect(confirmarResultadoSap(false, false)).toBe('nao_confirmado');
+  });
   it('envia somente a carga vinculada à ordem', () => {
     expect(validarFrota(ordem, vinculo).shipment_id).toBe('BAU.737681');
     expect(() => validarFrota({ ...ordem, codigo_otm: '737680' }, vinculo)).toThrow();
