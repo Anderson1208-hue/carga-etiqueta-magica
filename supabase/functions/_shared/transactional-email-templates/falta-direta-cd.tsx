@@ -11,9 +11,9 @@ const Email = ({ nf = '', carga = '', placa = '', destinatario = '', data = '', 
     <Body style={main}>
       <Container style={container}>
         <Heading style={h1}>NF {nf} — Falta Direta do CD</Heading>
-        <Text style={text}>A carga <strong>{carga || '—'}</strong> é <strong>Falta Direta do CD</strong>.</Text>
+        <Text style={text}>A NF <strong>{nf || '—'}</strong> é <strong>Falta Direta do CD</strong>.</Text>
         <Text style={text}>A nota foi lançada como <strong>falta total</strong> na divergência de recebimento e passou para o status <strong>Falta Direta do CD</strong>. Ela não aparece na preparação e não pode ser agendada.</Text>
-        <Text style={text}><strong>Carga:</strong> {carga || '—'} &nbsp; <strong>Placa:</strong> {placa || '—'} &nbsp; <strong>Status da carga:</strong> Falta Direta do CD</Text>
+        <Text style={text}><strong>NF:</strong> {nf || '—'} &nbsp; <strong>Carga:</strong> {carga || '—'} &nbsp; <strong>Placa:</strong> {placa || '—'} &nbsp; <strong>Status da NF:</strong> Falta Direta do CD</Text>
         {destinatario ? <Text style={text}><strong>Destinatário:</strong> {destinatario}</Text> : null}
         <Text style={text}><strong>Data:</strong> {data} &nbsp; <strong>Lançado por:</strong> {operador || '—'}</Text>
         <Text style={muted}>Expresso Ebenezer.</Text>
