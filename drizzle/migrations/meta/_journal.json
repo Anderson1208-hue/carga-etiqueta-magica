@@ -512,6 +512,13 @@
       "when": 1795553841122,
       "tag": "0072_add_placa_carreta_2_ordens_coleta",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795628805535,
+      "tag": "0073_falta_total_bloqueia_agendamento",
+      "breakpoints": true
     }
   ]
 }
