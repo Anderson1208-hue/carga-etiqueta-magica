@@ -210,7 +210,13 @@ export default function DivergenciaRecebimento({ embedded = false, embarcador }:
       if (r?.duplicada) toast.info("Esta ocorrência já estava lançada; nada foi bloqueado de novo.");
       else {
         const partes = [`Lançado. ${r?.bloqueadas ?? 0} etiqueta(s) bloqueada(s).`];
-        if (tipo === "falta_total") partes.push("NF marcada como cancelada.");
+        if (tipo === "falta_total") {
+          partes.push("NF marcada como Falta Direta do CD.");
+          supabase.functions.invoke("divergencia-resumo-email", { body: { falta_direta_divergencia_id: r?.id } }).then(({ error: ef }) => {
+            if (ef) toast.error("Lançamento salvo, mas o aviso de Falta Direta do CD não foi enviado para arquivostlm.");
+            else toast.success("Aviso de Falta Direta do CD enviado para arquivostlm@tlmlogistica.com.br");
+          });
+        }
         toast.success(partes.join(" "));
         supabase.functions.invoke("divergencia-consolidado", { body: { acao: "enviar" } }).then(({ error: ec }) => {
           if (ec) toast.error("Lançamento salvo, mas o consolidado não foi enviado para gessica.rodrigues. Tente pelo botão Consolidado.");

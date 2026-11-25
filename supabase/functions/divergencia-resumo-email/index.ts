@@ -19,6 +19,21 @@ Deno.serve(async (req) => {
   const cargaId = String(corpo?.carga_id ?? '')
   if (!/^[0-9a-f-]{36}$/i.test(cargaId)) return json({ error: 'carga inválida' }, 400)
 
+  if (corpo?.falta_direta_divergencia_id) {
+    const id = String(corpo.falta_direta_divergencia_id)
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'divergência inválida' }, 400)
+    const { data: d } = await sb.from('divergencias_recebimento').select('id, numero_nf, nf_id, carga_id, tipo, cancelado_em').eq('id', id).maybeSingle()
+    if (!d || d.tipo !== 'falta_total' || d.cancelado_em) return json({ error: 'não é falta total ativa' }, 400)
+    const { data: c } = d.carga_id ? await sb.from('cargas').select('numero_carga, placa').eq('id', d.carga_id).maybeSingle() : { data: null }
+    const { data: n } = await sb.from('notas_fiscais').select('dest_razao_social').eq('id', d.nf_id).maybeSingle()
+    const { data: p } = await sb.from('profiles').select('full_name, email').eq('id', u.user!.id).maybeSingle()
+    const { error: ef } = await sb.functions.invoke('send-transactional-email', { body: {
+      templateName: 'falta-direta-cd', idempotencyKey: `falta-direta-cd-${id}`,
+      templateData: { nf: d.numero_nf, carga: c?.numero_carga ?? '', placa: c?.placa ?? '', destinatario: (n as any)?.dest_razao_social ?? '',
+        data: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), operador: p?.full_name || p?.email || '' } } })
+    if (ef) { console.error('[falta-direta-cd]', ef); return json({ error: 'Falha no envio do e-mail' }, 502) }
+    return json({ ok: true })
+  }
   const clientes = corpo?.origem === 'clientes'
   const { data: itens, error } = clientes
     ? await sb.from('divergencias_recebimento_clientes')

@@ -24,6 +24,7 @@ import { template as overhaulSmFalha } from './overhaul-sm-falha.tsx'
 import { template as integracaoFalha } from './integracao-falha.tsx'
 import { template as divergenciaRecebimento } from './divergencia-recebimento.tsx'
 import { template as divergenciaConsolidado } from './divergencia-consolidado.tsx'
+import { template as faltaDiretaCd } from './falta-direta-cd.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'teste-envio': testeEnvio,
@@ -36,4 +37,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'integracao-falha': integracaoFalha,
   'divergencia-recebimento': divergenciaRecebimento,
   'divergencia-consolidado': divergenciaConsolidado,
+  'falta-direta-cd': faltaDiretaCd,
 }
