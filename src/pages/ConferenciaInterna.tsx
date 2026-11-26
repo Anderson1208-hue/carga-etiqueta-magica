@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages } from "@/lib/supabase-pagination";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useLockPortrait } from "@/hooks/useLockPortrait";
@@ -252,12 +253,12 @@ export default function ConferenciaInterna() {
     if (!nf) return;
     setSearchLoading(true);
     try {
-      const { data: etiquetas, error } = await supabase
+      const etiquetas = await fetchAllPages((from, to) => supabase
         .from("etiquetas")
         .select("carga_id, status, numero_nf")
-        .eq("numero_nf", nf);
-
-      if (error) throw error;
+        .eq("numero_nf", nf)
+        .order("id", { ascending: true })
+        .range(from, to));
       if (!etiquetas || etiquetas.length === 0) {
         toast({ title: "NF não encontrada", description: `NF ${nf} não existe em nenhuma carga acessível.`, variant: "destructive" });
         setSearchLoading(false);
@@ -1362,12 +1363,13 @@ export default function ConferenciaInterna() {
         const ets = await getOfflineEtiquetas(selectedCarga.id);
         all = ets.filter((e) => e.numero_nf === selectedNf).map((e) => ({ id: e.id, status: e.status }));
       } else {
-        const { data: etiquetasData } = await supabase
+        all = await fetchAllPages((from, to) => supabase
           .from("etiquetas")
           .select("id, status")
           .eq("carga_id", selectedCarga.id)
-          .eq("numero_nf", selectedNf);
-        all = etiquetasData || [];
+          .eq("numero_nf", selectedNf)
+          .order("id", { ascending: true })
+          .range(from, to));
       }
 
       const divergencias = all.filter((e) => e.status === "divergencia").length;
@@ -1440,17 +1442,18 @@ export default function ConferenciaInterna() {
           .map((e) => ({ id: e.id, x_prod: e.x_prod, c_prod: e.c_prod, seq: e.seq, total: e.total }));
         setEtiquetasFaltantes(faltantes);
       } else {
-        const { data, error } = await supabase
+        const data = await fetchAllPages((from, to) => supabase
           .from("etiquetas")
           .select("id, x_prod, c_prod, seq, total")
           .eq("carga_id", selectedCarga.id)
           .eq("numero_nf", selectedNf)
           .eq("status", statusFaltante)
           .order("c_prod")
-          .order("seq");
+          .order("seq")
+          .order("id")
+          .range(from, to));
 
-        if (error) throw error;
-        setEtiquetasFaltantes(data || []);
+        setEtiquetasFaltantes(data);
       }
     } catch (error) {
       console.error("Erro ao carregar faltantes:", error);
@@ -1464,15 +1467,16 @@ export default function ConferenciaInterna() {
     if (!selectedCarga || !selectedNf) return;
     setLoadingDivergencia(true);
     try {
-      const { data, error } = await supabase
+      const data = await fetchAllPages((from, to) => supabase
         .from("etiquetas")
         .select("id, c_prod, x_prod, seq, total, status, divergencia_motivo")
         .eq("carga_id", selectedCarga.id)
         .eq("numero_nf", selectedNf)
-        .order("seq", { ascending: true });
+        .order("seq", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to));
 
-      if (error) throw error;
-      setPendingEtiquetas(data || []);
+      setPendingEtiquetas(data);
       setSelectedEtiquetaIds(new Set());
       setDivergenciaMotivo("");
       setShowDivergencia(true);

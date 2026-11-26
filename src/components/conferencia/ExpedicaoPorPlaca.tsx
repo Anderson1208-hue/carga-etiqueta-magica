@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllPages, fetchInChunks } from "@/lib/supabase-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -159,13 +160,14 @@ export function ExpedicaoPorPlaca({ veiculo, onSelectVeiculo, onAbrirNf, isAdmin
         porCarga.set(r.carga_origem_id, arr);
       });
       for (const [cargaId, numeros] of porCarga) {
-        const { data: ets, error } = await supabase
+        const ets = await fetchInChunks(numeros, (chunk) => fetchAllPages((from, to) => supabase
           .from("etiquetas")
           .select("numero_nf, status")
           .eq("carga_id", cargaId)
-          .in("numero_nf", numeros)
-          .neq("status", "divergencia");
-        if (error) throw error;
+          .in("numero_nf", chunk)
+          .neq("status", "divergencia")
+          .order("id", { ascending: true })
+          .range(from, to)));
         const agg = new Map<string, { t: number; c: number }>();
         (ets ?? []).forEach((e: any) => {
           const a = agg.get(e.numero_nf) ?? { t: 0, c: 0 };
