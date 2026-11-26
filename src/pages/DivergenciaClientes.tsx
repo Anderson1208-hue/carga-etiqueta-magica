@@ -128,7 +128,13 @@ export default function DivergenciaClientes({ embedded = false, embarcador }: { 
         p_quantidade: (Number(qtd) || null) as any, p_retorno_cd: retorno, p_observacao: obs, p_fotos: caminhos,
       } as any);
       if (error) throw error;
-      toast.success("Divergência lançada (só relatório, nada bloqueado).");
+      toast.success("Divergência lançada.");
+      if (!semNf && nf?.id && status === "FALTA") {
+        supabase.functions.invoke("divergencia-resumo-email", { body: { falta_direta_cliente_nf_id: nf.id } }).then(({ data: r, error: ef }) => {
+          if (ef) toast.error("NF em falta total, mas o e-mail para arquivostlm falhou.");
+          else if ((r as any)?.falta_total) toast.success("Falta total: NF marcada como Falta Direta do CD e aviso enviado a arquivostlm.");
+        });
+      }
       supabase.functions.invoke("divergencia-consolidado", { body: { acao: "enviar" } }).then(({ error: ec }) => {
         if (ec) toast.error("Lançamento salvo, mas o consolidado não foi enviado para gessica.rodrigues.");
         else toast.success("Consolidado atualizado enviado para gessica.rodrigues@tlmlogistica.com.br");

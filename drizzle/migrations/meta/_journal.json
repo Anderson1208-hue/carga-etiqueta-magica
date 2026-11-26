@@ -519,6 +519,13 @@
       "when": 1795628805535,
       "tag": "0073_falta_total_bloqueia_agendamento",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1795700937728,
+      "tag": "0074_falta_total_todos_clientes",
+      "breakpoints": true
     }
   ]
 }

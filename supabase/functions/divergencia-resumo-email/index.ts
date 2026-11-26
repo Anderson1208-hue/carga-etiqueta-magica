@@ -16,9 +16,23 @@ Deno.serve(async (req) => {
   if (negado) return json({ error: 'não autorizado' }, negado)
   const { data: u } = await sb.auth.getUser(auth!.replace(/^Bearer\s+/i, ''))
   const corpo: any = await req.json().catch(() => ({}))
-  const cargaId = String(corpo?.carga_id ?? '')
-  if (!/^[0-9a-f-]{36}$/i.test(cargaId)) return json({ error: 'carga inválida' }, 400)
 
+  if (corpo?.falta_direta_cliente_nf_id) {
+    const nfId = String(corpo.falta_direta_cliente_nf_id)
+    if (!/^[0-9a-f-]{36}$/i.test(nfId)) return json({ error: 'nf inválida' }, 400)
+    const { data: tot } = await sb.rpc('nf_falta_total_cliente', { _nf: nfId })
+    if (!tot) return json({ ok: true, falta_total: false })
+    const { data: d } = await sb.from('divergencias_recebimento_clientes').select('numero_nf, carga_id').eq('nf_id', nfId).eq('status', 'FALTA').is('cancelado_em', null).order('criado_em').limit(1).maybeSingle()
+    const { data: c } = d?.carga_id ? await sb.from('cargas').select('numero_carga, placa').eq('id', d.carga_id).maybeSingle() : { data: null }
+    const { data: n } = await sb.from('notas_fiscais').select('numero_nf, dest_razao_social').eq('id', nfId).maybeSingle()
+    const { data: p } = await sb.from('profiles').select('full_name, email').eq('id', u.user!.id).maybeSingle()
+    const { error: ef } = await sb.functions.invoke('send-transactional-email', { body: {
+      templateName: 'falta-direta-cd', idempotencyKey: `falta-direta-cd-cli-${nfId}`,
+      templateData: { nf: (n as any)?.numero_nf ?? d?.numero_nf ?? '', carga: c?.numero_carga ?? '', placa: c?.placa ?? '', destinatario: (n as any)?.dest_razao_social ?? '',
+        data: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), operador: p?.full_name || p?.email || '' } } })
+    if (ef) { console.error('[falta-direta-cd-cli]', ef); return json({ error: 'Falha no envio do e-mail' }, 502) }
+    return json({ ok: true, falta_total: true })
+  }
   if (corpo?.falta_direta_divergencia_id) {
     const id = String(corpo.falta_direta_divergencia_id)
     if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'divergência inválida' }, 400)
@@ -34,6 +48,8 @@ Deno.serve(async (req) => {
     if (ef) { console.error('[falta-direta-cd]', ef); return json({ error: 'Falha no envio do e-mail' }, 502) }
     return json({ ok: true })
   }
+  const cargaId = String(corpo?.carga_id ?? '')
+  if (!/^[0-9a-f-]{36}$/i.test(cargaId)) return json({ error: 'carga inválida' }, 400)
   const clientes = corpo?.origem === 'clientes'
   const { data: itens, error } = clientes
     ? await sb.from('divergencias_recebimento_clientes')

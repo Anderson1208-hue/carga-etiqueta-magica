@@ -5919,6 +5919,7 @@ export type Database = {
       }
       medir_espaco_banco: { Args: never; Returns: undefined }
       nf_calcular_termo_sensivel: { Args: { _nf_id: string }; Returns: boolean }
+      nf_falta_total_cliente: { Args: { _nf: string }; Returns: boolean }
       nf_raiz_chocolate_total: { Args: { _cnpj: string }; Returns: boolean }
       okentrega_reservar_item: {
         Args: { p_queue_id?: string }
