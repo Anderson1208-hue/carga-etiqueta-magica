@@ -31,3 +31,4 @@
 - Cacau receiving divergences go only through NF-locking RPCs that block pending labels via existing `divergencia` status (scanned labels untouched) with cancellable records; nothing is sent to Cacau, only an internal summary email.
 - Invites: 1-use 96h hashed token, redeemed in handle_new_user.
 - Cancelled Pandurata pending cargas are soft-excluded by RPC, never deleted, so the robot skips them.
+- Pending Pandurata PDFs export the currently filtered list client-side with lazy-loaded PDF libraries, avoiding portal calls and preserving list exclusions.

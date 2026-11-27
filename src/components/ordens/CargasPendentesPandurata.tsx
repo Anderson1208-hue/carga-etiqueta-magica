@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useState } from "react";
-import { FileText, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Download, FileText, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { CargaPendentePandurata } from "@/lib/pandurata-pendentes";
+import { gerarPdfPendentesPandurata } from "@/lib/pandurata-pendentes-pdf";
 
 const fmt = (n: number | null, d = 2) => (n === null ? "—" : Number(n).toLocaleString("pt-BR", { maximumFractionDigits: d }));
 const dataHora = (iso: string | null) =>
@@ -17,6 +18,7 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
   const qc = useQueryClient();
   const [pesquisa, setPesquisa] = useState("");
   const [termo, setTermo] = useState("");
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const pendentes = useQuery({
     queryKey: ["pandurata-otm-pendentes"],
@@ -109,10 +111,24 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
             </span>
           )}
         </p>
+        <div className="flex shrink-0 flex-wrap gap-2">
+        <Button variant="outline" disabled={gerandoPdf || pendentes.isFetching || pendentes.isError || lista.length === 0} onClick={async () => {
+          setGerandoPdf(true);
+          try {
+            await gerarPdfPendentesPandurata(lista, termo);
+          } catch {
+            toast.error("Não foi possível gerar o PDF.");
+          } finally {
+            setGerandoPdf(false);
+          }
+        }}>
+          <Download className="mr-2 h-4 w-4" />{gerandoPdf ? "Gerando PDF..." : "Gerar PDF"}
+        </Button>
         <Button onClick={() => atualizar.mutate()} disabled={atualizar.isPending}>
           <RefreshCw className={`mr-2 h-4 w-4 ${atualizar.isPending ? "animate-spin" : ""}`} />
           {atualizar.isPending ? "Consultando portal..." : "Atualizar do portal"}
         </Button>
+        </div>
       </div>
 
       <form
