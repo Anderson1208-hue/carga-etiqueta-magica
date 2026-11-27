@@ -19,6 +19,39 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
   const [pesquisa, setPesquisa] = useState("");
   const [termo, setTermo] = useState("");
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [gerandoCanceladas, setGerandoCanceladas] = useState(false);
+
+  const gerarCanceladas = async () => {
+    setGerandoCanceladas(true);
+    try {
+      const cargas: CargaPendentePandurata[] = [];
+      let cursor: string | null = null;
+      while (true) {
+        let consulta = supabase.from("pandurata_otm_cargas").select("*")
+          .not("excluida_em", "is", null).order("id").limit(300);
+        if (cursor) consulta = consulta.gt("id", cursor);
+        const { data, error } = await consulta;
+        if (error) throw error;
+        const pagina = data ?? [];
+        cargas.push(...pagina);
+        if (pagina.length < 300) break;
+        const ultimaCarga = pagina[pagina.length - 1];
+        if (!ultimaCarga) break;
+        cursor = ultimaCarga.id;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (!cargas.length) {
+        toast.info("Nenhuma carga cancelada registrada.");
+        return;
+      }
+      cargas.sort((a, b) => (b.excluida_em ?? "").localeCompare(a.excluida_em ?? "") || a.id.localeCompare(b.id));
+      await gerarPdfPendentesPandurata(cargas, "", true);
+    } catch {
+      toast.error("Não foi possível gerar o PDF de cargas canceladas.");
+    } finally {
+      setGerandoCanceladas(false);
+    }
+  };
 
   const pendentes = useQuery({
     queryKey: ["pandurata-otm-pendentes"],
@@ -111,7 +144,10 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
             </span>
           )}
         </p>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+        <Button variant="outline" disabled={gerandoCanceladas || excluir.isPending} onClick={gerarCanceladas}>
+          <Download className="mr-2 h-4 w-4" />{gerandoCanceladas ? "Gerando canceladas..." : "PDF de cargas canceladas"}
+        </Button>
         <Button variant="outline" disabled={gerandoPdf || pendentes.isFetching || pendentes.isError || lista.length === 0} onClick={async () => {
           setGerandoPdf(true);
           try {
