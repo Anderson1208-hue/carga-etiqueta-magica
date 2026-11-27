@@ -30,4 +30,4 @@
 - CT-e import stores freight components and the full XML in cte_detalhes keyed by chave_cte (insert-only, ignore duplicates), separate from ctes links, so re-imports enrich detail without altering existing freight.
 - Cacau receiving divergences go only through NF-locking RPCs that block pending labels via existing `divergencia` status (scanned labels untouched) with cancellable records; nothing is sent to Cacau, only an internal summary email.
 - Invites: 1-use 96h hashed token, redeemed in handle_new_user.
-- Pandurata pending cargas cancelled in the portal are soft-excluded via excluir_carga_pendente_pandurata (reason + who/when), never deleted, so the robot does not re-import them.
+- Cancelled Pandurata pending cargas are soft-excluded by RPC, never deleted, so the robot skips them.
