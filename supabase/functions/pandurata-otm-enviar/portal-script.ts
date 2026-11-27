@@ -2,7 +2,7 @@ import { autorizarEnvioSap, compararFrota, confirmarResultadoSap, type Frota } f
 import { interpretarRespostaSap } from './sap-resposta.ts';
 
 // Runs only in the authenticated OTM origin and only for the explicitly confirmed shipment.
-async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof compararFrota, autorizarSap: typeof autorizarEnvioSap, confirmarSap: typeof confirmarResultadoSap, interpretarSap: typeof interpretarRespostaSap) {
+async function executar(dados: Frota, permitirGravar: boolean, substituir: boolean, comparar: typeof compararFrota, autorizarSap: typeof autorizarEnvioSap, confirmarSap: typeof confirmarResultadoSap, interpretarSap: typeof interpretarRespostaSap) {
   const out = (obj: unknown) => {
     const pre = document.createElement('pre'); pre.id = 'lovenvio'; pre.textContent = JSON.stringify(obj);
     document.body.replaceChildren(pre);
@@ -84,11 +84,13 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
         out({ ok: false, codigo: 'nao_confirmado', status_portal: leitura.cols[5], campos: leitura.cols.slice(10, 14).map((v, i) => !v ? 'vazio' : comparar([v], [valores[i]]) === 'igual' ? 'igual' : 'diferente'), limite_carreta: field.maxLength, gravou: false, sap_acionado: false });
         return;
       }
-      if (decisao === 'conflito' || leitura.cols[5] !== 'SH_ACEITO') { out({ ok: false, codigo: 'frota_divergente', gravou: false, sap_acionado: false }); return; }
+      // A confirmed operator-requested replacement may overwrite differing cells; otherwise never.
+      if (!substituir && (decisao === 'conflito' || leitura.cols[5] !== 'SH_ACEITO')) { out({ ok: false, codigo: 'frota_divergente', gravou: false, sap_acionado: false }); return; }
       const suffixes = ['NOME_MOTORISTA', 'CPF_MOTORISTA', 'PLACA_VEICULO', 'PLACA_CARRETA'];
       for (let i = 0; i < 4; i++) {
         etapa = `editar_frota_${i}`;
-        if (leitura.cols[10 + i]) continue;
+        const igualCampo = (a: string, b: string) => i === 1 ? a.replace(/\D/g, '') === b.replace(/\D/g, '') : a.replace(/\s+/g, ' ').trim().toUpperCase() === b.replace(/\s+/g, ' ').trim().toUpperCase();
+        if (leitura.cols[10 + i] && (!substituir || igualCampo(leitura.cols[10 + i], valores[i]))) continue;
         const suffix = suffixes[i];
         const current = leitura.iframe.contentDocument;
         const editor = current?.getElementById(`rgSGSec.2.2.1.${7 + i}.u`);
@@ -208,8 +210,8 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
   finally { for (const restore of restaurarJanelas.reverse()) restore(); }
 }
 
-export function montarScriptEnvio(dados: Frota, permitirGravar: boolean) {
+export function montarScriptEnvio(dados: Frota, permitirGravar: boolean, substituir = false) {
   // Return immediately to the remote action runner; the following selector wait
   // observes completion. Awaiting this promise adds to the runner's action budget.
-  return `void (${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${compararFrota.toString()},${autorizarEnvioSap.toString()},${confirmarResultadoSap.toString()},${interpretarRespostaSap.toString()});`;
+  return `void (${executar.toString()})(${JSON.stringify(dados)},${permitirGravar},${substituir},${compararFrota.toString()},${autorizarEnvioSap.toString()},${confirmarResultadoSap.toString()},${interpretarRespostaSap.toString()});`;
 }

@@ -10,6 +10,7 @@ import { CargasPendentesPandurata } from "@/components/ordens/CargasPendentesPan
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { coletaDePendentePandurata, type CargaPendentePandurata } from "@/lib/pandurata-pendentes";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,7 +61,8 @@ export default function OrdemColetaPage() {
   const [status, setStatus] = useState("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [envio, setEnvio] = useState<{ ordem: OrdemColeta; consultar: boolean } | null>(null);
+  const [envio, setEnvio] = useState<{ ordem: OrdemColeta; consultar: boolean; trocar?: boolean } | null>(null);
+  const [motivoTroca, setMotivoTroca] = useState("");
 
   const historicoQuery = useQuery({
     queryKey: ["ordens-coleta", "envios-portal"],
@@ -91,7 +93,7 @@ export default function OrdemColetaPage() {
     mutationFn: async () => {
       if (!envio) throw new Error("Selecione uma ordem.");
       const { data, error } = await supabase.functions.invoke("pandurata-otm-enviar", {
-        body: { ordem_id: envio.ordem.id, confirmar: true, consultar: envio.consultar },
+        body: envio.trocar ? { ordem_id: envio.ordem.id, confirmar: true, trocar: true, motivo: motivoTroca.trim() } : { ordem_id: envio.ordem.id, confirmar: true, consultar: envio.consultar },
       });
       if (error) {
         const detalhe = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
@@ -383,6 +385,11 @@ export default function OrdemColetaPage() {
                             {consultar ? "Verificar portal" : "Enviar ao portal"}
                           </Button>
                         )}
+                        {pandurata && historico?.status === "confirmado" && (
+                          <Button size="sm" variant="outline" disabled={enviarMutation.isPending || ordem.status === "cancelada"} onClick={() => { setMotivoTroca(""); setEnvio({ ordem, consultar: false, trocar: true }); }}>
+                            Trocar veículo/motorista
+                          </Button>
+                        )}
                         </div>
                         {historico && <p className={`mt-1 max-w-56 text-xs ${historico.status === "erro" || historico.status === "incerto" ? "text-destructive" : "text-muted-foreground"}`} title={historico.mensagem ?? undefined}>
                           {historico.status === "em_andamento" ? "Processando frota e SAP" : historico.mensagem}
@@ -408,20 +415,25 @@ export default function OrdemColetaPage() {
 
       <Dialog open={Boolean(envio)} onOpenChange={(open) => { if (!open && !enviarMutation.isPending) setEnvio(null); }}>
         <DialogContent onEscapeKeyDown={(e) => { if (enviarMutation.isPending) e.preventDefault(); }} onPointerDownOutside={(e) => { if (enviarMutation.isPending) e.preventDefault(); }}>
-          <DialogHeader><DialogTitle>{envio?.consultar ? "Verificar frota e SAP no portal" : "Confirmar frota e envio ao SAP"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{envio?.trocar ? "Trocar veículo/motorista no portal" : envio?.consultar ? "Verificar frota e SAP no portal" : "Confirmar frota e envio ao SAP"}</DialogTitle></DialogHeader>
           {envio && <div className="space-y-2 text-sm">
             <p className="font-medium">{formatarNumeroColeta(envio.ordem.numero)} · DT {envio.ordem.numero_roteiro}</p>
             <p>Motorista: {envio.ordem.motorista || "Não informado"}</p>
             <p>CPF: {envio.ordem.cpf_motorista ? formatarCpfColeta(envio.ordem.cpf_motorista) : "Não informado"}</p>
             <p>Cavalo: {envio.ordem.placa || "Não informado"} · Carreta: {placasCarretaColeta(envio.ordem).join(" · ") || "Não informado"}</p>
-            <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e conferirá a resposta dessa ação no portal. Dados diferentes já existentes não serão substituídos."}</p>
+            {envio.trocar && <div className="space-y-1">
+              <p className="text-muted-foreground">Os dados acima substituirão os que estão no portal. Depois o sistema acionará Envio Frota Sap de novo, uma única vez, e um novo e-mail será gerado. Edite a ordem antes, se ainda não editou.</p>
+              <label htmlFor="motivo-troca" className="font-medium">Motivo da troca</label>
+              <Textarea id="motivo-troca" value={motivoTroca} maxLength={300} onChange={(e) => setMotivoTroca(e.target.value)} placeholder="Ex.: veículo quebrou, motorista substituído" />
+            </div>}
+            {!envio.trocar && <p className="text-muted-foreground">{envio.consultar ? "Somente consulta da frota e do envio ao SAP, sem repetir nenhuma gravação." : "Primeiro o sistema preencherá e confirmará a frota; depois acionará Envio Frota Sap uma única vez e conferirá a resposta dessa ação no portal. Dados diferentes já existentes não serão substituídos."}</p>}
             <p className="text-muted-foreground">Estimativa: 0,004 crédito Lovable por consulta; consumo registrado após a conclusão.</p>
           </div>}
           <DialogFooter>
             <Button variant="outline" disabled={enviarMutation.isPending} onClick={() => setEnvio(null)}>Cancelar</Button>
-            <Button disabled={enviarMutation.isPending} onClick={() => enviarMutation.mutate()}>
+            <Button disabled={enviarMutation.isPending || (envio?.trocar === true && motivoTroca.trim().length < 5)} onClick={() => enviarMutation.mutate()}>
               {enviarMutation.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              {enviarMutation.isPending ? "Processando frota e SAP..." : envio?.consultar ? "Consultar portal" : "Confirmar envio completo"}
+              {enviarMutation.isPending ? "Processando frota e SAP..." : envio?.trocar ? "Confirmar troca e novo envio" : envio?.consultar ? "Consultar portal" : "Confirmar envio completo"}
             </Button>
           </DialogFooter>
         </DialogContent>

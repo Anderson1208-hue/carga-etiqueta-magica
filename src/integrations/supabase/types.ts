@@ -4052,10 +4052,12 @@ export type Database = {
           creditos_firecrawl: number | null
           creditos_lovable: number | null
           dados: Json
+          dados_anteriores: Json | null
           id: string
           iniciado_em: string
           iniciado_por: string
           mensagem: string | null
+          motivo_troca: string | null
           ordem_coleta_id: string
           shipment_id: string
           status: string
@@ -4066,10 +4068,12 @@ export type Database = {
           creditos_firecrawl?: number | null
           creditos_lovable?: number | null
           dados: Json
+          dados_anteriores?: Json | null
           id?: string
           iniciado_em?: string
           iniciado_por: string
           mensagem?: string | null
+          motivo_troca?: string | null
           ordem_coleta_id: string
           shipment_id: string
           status?: string
@@ -4080,10 +4084,12 @@ export type Database = {
           creditos_firecrawl?: number | null
           creditos_lovable?: number | null
           dados?: Json
+          dados_anteriores?: Json | null
           id?: string
           iniciado_em?: string
           iniciado_por?: string
           mensagem?: string | null
+          motivo_troca?: string | null
           ordem_coleta_id?: string
           shipment_id?: string
           status?: string

@@ -533,6 +533,13 @@
       "when": 1795806145144,
       "tag": "0075_convites_operador",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1795813378343,
+      "tag": "0076_pandurata_envio_troca",
+      "breakpoints": true
     }
   ]
 }

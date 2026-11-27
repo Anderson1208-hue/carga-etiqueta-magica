@@ -1,0 +1,1 @@
+ALTER TABLE public.pandurata_otm_envios ADD COLUMN IF NOT EXISTS motivo_troca text, ADD COLUMN IF NOT EXISTS dados_anteriores jsonb;

@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   const acesso = await operatorAccessStatus(authorization, sb);
   if (acesso) return json({ error: 'Operador não autenticado ou não aprovado' }, acesso);
   const body = await req.json().catch(() => null);
-  if (!body || Object.keys(body).some((k) => !['ordem_id','confirmar','consultar'].includes(k)) || !/^[0-9a-f-]{36}$/i.test(body.ordem_id ?? '') || body.confirmar !== true || (body.consultar !== undefined && typeof body.consultar !== 'boolean')) return json({ error: 'Confirme a ordem antes de continuar.' }, 400);
+  if (!body || Object.keys(body).some((k) => !['ordem_id','confirmar','consultar','trocar','motivo'].includes(k)) || !/^[0-9a-f-]{36}$/i.test(body.ordem_id ?? '') || body.confirmar !== true || (body.consultar !== undefined && typeof body.consultar !== 'boolean') || (body.trocar !== undefined && body.trocar !== true) || (body.trocar && (body.consultar || typeof body.motivo !== 'string' || body.motivo.trim().length < 5 || body.motivo.length > 300)) || (!body.trocar && body.motivo !== undefined)) return json({ error: 'Confirme a ordem antes de continuar.' }, 400);
   const usuario = Deno.env.get('PANDURATA_OTM_USUARIO'); const senha = Deno.env.get('PANDURATA_OTM_SENHA');
   const lovKey = Deno.env.get('LOVABLE_API_KEY'); const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
   if (!usuario || !senha || !lovKey || !fcKey) return json({ error: 'Configuração do portal incompleta' }, 500);
@@ -37,11 +37,12 @@ Deno.serve(async (req) => {
     if (oe || ve || !ordem || !vinculo) return json({ error: 'A ordem precisa estar vinculada a uma carga capturada da Pandurata.' }, 400);
     let dados: Frota;
     try { dados = validarFrota(ordem, vinculo); } catch (e) { return json({ error: e instanceof Error ? e.message : 'Dados inválidos' }, 400); }
-    const { data: confirmado, error: ce } = await sb.from('pandurata_otm_envios').select('status,mensagem').eq('shipment_id', vinculo.shipment_id).eq('status', 'confirmado').order('iniciado_em', { ascending: false }).order('id').limit(1).maybeSingle();
+    const { data: confirmado, error: ce } = await sb.from('pandurata_otm_envios').select('status,mensagem,dados').eq('shipment_id', vinculo.shipment_id).eq('status', 'confirmado').order('iniciado_em', { ascending: false }).order('id').limit(1).maybeSingle();
     if (ce) throw new Error('Não foi possível verificar o envio anterior.');
     if (preservarConfirmacaoSap(confirmado?.status)) {
       // A acknowledged action is settled: never replay it or downgrade its history.
-      if (!body.consultar) return json({ error: 'Esta carga já tem confirmação registrada. O envio não será repetido; use Verificar portal.' }, 409);
+      if (body.trocar && confirmado?.dados && Object.entries(dados).every(([k,v]) => (confirmado.dados as Record<string,unknown>)[k] === v)) return json({ error: 'Os dados da ordem são iguais aos já enviados. Edite o motorista ou veículo antes da troca.' }, 400);
+      if (!body.consultar && !body.trocar) return json({ error: 'Esta carga já tem confirmação registrada. O envio não será repetido; use Verificar portal.' }, 409);
     }
     const { data: aberto, error: ae } = await sb.from('pandurata_otm_envios').select('id,status,iniciado_em,dados').eq('shipment_id', vinculo.shipment_id).in('status', ['em_andamento','incerto']).maybeSingle();
     if (ae) throw new Error('Não foi possível verificar a reserva da carga.');
@@ -53,15 +54,17 @@ Deno.serve(async (req) => {
         if (Object.entries(dados).some(([k,v]) => aberto.dados[k] !== v)) return json({ error: 'A ordem foi alterada após a tentativa. Confira os dados anteriores antes de prosseguir.' }, 409);
       }
       envioId = aberto.id;
-    } else if (!preservarConfirmacaoSap(confirmado?.status)) {
+    } else if (body.trocar && !preservarConfirmacaoSap(confirmado?.status)) {
+      return json({ error: 'A troca só é permitida em ordem já confirmada no portal.' }, 409);
+    } else if (!preservarConfirmacaoSap(confirmado?.status) || body.trocar) {
       const { data: user } = await sb.auth.getUser((authorization ?? '').replace(/^Bearer\s+/i, ''));
       if (!user.user) return json({ error: 'Sessão inválida' }, 401);
-      const { data: novo, error: ne } = await sb.from('pandurata_otm_envios').insert({ ordem_coleta_id: ordem.id, shipment_id: vinculo.shipment_id, iniciado_por: user.user.id, dados }).select('id').single();
+      const { data: novo, error: ne } = await sb.from('pandurata_otm_envios').insert({ ordem_coleta_id: ordem.id, shipment_id: vinculo.shipment_id, iniciado_por: user.user.id, dados, ...(body.trocar ? { motivo_troca: body.motivo.trim(), dados_anteriores: confirmado?.dados ?? null } : {}) }).select('id').single();
       if (ne || !novo) return json({ error: 'Outra tentativa está em andamento para esta carga.' }, 409);
       envioId = novo.id;
     }
     iniciouConsulta = true;
-    const rodar = async (permitirGravar: boolean) => {
+    const rodar = async (permitirGravar: boolean, substituir = false) => {
       const r = await fetch('https://connector-gateway.lovable.dev/firecrawl/v2/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lovKey}`, 'X-Connection-Api-Key': fcKey },
@@ -73,7 +76,7 @@ Deno.serve(async (req) => {
             { type: 'click', selector: '#idcs-signin-basic-signin-form-username' }, { type: 'write', text: usuario },
             { type: 'click', selector: 'input[type=password]' }, { type: 'write', text: senha },
             { type: 'press', key: 'Enter' }, { type: 'wait', milliseconds: 15000 },
-            { type: 'executeJavascript', script: montarScriptEnvio(dados, permitirGravar) },
+            { type: 'executeJavascript', script: montarScriptEnvio(dados, permitirGravar, substituir) },
             { type: 'wait', milliseconds: 35000 }, { type: 'wait', selector: '#lovenvio' },
           ],
         }),
@@ -97,7 +100,7 @@ Deno.serve(async (req) => {
       if (envioId) await sb.from('pandurata_otm_envios').update({ status: 'incerto', mensagem: msg, concluido_em: new Date().toISOString() }).eq('id', envioId);
       return json({ error: msg }, 502);
     };
-    let etapa1 = await rodar(!body.consultar);
+    let etapa1 = await rodar(!body.consultar, Boolean(body.trocar));
     if ('falha' in etapa1) return await falhou(etapa1.falha, false);
     let creditosTotal = etapa1.credits;
     if (!body.consultar && etapa1.saida.codigo === 'frota_gravada') {
