@@ -72,7 +72,8 @@ import {
 import { AlterarRotaDialog } from "@/components/roteirizacao/AlterarRotaDialog";
 import { CancelarRoteirizacaoDialog } from "@/components/roteirizacao/CancelarRoteirizacaoDialog";
 import { ReroteirizarVeiculoDialog } from "@/components/roteirizacao/ReroteirizarVeiculoDialog";
-import { Settings2, FileSpreadsheet, Search, Ban } from "lucide-react";
+import { Settings2, FileSpreadsheet, Search, Ban, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface Carga {
   id: string;
@@ -2376,16 +2377,26 @@ export default function Roteirizacao() {
                   {geocoding ? "Calculando km/tempo..." : "Confirmar Ordem Manual"}
                 </Button>
               )}
-              <Button onClick={exportCSV} variant="secondary" disabled={entregas.length === 0}>
-                <Download className="w-4 h-4 mr-2" />
-                Exportar Rota CSV
-              </Button>
-              {roteirizacao && (
-                <Button onClick={exportPDF} variant="secondary">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar PDF
-                </Button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary">
+                    <MoreHorizontal className="w-4 h-4 mr-2" />
+                    Mais
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportCSV} disabled={entregas.length === 0}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar Rota CSV
+                  </DropdownMenuItem>
+                  {roteirizacao && (
+                    <DropdownMenuItem onClick={exportPDF}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar PDF
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Route Results */}

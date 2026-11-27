@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from "lucide-react";
 
 import {
   Select,
@@ -97,6 +99,7 @@ export default function Programacao() {
   const [buscaMultipla, setBuscaMultipla] = useState(false);
   const [buscaMultiplaTexto, setBuscaMultiplaTexto] = useState("");
   const [filtroBairro, setFiltroBairro] = useState<string>("todos");
+  const [mostrarEndereco, setMostrarEndereco] = useState(() => localStorage.getItem("prep_mostrar_endereco") !== "0");
 
   useEffect(() => {
     loadNfsDisponiveis();
@@ -960,10 +963,31 @@ export default function Programacao() {
                 NFs Disponíveis ({filteredNfs.length})
               </CardTitle>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => exportarExcel(filteredNfs)}>
-                  <Download className="w-4 h-4 mr-1" />
-                  Exportar Excel
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <MoreHorizontal className="w-4 h-4 mr-1" />
+                      Mais
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => exportarExcel(filteredNfs)}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Exportar Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Mostrar na lista</DropdownMenuLabel>
+                    <DropdownMenuCheckboxItem
+                      checked={mostrarEndereco}
+                      onCheckedChange={(v) => {
+                        setMostrarEndereco(!!v);
+                        localStorage.setItem("prep_mostrar_endereco", v ? "1" : "0");
+                      }}
+                    >
+                      Endereço
+                    </DropdownMenuCheckboxItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button variant="outline" size="sm" onClick={toggleAllFiltered}>
                   {filteredNfs.every((nf) => selectedNfIds.has(nf.id))
                     ? "Desmarcar Todos"
@@ -1124,12 +1148,12 @@ export default function Programacao() {
                                           </Badge>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                                      {mostrarEndereco && <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                         <MapPin className="w-3 h-3 shrink-0" />
                                         <span className="truncate">
                                           {endereco ? `${endereco} – ` : ""}{first.dest_bairro}{first.dest_cidade ? `, ${first.dest_cidade}` : ""}{first.dest_uf ? `/${first.dest_uf}` : ""}
                                         </span>
-                                      </div>
+                                      </div>}
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5 flex-wrap">
                                         <FileText className="w-3 h-3 shrink-0" />
                                         <span className="truncate">

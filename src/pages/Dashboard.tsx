@@ -26,6 +26,7 @@ import { AlertasResumo } from "@/components/dashboard/AlertasResumo";
 import { IbacResumo } from "@/components/dashboard/IbacResumo";
 import { RecebidosPorDia } from "@/components/dashboard/RecebidosPorDia";
 import { AcaoHoje } from "@/components/dashboard/AcaoHoje";
+import { useAuth } from "@/hooks/useAuth";
 
 const REFRESH_MS = 60_000;
 const TIPOS_ALERTA = [
@@ -198,6 +199,7 @@ export default function Dashboard() {
   });
 
   const d = data;
+  const { isAdmin } = useAuth();
 
   return (
     <MainLayout>
@@ -207,7 +209,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground">Visão consolidada do dia — atualiza a cada minuto</p>
         </div>
 
-        <AcaoHoje />
+        {isAdmin && <AcaoHoje />}
 
         {/* Banner de saúde */}
         <HealthBanner
@@ -360,6 +362,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+        {!isAdmin && <AcaoHoje />}
       </div>
     </MainLayout>
   );
