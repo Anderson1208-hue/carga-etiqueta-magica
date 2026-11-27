@@ -119,6 +119,9 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
       if (comparar(leitura.cols.slice(10, 14), valores) !== 'igual') {
         out({ ok: false, codigo: 'nao_confirmado', status_portal: leitura.cols[5], gravou, sap_acionado: false }); return;
       }
+      // Stage 1 ends here: the SAP action runs in a separate short execution so a
+      // dropped connection cannot hide whether the fleet was saved.
+      out({ ok: false, codigo: 'frota_gravada', status_portal: leitura.cols[5], gravou, sap_acionado: false }); return;
     }
 
     if (!autorizarSap(permitirGravar, true)) {

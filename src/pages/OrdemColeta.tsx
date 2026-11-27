@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackageOpen, Pencil, Plus, Search, Send, RefreshCw } from "lucide-react";
 import { FunctionsHttpError } from "@supabase/supabase-js";
@@ -66,13 +66,27 @@ export default function OrdemColetaPage() {
     queryKey: ["ordens-coleta", "envios-portal"],
     queryFn: async () => {
       const { data, error } = await supabase.from("pandurata_otm_envios")
-        .select("id,ordem_coleta_id,status,mensagem,status_portal,creditos_lovable,iniciado_em")
+        .select("id,ordem_coleta_id,status,mensagem,status_portal,creditos_lovable,iniciado_em,concluido_em")
         .order("iniciado_em", { ascending: false }).order("id").limit(500);
       if (error) throw error;
       return data;
     },
-    refetchInterval: envio ? 10000 : false,
+    refetchInterval: (q) => envio ? 10000 : (q.state.data ?? []).some((h) => h.status === "incerto") ? 60000 : false,
   });
+  // Read-only follow-up of uncertain sends: once per attempt, 3 minutes after it ended. Never resends.
+  const autoVerificados = useRef(new Set<string>());
+  useEffect(() => {
+    const ultimos = new Map<string, NonNullable<typeof historicoQuery.data>[number]>();
+    for (const h of historicoQuery.data ?? []) if (!ultimos.has(h.ordem_coleta_id)) ultimos.set(h.ordem_coleta_id, h);
+    const agora = Date.now();
+    const alvo = [...ultimos.values()].find((h) => h.status === "incerto" && h.concluido_em
+      && agora - new Date(h.concluido_em).getTime() > 180000 && agora - new Date(h.concluido_em).getTime() < 86400000
+      && !autoVerificados.current.has(h.id));
+    if (!alvo) return;
+    autoVerificados.current.add(alvo.id);
+    supabase.functions.invoke("pandurata-otm-enviar", { body: { ordem_id: alvo.ordem_coleta_id, confirmar: true, consultar: true } })
+      .finally(() => queryClient.invalidateQueries({ queryKey: ["ordens-coleta", "envios-portal"] }));
+  }, [historicoQuery.data, queryClient]);
   const enviarMutation = useMutation({
     mutationFn: async () => {
       if (!envio) throw new Error("Selecione uma ordem.");
@@ -372,6 +386,7 @@ export default function OrdemColetaPage() {
                         </div>
                         {historico && <p className={`mt-1 max-w-56 text-xs ${historico.status === "erro" || historico.status === "incerto" ? "text-destructive" : "text-muted-foreground"}`} title={historico.mensagem ?? undefined}>
                           {historico.status === "em_andamento" ? "Processando frota e SAP" : historico.mensagem}
+                          {historico.status === "incerto" && <span className="block font-semibold">Não reenviar — aguardando confirmação</span>}
                           {historico.creditos_lovable !== null && <span className="block">{Number(historico.creditos_lovable).toLocaleString("pt-BR", { maximumFractionDigits: 4 })} crédito Lovable</span>}
                         </p>}
                       </TableCell>

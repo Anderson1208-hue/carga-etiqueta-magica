@@ -61,36 +61,55 @@ Deno.serve(async (req) => {
       envioId = novo.id;
     }
     iniciouConsulta = true;
-    const r = await fetch('https://connector-gateway.lovable.dev/firecrawl/v2/scrape', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lovKey}`, 'X-Connection-Api-Key': fcKey },
-      body: JSON.stringify({
-        url: 'https://otmgtm-bauducco.otmgtm.us-phoenix-1.ocs.oraclecloud.com/GC3/glog.webserver.home.HomeServlet?ojr=maincontent',
-        formats: ['rawHtml'], onlyMainContent: false, timeout: 170000, maxAge: 0,
-        actions: [
-          { type: 'wait', selector: '#idcs-signin-basic-signin-form-username' },
-          { type: 'click', selector: '#idcs-signin-basic-signin-form-username' }, { type: 'write', text: usuario },
-          { type: 'click', selector: 'input[type=password]' }, { type: 'write', text: senha },
-          { type: 'press', key: 'Enter' }, { type: 'wait', milliseconds: 15000 },
-          { type: 'executeJavascript', script: montarScriptEnvio(dados, !body.consultar) },
-          { type: 'wait', milliseconds: 35000 }, { type: 'wait', selector: '#lovenvio' },
-        ],
-      }),
-    });
-    if (!r.ok) {
-      // Never return provider bodies: they may contain the submitted login or CPF.
-      const failure = await r.text();
-      const limite = /Credit limit reached|Not enough credits|payment_required/i.test(failure);
-      const msg = limite ? 'O limite de créditos impediu a consulta ao portal.' : `A consulta ao portal falhou (${r.status}). Verifique antes de repetir.`;
+    const rodar = async (permitirGravar: boolean) => {
+      const r = await fetch('https://connector-gateway.lovable.dev/firecrawl/v2/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lovKey}`, 'X-Connection-Api-Key': fcKey },
+        body: JSON.stringify({
+          url: 'https://otmgtm-bauducco.otmgtm.us-phoenix-1.ocs.oraclecloud.com/GC3/glog.webserver.home.HomeServlet?ojr=maincontent',
+          formats: ['rawHtml'], onlyMainContent: false, timeout: 170000, maxAge: 0,
+          actions: [
+            { type: 'wait', selector: '#idcs-signin-basic-signin-form-username' },
+            { type: 'click', selector: '#idcs-signin-basic-signin-form-username' }, { type: 'write', text: usuario },
+            { type: 'click', selector: 'input[type=password]' }, { type: 'write', text: senha },
+            { type: 'press', key: 'Enter' }, { type: 'wait', milliseconds: 15000 },
+            { type: 'executeJavascript', script: montarScriptEnvio(dados, permitirGravar) },
+            { type: 'wait', milliseconds: 35000 }, { type: 'wait', selector: '#lovenvio' },
+          ],
+        }),
+      });
+      if (!r.ok) {
+        // Never return provider bodies: they may contain the submitted login or CPF.
+        const failure = await r.text();
+        return { falha: /Credit limit reached|Not enough credits|payment_required/i.test(failure) ? 'limite' : String(r.status) } as const;
+      }
+      const fc = await r.json();
+      const credits = fc?.data?.metadata?.creditsUsed ?? fc?.creditsUsed ?? null;
+      const match = String(fc?.data?.rawHtml ?? '').match(/<pre[^>]*id=["']lovenvio["'][^>]*>([\s\S]*?)<\/pre>/i);
+      let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean; etapa?: string; campos?: string[]; limite_carreta?: number } = {};
+      if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
+      return { saida, credits: credits === null ? null : Number(credits), match: Boolean(match) } as const;
+    };
+    const falhou = async (falha: string, frotaGravada: boolean) => {
+      const msg = falha === 'limite' ? 'O limite de créditos impediu a consulta ao portal.'
+        : frotaGravada ? 'Frota gravada e conferida. O Envio Frota SAP ficou sem resposta; aguarde a conferência automática. Não reenvie.'
+        : `A consulta ao portal falhou (${falha}). Verifique antes de repetir.`;
       if (envioId) await sb.from('pandurata_otm_envios').update({ status: 'incerto', mensagem: msg, concluido_em: new Date().toISOString() }).eq('id', envioId);
-      return json({ error: msg, status: r.status }, 502);
+      return json({ error: msg }, 502);
+    };
+    let etapa1 = await rodar(!body.consultar);
+    if ('falha' in etapa1) return await falhou(etapa1.falha, false);
+    let creditosTotal = etapa1.credits;
+    if (!body.consultar && etapa1.saida.codigo === 'frota_gravada') {
+      // Stage 2: fleet is saved and verified; trigger SAP in its own short execution.
+      if (envioId) await sb.from('pandurata_otm_envios').update({ mensagem: 'Frota gravada e conferida. Acionando Envio Frota SAP.', status_portal: etapa1.saida.status_portal ?? null }).eq('id', envioId);
+      const etapa2 = await rodar(true);
+      if ('falha' in etapa2) return await falhou(etapa2.falha, true);
+      creditosTotal = (creditosTotal ?? 0) + (etapa2.credits ?? 0);
+      etapa1 = { ...etapa2, saida: { ...etapa2.saida, gravou: true } };
     }
-    const fc = await r.json();
-    const credits = fc?.data?.metadata?.creditsUsed ?? fc?.creditsUsed ?? null;
-    const raw = String(fc?.data?.rawHtml ?? '');
-    const match = raw.match(/<pre[^>]*id=["']lovenvio["'][^>]*>([\s\S]*?)<\/pre>/i);
-    let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean; etapa?: string; campos?: string[]; limite_carreta?: number } = {};
-    if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
+    const { saida, match } = etapa1;
+    const credits = creditosTotal;
     const verificacaoIncerta = Boolean(body.consultar && aberto?.status === 'incerto' && saida.ok !== true);
     const status = definirStatusEnvio(saida, verificacaoIncerta);
     const mensagem = ['sap_ambiguo', 'sap_requisitado', 'sap_erro_processo'].includes(saida.codigo ?? '') ? mensagens[saida.codigo ?? ''] : status === 'confirmado'
