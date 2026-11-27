@@ -160,7 +160,18 @@ Deno.serve(async (req) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const access = await operatorAccessStatus(req.headers.get('Authorization'), admin as any);
   if (access) return json({ mensagem: access === 401 ? 'Não autenticado' : 'Operador não aprovado' }, access);
-  const parsed = Body.safeParse(await req.json().catch(() => null));
+  const body = await req.json().catch(() => null);
+  if (body?.acao === 'testar_login') {
+    try {
+      const portal = new Portal();
+      await portal.login();
+      const consulta = await portal.jsonData('solicitacaomonitoramento/getjsondata', '', 1);
+      return json({ status: 'ok', acesso: true, leitura: Array.isArray(consulta.data) });
+    } catch (e) {
+      return json({ status: 'falha', acesso: false, erro: String((e as Error)?.message ?? e).slice(0, 300) });
+    }
+  }
+  const parsed = Body.safeParse(body);
   if (!parsed.success) return json({ mensagem: 'Dados inválidos' }, 400);
   const { veiculo_id } = parsed.data;
   const cnpjs = parsed.data.cnpjs_ordenados.map((c) => c.replace(/\D/g, ''));
