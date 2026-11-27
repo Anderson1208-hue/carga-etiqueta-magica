@@ -3952,9 +3952,12 @@ export type Database = {
           cliente: string | null
           created_at: string
           custo_frete: number | null
+          excluida_em: string | null
+          excluida_por: string | null
           fim_viagem: string | null
           id: string
           inicio_viagem: string | null
+          motivo_exclusao: string | null
           num_paradas: number | null
           numero_dt: string | null
           numero_ordens: number | null
@@ -3982,9 +3985,12 @@ export type Database = {
           cliente?: string | null
           created_at?: string
           custo_frete?: number | null
+          excluida_em?: string | null
+          excluida_por?: string | null
           fim_viagem?: string | null
           id?: string
           inicio_viagem?: string | null
+          motivo_exclusao?: string | null
           num_paradas?: number | null
           numero_dt?: string | null
           numero_ordens?: number | null
@@ -4012,9 +4018,12 @@ export type Database = {
           cliente?: string | null
           created_at?: string
           custo_frete?: number | null
+          excluida_em?: string | null
+          excluida_por?: string | null
           fim_viagem?: string | null
           id?: string
           inicio_viagem?: string | null
+          motivo_exclusao?: string | null
           num_paradas?: number | null
           numero_dt?: string | null
           numero_ordens?: number | null
@@ -5789,6 +5798,10 @@ export type Database = {
         Returns: Json
       }
       ensure_audit_log_partition: { Args: never; Returns: undefined }
+      excluir_carga_pendente_pandurata: {
+        Args: { _id: string; _motivo: string }
+        Returns: undefined
+      }
       fechar_conferencia_interna_veiculo: {
         Args: { p_forcar?: boolean; p_motivo?: string; p_veiculo_id: string }
         Returns: Json

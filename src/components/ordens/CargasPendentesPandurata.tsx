@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useState } from "react";
-import { FileText, RefreshCw, Search, X } from "lucide-react";
+import { FileText, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
         .from("pandurata_otm_cargas")
         .select("*")
         .is("ordem_coleta_id", null)
+        .is("excluida_em", null)
         .order("inicio_viagem", { ascending: true })
         .order("shipment_id")
         .limit(300);
@@ -73,6 +74,23 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
       qc.invalidateQueries({ queryKey: ["pandurata-otm-execucao"] });
     },
   });
+
+  const excluir = useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
+      const { error } = await supabase.rpc("excluir_carga_pendente_pandurata", { _id: id, _motivo: motivo });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success("Carga retirada da lista de pendentes.");
+      qc.invalidateQueries({ queryKey: ["pandurata-otm-pendentes"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pedirExclusao = (c: CargaPendentePandurata) => {
+    const motivo = window.prompt(`Retirar a DT ${c.numero_dt ?? c.shipment_id} da lista? Informe o motivo (ex.: cancelada no portal):`, "Cancelada no portal");
+    if (motivo && motivo.trim().length >= 3) excluir.mutate({ id: c.id, motivo: motivo.trim() });
+  };
 
   const normalizar = (valor: string) => valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").trim();
   const lista = (pendentes.data ?? []).filter((c) =>
@@ -156,6 +174,9 @@ export function CargasPendentesPandurata({ onEmitir }: { onEmitir: (carga: Carga
                   <TableCell>
                     <Button size="sm" onClick={() => onEmitir(c)}>
                       <FileText className="mr-2 h-4 w-4" /> Emitir ordem de coleta
+                    </Button>
+                    <Button size="sm" variant="ghost" className="ml-1 text-destructive" title="Carga cancelada: retirar da lista" aria-label="Excluir carga cancelada" disabled={excluir.isPending} onClick={() => pedirExclusao(c)}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

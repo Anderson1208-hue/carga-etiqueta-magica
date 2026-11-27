@@ -540,6 +540,13 @@
       "when": 1795813378343,
       "tag": "0076_pandurata_envio_troca",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1795813807687,
+      "tag": "0077_pandurata_pendente_exclusao",
+      "breakpoints": true
     }
   ]
 }
