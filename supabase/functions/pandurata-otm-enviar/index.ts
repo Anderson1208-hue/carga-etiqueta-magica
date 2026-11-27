@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     const credits = fc?.data?.metadata?.creditsUsed ?? fc?.creditsUsed ?? null;
     const raw = String(fc?.data?.rawHtml ?? '');
     const match = raw.match(/<pre[^>]*id=["']lovenvio["'][^>]*>([\s\S]*?)<\/pre>/i);
-    let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean; etapa?: string; campos?: string[] } = {};
+    let saida: { ok?: boolean; codigo?: string; status_portal?: string; gravou?: boolean; sap_acionado?: boolean; etapa?: string; campos?: string[]; limite_carreta?: number } = {};
     if (match) try { saida = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')); } catch { /* uncertain, never replay */ }
     const verificacaoIncerta = Boolean(body.consultar && aberto?.status === 'incerto' && saida.ok !== true);
     const status = definirStatusEnvio(saida, verificacaoIncerta);
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       const { error: saveError } = await sb.from('pandurata_otm_envios').update({ status, mensagem: mensagemFinal, status_portal: saida.status_portal ?? null, creditos_firecrawl: credits, creditos_lovable: credits === null ? null : Number(credits) * 0.004, concluido_em: new Date().toISOString() }).eq('id', envioId);
       if (saveError) throw new Error('O portal foi consultado, mas o histórico não pôde ser confirmado.');
     }
-    return json({ ok: status === 'confirmado', status, mensagem: mensagemFinal, etapa, codigo: saida.codigo ?? null, campos: Array.isArray(saida.campos) ? saida.campos.slice(0,4).filter((c) => ['vazio','igual','diferente'].includes(c)) : null, status_portal: saida.status_portal, creditos_lovable: credits === null ? null : Number(credits) * 0.004 });
+    return json({ ok: status === 'confirmado', status, mensagem: mensagemFinal, etapa, codigo: saida.codigo ?? null, campos: Array.isArray(saida.campos) ? saida.campos.slice(0,4).filter((c) => ['vazio','igual','diferente'].includes(c)) : null, limite_carreta: typeof saida.limite_carreta === 'number' ? saida.limite_carreta : null, status_portal: saida.status_portal, creditos_lovable: credits === null ? null : Number(credits) * 0.004 });
   } catch {
     const msg = iniciouConsulta ? 'Resultado incerto. Use Verificar portal; não repita o envio.' : 'Não foi possível preparar o envio ao portal.';
     if (envioId) await sb.from('pandurata_otm_envios').update({ status: 'incerto', mensagem: msg, concluido_em: new Date().toISOString() }).eq('id', envioId);

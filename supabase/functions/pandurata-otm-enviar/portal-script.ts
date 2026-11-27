@@ -72,7 +72,18 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
     const valores = [dados.motorista, dados.cpf_motorista, dados.placa, dados.placa_carreta];
     const decisao = comparar(leitura.cols.slice(10, 14), valores);
     if (decisao !== 'igual') {
-      if (!permitirGravar) { out({ ok: false, codigo: 'nao_confirmado', status_portal: leitura.cols[5], campos: leitura.cols.slice(10, 14).map((v, i) => !v ? 'vazio' : comparar([v], [valores[i]]) === 'igual' ? 'igual' : 'diferente'), gravou: false, sap_acionado: false }); return; }
+      if (!permitirGravar) {
+        // Read the trailer editor's limit without typing, confirming or saving anything.
+        const editor = leitura.result.getElementById('rgSGSec.2.2.1.10.u');
+        if (!editor?.parentElement || !leitura.iframe.contentWindow) throw new Error('editor_indisponivel');
+        editor.parentElement.dispatchEvent(new (leitura.iframe.contentWindow as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent('dblclick', { bubbles: true }));
+        const field = await until(() => {
+          const e = leitura.result.querySelector<HTMLInputElement>('input[name=rgsrShipmentRefnumValue_RFN_SHP_PLACA_CARRETATextEditControl]');
+          return e && e.getBoundingClientRect().width > 0 ? e : null;
+        });
+        out({ ok: false, codigo: 'nao_confirmado', status_portal: leitura.cols[5], campos: leitura.cols.slice(10, 14).map((v, i) => !v ? 'vazio' : comparar([v], [valores[i]]) === 'igual' ? 'igual' : 'diferente'), limite_carreta: field.maxLength, gravou: false, sap_acionado: false });
+        return;
+      }
       if (decisao === 'conflito' || leitura.cols[5] !== 'SH_ACEITO') { out({ ok: false, codigo: 'frota_divergente', gravou: false, sap_acionado: false }); return; }
       const suffixes = ['NOME_MOTORISTA', 'CPF_MOTORISTA', 'PLACA_VEICULO', 'PLACA_CARRETA'];
       for (let i = 0; i < 4; i++) {
