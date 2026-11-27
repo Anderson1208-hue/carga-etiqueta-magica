@@ -25,6 +25,7 @@ import { FunilOperacional } from "@/components/dashboard/FunilOperacional";
 import { AlertasResumo } from "@/components/dashboard/AlertasResumo";
 import { IbacResumo } from "@/components/dashboard/IbacResumo";
 import { RecebidosPorDia } from "@/components/dashboard/RecebidosPorDia";
+import { AcaoHoje } from "@/components/dashboard/AcaoHoje";
 
 const REFRESH_MS = 60_000;
 const TIPOS_ALERTA = [
@@ -205,6 +206,8 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold">Torre operacional</h1>
           <p className="text-muted-foreground">Visão consolidada do dia — atualiza a cada minuto</p>
         </div>
+
+        <AcaoHoje />
 
         {/* Banner de saúde */}
         <HealthBanner
