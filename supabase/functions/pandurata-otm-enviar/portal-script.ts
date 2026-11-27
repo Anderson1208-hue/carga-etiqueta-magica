@@ -87,23 +87,31 @@ async function executar(dados: Frota, permitirGravar: boolean, comparar: typeof 
       if (decisao === 'conflito' || leitura.cols[5] !== 'SH_ACEITO') { out({ ok: false, codigo: 'frota_divergente', gravou: false, sap_acionado: false }); return; }
       const suffixes = ['NOME_MOTORISTA', 'CPF_MOTORISTA', 'PLACA_VEICULO', 'PLACA_CARRETA'];
       for (let i = 0; i < 4; i++) {
-        etapa = 'editar_frota';
+        etapa = `editar_frota_${i}`;
         if (leitura.cols[10 + i]) continue;
         const suffix = suffixes[i];
-        const editor = leitura.result.getElementById(`rgSGSec.2.2.1.${7 + i}.u`);
+        const current = leitura.iframe.contentDocument;
+        const editor = current?.getElementById(`rgSGSec.2.2.1.${7 + i}.u`);
         if (!editor?.parentElement || !leitura.iframe.contentWindow) throw new Error('editor_indisponivel');
         editor.parentElement.dispatchEvent(new (leitura.iframe.contentWindow as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent('dblclick', { bubbles: true }));
         const field = await until(() => {
-          const e = leitura.result.querySelector<HTMLInputElement>(`input[name=rgsrShipmentRefnumValue_RFN_SHP_${suffix}TextEditControl]`);
+          const e = leitura.iframe.contentDocument?.querySelector<HTMLInputElement>(`input[name=rgsrShipmentRefnumValue_RFN_SHP_${suffix}TextEditControl]`);
           return e && e.getBoundingClientRect().width > 0 ? e : null;
         });
         if (field.maxLength >= 0 && field.maxLength < valores[i].length) throw new Error('campo_portal_curto');
         field.value = valores[i]; field.dispatchEvent(new Event('change', { bubbles: true }));
-        const ok = leitura.result.getElementById(`resultsPage:srShipmentRefnumValue_RFN_SHP_${suffix}PopupDialog::ok`);
+        const ok = leitura.iframe.contentDocument?.getElementById(`resultsPage:srShipmentRefnumValue_RFN_SHP_${suffix}PopupDialog::ok`);
         if (!ok) throw new Error('editor_indisponivel');
-        ok.click(); await pause();
+        ok.click();
+        // The portal refreshes the result document after each field. Wait for the
+        // popup to close and always read the next editor from the current document.
+        await until(() => {
+          const e = leitura.iframe.contentDocument?.querySelector<HTMLInputElement>(`input[name=rgsrShipmentRefnumValue_RFN_SHP_${suffix}TextEditControl]`);
+          return !e || e.getBoundingClientRect().width === 0 ? true : null;
+        });
+        await pause(500);
       }
-      const save = leitura.result.getElementById('rgSaveImg');
+      const save = leitura.iframe.contentDocument?.getElementById('rgSaveImg');
       if (!save) throw new Error('salvar_indisponivel');
       gravou = true; save.click();
       await pause(4500);
