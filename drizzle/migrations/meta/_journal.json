@@ -526,6 +526,13 @@
       "when": 1795700937728,
       "tag": "0074_falta_total_todos_clientes",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1795806145144,
+      "tag": "0075_convites_operador",
+      "breakpoints": true
     }
   ]
 }

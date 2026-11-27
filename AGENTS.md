@@ -29,3 +29,4 @@
 - Scheduled OK Entrega/IBAC consultations run through integracao-guardiao: a failed run arms a temporary 10-minute retry job (max 5 attempts, unscheduled on success or exhaustion) and emails arquivostlm on the 5th failure, so silent missed rounds surface without a permanent poller.
 - CT-e import stores freight components and the full XML in cte_detalhes keyed by chave_cte (insert-only, ignore duplicates), separate from ctes links, so re-imports enrich detail without altering existing freight.
 - Cacau receiving divergences go only through NF-locking RPCs that block pending labels via existing `divergencia` status (scanned labels untouched) with cancellable records; nothing is sent to Cacau, only an internal summary email.
+- Invites: 1-use 96h hashed token, redeemed in handle_new_user.

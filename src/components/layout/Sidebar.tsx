@@ -39,7 +39,7 @@ import {
   FileSpreadsheet,
   BarChart3,
   ChevronRight,
-  HandCoins,
+  HandCoins, UserPlus,
   Building2,
   Plug,
   Contact,
@@ -414,6 +414,24 @@ export function Sidebar() {
             <Coins className="w-4 h-4 shrink-0" />
             {!collapsed && "Créditos"}
           </a>
+        )}
+        {isAdmin && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            title="Gerar convite de operador"
+            onClick={async () => {
+              const { data, error } = await supabase.rpc("criar_convite_operador");
+              if (error || !data) { window.alert("Não foi possível gerar o convite."); return; }
+              const link = `https://carga-etiqueta-magica.lovable.app/login?convite=${data}`;
+              try { await navigator.clipboard.writeText(link); } catch { /* exibe abaixo */ }
+              window.prompt("Convite copiado. Vale para 1 cadastro por 96 horas:", link);
+            }}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            {!collapsed && "Convidar operador"}
+          </Button>
         )}
         <Button
           variant="ghost"

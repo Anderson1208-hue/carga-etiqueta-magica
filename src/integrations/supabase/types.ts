@@ -1222,6 +1222,36 @@ export type Database = {
         }
         Relationships: []
       }
+      convites_operador: {
+        Row: {
+          criado_em: string
+          criado_por: string
+          expira_em: string
+          id: string
+          token_hash: string
+          usado_em: string | null
+          usado_por: string | null
+        }
+        Insert: {
+          criado_em?: string
+          criado_por: string
+          expira_em?: string
+          id?: string
+          token_hash: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string
+          expira_em?: string
+          id?: string
+          token_hash?: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Relationships: []
+      }
       cte_detalhes: {
         Row: {
           cfop: string | null
@@ -5704,6 +5734,7 @@ export type Database = {
         Returns: number
       }
       contar_canhotos_pendentes: { Args: never; Returns: number }
+      criar_convite_operador: { Args: never; Returns: string }
       definir_lacre_carga: {
         Args: { p_carga_id: string; p_lacre: string }
         Returns: undefined
